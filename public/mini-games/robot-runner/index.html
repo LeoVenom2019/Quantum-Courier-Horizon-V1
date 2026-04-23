@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Robot Runner - QCH</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Michroma&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div id="game-container">
+        <div id="danger-overlay"></div>
+        <canvas id="gameCanvas"></canvas>
+        
+        <!-- HUD -->
+        <div id="hud">
+            <div class="hud-section">
+                <div class="hud-label">STATUS</div>
+                <div id="phase-display">FASE 01</div>
+            </div>
+            <div class="hud-section">
+                <div class="hud-label">SCORE</div>
+                <div id="score-display">00000</div>
+            </div>
+            <div class="hud-section">
+                <div class="hud-label">TIME</div>
+                <div id="time-display">00:00.0</div>
+            </div>
+        </div>
+
+        <!-- Boost Bar -->
+        <div id="boost-container">
+            <div id="boost-label">BOOST</div>
+            <div id="boost-bar-wrapper">
+                <div id="boost-fill"></div>
+            </div>
+            <div id="boost-percent">0%</div>
+        </div>
+
+        <!-- Overlays -->
+        <div id="start-screen" class="overlay">
+            <h1 class="gaming-rgb">THE ROBOT RUNNER</h1>
+            <p>Colete energia azul e evite os fantasmas.</p>
+            <p>Pressione ESPAÇO para Boost de velocidade.</p>
+            <button id="start-btn">INICIAR MISSÃO</button>
+        </div>
+
+        <div id="level-complete" class="overlay hidden">
+            <h2 id="complete-title">FASE CONCLUÍDA</h2>
+            <div class="stats-panel">
+                <p>Pontos: <span id="stats-score">0</span></p>
+                <p>Tempo: <span id="stats-time">0</span></p>
+            </div>
+            <button id="next-btn">PRÓXIMA FASE</button>
+        </div>
+
+        <div id="game-over" class="overlay hidden">
+            <h2 class="danger">SISTEMA CORROMPIDO</h2>
+            <p>O Robô foi capturado.</p>
+            <button id="retry-btn">REINICIAR</button>
+        </div>
+
+        <div id="victory-screen" class="overlay hidden">
+            <h1 class="success">MISSÃO CUMPRIDA</h1>
+            <p>A Terra se desenvolveu em velocidade recorde!</p>
+            <div class="final-stats">
+                <p>Score Final: <span id="final-score">0</span></p>
+                <p>Tempo Total: <span id="final-time">0</span></p>
+            </div>
+            <button id="finish-btn">FINALIZAR</button>
+        </div>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>

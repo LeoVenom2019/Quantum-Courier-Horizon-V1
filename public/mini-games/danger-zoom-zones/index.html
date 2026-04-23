@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Danger Zoom Zones - QCH Arcade</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="stars-container"></div>
+    <div id="game-container">
+        <div class="side-panel left">
+            <div class="stat-box timer">
+                <label>TIME</label>
+                <div id="timer">04:00</div>
+            </div>
+            <div class="stat-box mines">
+                <label>MINES</label>
+                <div id="mines-count">16</div>
+            </div>
+            <div class="stat-box disarmers">
+                <label>DISARMS</label>
+                <div id="disarm-kits">18</div>
+            </div>
+        </div>
+
+        <div class="main-screen">
+            <div class="scanlines"></div>
+            <div id="grid" class="grid-container"></div>
+            
+            <div id="action-modal" class="modal hidden">
+                <div class="modal-content">
+                    <button id="modal-close" class="modal-close-btn" title="Cancelar">&times;</button>
+                    <h3>DISARM TARGET?</h3>
+                    <p>Kits remaining: <span id="modal-kits">0</span></p>
+                    <div class="modal-buttons">
+                        <button id="btn-disarm" class="btn-primary"><span>S</span> YES</button>
+                        <button id="btn-reveal" class="btn-secondary"><span>N</span> NO (SCAN)</button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="overlay" class="overlay hidden">
+                <div class="overlay-content">
+                    <h2 id="game-status">MISSION FAILED</h2>
+                    <div class="final-score-box">
+                        <label>RECORD TIME</label>
+                        <div id="best-time">--:--</div>
+                        <label>CURRENT TIME</label>
+                        <div id="current-finish-time">00:00</div>
+                    </div>
+                    <button id="restart-btn">REBOOT SYSTEM</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="side-panel right">
+            <div class="stat-box combo">
+                <label>COMBO</label>
+                <div id="combo-count">0</div>
+            </div>
+            <div class="controls-hint">
+                <p><span>LEFT CLICK</span> SELECT ZONE</p>
+                <p><span>S / N</span> MODAL CHOICE</p>
+                <p><span>ESC</span> CANCEL</p>
+            </div>
+        </div>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>

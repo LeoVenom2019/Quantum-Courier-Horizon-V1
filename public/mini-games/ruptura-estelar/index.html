@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ruptura Estelar - QCH Mini-Games</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div id="game-container">
+        <div id="hud">
+            <div class="hud-item">
+                <span class="label">PONTUAÇÃO</span>
+                <span id="score">00000</span>
+            </div>
+            <div class="hud-item center">
+                <span class="label">SISTEMA</span>
+                <span id="status" class="status-normal">NORMAL</span>
+            </div>
+            <button id="exit-btn">SAIR</button>
+        </div>
+        
+        <canvas id="gameCanvas" width="960" height="540"></canvas>
+        
+        <div id="overlay" class="hidden">
+            <div class="modal">
+                <h1 id="modal-title">FIM DE MISSÃO</h1>
+                <p>Nave Destruída</p>
+                <div class="score-display">
+                    <span class="score-label">SCORE FINAL</span>
+                    <span id="final-score">0</span>
+                </div>
+                <button id="restart-btn">REINICIAR</button>
+            </div>
+        </div>
+
+        <div id="controls-hint">
+            WASD to MOVE • SPACE to FIRE
+        </div>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>

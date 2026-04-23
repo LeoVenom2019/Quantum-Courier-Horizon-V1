@@ -1,0 +1,1055 @@
+export type CargoType = 'Tecnologia' | 'Artefatos' | 'Minerais' | 'Biológico' | 'Dados' | 'Energia';
+
+export type ThemeColor = 'cyan' | 'orange' | 'neila' | 'pink' | 'violet' | 'amber' | 'emerald' | 'rose' | 'blue';
+
+export interface GameTheme {
+  id: string;
+  name: { en: string; pt: string };
+  color: ThemeColor;
+  visual: string;
+}
+
+export const GAME_THEMES: GameTheme[] = [
+  { id: 'default', name: { en: 'DEFAULT', pt: 'PADRÃO' }, color: 'cyan', visual: 'none' },
+  { id: 'moon', name: { en: 'LUNAR', pt: 'LUNAR' }, color: 'cyan', visual: 'moon' },
+  { id: 'earth', name: { en: 'TERRA', pt: 'TERRA' }, color: 'blue', visual: 'earth' },
+  { id: 'saturn', name: { en: 'SATURN', pt: 'SATURNO' }, color: 'orange', visual: 'saturn' },
+  { id: 'musk', name: { en: 'X-FACTOR', pt: 'FATOR X' }, color: 'cyan', visual: 'musk' },
+  { id: 'blackhole', name: { en: 'SINGULARITY', pt: 'SINGULARIDADE' }, color: 'violet', visual: 'blackhole' },
+  { id: 'sun', name: { en: 'SOLAR', pt: 'SOLAR' }, color: 'orange', visual: 'sun' },
+  { id: 'robot', name: { en: 'ANDROID', pt: 'ANDRÓIDE' }, color: 'emerald', visual: 'robot' },
+  { id: 'chess', name: { en: 'GRANDMASTER', pt: 'GRÃO-MESTRE' }, color: 'amber', visual: 'chess' },
+  { id: 'neila', name: { en: 'EMERALD', pt: 'ESMERALDA' }, color: 'neila', visual: 'alien' },
+];
+
+export interface Route {
+  id: string;
+  name: string;
+  origin: string;
+  destination: string;
+  distance: number;
+  risk: number;
+  reward: number;
+  cargoType: CargoType;
+  tier: 'Solar' | 'Interstellar' | 'Void';
+  autoTravelCost: number;
+  unlockCost?: number;
+  requiredShipLevel: number;
+  unlockCondition: {
+    deliveriesTotal?: number;
+    deliveriesTo?: { location: string; count: number };
+    techLevel?: { category: string; level: number };
+    initial?: boolean;
+    route2Unlocked?: boolean;
+    route3Unlocked?: boolean;
+  };
+}
+
+export interface VoidAircraft {
+  id: string;
+  name: string;
+  capacity: number;
+  efficiency: number;
+  rareChance: number;
+  missionTime: number; // in milliseconds
+  description: string;
+}
+
+export interface VoidPOI {
+  id: string;
+  name: string;
+  lore: string;
+  need: 'Energia' | 'Alimentos' | 'Tecnologia' | 'Medicamentos';
+  resourceRequired: number;
+  passiveGeneration: {
+    resource: string;
+    amount: number;
+  };
+}
+
+export interface Ship {
+  level: number;
+  name: string;
+  route: string;
+  maxSpeed: number;
+  technology: string;
+  description: string;
+  range: number;
+  cost: number;
+  tier: 'Solar' | 'Interstellar' | 'Void';
+  color: string;
+}
+
+export interface Technology {
+  id: string;
+  level: number;
+  name: string;
+  description: string;
+  unlocksShipLevel: number;
+  cost: number;
+  researchTime: number; // in milliseconds
+  tier: 'Solar' | 'Interstellar' | 'Void';
+}
+
+export interface UpgradeTier {
+  level: number;
+  name: string;
+  cost: number;
+  bonus: string;
+  value: number; // The numerical value of the bonus (e.g., 0.2 for 20%)
+}
+
+export interface Upgrade {
+  id: string;
+  name: string;
+  category: 'Motor' | 'IA' | 'Valor' | 'Raro';
+  tiers: UpgradeTier[];
+}
+
+export interface Ore {
+  id: string;
+  name: string;
+  rarity: number;
+  baseValue: number;
+  requiredShipLevel: number;
+  packSize: number;
+  robotBaseCost: number;
+  autoSellCost: number;
+  tier: 'Solar' | 'Interstellar';
+}
+
+export interface MiningRobotUpgrade {
+  level: number;
+  name: string;
+  costMultiplier: number;
+  speedBonus: number;
+  efficiencyBonus: number;
+  productionBonus: number;
+}
+
+export const ORES: Ore[] = [
+  // ROTA 1: Solar
+  { id: 'ferrita', name: 'Ferrita Comum', rarity: 1, baseValue: 50, requiredShipLevel: 1, packSize: 50, robotBaseCost: 5000, autoSellCost: 50000, tier: 'Solar' },
+  { id: 'quartzo', name: 'Quartzo Energizado', rarity: 1, baseValue: 150, requiredShipLevel: 2, packSize: 50, robotBaseCost: 15000, autoSellCost: 75000, tier: 'Solar' },
+  { id: 'niquel', name: 'Níquel Espacial', rarity: 1, baseValue: 500, requiredShipLevel: 3, packSize: 50, robotBaseCost: 50000, autoSellCost: 150000, tier: 'Solar' },
+  { id: 'cobalto', name: 'Cobalto Ionizado', rarity: 1, baseValue: 2000, requiredShipLevel: 4, packSize: 50, robotBaseCost: 200000, autoSellCost: 350000, tier: 'Solar' },
+  { id: 'titanio', name: 'Titânio Refinado', rarity: 1, baseValue: 8000, requiredShipLevel: 5, packSize: 50, robotBaseCost: 800000, autoSellCost: 800000, tier: 'Solar' },
+  { id: 'plasma', name: 'Cristal de Plasma', rarity: 1, baseValue: 30000, requiredShipLevel: 6, packSize: 50, robotBaseCost: 3000000, autoSellCost: 2000000, tier: 'Solar' },
+  { id: 'eter', name: 'Éter Condensado', rarity: 1, baseValue: 100000, requiredShipLevel: 7, packSize: 50, robotBaseCost: 10000000, autoSellCost: 5000000, tier: 'Solar' },
+  { id: 'materia', name: 'Matéria Exótica', rarity: 1, baseValue: 300000, requiredShipLevel: 8, packSize: 50, robotBaseCost: 30000000, autoSellCost: 15000000, tier: 'Solar' },
+  { id: 'nucleo', name: 'Núcleo Quântico', rarity: 1, baseValue: 1000000, requiredShipLevel: 9, packSize: 50, robotBaseCost: 100000000, autoSellCost: 50000000, tier: 'Solar' },
+  
+  // ROTA 2: Interstellar
+  { id: 'ferro-estelar', name: 'Ferro Estelar', rarity: 1, baseValue: 100000, requiredShipLevel: 1, packSize: 50, robotBaseCost: 5000000, autoSellCost: 100000000, tier: 'Interstellar' },
+  { id: 'cristal-fotonico', name: 'Cristal Fotônico', rarity: 1, baseValue: 250000, requiredShipLevel: 2, packSize: 50, robotBaseCost: 25000000, autoSellCost: 250000000, tier: 'Interstellar' },
+  { id: 'liga-iridio', name: 'Liga de Irídio', rarity: 1, baseValue: 600000, requiredShipLevel: 3, packSize: 50, robotBaseCost: 100000000, autoSellCost: 750000000, tier: 'Interstellar' },
+  { id: 'plasma-solido', name: 'Plasma Sólido', rarity: 1, baseValue: 1500000, requiredShipLevel: 4, packSize: 50, robotBaseCost: 500000000, autoSellCost: 2500000000, tier: 'Interstellar' },
+  { id: 'nucleo-radiante', name: 'Núcleo Radiante', rarity: 1, baseValue: 3500000, requiredShipLevel: 5, packSize: 50, robotBaseCost: 2000000000, autoSellCost: 10000000000, tier: 'Interstellar' },
+  { id: 'fragmento-anomalia', name: 'Fragmento de Anomalia', rarity: 1, baseValue: 8000000, requiredShipLevel: 6, packSize: 50, robotBaseCost: 7500000000, autoSellCost: 35000000000, tier: 'Interstellar' },
+  { id: 'essencia-nebular', name: 'Essência Nebular', rarity: 1, baseValue: 18000000, requiredShipLevel: 7, packSize: 50, robotBaseCost: 25000000000, autoSellCost: 100000000000, tier: 'Interstellar' },
+  { id: 'materia-instavel', name: 'Matéria Instável', rarity: 1, baseValue: 40000000, requiredShipLevel: 8, packSize: 50, robotBaseCost: 100000000000, autoSellCost: 500000000000, tier: 'Interstellar' },
+  { id: 'singularidade-condensada', name: 'Singularidade Condensada', rarity: 1, baseValue: 100000000, requiredShipLevel: 9, packSize: 50, robotBaseCost: 500000000000, autoSellCost: 2000000000000, tier: 'Interstellar' },
+];
+
+export const ROBOT_UPGRADES: MiningRobotUpgrade[] = [
+  { level: 1, name: 'Base', costMultiplier: 0, speedBonus: 1, efficiencyBonus: 1, productionBonus: 1 },
+  { level: 2, name: 'Otimização Hidráulica', costMultiplier: 5, speedBonus: 1.25, efficiencyBonus: 1, productionBonus: 1 },
+  { level: 3, name: 'Processador de Fluxo', costMultiplier: 25, speedBonus: 1.25, efficiencyBonus: 1.5, productionBonus: 1 },
+  { level: 4, name: 'Broca de Diamante', costMultiplier: 100, speedBonus: 1.25, efficiencyBonus: 1.5, productionBonus: 1.75 },
+  { level: 5, name: 'Núcleo de Fusão Local', costMultiplier: 500, speedBonus: 1.25, efficiencyBonus: 1.5, productionBonus: 2.0 },
+];
+
+// Removed global AUTO_SELL_UPGRADE_COST as it is now per ore in ORES array
+
+export const TECHNOLOGIES: Technology[] = [
+  // ROTA 1: Solar
+  {
+    id: 'solar-1',
+    level: 1,
+    name: 'Fundação Orbital',
+    description: 'Base tecnológica inicial. Permite construir Naves de nível 1.',
+    unlocksShipLevel: 1,
+    cost: 0,
+    researchTime: 0,
+    tier: 'Solar'
+  },
+  {
+    id: 'solar-2',
+    level: 2,
+    name: 'Propulsão Inicial',
+    description: 'Desbloqueia Nave 2.',
+    unlocksShipLevel: 2,
+    cost: 5000,
+    researchTime: 300000, // 5 minutes
+    tier: 'Solar'
+  },
+  {
+    id: 'solar-3',
+    level: 3,
+    name: 'Estabilização Energética',
+    description: 'Desbloqueia Nave 3.',
+    unlocksShipLevel: 3,
+    cost: 25000,
+    researchTime: 600000, // 10 minutes
+    tier: 'Solar'
+  },
+  {
+    id: 'solar-4',
+    level: 4,
+    name: 'Navegação de Longo Alcance',
+    description: 'Desbloqueia Nave 4.',
+    unlocksShipLevel: 4,
+    cost: 100000,
+    researchTime: 900000, // 15 minutes
+    tier: 'Solar'
+  },
+  {
+    id: 'solar-5',
+    level: 5,
+    name: 'Núcleo de Fusão Avançado',
+    description: 'Desbloqueia Nave 5.',
+    unlocksShipLevel: 5,
+    cost: 500000,
+    researchTime: 1800000, // 30 minutes
+    tier: 'Solar'
+  },
+  {
+    id: 'solar-6',
+    level: 6,
+    name: 'Dobra Espacial',
+    description: 'Desbloqueia Nave 6.',
+    unlocksShipLevel: 6,
+    cost: 2500000,
+    researchTime: 2700000, // 45 minutes
+    tier: 'Solar'
+  },
+  {
+    id: 'solar-7',
+    level: 7,
+    name: 'Engenharia Interestelar',
+    description: 'Desbloqueia Nave 7.',
+    unlocksShipLevel: 7,
+    cost: 12500000,
+    researchTime: 3600000, // 60 minutes
+    tier: 'Solar'
+  },
+  {
+    id: 'solar-8',
+    level: 8,
+    name: 'Matéria Escura Aplicada',
+    description: 'Desbloqueia Nave 8.',
+    unlocksShipLevel: 8,
+    cost: 50000000,
+    researchTime: 7200000, // 120 minutes
+    tier: 'Solar'
+  },
+  {
+    id: 'solar-9',
+    level: 9,
+    name: 'Singularidade Controlada',
+    description: 'Desbloqueia Nave 9.',
+    unlocksShipLevel: 9,
+    cost: 250000000,
+    researchTime: 14400000, // 240 minutes
+    tier: 'Solar'
+  },
+
+  // ROTA 2: Interstellar
+  {
+    id: 'inter-1',
+    level: 1,
+    name: 'Fundação Interestelar',
+    description: 'Base para operações fora do Sistema Solar (equivalente à inicial, mas mais avançada)',
+    unlocksShipLevel: 1,
+    cost: 0,
+    researchTime: 0,
+    tier: 'Interstellar'
+  },
+  {
+    id: 'inter-2',
+    level: 2,
+    name: 'Motores de Dobra Fractal',
+    description: 'Manipulação de espaço em múltiplas camadas. Desbloqueia Nave 2',
+    unlocksShipLevel: 2,
+    cost: 25000000,
+    researchTime: 600000, // 10 minutes
+    tier: 'Interstellar'
+  },
+  {
+    id: 'inter-3',
+    level: 3,
+    name: 'Ancoragem de Realidade',
+    description: 'Mantém a nave estável durante distorções espaciais. Desbloqueia Nave 3',
+    unlocksShipLevel: 3,
+    cost: 35000000,
+    researchTime: 1200000, // 20 minutes
+    tier: 'Interstellar'
+  },
+  {
+    id: 'inter-4',
+    level: 4,
+    name: 'Cartografia de Espaço Profundo',
+    description: 'Mapeamento de regiões além da luz visível. Desbloqueia Nave 4',
+    unlocksShipLevel: 4,
+    cost: 50000000,
+    researchTime: 1800000, // 30 minutes
+    tier: 'Interstellar'
+  },
+  {
+    id: 'inter-5',
+    level: 5,
+    name: 'Reatores de Energia Estelar',
+    description: 'Extração direta de energia de estrelas. Desbloqueia Nave 5',
+    unlocksShipLevel: 5,
+    cost: 75000000,
+    researchTime: 2400000, // 40 minutes
+    tier: 'Interstellar'
+  },
+  {
+    id: 'inter-6',
+    level: 6,
+    name: 'Propuls propulsion de Horizonte de Eventos',
+    description: 'Uso de singularidades para deslocamento. Desbloqueia Nave 6',
+    unlocksShipLevel: 6,
+    cost: 100000000,
+    researchTime: 3600000, // 60 minutes
+    tier: 'Interstellar'
+  },
+  {
+    id: 'inter-7',
+    level: 7,
+    name: 'Sincronização Multiversal',
+    description: 'Navegação entre realidades paralelas. Desbloqueia Nave 7',
+    unlocksShipLevel: 7,
+    cost: 150000000,
+    researchTime: 7200000, // 120 minutes
+    tier: 'Interstellar'
+  },
+  {
+    id: 'inter-8',
+    level: 8,
+    name: 'Condensação de Espaço-Tempo',
+    description: 'Compressão extrema de distância e tempo. Desbloqueia Nave 8',
+    unlocksShipLevel: 8,
+    cost: 250000000,
+    researchTime: 14400000, // 240 minutes
+    tier: 'Interstellar'
+  },
+  {
+    id: 'inter-9',
+    level: 9,
+    name: 'Ascensão Pós-Temporal',
+    description: 'Tecnologia além do fluxo linear do tempo. Desbloqueia Nave 9',
+    unlocksShipLevel: 9,
+    cost: 500000000,
+    researchTime: 21600000, // 360 minutes
+    tier: 'Interstellar'
+  },
+
+  // ROTA 3: Void
+  {
+    id: 'void-1',
+    level: 1,
+    name: 'Fundação do Vazio',
+    description: 'Adaptação inicial ao ambiente de distorção temporal. Desbloqueia Nave 1.',
+    unlocksShipLevel: 1,
+    cost: 0,
+    researchTime: 0,
+    tier: 'Void'
+  },
+  {
+    id: 'void-2',
+    level: 2,
+    name: 'Sincronização de Cronos',
+    description: 'Alinhamento com o fluxo temporal do Vazio. Desbloqueia Nave 2.',
+    unlocksShipLevel: 2,
+    cost: 10000000,
+    researchTime: 1200000, // 20 minutes
+    tier: 'Void'
+  },
+  {
+    id: 'void-3',
+    level: 3,
+    name: 'Estabilização de Vácuo',
+    description: 'Mantém a integridade estrutural em pressões negativas. Desbloqueia Nave 3.',
+    unlocksShipLevel: 3,
+    cost: 50000000,
+    researchTime: 2400000, // 40 minutes
+    tier: 'Void'
+  },
+  {
+    id: 'void-4',
+    level: 4,
+    name: 'Navegação Entrópica',
+    description: 'Uso da desordem como guia estelar. Desbloqueia Nave 4.',
+    unlocksShipLevel: 4,
+    cost: 250000000,
+    researchTime: 3600000, // 60 minutes
+    tier: 'Void'
+  },
+  {
+    id: 'void-5',
+    level: 5,
+    name: 'Convergência Dimensional',
+    description: 'Unificação de múltiplas realidades em um ponto. Desbloqueia Nave 5.',
+    unlocksShipLevel: 5,
+    cost: 1000000000,
+    researchTime: 7200000, // 120 minutes
+    tier: 'Void'
+  },
+  {
+    id: 'void-6',
+    level: 6,
+    name: 'Manipulação de Singularidade',
+    description: 'Controle sobre o colapso gravitacional. Desbloqueia Nave 6.',
+    unlocksShipLevel: 6,
+    cost: 5000000000,
+    researchTime: 14400000, // 240 minutes
+    tier: 'Void'
+  },
+  {
+    id: 'void-7',
+    level: 7,
+    name: 'Arquitetura Eterna',
+    description: 'Construções que desafiam o fim do universo. Desbloqueia Nave 7.',
+    unlocksShipLevel: 7,
+    cost: 20000000000,
+    researchTime: 28800000, // 480 minutes
+    tier: 'Void'
+  },
+  {
+    id: 'void-8',
+    level: 8,
+    name: 'Consciência Universal',
+    description: 'Integração total com a malha do cosmos. Desbloqueia Nave 8.',
+    unlocksShipLevel: 8,
+    cost: 100000000000,
+    researchTime: 43200000, // 720 minutes
+    tier: 'Void'
+  },
+  {
+    id: 'void-9',
+    level: 9,
+    name: 'Protocolo Ômega',
+    description: 'O segredo final da existência. Desbloqueia Nave 9.',
+    unlocksShipLevel: 9,
+    cost: 500000000000,
+    researchTime: 86400000, // 1440 minutes (24 hours)
+    tier: 'Void'
+  },
+];
+
+export interface ExtractionPoint {
+  id: string;
+  name: string;
+  resourceName: string;
+  productionPerCycle: number; // 10 packs
+  cycleTime: number; // 5 seconds
+  cost: number;
+  researchTime: number; // in milliseconds
+  valuePerPack: number;
+}
+
+export const EXTRACTION_POINTS: ExtractionPoint[] = [
+  {
+    id: 'ext-1',
+    name: 'Cinturão de Centauri Prime',
+    resourceName: 'Basalto Vulcânico',
+    productionPerCycle: 10,
+    cycleTime: 5000,
+    cost: 100000000, // 100 Mi
+    researchTime: 600000, // 10 minutes
+    valuePerPack: 50000, // 50k (Decreased by 99% again for balance)
+  },
+  {
+    id: 'ext-2',
+    name: 'Proxima b – Planície Crepuscular',
+    resourceName: 'Magnetita',
+    productionPerCycle: 10,
+    cycleTime: 5000,
+    cost: 150000000, // 150 Mi
+    researchTime: 900000, // 15 minutes
+    valuePerPack: 75000, // 75k (Decreased by 99% again for balance)
+  },
+  {
+    id: 'ext-3',
+    name: 'Barnard b – Campos Criogênicos',
+    resourceName: 'Criolita',
+    productionPerCycle: 10,
+    cycleTime: 5000,
+    cost: 200000000, // 200 Mi
+    researchTime: 1200000, // 20 minutes
+    valuePerPack: 100000, // 100k (Decreased by 99% again for balance)
+  },
+  {
+    id: 'ext-4',
+    name: 'Anel Fragmentado de Wolf 359',
+    resourceName: 'Titânio',
+    productionPerCycle: 10,
+    cycleTime: 5000,
+    cost: 250000000, // 250 Mi
+    researchTime: 1500000, // 25 minutes
+    valuePerPack: 125000, // 125k (Decreased by 99% again for balance)
+  },
+  {
+    id: 'ext-5',
+    name: 'Lalande IV – Crosta Ferrífera',
+    resourceName: 'Silício',
+    productionPerCycle: 10,
+    cycleTime: 5000,
+    cost: 300000000, // 300 Mi
+    researchTime: 1800000, // 30 minutes
+    valuePerPack: 150000, // 150k (Decreased by 99% again for balance)
+  },
+  {
+    id: 'ext-6',
+    name: 'Campo de Resíduos de Sirius B',
+    resourceName: 'Platina Bruta',
+    productionPerCycle: 10,
+    cycleTime: 5000,
+    cost: 400000000, // 400 Mi
+    researchTime: 2400000, // 40 minutes
+    valuePerPack: 175000, // 175k (Decreased by 99% again for balance)
+  },
+  {
+    id: 'ext-7',
+    name: 'Luyten Beta – Zona Binária Instável',
+    resourceName: 'Diamante',
+    productionPerCycle: 10,
+    cycleTime: 5000,
+    cost: 500000000, // 500 Mi
+    researchTime: 3000000, // 50 minutes
+    valuePerPack: 200000, // 200k (Decreased by 99% again for balance)
+  },
+  {
+    id: 'ext-8',
+    name: 'Cratera Magnetizada de Ross',
+    resourceName: 'Ródio',
+    productionPerCycle: 10,
+    cycleTime: 5000,
+    cost: 600000000, // 600 Mi
+    researchTime: 3600000, // 60 minutes
+    valuePerPack: 225000, // 225k (Decreased by 99% again for balance)
+  },
+  {
+    id: 'ext-9',
+    name: 'Disco de Detritos Eridani',
+    resourceName: 'Irídio',
+    productionPerCycle: 10,
+    cycleTime: 5000,
+    cost: 750000000, // 750 Mi
+    researchTime: 4500000, // 75 minutes
+    valuePerPack: 250000, // 250k (Decreased by 99% again for balance)
+  },
+];
+
+export interface Achievement {
+  id: string;
+  name: string;
+  description: string;
+  type: 'accumulative' | 'action' | 'milestone';
+  target: number;
+  icon: string;
+}
+
+export const ACHIEVEMENTS: Achievement[] = [
+  { id: 'first_delivery', name: 'Primeira Entrega', description: 'Complete sua primeira entrega com sucesso.', type: 'accumulative', target: 1, icon: 'CheckCircle2' },
+  { id: 'qc_millionaire', name: 'Magnata Espacial', description: 'Acumule um total de 1.000.000 de QC.', type: 'milestone', target: 1000000, icon: 'Coins' },
+  { id: 'battle_warrior', name: 'Guerreiro das Estrelas', description: 'Vença 10 batalhas contra piratas.', type: 'accumulative', target: 10, icon: 'Sword' },
+  { id: 'robot_owner', name: 'Minerador Experiente', description: 'Compre 5 robôs mineradores.', type: 'accumulative', target: 5, icon: 'Bot' },
+  { id: 'route_2_unlocked', name: 'Explorador de Rotas', description: 'Desbloqueie a Rota 2 (Interestelar).', type: 'milestone', target: 1, icon: 'Globe' },
+  { id: 'tech_master', name: 'Mestre da Tecnologia', description: 'Desbloqueie 5 tecnologias diferentes.', type: 'accumulative', target: 5, icon: 'Cpu' },
+  { id: 'void_unlocked', name: 'Senhor do Vazio', description: 'Desbloqueie a Rota 3 (Vazio).', type: 'milestone', target: 1, icon: 'Skull' },
+  { id: 'ship_collector', name: 'Colecionador de Naves', description: 'Possua 5 naves diferentes em sua frota.', type: 'accumulative', target: 5, icon: 'Rocket' },
+  { id: 'max_upgrade', name: 'Eficiência Máxima', description: 'Alcance o nível 5 em qualquer melhoria de local.', type: 'milestone', target: 5, icon: 'TrendingUp' },
+  { id: 'pirate_slayer', name: 'Dizimador de Piratas', description: 'Vença 50 batalhas contra piratas.', type: 'accumulative', target: 50, icon: 'Zap' },
+  { id: 'qc_trillionaire', name: 'Trilionário', description: 'Acumule um total de 1.000.000.000.000 de QC.', type: 'milestone', target: 1000000000000, icon: 'HistoryIcon' },
+  { id: 'earth_restorer', name: 'Restaurador da Terra', description: 'Complete 50% da reconstrução do Projeto Terra.', type: 'milestone', target: 50, icon: 'CheckCircle2' },
+  { id: 'earth_restorer_100', name: 'Salvador da Humanidade', description: 'Complete 100% da reconstrução do Projeto Terra.', type: 'milestone', target: 100, icon: 'Globe' },
+  { id: 'total_deliveries_10k', name: 'Magnata Logístico', description: 'Faça 10.000 entregas em todas as Rotas.', type: 'accumulative', target: 10000, icon: 'TrendingUp' },
+  { id: 'all_ships_r1_r2', name: 'Colecionador de Frotas', description: 'Compre todas as naves da Rota 1 e Rota 2 (18 naves).', type: 'milestone', target: 18, icon: 'Rocket' },
+  { id: 'total_missions_1k', name: 'Herói das Galáxias', description: 'Faça 1000 Missões da aba "Missões" em ambas as Rotas.', type: 'accumulative', target: 1000, icon: 'Trophy' },
+  { id: 'battle_level_55', name: 'Lenda de Combate', description: 'Alcance o Nível de Batalha 55.', type: 'milestone', target: 55, icon: 'Sword' },
+];
+
+export const VOID_AIRCRAFT: VoidAircraft[] = [
+  {
+    id: 'va-1',
+    name: 'Seeker-Alpha',
+    capacity: 12500,
+    efficiency: 35,
+    rareChance: 0.05,
+    missionTime: 150000, // 2.5 min
+    description: 'Uma aeronave leve e ágil, ideal para incursões rápidas em zonas de baixa densidade.'
+  },
+  {
+    id: 'va-2',
+    name: 'Collector-Beta',
+    capacity: 25000,
+    efficiency: 45,
+    rareChance: 0.10,
+    missionTime: 210000, // 3.5 min
+    description: 'Projetada para transporte de carga pesada, com sistemas de filtragem de recursos aprimorados.'
+  },
+  {
+    id: 'va-3',
+    name: 'Ghost-Gamma',
+    capacity: 50000,
+    efficiency: 55,
+    rareChance: 0.25,
+    missionTime: 270000, // 4.5 min
+    description: 'Equipada com sensores de longo alcance e tecnologia de ocultação para encontrar o que outros ignoram.'
+  }
+];
+
+export const VOID_POIS: VoidPOI[] = [
+  {
+    id: 'poi-1',
+    name: 'Colônia de Eridani',
+    lore: 'Uma antiga colônia de mineração que sobreviveu ao colapso, mas agora sofre com a falta de energia.',
+    need: 'Energia',
+    resourceRequired: 1000000,
+    passiveGeneration: { resource: 'Energia', amount: 100 }
+  },
+  {
+    id: 'poi-2',
+    name: 'Refúgio de Vega',
+    lore: 'Sobreviventes isolados em um cinturão de asteroides, buscando desesperadamente por suprimentos básicos.',
+    need: 'Alimentos',
+    resourceRequired: 2500000,
+    passiveGeneration: { resource: 'Alimentos', amount: 50 }
+  },
+  {
+    id: 'poi-3',
+    name: 'Estação Aurora',
+    lore: 'Uma base científica oculta que guarda segredos da antiga Terra, mas precisa de tecnologia para reativar seus sistemas.',
+    need: 'Tecnologia',
+    resourceRequired: 5000000,
+    passiveGeneration: { resource: 'Tecnologia', amount: 20 }
+  },
+  {
+    id: 'poi-4',
+    name: 'Posto Avançado de Sirius',
+    lore: 'Uma facção neutra que controla rotas comerciais, disposta a ajudar na reconstrução em troca de medicamentos.',
+    need: 'Medicamentos',
+    resourceRequired: 10000000,
+    passiveGeneration: { resource: 'Medicamentos', amount: 10 }
+  }
+];
+
+export const SHIPS: Ship[] = [
+  // ROTA 1: Solar
+  {
+    level: 1,
+    name: 'Atlas Courier',
+    route: 'Terra → Terra',
+    maxSpeed: 80,
+    technology: 'Propulsão Química Avançada',
+    description: 'A Atlas Courier é uma pequena nave atmosférica usada para entregas dentro da Terra. Não possui motor de dobra ou tecnologia de salto espacial, sendo projetada apenas para rotas locais rápidas dentro do planeta.',
+    range: 5000,
+    cost: 0,
+    tier: 'Solar',
+    color: 'text-cyan-400'
+  },
+  {
+    level: 2,
+    name: 'Lunar Runner',
+    route: 'Terra → Lua',
+    maxSpeed: 120,
+    technology: 'Motor de Íons Orbital',
+    description: 'A Lunar Runner é otimizada para viagens entre a Terra e a Lua. Seu motor de íons permite escapar eficientemente da gravidade da Terra, mas ainda depende de viagens convencionais sem motor de dobra.',
+    range: 400000,
+    cost: 10000,
+    tier: 'Solar',
+    color: 'text-blue-400'
+  },
+  {
+    level: 3,
+    name: 'Solar Swift',
+    route: 'Terra → Vênus',
+    maxSpeed: 300,
+    technology: 'Motor de Fusão',
+    description: 'A Solar Swift é a primeira nave da frota equipada com um motor experimental de pré-dobra. Ela acelera a uma alta velocidade sub-luz e então ativa um micro-salto que encurta drasticamente a distância até seu destino.',
+    range: 50000000,
+    cost: 50000,
+    tier: 'Solar',
+    color: 'text-yellow-400'
+  },
+  {
+    level: 4,
+    name: 'Red Horizon',
+    route: 'Terra → Marte',
+    maxSpeed: 500,
+    technology: 'Motor de fusão aprimorado + micro-dobra',
+    description: 'A Red Horizon utiliza uma versão mais estável da tecnologia de dobra. Após atingir velocidade suficiente, o motor gera uma pequena distorção no espaço-tempo que permite saltos curtos entre órbitas planetárias.',
+    range: 100000000,
+    cost: 200000,
+    tier: 'Solar',
+    color: 'text-red-400'
+  },
+  {
+    level: 5,
+    name: 'Helios Freighter',
+    route: 'Terra → Mercúrio',
+    maxSpeed: 800,
+    technology: 'Núcleo de dobra comercial',
+    description: 'Projetada para operar perto do Sol, a Helios Freighter possui blindagem térmica avançada e um núcleo de dobra comercial capaz de saltos espaciais mais longos após atingir velocidade sub-luz.',
+    range: 200000000,
+    cost: 1000000,
+    tier: 'Solar',
+    color: 'text-orange-400'
+  },
+  {
+    level: 6,
+    name: 'Jovian Hauler',
+    route: 'Terra → Júpiter',
+    maxSpeed: 1200,
+    technology: 'Motor de dobra orbital',
+    description: 'A Jovian Hauler foi projetada para rotas profundas no Sistema Solar. Ao atingir sua velocidade de ativação, ela gera um campo de dobra que encurta a distância entre dois pontos, permitindo viagens rápidas sem exceder a velocidade da luz.',
+    range: 700000000,
+    cost: 5000000,
+    tier: 'Solar',
+    color: 'text-purple-400'
+  },
+  {
+    level: 7,
+    name: 'Titan Carrier',
+    route: 'Terra → Saturno',
+    maxSpeed: 1800,
+    technology: 'Dobra estável de longo alcance',
+    description: 'A Titan Carrier é uma nave de carga pesada capaz de manter um campo de dobra por períodos prolongados. Isso permite atravessar vastas distâncias no Sistema Solar mantendo um tempo de entrega constante.',
+    range: 1500000000,
+    cost: 25000000,
+    tier: 'Solar',
+    color: 'text-amber-400'
+  },
+  {
+    level: 8,
+    name: 'Void Strider',
+    route: 'Terra → Urano',
+    maxSpeed: 2500,
+    technology: 'Núcleo de dobra quântico',
+    description: 'A Void Strider utiliza um núcleo de dobra quântico que cria um túnel temporário no espaço-tempo. A nave não viaja mais rápido que a luz — ela encurta o espaço entre a origem e o destino.',
+    range: 3000000000,
+    cost: 100000000,
+    tier: 'Solar',
+    color: 'text-indigo-400'
+  },
+  {
+    level: 9,
+    name: 'Neptune Vanguard',
+    route: 'Terra → Netuno',
+    maxSpeed: 3500,
+    technology: 'Teletransporte quântico estabilizado',
+    description: 'A Neptune Vanguard representa o auge da engenharia humana. Ao atingir sua velocidade de ativação, o núcleo quântico abre um salto espacial instantâneo, teletransportando a nave através de bilhões de quilômetros sem violar as leis da relatividade.',
+    range: 5000000000,
+    cost: 500000000,
+    tier: 'Solar',
+    color: 'text-teal-400'
+  },
+
+  // ROTA 2: Interstellar
+  {
+    level: 1,
+    name: 'Pulsar I',
+    route: 'Interestelar → Alpha Centauri',
+    maxSpeed: 5000,
+    technology: 'Reator de Pulso Interestelar',
+    description: 'Uma nave experimental de travessia interestelar inicial. Equipada com um reator de pulso instável, ela marca o primeiro passo da humanidade além dos limites do sistema solar. Frágil, mas revolucionária.',
+    range: 5,
+    cost: 0,
+    tier: 'Interstellar',
+    color: 'text-pink-400'
+  },
+  {
+    level: 2,
+    name: 'Pulsar II',
+    route: 'Interestelar → Proxima Centauri',
+    maxSpeed: 8000,
+    technology: 'Núcleo de Pulso Estabilizado',
+    description: 'Versão refinada do protótipo original. Seu núcleo foi estabilizado, permitindo viagens mais longas com menor risco de colapso energético. Ainda limitada, mas muito mais confiável.',
+    range: 6,
+    cost: 50000000,
+    tier: 'Interstellar',
+    color: 'text-rose-400'
+  },
+  {
+    level: 3,
+    name: 'Nebula Runner',
+    route: 'Interestelar → Barnard\'s Star',
+    maxSpeed: 12000,
+    technology: 'Captação de Energia Residual',
+    description: 'Projetada para cortar o vazio interestelar com eficiência. Utiliza captação de energia residual de nebulosas e poeira cósmica para alimentar seus sistemas auxiliares.',
+    range: 8,
+    cost: 250000000,
+    tier: 'Interstellar',
+    color: 'text-violet-400'
+  },
+  {
+    level: 4,
+    name: 'Orion VX',
+    route: 'Interestelar → Wolf 359',
+    maxSpeed: 18000,
+    technology: 'Propulsão de Antimatéria Estágio I',
+    description: 'O primeiro modelo a utilizar antimatéria como combustível principal. Seus motores de alta performance permitem alcançar sistemas estelares distantes em tempo recorde.',
+    range: 10,
+    cost: 1000000000,
+    tier: 'Interstellar',
+    color: 'text-emerald-400'
+  },
+  {
+    level: 5,
+    name: 'Quasar Light',
+    route: 'Interestelar → Lalande 21185',
+    maxSpeed: 25000,
+    technology: 'Vela de Fótons de Alta Densidade',
+    description: 'Uma maravilha da engenharia óptica. Utiliza feixes de laser concentrados para impulsionar velas de fótons, atingindo velocidades próximas à da luz.',
+    range: 12,
+    cost: 5000000000,
+    tier: 'Interstellar',
+    color: 'text-yellow-500'
+  },
+  {
+    level: 6,
+    name: 'Zenith Core',
+    route: 'Interestelar → Sirius',
+    maxSpeed: 40000,
+    technology: 'Núcleo de Singularidade Controlada',
+    description: 'Utiliza uma micro-singularidade artificial para curvar o espaço-tempo à sua frente, permitindo viagens interestelares massivas com consumo mínimo de energia.',
+    range: 15,
+    cost: 20000000000,
+    tier: 'Interstellar',
+    color: 'text-fuchsia-400'
+  },
+  {
+    level: 7,
+    name: 'Nova Striker',
+    route: 'Interestelar → Luyten 726-8',
+    maxSpeed: 65000,
+    technology: 'Motores de Fusão de Hélio-3',
+    description: 'Uma nave de alta potência projetada para exploração profunda. Seus motores de fusão avançados fornecem empuxo constante para travessias de longo alcance.',
+    range: 18,
+    cost: 100000000000,
+    tier: 'Interstellar',
+    color: 'text-red-600'
+  },
+  {
+    level: 8,
+    name: 'Eclipse Prime',
+    route: 'Interestelar → Ross 154',
+    maxSpeed: 90000,
+    technology: 'Dobra Espacial de Quinta Geração',
+    description: 'O ápice da tecnologia de dobra. Capaz de comprimir o espaço-tempo de forma tão eficiente que as distâncias interestelares parecem meros saltos orbitais.',
+    range: 22,
+    cost: 500000000000,
+    tier: 'Interstellar',
+    color: 'text-sky-400'
+  },
+  {
+    level: 9,
+    name: 'Infinity Drive',
+    route: 'Interestelar → Epsilon Eridani',
+    maxSpeed: 120000,
+    technology: 'Motor de Probabilidade Infinita',
+    description: 'A fronteira final da tecnologia. Utiliza flutuações quânticas para existir em múltiplos pontos do espaço simultaneamente, tornando a distância um conceito obsoleto.',
+    range: 25,
+    cost: 2500000000000,
+    tier: 'Interstellar',
+    color: 'text-lime-400'
+  },
+  {
+    level: 1,
+    name: 'Sombra do Vazio',
+    route: 'Vazio Profundo → Singularidade',
+    maxSpeed: 250000,
+    technology: 'Motor de Antimatéria Pura',
+    description: 'Uma nave projetada para navegar nas distorções do tempo. Quase invisível aos radares convencionais.',
+    range: 50,
+    cost: 0, // Initial ship for Route 3
+    tier: 'Void',
+    color: 'text-purple-500'
+  },
+  {
+    level: 2,
+    name: 'Espectro Temporal',
+    route: 'Vazio Profundo → Fenda de Eventos',
+    maxSpeed: 400000,
+    technology: 'Dobra de Cronos',
+    description: 'Utiliza partículas de tempo para deslizar entre segundos. Pode chegar ao destino antes mesmo de partir.',
+    range: 75,
+    cost: 5000000,
+    tier: 'Void',
+    color: 'text-indigo-500'
+  },
+  {
+    level: 3,
+    name: 'Nulificador de Matéria',
+    route: 'Vazio Profundo → Abismo Branco',
+    maxSpeed: 650000,
+    technology: 'Reator de Vácuo Absoluto',
+    description: 'Converte o nada em propulsão infinita. Uma maravilha da engenharia da Era Sem Tempo.',
+    range: 100,
+    cost: 25000000,
+    tier: 'Void',
+    color: 'text-fuchsia-500'
+  },
+  {
+    level: 4,
+    name: 'Arauto do Caos',
+    route: 'Vazio Profundo → Horizonte de Cauchy',
+    maxSpeed: 1000000,
+    technology: 'Motor de Entropia Reversa',
+    description: 'Navega nas correntes de probabilidade. Onde o caos reina, ela encontra o caminho mais curto.',
+    range: 150,
+    cost: 100000000,
+    tier: 'Void',
+    color: 'text-pink-500'
+  },
+  {
+    level: 5,
+    name: 'Soberano do Éter',
+    route: 'Vazio Profundo → Ponto Zero',
+    maxSpeed: 1800000,
+    technology: 'Sincronizador de Realidade',
+    description: 'Capaz de existir em todas as dimensões simultaneamente. A distância é apenas uma sugestão.',
+    range: 250,
+    cost: 500000000,
+    tier: 'Void',
+    color: 'text-violet-500'
+  },
+  {
+    level: 6,
+    name: 'Devorador de Estrelas',
+    route: 'Vazio Profundo → Quasar Negro',
+    maxSpeed: 3500000,
+    technology: 'Núcleo de Singularidade Primordial',
+    description: 'Alimentada por buracos negros artificiais. Sua presença distorce a luz ao seu redor.',
+    range: 400,
+    cost: 2000000000,
+    tier: 'Void',
+    color: 'text-purple-600'
+  },
+  {
+    level: 7,
+    name: 'Sentinela da Eternidade',
+    route: 'Vazio Profundo → Muralha de Planck',
+    maxSpeed: 7000000,
+    technology: 'Escudo de Tempo Estático',
+    description: 'Uma fortaleza móvel que ignora as leis da física convencional. O tempo não passa para seus tripulantes.',
+    range: 700,
+    cost: 10000000000,
+    tier: 'Void',
+    color: 'text-indigo-600'
+  },
+  {
+    level: 8,
+    name: 'Avatar do Vazio',
+    route: 'Vazio Profundo → Além do Infinito',
+    maxSpeed: 15000000,
+    technology: 'Consciência Coletiva de IAs',
+    description: 'Não é apenas uma nave, mas uma extensão da própria rede neural que governa o Vazio.',
+    range: 1200,
+    cost: 50000000000,
+    tier: 'Void',
+    color: 'text-fuchsia-600'
+  },
+  {
+    level: 9,
+    name: 'O Ômega',
+    route: 'Vazio Profundo → O Fim de Tudo',
+    maxSpeed: 50000000,
+    technology: 'Motor de Criação Ex-Nihilo',
+    description: 'A última nave. Capaz de reiniciar o universo se necessário. O ápice da evolução tecnológica.',
+    range: 5000,
+    cost: 250000000000,
+    tier: 'Void',
+    color: 'text-white'
+  }
+];
+
+export const ROUTES: Route[] = [
+  // ROTA 1: Sistema Solar
+  { id: 'terra', name: 'Terra: Distribuição Local', origin: 'Terra', destination: 'Terra', distance: 5000, risk: 0.001, reward: 2500, cargoType: 'Tecnologia', tier: 'Solar', autoTravelCost: 500, requiredShipLevel: 1, unlockCondition: { initial: true } },
+  { id: 'lua', name: 'Colônia Lunar', origin: 'Terra', destination: 'Lua', distance: 384400, risk: 0.01, reward: 7500, cargoType: 'Tecnologia', tier: 'Solar', autoTravelCost: 1500, unlockCost: 5000, requiredShipLevel: 2, unlockCondition: { initial: true } },
+  { id: 'venus', name: 'Estação Vênus', origin: 'Terra', destination: 'Vênus', distance: 41000000, risk: 0.08, reward: 25000, cargoType: 'Minerais', tier: 'Solar', autoTravelCost: 5000, unlockCost: 25000, requiredShipLevel: 3, unlockCondition: { initial: true } },
+  { id: 'marte', name: 'Colônia de Marte', origin: 'Terra', destination: 'Marte', distance: 78000000, risk: 0.05, reward: 100000, cargoType: 'Minerais', tier: 'Solar', autoTravelCost: 20000, unlockCost: 100000, requiredShipLevel: 4, unlockCondition: { initial: true } },
+  { id: 'mercurio', name: 'Base Mercúrio', origin: 'Terra', destination: 'Mercúrio', distance: 91000000, risk: 0.12, reward: 400000, cargoType: 'Energia', tier: 'Solar', autoTravelCost: 80000, unlockCost: 500000, requiredShipLevel: 5, unlockCondition: { initial: true } },
+  { id: 'jupiter', name: 'Posto Júpiter', origin: 'Terra', destination: 'Júpiter', distance: 628000000, risk: 0.15, reward: 1500000, cargoType: 'Dados', tier: 'Solar', autoTravelCost: 300000, unlockCost: 2500000, requiredShipLevel: 6, unlockCondition: { initial: true } },
+  { id: 'saturno', name: 'Anéis de Saturno', origin: 'Terra', destination: 'Saturno', distance: 1200000000, risk: 0.18, reward: 5000000, cargoType: 'Minerais', tier: 'Solar', autoTravelCost: 1000000, unlockCost: 12500000, requiredShipLevel: 7, unlockCondition: { initial: true } },
+  { id: 'urano', name: 'Estação Urano', origin: 'Terra', destination: 'Urano', distance: 2600000000, risk: 0.22, reward: 15000000, cargoType: 'Biológico', tier: 'Solar', autoTravelCost: 3000000, unlockCost: 50000000, requiredShipLevel: 8, unlockCondition: { initial: true } },
+  { id: 'netuno', name: 'Fronteira Netuno', origin: 'Terra', destination: 'Netuno', distance: 4300000000, risk: 0.25, reward: 50000000, cargoType: 'Artefatos', tier: 'Solar', autoTravelCost: 10000000, unlockCost: 250000000, requiredShipLevel: 9, unlockCondition: { initial: true } },
+
+  // ROTA 2: Interstellar
+  { id: 'alpha-centauri', name: 'Alpha Centauri', origin: 'Sistema Solar', destination: 'Alpha Centauri', distance: 4.37, risk: 0.30, reward: 20000, cargoType: 'Tecnologia', tier: 'Interstellar', autoTravelCost: 100000, requiredShipLevel: 1, unlockCondition: { route2Unlocked: true } },
+  { id: 'proxima-centauri', name: 'Proxima Centauri', origin: 'Sistema Solar', destination: 'Proxima Centauri', distance: 4.24, risk: 0.32, reward: 38000, cargoType: 'Energia', tier: 'Interstellar', autoTravelCost: 250000, unlockCost: 100000, requiredShipLevel: 2, unlockCondition: { route2Unlocked: true } },
+  { id: 'barnards-star', name: 'Barnard\'s Star', origin: 'Sistema Solar', destination: 'Barnard\'s Star', distance: 5.96, risk: 0.35, reward: 88000, cargoType: 'Dados', tier: 'Interstellar', autoTravelCost: 600000, unlockCost: 500000, requiredShipLevel: 3, unlockCondition: { route2Unlocked: true } },
+  { id: 'wolf-359', name: 'Wolf 359', origin: 'Sistema Solar', destination: 'Wolf 359', distance: 7.78, risk: 0.38, reward: 124000, cargoType: 'Tecnologia', tier: 'Interstellar', autoTravelCost: 1000000, unlockCost: 2500000, requiredShipLevel: 4, unlockCondition: { route2Unlocked: true } },
+  { id: 'lalande-21185', name: 'Lalande 21185', origin: 'Sistema Solar', destination: 'Lalande 21185', distance: 8.29, risk: 0.40, reward: 200000, cargoType: 'Biológico', tier: 'Interstellar', autoTravelCost: 1800000, unlockCost: 12500000, requiredShipLevel: 5, unlockCondition: { route2Unlocked: true } },
+  { id: 'sirius', name: 'Sirius', origin: 'Sistema Solar', destination: 'Sirius', distance: 8.60, risk: 0.45, reward: 376000, cargoType: 'Artefatos', tier: 'Interstellar', autoTravelCost: 3500000, unlockCost: 62500000, requiredShipLevel: 6, unlockCondition: { route2Unlocked: true } },
+  { id: 'luyten-726-8', name: 'Luyten 726-8', origin: 'Sistema Solar', destination: 'Luyten 726-8', distance: 8.73, risk: 0.50, reward: 624000, cargoType: 'Energia', tier: 'Interstellar', autoTravelCost: 6000000, unlockCost: 312500000, requiredShipLevel: 7, unlockCondition: { route2Unlocked: true } },
+  { id: 'ross-154', name: 'Ross 154', origin: 'Sistema Solar', destination: 'Ross 154', distance: 9.68, risk: 0.55, reward: 1120000, cargoType: 'Dados', tier: 'Interstellar', autoTravelCost: 12000000, unlockCost: 1562500000, requiredShipLevel: 8, unlockCondition: { route2Unlocked: true } },
+  { id: 'epsilon-eridani', name: 'Epsilon Eridani', origin: 'Sistema Solar', destination: 'Epsilon Eridani', distance: 10.50, risk: 0.60, reward: 2000000, cargoType: 'Tecnologia', tier: 'Interstellar', autoTravelCost: 25000000, unlockCost: 7812500000, requiredShipLevel: 9, unlockCondition: { route2Unlocked: true } },
+  
+  // ROTA 3: Void
+  { id: 'void-1', name: 'O Horizonte de Eventos', origin: 'Vazio Profundo', destination: 'Singularidade', distance: 5000, risk: 0.95, reward: 10000000, cargoType: 'Dados', tier: 'Void', autoTravelCost: 5000, requiredShipLevel: 1, unlockCondition: { route3Unlocked: true } },
+  { id: 'void-2', name: 'Fenda de Eventos', origin: 'Vazio Profundo', destination: 'Fenda de Eventos', distance: 12000, risk: 0.96, reward: 25000000, cargoType: 'Tecnologia', tier: 'Void', autoTravelCost: 10000, unlockCost: 1000000, requiredShipLevel: 2, unlockCondition: { route3Unlocked: true } },
+  { id: 'void-3', name: 'Abismo Branco', origin: 'Vazio Profundo', destination: 'Abismo Branco', distance: 25000, risk: 0.97, reward: 60000000, cargoType: 'Energia', tier: 'Void', autoTravelCost: 25000, unlockCost: 5000000, requiredShipLevel: 3, unlockCondition: { route3Unlocked: true } },
+  { id: 'void-4', name: 'Horizonte de Cauchy', origin: 'Vazio Profundo', destination: 'Horizonte de Cauchy', distance: 50000, risk: 0.98, reward: 150000000, cargoType: 'Dados', tier: 'Void', autoTravelCost: 50000, unlockCost: 20000000, requiredShipLevel: 4, unlockCondition: { route3Unlocked: true } },
+  { id: 'void-5', name: 'Ponto Zero', origin: 'Vazio Profundo', destination: 'Ponto Zero', distance: 100000, risk: 0.985, reward: 400000000, cargoType: 'Artefatos', tier: 'Void', autoTravelCost: 100000, unlockCost: 100000000, requiredShipLevel: 5, unlockCondition: { route3Unlocked: true } },
+  { id: 'void-6', name: 'Quasar Negro', origin: 'Vazio Profundo', destination: 'Quasar Negro', distance: 250000, risk: 0.99, reward: 1000000000, cargoType: 'Minerais', tier: 'Void', autoTravelCost: 250000, unlockCost: 500000000, requiredShipLevel: 6, unlockCondition: { route3Unlocked: true } },
+  { id: 'void-7', name: 'Muralha de Planck', origin: 'Vazio Profundo', destination: 'Muralha de Planck', distance: 500000, risk: 0.992, reward: 2500000000, cargoType: 'Tecnologia', tier: 'Void', autoTravelCost: 500000, unlockCost: 2000000000, requiredShipLevel: 7, unlockCondition: { route3Unlocked: true } },
+  { id: 'void-8', name: 'Além do Infinito', origin: 'Vazio Profundo', destination: 'Além do Infinito', distance: 1000000, risk: 0.995, reward: 7500000000, cargoType: 'Biológico', tier: 'Void', autoTravelCost: 1000000, unlockCost: 10000000000, requiredShipLevel: 8, unlockCondition: { route3Unlocked: true } },
+  { id: 'void-9', name: 'O Fim de Tudo', origin: 'Vazio Profundo', destination: 'O Fim de Tudo', distance: 5000000, risk: 0.999, reward: 25000000000, cargoType: 'Dados', tier: 'Void', autoTravelCost: 5000000, unlockCost: 50000000000, requiredShipLevel: 9, unlockCondition: { route3Unlocked: true } },
+];
+
+export const UPGRADES: Upgrade[] = [
+  {
+    id: 'engine',
+    name: 'Motor',
+    category: 'Motor',
+    tiers: [
+      { level: 1, name: 'Motor de íons', cost: 5000, bonus: '+25% Velocidade', value: 0.25 },
+      { level: 2, name: 'Motor de fusão', cost: 25000, bonus: '+50% Velocidade', value: 0.50 },
+      { level: 3, name: 'Motor de antimatéria', cost: 100000, bonus: '+75% Velocidade', value: 0.75 },
+      { level: 4, name: 'Motor quântico', cost: 500000, bonus: '+100% Velocidade', value: 1.00 },
+      { level: 5, name: 'Motor Dobra espacial', cost: 2500000, bonus: 'Instantâneo', value: 999 },
+    ]
+  },
+  {
+    id: 'ai',
+    name: 'Melhoria iA',
+    category: 'IA',
+    tiers: [
+      { level: 1, name: 'Nível 1', cost: 5000, bonus: '75% Sucesso', value: 0.75 },
+      { level: 2, name: 'Nível 2', cost: 25000, bonus: '80% Sucesso', value: 0.80 },
+      { level: 3, name: 'Nível 3', cost: 100000, bonus: '85% Sucesso', value: 0.85 },
+      { level: 4, name: 'Nível 4', cost: 500000, bonus: '90% Sucesso', value: 0.90 },
+      { level: 5, name: 'Nível 5', cost: 2500000, bonus: '100% Sucesso', value: 1.00 },
+      { level: 6, name: 'Nível 6 MAX', cost: 12500000, bonus: '100% Sucesso + 50% Perfeita', value: 1.50 },
+    ]
+  },
+  {
+    id: 'value',
+    name: 'Valor de Mercadoria',
+    category: 'Valor',
+    tiers: [
+      { level: 1, name: 'Carga Rara', cost: 10000, bonus: '+50% Lucro', value: 0.5 },
+      { level: 2, name: 'Carga Exótica', cost: 100000, bonus: '+100% Lucro', value: 1.0 },
+      { level: 3, name: 'Carga Interplanetária', cost: 1000000, bonus: '+200% Lucro', value: 2.0 },
+      { level: 4, name: 'Carga Intergalática', cost: 10000000, bonus: '+400% Lucro', value: 4.0 },
+      { level: 5, name: 'Carga Alienígena', cost: 100000000, bonus: '+1000% Lucro', value: 10.0 },
+    ]
+  },
+  {
+    id: 'rare',
+    name: 'Entrega Missão Especial',
+    category: 'Raro',
+    tiers: [
+      { level: 1, name: 'Missão Secreta', cost: 20000, bonus: '10% Chance (10x)', value: 0.10 },
+      { level: 2, name: 'Missão Ultra Secreta', cost: 200000, bonus: '15% Chance (10x)', value: 0.15 },
+      { level: 3, name: 'Missão Matrix', cost: 2000000, bonus: '20% Chance (10x)', value: 0.20 },
+      { level: 4, name: 'Missão X', cost: 20000000, bonus: '25% Chance (10x)', value: 0.25 },
+      { level: 5, name: 'Missão Tesla Musk MAX', cost: 200000000, bonus: '35% Chance (10x)', value: 0.35 },
+    ]
+  }
+];

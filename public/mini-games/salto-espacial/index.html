@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Salto Espacial</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div id="game-container">
+        <div id="hud">
+            <div class="hud-item">
+                <span class="label">SCORE</span>
+                <span id="score">00000</span>
+            </div>
+            <div class="hud-item">
+                <span class="label">STATUS</span>
+                <span id="game-status" class="status-active">ACTIVE</span>
+            </div>
+            <button id="exit-btn">EXIT</button>
+        </div>
+        
+        <canvas id="gameCanvas" width="960" height="544"></canvas>
+        
+        <div id="overlay" class="hidden">
+            <div class="modal">
+                <h1 id="modal-title">GAME OVER</h1>
+                <p>Final Score: <span id="final-score">0</span></p>
+                <button id="restart-btn">RESTART</button>
+            </div>
+        </div>
+
+        <div id="controls-hint">
+            WASD or ARROWS to NAVIGATE
+        </div>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>

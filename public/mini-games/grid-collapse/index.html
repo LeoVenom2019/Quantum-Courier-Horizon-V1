@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Grid Collapse - QCH Arcade</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div id="game-container">
+        <div class="side-panel left">
+            <div class="stat-box">
+                <label>LEVEL</label>
+                <div id="level">01</div>
+            </div>
+            <div class="stat-box">
+                <label>LINES</label>
+                <div id="lines">000</div>
+            </div>
+        </div>
+
+        <div class="main-screen">
+            <div class="scanlines"></div>
+            <canvas id="gameCanvas"></canvas>
+            
+            <div id="overlay" class="hidden">
+                <div class="overlay-content">
+                    <h1 id="game-status">GAME OVER</h1>
+                    <div class="final-score-box">
+                        <label>FINAL DATA SCORE</label>
+                        <div id="final-score">00000</div>
+                    </div>
+                    <button id="restart-btn">REBOOT SYSTEM</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="side-panel right">
+            <div class="stat-box">
+                <label>NEXT</label>
+                <div class="next-piece-container">
+                    <canvas id="nextCanvas"></canvas>
+                </div>
+            </div>
+            <div class="stat-box">
+                <label>SCORE</label>
+                <div id="score">00000</div>
+            </div>
+            <div class="controls-hint">
+                <p><span>W</span> ROTATE</p>
+                <p><span>A</span> LEFT</p>
+                <p><span>D</span> RIGHT</p>
+                <p><span>S</span> DROP</p>
+            </div>
+        </div>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>
