@@ -841,6 +841,7 @@ const translations = {
     insufficientResourcesForRepair: 'Insufficient resources for repair (Energy/Technology).',
     shipRepaired: 'Battle ship fully repaired.',
     insufficientResourcesForCombatUpgrade: 'Insufficient resources for combat upgrade.',
+    cannotUpgradeDuringAttack: 'Defensive systems in critical state! Only main ship upgrades allowed during current attack.',
     shipTooDamaged: 'Battle ship too damaged to fight!',
     shipUpgradedTo: 'Battle ship upgraded to',
     scanningForTargets: 'Scanning the Void for targets...',
@@ -1482,6 +1483,7 @@ const translations = {
     insufficientResourcesForRepair: 'Recursos insuficientes para reparo (Energia/Tecnologia).',
     shipRepaired: 'Nave de batalha totalmente reparada.',
     insufficientResourcesForCombatUpgrade: 'Recursos insuficientes para upgrade de combate.',
+    cannotUpgradeDuringAttack: 'Sistemas defensivos em estado crítico! Apenas melhorias da nave principal são permitidas durante o ataque atual.',
     shipTooDamaged: 'Nave de batalha muito danificada para lutar!',
     shipUpgradedTo: 'Nave de batalha melhorada para',
     scanningForTargets: 'Escaneando o Vazio em busca de alvos...',
@@ -7375,6 +7377,12 @@ export const GameDashboard = ({
     const currentLevel = voidBattleShipStats.upgrades[type];
     const maxLevel = 5 + (battleShipUpgradeLevelRef.current * 10);
 
+    if (isVoidWarActive) {
+      addLog(t('cannotUpgradeDuringAttack'), 'error');
+      playSfx('error');
+      return;
+    }
+
     if (currentLevel >= maxLevel) {
       addLog(t('maxLevelReached'), 'warning');
       return;
@@ -8709,33 +8717,33 @@ export const GameDashboard = ({
     return (
       <AnimatePresence>
         {showVoidWarMap && (
-          <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-black/90 backdrop-blur-xl">
+          <div className="fixed inset-0 z-[150] flex items-center justify-center p-2 bg-black/90 backdrop-blur-xl">
             <motion.div 
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
-              className="w-full max-w-5xl glass-panel border-4 border-red-900/40 rounded-3xl overflow-hidden bg-gradient-to-br from-red-950/20 via-black to-black shadow-[0_0_100px_rgba(220,38,38,0.1)]"
+              className="w-full max-w-3xl glass-panel border-4 border-red-900/40 rounded-3xl overflow-hidden bg-gradient-to-br from-red-950/20 via-black to-black shadow-[0_0_80px_rgba(220,38,38,0.1)]"
             >
-              <div className="p-8 border-b border-red-500/20 flex justify-between items-center bg-red-500/10">
-                <div className="flex items-center gap-4">
-                  <div className="p-3 bg-red-500/20 rounded-xl border border-red-500/40 animate-pulse">
-                    <Skull className="w-8 h-8 text-red-500" />
+              <div className="p-3 border-b border-red-500/20 flex justify-between items-center bg-red-500/10">
+                <div className="flex items-center gap-3">
+                  <div className="p-1.5 bg-red-500/20 rounded-xl border border-red-500/40 animate-pulse">
+                    <Skull className="w-4 h-4 text-red-500" />
                   </div>
                   <div>
-                    <h2 className="text-2xl font-orbitron font-black text-white tracking-widest uppercase">{t('voidWarMap')}</h2>
-                    <p className="text-xs text-red-500/60 font-mono uppercase tracking-widest">{t('voidWarAlert')}</p>
+                    <h2 className="text-base font-orbitron font-black text-white tracking-widest uppercase leading-none">{t('voidWarMap')}</h2>
+                    <p className="text-[8px] text-red-500/60 font-mono uppercase tracking-widest mt-0.5">{t('voidWarAlert')}</p>
                   </div>
                 </div>
                 <button 
                   onClick={() => setShowVoidWarMap(false)}
-                  className="p-2 hover:bg-white/10 rounded-full transition-colors text-slate-400 hover:text-white"
+                  className="p-1.5 hover:bg-white/10 rounded-full transition-colors text-slate-400 hover:text-white"
                 >
-                  <X className="w-6 h-6" />
+                  <X className="w-4 h-4" />
                 </button>
               </div>
 
-              <div className="p-8">
-                <div className="grid grid-cols-3 gap-4">
+              <div className="p-3">
+                <div className="grid grid-cols-3 gap-2">
                   {sectors.map(sector => {
                     const isCurrent = sector.id === voidWarProgress.currentSector;
                     const isCleared = sector.id < voidWarProgress.currentSector;
@@ -8743,10 +8751,10 @@ export const GameDashboard = ({
                     return (
                       <motion.div 
                         key={sector.id}
-                        whileHover={!sector.locked ? { scale: 1.05, y: -5 } : {}}
-                        className={`relative aspect-square rounded-2xl border-2 p-5 flex flex-col items-center justify-center gap-4 transition-all cursor-pointer overflow-hidden group scale-90 ${
+                        whileHover={!sector.locked ? { scale: 1.02, y: -2 } : {}}
+                        className={`relative aspect-[3/2] rounded-xl border-2 p-2 flex flex-col items-center justify-center gap-1 transition-all cursor-pointer overflow-hidden group ${
                           isCleared ? 'bg-emerald-500/10 border-emerald-500/40' :
-                          isCurrent ? 'bg-red-500/10 border-red-500 shadow-[0_0_30px_rgba(220,38,38,0.3)]' :
+                          isCurrent ? 'bg-red-500/10 border-red-500 shadow-[0_0_20px_rgba(220,38,38,0.3)]' :
                           'bg-white/5 border-white/10 opacity-60'
                         }`}
                         onClick={() => !sector.locked && startWarBattle(sector.id)}
@@ -8768,29 +8776,29 @@ export const GameDashboard = ({
                         )}
 
                         {isCleared ? (
-                          <CheckCircle2 className="w-12 h-12 text-emerald-400" />
+                          <CheckCircle2 className="w-6 h-6 text-emerald-400" />
                         ) : sector.locked ? (
-                          <Lock className="w-12 h-12 text-white/20" />
+                          <Lock className="w-6 h-6 text-white/20" />
                         ) : (
                           <div className="relative">
-                            <Crosshair className="w-12 h-12 text-red-500 animate-spin-slow" />
+                            <Crosshair className="w-6 h-6 text-red-500 animate-spin-slow" />
                             <div className="absolute inset-0 flex items-center justify-center">
-                              <span className="text-xs font-black text-white">{voidWarProgress.currentBattle + 1}/5</span>
+                              <span className="text-[9px] font-black text-white">{voidWarProgress.currentBattle + 1}/5</span>
                             </div>
                           </div>
                         )}
                         
-                        <div className="text-center z-10">
-                          <h3 className="font-orbitron font-black text-white text-base uppercase tracking-widest leading-tight mb-1">{sector.name}</h3>
-                          <div className="flex flex-col gap-0.5 mb-2">
-                            <p className="text-[10px] font-mono text-cyan-400/80 uppercase tracking-tighter">
+                        <div className="text-center z-10 w-full px-1">
+                          <h3 className="font-orbitron font-black text-white text-[10px] uppercase tracking-wider leading-none mb-1 truncate">{sector.name}</h3>
+                          <div className="flex flex-col gap-0 mb-1">
+                            <p className="text-[6px] font-mono text-cyan-400/80 uppercase tracking-tighter truncate">
                               {language === 'pt' ? 'ZONA' : 'ZONE'}: {sector.zone}
                             </p>
-                            <p className="text-[10px] font-mono text-rose-400/80 uppercase tracking-tighter">
+                            <p className="text-[6px] font-mono text-rose-400/80 uppercase tracking-tighter truncate">
                               BOSS: {sector.boss}
                             </p>
                           </div>
-                          <p className={`text-[11px] font-mono uppercase tracking-widest ${isCleared ? 'text-emerald-400' : isCurrent ? 'text-red-500' : 'text-white/40'}`}>
+                          <p className={`text-[8px] font-mono uppercase tracking-widest leading-none ${isCleared ? 'text-emerald-400' : isCurrent ? 'text-red-500' : 'text-white/40'}`}>
                             {isCleared ? t('cleared') : sector.locked ? t('lockedSector') : t('battleProgress')}
                           </p>
                         </div>
@@ -8829,87 +8837,87 @@ export const GameDashboard = ({
     ];
 
     return (
-      <div className="space-y-8">
-        <div className="glass-panel border-2 border-emerald-500/30 rounded-2xl p-10 bg-gradient-to-br from-emerald-500/10 via-black/60 to-black relative overflow-hidden text-center">
+      <div className="space-y-4">
+        <div className="glass-panel border-2 border-emerald-500/30 rounded-2xl p-6 bg-gradient-to-br from-emerald-500/10 via-black/60 to-black relative overflow-hidden text-center">
           <div className="absolute top-0 left-0 w-full h-full pointer-events-none">
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-emerald-500/5 rounded-full blur-[100px]" />
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[300px] h-[300px] bg-emerald-500/5 rounded-full blur-[80px]" />
           </div>
 
-          <div className="relative z-10 space-y-6">
-            <div className="flex flex-col items-center gap-4">
-              <div className="w-32 h-32 rounded-full border-4 border-emerald-500/20 flex items-center justify-center shadow-[0_0_50px_rgba(16,185,129,0.2)] bg-black/40">
-                <Globe className={`w-16 h-16 ${isComplete ? 'text-emerald-400 animate-pulse' : 'text-emerald-500/40'}`} />
+          <div className="relative z-10 space-y-4">
+            <div className="flex flex-col items-center gap-3">
+              <div className="w-20 h-20 rounded-full border-4 border-emerald-500/20 flex items-center justify-center shadow-[0_0_50px_rgba(16,185,129,0.2)] bg-black/40">
+                <Globe className={`w-10 h-10 ${isComplete ? 'text-emerald-400 animate-pulse' : 'text-emerald-500/40'}`} />
               </div>
-              <div className="space-y-1">
-                <h2 className="text-4xl font-orbitron font-black text-white tracking-[0.3em] uppercase">{t('earthProject')}</h2>
-                <p className="text-sm text-emerald-400/60 font-mono uppercase tracking-[0.2em]">{t('biosphereRestoration')}</p>
+              <div className="space-y-0.5">
+                <h2 className="text-2xl font-orbitron font-black text-white tracking-[0.2em] uppercase">{t('earthProject')}</h2>
+                <p className="text-xs text-emerald-400/60 font-mono uppercase tracking-[0.2em]">{t('biosphereRestoration')}</p>
               </div>
             </div>
 
-            <div className="max-w-3xl mx-auto space-y-4">
-              <div className="flex justify-between items-end text-[10px] font-orbitron text-emerald-400 uppercase tracking-widest">
+            <div className="max-w-2xl mx-auto space-y-3">
+              <div className="flex justify-between items-end text-[9px] font-orbitron text-emerald-400 uppercase tracking-widest">
                 <span>{t('globalReconstructionProgress')}</span>
-                <span className="text-xl font-bold">{totalProgress.toFixed(1)}%</span>
+                <span className="text-lg font-bold">{totalProgress.toFixed(1)}%</span>
               </div>
-              <div className="h-6 bg-black/60 rounded-full border-2 border-emerald-500/20 overflow-hidden p-1">
+              <div className="h-4 bg-black/60 rounded-full border-2 border-emerald-500/20 overflow-hidden p-0.5">
                 <motion.div 
                   initial={{ width: 0 }}
                   animate={{ width: `${totalProgress}%` }}
-                  className="h-full bg-gradient-to-r from-emerald-600 via-emerald-400 to-white shadow-[0_0_30px_rgba(16,185,129,0.6)] rounded-full"
+                  className="h-full bg-gradient-to-r from-emerald-600 via-emerald-400 to-white shadow-[0_0_20px_rgba(16,185,129,0.6)] rounded-full"
                 />
               </div>
             </div>
 
             {isComplete ? (
               <motion.div 
-                initial={{ opacity: 0, y: 20 }}
+                initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="pt-8"
+                className="pt-2"
               >
                 <button 
                   onClick={() => setShowRestorationModal(true)}
-                  className="inline-block px-12 py-6 bg-emerald-500 hover:bg-emerald-400 text-black font-orbitron font-black text-2xl rounded-2xl shadow-[0_0_50px_rgba(16,185,129,0.5)] transition-all active:scale-95"
+                  className="inline-block px-8 py-3 bg-emerald-500 hover:bg-emerald-400 text-black font-orbitron font-black text-xl rounded-xl shadow-[0_0_30px_rgba(16,185,129,0.5)] transition-all active:scale-95"
                 >
                   {t('restoration')}
                 </button>
-                <p className="mt-4 text-emerald-400 font-orbitron text-sm uppercase tracking-widest animate-pulse">{t('hopeSymbol')}</p>
+                <p className="mt-2 text-emerald-400 font-orbitron text-[10px] uppercase tracking-widest animate-pulse">{t('hopeSymbol')}</p>
               </motion.div>
             ) : (
-              <div className="pt-8">
+              <div className="pt-2">
                 <button 
                   onClick={() => setShowRestorationModal(true)}
-                  className="inline-block px-12 py-6 bg-emerald-500/20 border-2 border-emerald-500/40 text-emerald-400 font-orbitron font-black text-2xl rounded-2xl hover:bg-emerald-500/30 transition-all active:scale-95"
+                  className="inline-block px-8 py-3 bg-emerald-500/20 border-2 border-emerald-500/40 text-emerald-400 font-orbitron font-black text-xl rounded-xl hover:bg-emerald-500/30 transition-all active:scale-95"
                 >
                   {t('restoration')}
                 </button>
-                <p className="mt-4 text-white/40 font-mono uppercase tracking-widest">{t('waitingNoduleInit')}</p>
+                <p className="mt-2 text-white/40 font-mono text-[10px] uppercase tracking-widest">{t('waitingNoduleInit')}</p>
               </div>
             )}
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
           {resourceNodes.map(node => {
             const progress = earthReconstructionProgress[node.id];
             const isNodeComplete = progress >= 100;
             return (
-              <div key={node.id} className={`glass-panel border p-6 rounded-2xl flex flex-col gap-4 transition-all relative overflow-hidden ${isNodeComplete ? 'border-emerald-500/40 bg-emerald-500/5' : `border-white/5 ${node.bg} hover:border-white/20`}`}>
+              <div key={node.id} className={`glass-panel border p-3 rounded-xl flex flex-col gap-2.5 transition-all relative overflow-hidden ${isNodeComplete ? 'border-emerald-500/40 bg-emerald-500/5' : `border-white/5 ${node.bg} hover:border-white/20`}`}>
                 <div className="flex justify-between items-start">
-                  <div className="flex items-center gap-3">
-                    <div className={`p-3 rounded-xl bg-black/40 border border-white/10 ${node.color}`}>
-                      <node.icon className="w-6 h-6" />
+                  <div className="flex items-center gap-2">
+                    <div className={`p-2 rounded-lg bg-black/40 border border-white/10 ${node.color}`}>
+                      <node.icon className="w-5 h-5" />
                     </div>
                     <div>
-                      <h4 className="text-xs font-orbitron font-bold text-white uppercase tracking-wider">{node.name}</h4>
-                      <p className="text-[9px] text-white/40 uppercase tracking-widest">{t('captureNodule')}</p>
+                      <h4 className="text-[10px] font-orbitron font-bold text-white uppercase tracking-wider leading-tight">{node.name}</h4>
+                      <p className="text-[8px] text-white/40 uppercase tracking-widest">{t('captureNodule')}</p>
                     </div>
                   </div>
                   <div className="text-right">
-                    <div className={`text-lg font-orbitron font-bold ${isNodeComplete ? 'text-emerald-400' : 'text-white'}`}>{progress.toFixed(1)}%</div>
+                    <div className={`text-base font-orbitron font-bold ${isNodeComplete ? 'text-emerald-400' : 'text-white'}`}>{progress.toFixed(1)}%</div>
                   </div>
                 </div>
 
-                <div className="h-2 bg-black/40 rounded-full overflow-hidden border border-white/5">
+                <div className="h-1.5 bg-black/40 rounded-full overflow-hidden border border-white/5">
                   <motion.div 
                     initial={{ width: 0 }}
                     animate={{ width: `${progress}%` }}
@@ -8921,7 +8929,7 @@ export const GameDashboard = ({
                   <span className="text-[8px] text-white/40 uppercase tracking-widest font-mono">
                     {isNodeComplete ? t('syncComplete') : t('waitingCompactedResources')}
                   </span>
-                  {isNodeComplete && <CheckCircle2 className="w-4 h-4 text-emerald-400" />}
+                  {isNodeComplete && <CheckCircle2 className="w-3 h-3 text-emerald-400" />}
                 </div>
               </div>
             );
@@ -9039,66 +9047,66 @@ export const GameDashboard = ({
     const reservoirs = [
       { id: 'energy', name: 'Células Quânticas', raw: 'Energia', icon: Zap, color: 'text-yellow-400', bg: 'bg-yellow-400/10', border: 'border-yellow-400/20' },
       { id: 'minerals', name: 'Núcleos Minerais Compactados', raw: 'Minérios', icon: Database, color: 'text-orange-400', bg: 'bg-orange-400/10', border: 'border-orange-400/20' },
-      { id: 'tech', name: 'Núcleos de Dados Multifatoriais', raw: 'Tecnologia', icon: Cpu, color: 'text-purple-400', bg: 'bg-purple-400/10', border: 'border-purple-400/20' },
       { id: 'food', name: 'Rações de Colonização', raw: 'Alimentos', icon: Coffee, color: 'text-emerald-400', bg: 'bg-emerald-400/10', border: 'border-emerald-400/20' },
-      { id: 'meds', name: 'Kits Médicos Avançados', raw: 'Medicamentos', icon: Activity, color: 'text-red-400', bg: 'bg-red-400/10', border: 'border-red-400/20' }
+      { id: 'meds', name: 'Kits Médicos Avançados', raw: 'Medicamentos', icon: Activity, color: 'text-red-400', bg: 'bg-red-400/10', border: 'border-red-400/20' },
+      { id: 'tech', name: 'Núcleos de Dados Multifatoriais', raw: 'Tecnologia', icon: Cpu, color: 'text-purple-400', bg: 'bg-purple-400/10', border: 'border-purple-400/20' }
     ];
 
     return (
-      <div className="space-y-8">
-        <div className="glass-panel border-2 border-cyan-500/30 rounded-2xl p-8 bg-gradient-to-br from-cyan-500/10 via-black/60 to-black relative overflow-hidden">
-          <div className="flex flex-col md:flex-row items-center gap-8">
-            <div className="relative">
-              <div className="w-32 h-32 rounded-2xl bg-cyan-500/20 border-2 border-cyan-500 flex items-center justify-center shadow-[0_0_30px_rgba(6,182,212,0.3)] animate-float">
-                <Home className="w-16 h-16 text-cyan-400" />
+      <div className="space-y-4">
+        <div className="glass-panel border-2 border-cyan-500/30 rounded-xl p-3 bg-gradient-to-br from-cyan-500/10 via-black/60 to-black relative overflow-hidden">
+          <div className="flex flex-row items-center gap-3">
+            <div className="relative shrink-0">
+              <div className="w-12 h-12 rounded-xl bg-cyan-500/20 border-2 border-cyan-500 flex items-center justify-center shadow-[0_0_15px_rgba(6,182,212,0.3)] animate-float">
+                <Home className="w-6 h-6 text-cyan-400" />
               </div>
-              <div className="absolute -top-2 -right-2 w-8 h-8 bg-cyan-500 rounded-full flex items-center justify-center shadow-lg animate-pulse">
-                <Globe className="w-5 h-5 text-black" />
+              <div className="absolute -top-1 -right-1 w-4 h-4 bg-cyan-500 rounded-full flex items-center justify-center shadow-lg animate-pulse">
+                <Globe className="w-2.5 h-2.5 text-black" />
               </div>
             </div>
-            <div className="flex-1 space-y-2 text-center md:text-left">
-              <h2 className="text-3xl font-orbitron font-black text-white tracking-widest uppercase">{t('colonizationCore')}</h2>
-              <p className="text-sm text-cyan-400/60 font-mono uppercase tracking-[0.2em]">{t('finalPreparationEarth')}</p>
-              <p className="text-xs text-white/40 max-w-2xl leading-relaxed">
+            <div className="flex-1 space-y-0 text-left">
+              <h2 className="text-base font-orbitron font-black text-white tracking-widest uppercase leading-none">{t('colonizationCore')}</h2>
+              <p className="text-[9px] text-cyan-400/60 font-mono uppercase tracking-[0.2em]">{t('finalPreparationEarth')}</p>
+              <p className="text-[8px] text-white/40 max-w-2xl leading-tight">
                 {t('colonizationCoreDesc')}
               </p>
             </div>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
           {reservoirs.map(res => {
             const rawAmount = voidResources[res.id as keyof typeof voidResources];
             const compactedAmount = voidCompactedResources[res.id as keyof typeof voidCompactedResources];
             const canCompact = rawAmount >= 50000;
 
             return (
-              <div key={res.id} className={`glass-panel border p-6 rounded-2xl flex flex-col gap-6 transition-all relative overflow-hidden ${res.border} ${res.bg}`}>
+              <div key={res.id} className={`glass-panel border p-2 rounded-xl flex flex-col gap-1.5 transition-all relative overflow-hidden ${res.border} ${res.bg} ${res.id === 'tech' ? 'md:col-span-2' : ''}`}>
                 <div className="flex justify-between items-start">
-                  <div className="flex items-center gap-3">
-                    <div className={`p-3 rounded-xl bg-black/40 border ${res.border} ${res.color}`}>
-                      <res.icon className="w-6 h-6" />
+                  <div className="flex items-center gap-2">
+                    <div className={`p-1.5 rounded-lg bg-black/40 border ${res.border} ${res.color}`}>
+                      <res.icon className="w-3.5 h-3.5" />
                     </div>
                     <div>
-                      <h4 className="text-sm font-orbitron font-bold text-white uppercase tracking-wider">{res.name}</h4>
-                      <p className="text-[10px] text-white/40 uppercase tracking-widest">{t('reservoirOf')} {res.raw}</p>
+                      <h4 className="text-[10px] font-orbitron font-bold text-white uppercase tracking-wider leading-tight">{res.name}</h4>
+                      <p className="text-[8px] text-white/40 uppercase tracking-widest leading-none">{t('reservoirOf')} {res.raw}</p>
                     </div>
                   </div>
                 </div>
 
-                <div className="space-y-4">
+                <div className="space-y-1.5">
                   <div className="flex justify-between items-end">
-                    <div className="space-y-1">
-                      <span className="text-[9px] text-white/40 uppercase tracking-widest">{t('rawResource')}</span>
-                      <div className="text-lg font-orbitron font-bold text-white">{formatValue(rawAmount)}</div>
+                    <div className="space-y-0">
+                      <span className="text-[7px] text-white/40 uppercase tracking-widest">{t('rawResource')}</span>
+                      <div className="text-sm font-orbitron font-bold text-white">{formatValue(rawAmount)}</div>
                     </div>
-                    <div className="text-right space-y-1">
-                      <span className="text-[9px] text-white/40 uppercase tracking-widest">{t('compacted')}</span>
-                      <div className={`text-xl font-orbitron font-bold ${res.color}`}>{compactedAmount}</div>
+                    <div className="text-right space-y-0">
+                      <span className="text-[7px] text-white/40 uppercase tracking-widest">{t('compacted')}</span>
+                      <div className={`text-base font-orbitron font-bold ${res.color}`}>{compactedAmount}</div>
                     </div>
                   </div>
 
-                  <div className="h-2 bg-black/60 rounded-full overflow-hidden border border-white/5">
+                  <div className="h-1 bg-black/60 rounded-full overflow-hidden border border-white/5">
                     <motion.div 
                       initial={{ width: 0 }}
                       animate={{ width: `${Math.min(100, (rawAmount / 50000) * 100)}%` }}
@@ -9110,7 +9118,7 @@ export const GameDashboard = ({
                     <button
                       onClick={() => compactVoidResource(res.id as any)}
                       disabled={!canCompact}
-                      className={`flex-1 py-3 rounded-xl font-orbitron font-bold text-[10px] uppercase tracking-widest transition-all active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed ${
+                      className={`flex-1 py-1.5 rounded-lg font-orbitron font-bold text-[8px] uppercase tracking-widest transition-all active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed ${
                         canCompact ? 'bg-white text-black shadow-lg' : 'bg-white/5 text-white/40 border border-white/10'
                       }`}
                     >
@@ -9119,8 +9127,8 @@ export const GameDashboard = ({
                     <button
                       onClick={() => sendCompactedToEarth(res.id as any)}
                       disabled={compactedAmount <= 0}
-                      className={`flex-1 py-3 rounded-xl font-orbitron font-bold text-[10px] uppercase tracking-widest transition-all active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed border ${
-                        compactedAmount > 0 ? 'bg-cyan-600 border-cyan-400 text-white shadow-[0_0_15px_rgba(6,182,212,0.4)]' : 'bg-white/5 border-white/10 text-white/40'
+                      className={`flex-1 py-1.5 rounded-lg font-orbitron font-bold text-[8px] uppercase tracking-widest transition-all active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed border ${
+                        compactedAmount > 0 ? 'bg-cyan-600 border-cyan-400 text-white shadow-[0_0_8px_rgba(6,182,212,0.4)]' : 'bg-white/5 border-white/10 text-white/40'
                       }`}
                     >
                       {t('sendToEarth')}
@@ -9147,8 +9155,8 @@ export const GameDashboard = ({
     };
 
     return (
-      <div className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="space-y-2">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
           {VOID_POIS.map(poi => {
             const poiStats = voidPOIsInspiration[poi.id] || { minerals: 0, energy: 0, food: 0, tech: 0, meds: 0 };
             const totalProgress = Object.values(poiStats).reduce((a, b) => a + b, 0);
@@ -9162,56 +9170,55 @@ export const GameDashboard = ({
             };
 
             return (
-              <div key={poi.id} className={`glass-panel border-2 rounded-2xl p-6 flex flex-col gap-4 relative overflow-hidden ${isInspired ? 'neon-border-emerald bg-emerald-500/5' : colorClasses[color as keyof typeof colorClasses]}`}>
+              <div key={poi.id} className={`glass-panel border-2 rounded-xl p-2.5 flex flex-col gap-2 relative overflow-hidden ${isInspired ? 'neon-border-emerald bg-emerald-500/5' : colorClasses[color as keyof typeof colorClasses]}`}>
                 <div className="flex justify-between items-start">
-                  <div className="space-y-1">
-                    <h3 className="text-xl font-orbitron font-black text-white tracking-tighter uppercase">{poi.name}</h3>
-                    <p className="text-[10px] text-white/60 font-mono uppercase tracking-widest leading-relaxed max-w-xs">{poi.lore}</p>
+                  <div className="space-y-0 text-left">
+                    <h3 className="text-base font-orbitron font-black text-white tracking-widest uppercase leading-none">{poi.name}</h3>
+                    <p className="text-[9px] text-white/60 font-mono uppercase tracking-widest leading-none max-w-sm line-clamp-1 mt-1">{poi.lore}</p>
                   </div>
                   <button 
                     onClick={() => setActiveDonationModal(poi.id)}
-                    className={`p-3 rounded-xl border transition-all hover:scale-110 active:scale-95 ${isInspired ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-400' : `bg-${color}-500/20 border-${color}-500/40 text-${color}-400`}`}
+                    className={`p-2 rounded-lg border transition-all hover:scale-105 active:scale-95 shrink-0 ${isInspired ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-400' : `bg-${color}-500/20 border-${color}-500/40 text-${color}-400`}`}
                   >
-                    <Globe className="w-6 h-6" />
+                    <Globe className="w-4 h-4" />
                   </button>
                 </div>
 
-                <div className="space-y-4">
+                <div className="space-y-2">
                   <div className="flex justify-between items-end">
-                    <div className="space-y-1">
-                      <span className="text-[9px] text-white/40 uppercase tracking-widest">{t('locationStatus')}</span>
-                      <div className="flex items-center gap-2">
-                        <div className={`w-2 h-2 rounded-full ${isInspired ? 'bg-emerald-400' : `bg-${color}-400 animate-pulse`}`} />
-                        <span className="text-sm font-orbitron font-bold text-white uppercase">{isInspired ? t('inspired') : t('waitingHelp')}</span>
+                    <div className="space-y-0.5">
+                      <span className="text-[8px] text-white/40 uppercase tracking-widest leading-none">{t('locationStatus')}</span>
+                      <div className="flex items-center gap-1 mt-0.5">
+                        <div className={`w-1.5 h-1.5 rounded-full ${isInspired ? 'bg-emerald-400' : `bg-${color}-400 animate-pulse`}`} />
+                        <span className="text-[11px] font-orbitron font-bold text-white uppercase leading-none">{isInspired ? t('inspired') : t('waitingHelp')}</span>
                       </div>
                     </div>
                     <div className="text-right">
-                      <span className="text-[9px] text-white/40 uppercase tracking-widest">{t('confidenceInspiration')}</span>
-                      <div className="text-lg font-orbitron font-bold text-white">{totalProgress.toFixed(1)}%</div>
+                      <span className="text-[8px] text-white/40 uppercase tracking-widest leading-none">{t('confidenceInspiration')}</span>
+                      <div className="text-sm font-orbitron font-bold text-white leading-none mt-0.5">{totalProgress.toFixed(1)}%</div>
                     </div>
                   </div>
 
-                  <div className="h-3 bg-black/40 rounded-full overflow-hidden border border-white/10">
+                  <div className="h-1.5 bg-black/40 rounded-full overflow-hidden border border-white/10">
                     <motion.div 
                       initial={{ width: 0 }}
                       animate={{ width: `${totalProgress}%` }}
-                      className={`h-full bg-gradient-to-r ${isInspired ? 'from-emerald-600 to-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.5)]' : `from-${color}-600 to-${color}-400 shadow-[0_0_15px_rgba(0,0,0,0.5)]`}`}
-                      style={{ boxShadow: !isInspired ? `0 0 15px var(--tw-shadow-color)` : undefined }}
+                      className={`h-full bg-gradient-to-r ${isInspired ? 'from-emerald-600 to-emerald-400 shadow-[0_0_10px_rgba(16,185,129,0.5)]' : `from-${color}-600 to-${color}-400 shadow-[0_0_10px_rgba(0,0,0,0.5)]`}`}
                     />
                   </div>
 
                   {isInspired && (
-                    <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-4 flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center border border-emerald-500/40">
-                          <Globe className="w-4 h-4 text-emerald-400" />
+                    <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-lg p-2 flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 rounded-md bg-emerald-500/20 flex items-center justify-center border border-emerald-500/40">
+                          <Globe className="w-3.5 h-3.5 text-emerald-400" />
                         </div>
-                        <div>
-                          <p className="text-[9px] text-emerald-400/60 uppercase tracking-widest font-bold">{t('activeStatus')}</p>
-                          <p className="text-xs font-orbitron font-bold text-white">{t('contributingToEarth')}</p>
+                        <div className="leading-tight">
+                          <p className="text-[7px] text-emerald-400/60 uppercase tracking-widest font-bold">{t('activeStatus')}</p>
+                          <p className="text-[10px] font-orbitron font-bold text-white">{t('contributingToEarth')}</p>
                         </div>
                       </div>
-                      <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+                      <CheckCircle2 className="w-4 h-4 text-emerald-400" />
                     </div>
                   )}
 
@@ -9234,13 +9241,13 @@ export const GameDashboard = ({
                             key={res.label}
                             onClick={() => donateQCToPOI(poi.id)}
                             disabled={!canAfford}
-                            className={`flex flex-col items-center justify-center gap-1 py-2 px-1 border rounded-xl transition-all text-[8px] font-orbitron font-bold uppercase tracking-widest disabled:opacity-30 disabled:cursor-not-allowed group relative overflow-hidden ${
+                            className={`flex flex-col items-center justify-center gap-0.5 py-2 px-0.5 border rounded-lg transition-all text-[9px] font-orbitron font-bold uppercase tracking-widest disabled:opacity-30 disabled:cursor-not-allowed group relative overflow-hidden ${
                               isMax
                                 ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-400'
                                 : 'bg-yellow-500/10 border-yellow-500/40 text-yellow-400 hover:bg-yellow-500/20'
                             }`}
                           >
-                            <res.icon className={`w-3 h-3 group-hover:scale-110 transition-transform ${isMax ? 'text-emerald-400' : 'text-yellow-400'}`} />
+                            <res.icon className={`w-3.5 h-3.5 group-hover:scale-110 transition-transform ${isMax ? 'text-emerald-400' : 'text-yellow-400'}`} />
                             <span>{res.label}</span>
                             <span className={`text-[7px] ${isMax ? 'text-emerald-400/60' : 'text-yellow-400/60'}`}>
                               {isMax ? 'MÁXIMO' : `LVL ${qcLevel}/10`}
@@ -9266,7 +9273,7 @@ export const GameDashboard = ({
                           key={res.label}
                           onClick={() => donateToPOI(poi.id, res.label)}
                           disabled={!canDonate}
-                          className={`flex flex-col items-center justify-center gap-1 py-2 px-1 border rounded-xl transition-all text-[8px] font-orbitron font-bold uppercase tracking-widest disabled:opacity-30 disabled:cursor-not-allowed group relative overflow-hidden ${
+                          className={`flex flex-col items-center justify-center gap-0.5 py-2 px-0.5 border rounded-lg transition-all text-[9px] font-orbitron font-bold uppercase tracking-widest disabled:opacity-30 disabled:cursor-not-allowed group relative overflow-hidden ${
                             isResMax
                               ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-400'
                               : isPrimary 
@@ -9274,7 +9281,7 @@ export const GameDashboard = ({
                                 : 'bg-white/5 border-white/10 text-white hover:bg-white/10'
                           }`}
                         >
-                          <res.icon className={`w-3 h-3 group-hover:scale-110 transition-transform ${isResMax ? 'text-emerald-400' : isPrimary ? `text-${color}-400` : 'text-white/40'}`} />
+                          <res.icon className={`w-3.5 h-3.5 group-hover:scale-110 transition-transform ${isResMax ? 'text-emerald-400' : isPrimary ? `text-${color}-400` : 'text-white/40'}`} />
                           <span>{res.label}</span>
                           <span className={`text-[7px] ${isResMax ? 'text-emerald-400/60' : isPrimary ? `text-${color}-400/60` : 'text-white/40'}`}>
                             {isResMax ? 'MÁXIMO' : `+${(isPrimary ? 0.2 : 0.1) * (voidDonationModes[poi.id] === '10x' ? 10 : 1)}%`}
@@ -9371,10 +9378,10 @@ export const GameDashboard = ({
     const displayEnemy = enemies.find(e => e.hp > 0) || enemies[0];
 
     return (
-      <div className="h-[600px] glass-panel border border-white/10 rounded-2xl flex flex-col overflow-hidden bg-black relative">
+      <div className="h-[450px] lg:h-[420px] glass-panel border border-white/10 rounded-2xl flex flex-col overflow-hidden bg-black relative">
         {/* Background Stars */}
         <div className="absolute inset-0 pointer-events-none opacity-30 overflow-hidden">
-          {[...Array(50)].map((_, i) => (
+          {[...Array(30)].map((_, i) => (
             <motion.div
               key={i}
               className="absolute w-0.5 h-0.5 bg-white rounded-full"
@@ -9396,34 +9403,34 @@ export const GameDashboard = ({
         </div>
 
         {/* Header Stats */}
-        <div className="p-4 border-b border-white/10 bg-black/40 backdrop-blur-md flex justify-between items-center z-10">
+        <div className="p-3 border-b border-white/10 bg-black/40 backdrop-blur-md flex justify-between items-center z-10 shrink-0">
           <div className="space-y-1">
-            <p className="text-[10px] font-orbitron text-white/40 uppercase tracking-widest">{t('yourShip')}</p>
-            <div className="flex gap-2">
-              <div className="w-32 h-2 bg-black/60 rounded-full border border-white/10 overflow-hidden">
+            <p className="text-[8px] font-orbitron text-white/40 uppercase tracking-widest leading-none">{t('yourShip')}</p>
+            <div className="flex gap-1.5">
+              <div className="w-24 h-1.5 bg-black/60 rounded-full border border-white/10 overflow-hidden">
                 <div className="h-full bg-cyan-500 transition-all duration-300" style={{ width: `${(playerStats.shield / playerStats.maxShield) * 100}%` }} />
               </div>
-              <div className="w-32 h-2 bg-black/60 rounded-full border border-white/10 overflow-hidden">
+              <div className="w-24 h-1.5 bg-black/60 rounded-full border border-white/10 overflow-hidden">
                 <div className="h-full bg-red-500 transition-all duration-300" style={{ width: `${(playerStats.hp / playerStats.maxHp) * 100}%` }} />
               </div>
             </div>
           </div>
 
           <div className="text-center">
-             <div className={`text-[10px] font-orbitron font-bold ${isGroupBattle ? 'text-yellow-500' : 'text-red-500'} animate-pulse tracking-[0.2em]`}>
-               {isGroupBattle ? t('groupBattle') : t('realTimeCombat')}
+             <div className={`text-[9px] font-orbitron font-bold ${isGroupBattle ? 'text-yellow-500' : 'text-red-500'} animate-pulse tracking-[0.2em] leading-none`}>
+               {isGroupBattle ? t('groupBattle').toUpperCase() : t('realTimeCombat').toUpperCase()}
              </div>
           </div>
 
           <div className="space-y-1 text-right">
-            <p className="text-[10px] font-orbitron text-white/40 uppercase tracking-widest">
-              {isGroupBattle ? `${t('enemyGroup')} (${enemies.filter(e => e.hp > 0).length} ${t('activeUnits')})` : `${t('enemyShip')} ${displayEnemy.type}`}
+            <p className="text-[8px] font-orbitron text-white/40 uppercase tracking-widest leading-none">
+              {isGroupBattle ? `${t('enemyGroup')} (${enemies.filter(e => e.hp > 0).length})` : `${displayEnemy.type}`}
             </p>
-            <div className="flex gap-2 justify-end">
-              <div className="w-32 h-2 bg-black/60 rounded-full border border-white/10 overflow-hidden">
+            <div className="flex gap-1.5 justify-end">
+              <div className="w-24 h-1.5 bg-black/60 rounded-full border border-white/10 overflow-hidden">
                 <div className="h-full bg-red-500 transition-all duration-300" style={{ width: `${(displayEnemy.hp / displayEnemy.maxHp) * 100}%` }} />
               </div>
-              <div className="w-32 h-2 bg-black/60 rounded-full border border-white/10 overflow-hidden">
+              <div className="w-24 h-1.5 bg-black/60 rounded-full border border-white/10 overflow-hidden">
                 <div className="h-full bg-cyan-500 transition-all duration-300" style={{ width: `${(displayEnemy.shield / displayEnemy.maxShield) * 100}%` }} />
               </div>
             </div>
@@ -9431,12 +9438,12 @@ export const GameDashboard = ({
         </div>
 
         {/* Lanes */}
-        <div className="flex-1 relative p-8 flex flex-col justify-between">
+        <div className="flex-1 relative p-4 flex flex-col justify-between min-h-0">
           {[0, 1, 2, 3].map(lane => (
             <div 
               key={lane} 
               onClick={() => moveVoidPlayer(lane)}
-              className={`h-24 border-y border-white/5 relative flex items-center cursor-pointer transition-all ${playerLane === lane ? 'bg-white/5' : 'hover:bg-white/[0.02]'}`}
+              className={`h-16 lg:h-14 border-y border-white/5 relative flex items-center cursor-pointer transition-all ${playerLane === lane ? 'bg-white/5' : 'hover:bg-white/[0.02]'}`}
             >
               {/* Lane Rail */}
               <div className="absolute left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-white/10 to-transparent" />
@@ -9445,10 +9452,10 @@ export const GameDashboard = ({
               {playerLane === lane && (
                 <motion.div 
                   layoutId="player-ship"
-                  className="absolute left-8 z-20"
+                  className="absolute left-6 z-20"
                 >
-                  <div className="w-12 h-12 bg-cyan-500/20 border-2 border-cyan-500 rounded-lg flex items-center justify-center shadow-[0_0_20px_rgba(6,182,212,0.5)]">
-                    <Rocket className="w-6 h-6 text-cyan-400" />
+                  <div className="w-10 h-10 bg-cyan-500/20 border-2 border-cyan-500 rounded-lg flex items-center justify-center shadow-[0_0_15px_rgba(6,182,212,0.5)]">
+                    <Rocket className="w-5 h-5 text-cyan-400" />
                   </div>
                 </motion.div>
               )}
@@ -9458,15 +9465,15 @@ export const GameDashboard = ({
                 <motion.div 
                   key={enemy.id}
                   layoutId={enemy.id}
-                  className="absolute right-8 z-20"
-                  style={{ marginRight: `${idx * 10}px` }} // Slight offset for multiple enemies in same lane
+                  className="absolute right-6 z-20"
+                  style={{ marginRight: `${idx * 8}px` }} 
                 >
-                  <div className={`w-12 h-12 bg-red-500/20 border-2 border-red-500 rounded-lg flex items-center justify-center shadow-[0_0_20px_rgba(239,68,68,0.5)] ${enemy.type === 'Boss' ? 'scale-125' : ''}`}>
-                    <Sword className="w-6 h-6 text-red-400 rotate-180" />
+                  <div className={`w-10 h-10 bg-red-500/20 border-2 border-red-500 rounded-lg flex items-center justify-center shadow-[0_0_15px_rgba(239,68,68,0.5)] ${enemy.type === 'Boss' ? 'scale-110' : ''}`}>
+                    <Sword className="w-5 h-5 text-red-400 rotate-180" />
                   </div>
                   {/* Small HP bar for each enemy in group */}
                   {isGroupBattle && (
-                    <div className="absolute -bottom-2 left-0 right-0 h-1 bg-black/60 rounded-full overflow-hidden border border-white/10">
+                    <div className="absolute -bottom-1.5 left-0 right-0 h-1 bg-black/60 rounded-full overflow-hidden border border-white/10">
                       <div className="h-full bg-red-500" style={{ width: `${(enemy.hp / enemy.maxHp) * 100}%` }} />
                     </div>
                   )}
@@ -9480,7 +9487,7 @@ export const GameDashboard = ({
                   initial={false}
                   animate={{ left: `${p.x}%` }}
                   transition={{ duration: 0.05, ease: "linear" }}
-                  className={`absolute w-8 h-1 rounded-full z-10 ${p.owner === 'player' ? 'bg-cyan-400 shadow-[0_0_10px_rgba(6,182,212,1)]' : 'bg-red-400 shadow-[0_0_10px_rgba(239,68,68,1)]'}`}
+                  className={`absolute w-6 h-0.5 rounded-full z-10 ${p.owner === 'player' ? 'bg-cyan-400 shadow-[0_0_8px_rgba(6,182,212,1)]' : 'bg-red-400 shadow-[0_0_8px_rgba(239,68,68,1)]'}`}
                 >
                   {p.isCrit && <div className="absolute inset-0 bg-white animate-ping rounded-full" />}
                 </motion.div>
@@ -9490,32 +9497,32 @@ export const GameDashboard = ({
         </div>
 
         {/* Controls */}
-        <div className="p-6 border-t border-white/10 bg-black/60 backdrop-blur-md flex justify-between items-center z-10">
-          <div className="flex gap-4">
+        <div className="p-4 border-t border-white/10 bg-black/60 backdrop-blur-md flex justify-between items-center z-10 shrink-0">
+          <div className="flex gap-3">
             <button 
               onClick={() => moveVoidPlayer(Math.max(0, playerLane - 1))}
               disabled={playerLane === 0}
-              className="w-12 h-12 bg-white/5 border border-white/10 rounded-xl flex items-center justify-center hover:bg-white/10 disabled:opacity-20"
+              className="w-10 h-10 bg-white/5 border border-white/10 rounded-lg flex items-center justify-center hover:bg-white/10 disabled:opacity-20"
             >
-              <ChevronUp className="w-6 h-6 text-white" />
+              <ChevronUp className="w-5 h-5 text-white" />
             </button>
             <button 
               onClick={() => moveVoidPlayer(Math.min(3, playerLane + 1))}
               disabled={playerLane === 3}
-              className="w-12 h-12 bg-white/5 border border-white/10 rounded-xl flex items-center justify-center hover:bg-white/10 disabled:opacity-20"
+              className="w-10 h-10 bg-white/5 border border-white/10 rounded-lg flex items-center justify-center hover:bg-white/10 disabled:opacity-20"
             >
-              <ChevronDown className="w-6 h-6 text-white" />
+              <ChevronDown className="w-5 h-5 text-white" />
             </button>
           </div>
 
           <button 
             onClick={voidPlayerAttack}
-            className="px-16 py-4 bg-red-600 text-white font-orbitron font-black text-xl rounded-2xl hover:bg-red-500 transition-all shadow-[0_0_30px_rgba(239,68,68,0.4)] active:scale-95 uppercase tracking-[0.3em]"
+            className="px-10 py-3 bg-red-600 text-white font-orbitron font-black text-lg rounded-xl hover:bg-red-500 transition-all shadow-[0_0_20px_rgba(239,68,68,0.4)] active:scale-95 uppercase tracking-[0.2em]"
           >
             {t('attack')}
           </button>
 
-          <div className="w-24" />
+          <div className="w-20" />
         </div>
       </div>
     );
@@ -9606,16 +9613,16 @@ export const GameDashboard = ({
 
     if (voidBattleStatus === 'searching') {
       return (
-        <div className="h-[600px] glass-panel border border-white/10 rounded-2xl flex flex-col items-center justify-center space-y-8 bg-black/60">
+        <div className="h-[450px] lg:h-[400px] glass-panel border border-white/10 rounded-2xl flex flex-col items-center justify-center space-y-6 bg-black/60">
           <div className="relative">
-            <div className="w-32 h-32 rounded-full border-4 border-red-500/20 flex items-center justify-center animate-spin-slow">
-              <Radar className="w-16 h-16 text-red-500" />
+            <div className="w-24 h-24 rounded-full border-4 border-red-500/20 flex items-center justify-center animate-spin-slow">
+              <Radar className="w-12 h-12 text-red-500" />
             </div>
             <div className="absolute inset-0 border-4 border-red-500/40 rounded-full animate-ping" />
           </div>
-          <div className="text-center space-y-2">
-            <h3 className="text-2xl font-orbitron font-black text-white tracking-widest uppercase">{t('scanningVoid')}</h3>
-            <p className="text-xs text-red-400/60 font-mono uppercase tracking-[0.2em] animate-pulse">{t('searchingEnemySignatures')}</p>
+          <div className="text-center space-y-1">
+            <h3 className="text-xl font-orbitron font-black text-white tracking-widest uppercase">{t('scanningVoid')}</h3>
+            <p className="text-[10px] text-red-400/60 font-mono uppercase tracking-[0.2em] animate-pulse">{t('searchingEnemySignatures')}</p>
           </div>
         </div>
       );
@@ -9623,51 +9630,51 @@ export const GameDashboard = ({
 
     if (voidBattleStatus === 'choosing') {
       return (
-        <div className="space-y-6">
+        <div className="space-y-4">
           <div className="flex justify-between items-center">
-            <h3 className="text-xl font-orbitron font-black text-white tracking-widest uppercase">{t('targetsDetected')}</h3>
+            <h3 className="text-lg font-orbitron font-black text-white tracking-widest uppercase">{t('targetsDetected')}</h3>
             <button 
               onClick={() => setVoidBattleStatus('idle')}
-              className="px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-[10px] font-orbitron text-white/60 hover:text-white transition-all uppercase tracking-widest"
+              className="px-3 py-1.5 bg-white/5 border border-white/10 rounded-lg text-[9px] font-orbitron text-white/60 hover:text-white transition-all uppercase tracking-widest"
             >
               {t('cancelSearch')}
             </button>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
             {voidBattleOptions.map(enemy => (
-              <div key={enemy.id} className="glass-panel border border-white/10 rounded-2xl p-6 space-y-6 bg-gradient-to-br from-red-500/5 to-black hover:border-red-500/40 transition-all group">
+              <div key={enemy.id} className="glass-panel border border-white/10 rounded-xl p-3 space-y-3 bg-gradient-to-br from-red-500/5 to-black hover:border-red-500/40 transition-all group">
                 <div className="flex justify-between items-start">
-                  <div className={`px-3 py-1 rounded-full text-[8px] font-orbitron font-bold tracking-widest uppercase ${
+                  <div className={`px-2 py-0.5 rounded-full text-[7px] font-orbitron font-bold tracking-widest uppercase ${
                     enemy.type === 'Boss' ? 'bg-red-500 text-black' : enemy.type === 'Elite' ? 'bg-orange-500 text-black' : 'bg-white/10 text-white'
                   }`}>
                     {enemy.type}
                   </div>
                   <div className="text-right">
-                    <p className="text-[9px] text-white/40 uppercase tracking-widest">{t('qcInPossession')}</p>
-                    <p className="text-sm font-orbitron font-bold text-yellow-400">{formatValue(enemy.qc)}</p>
+                    <p className="text-[8px] text-white/40 uppercase tracking-widest leading-none">{t('qcInPossession')}</p>
+                    <p className="text-xs font-orbitron font-bold text-yellow-400">{formatValue(enemy.qc)}</p>
                   </div>
                 </div>
                 
-                <div className="space-y-3">
-                   <div className="flex justify-between text-[10px] font-mono">
+                <div className="space-y-2">
+                   <div className="flex justify-between text-[9px] font-mono leading-none">
                      <span className="text-white/40">ESCUDO</span>
                      <span className="text-cyan-400">{enemy.maxShield}</span>
                    </div>
-                   <div className="h-1.5 bg-black/60 rounded-full overflow-hidden border border-white/5">
+                   <div className="h-1 bg-black/60 rounded-full overflow-hidden border border-white/5">
                      <div className="h-full bg-cyan-500" style={{ width: '100%' }} />
                    </div>
-                   <div className="flex justify-between text-[10px] font-mono">
+                   <div className="flex justify-between text-[9px] font-mono leading-none">
                      <span className="text-white/40">CASCO</span>
                      <span className="text-red-400">{enemy.maxHp}</span>
                    </div>
-                   <div className="h-1.5 bg-black/60 rounded-full overflow-hidden border border-white/5">
+                   <div className="h-1 bg-black/60 rounded-full overflow-hidden border border-white/5">
                      <div className="h-full bg-red-500" style={{ width: '100%' }} />
                    </div>
                 </div>
 
                 <button 
                   onClick={() => selectVoidBattle(enemy)}
-                  className="w-full py-3 bg-red-600 text-white font-orbitron font-black rounded-xl hover:bg-red-500 transition-all uppercase tracking-widest shadow-lg group-hover:scale-105 active:scale-95"
+                  className="w-full py-2 bg-red-600 text-white font-orbitron font-black text-[10px] rounded-lg hover:bg-red-500 transition-all uppercase tracking-widest shadow-lg group-hover:scale-[1.02] active:scale-95"
                 >
                   {t('attackTarget')}
                 </button>
@@ -9684,17 +9691,17 @@ export const GameDashboard = ({
 
     if (voidBattleStatus === 'won' || voidBattleStatus === 'lost') {
       return (
-        <div className="h-[600px] glass-panel border border-white/10 rounded-2xl flex flex-col items-center justify-center space-y-8 bg-black/60">
-           <div className={`w-24 h-24 rounded-2xl flex items-center justify-center border-2 ${voidBattleStatus === 'won' ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-400' : 'bg-red-500/10 border-red-500/40 text-red-400'}`}>
-             {voidBattleStatus === 'won' ? <Trophy className="w-12 h-12" /> : <Skull className="w-12 h-12" />}
+        <div className="h-[450px] lg:h-[400px] glass-panel border border-white/10 rounded-2xl flex flex-col items-center justify-center space-y-6 bg-black/60">
+           <div className={`w-20 h-20 rounded-2xl flex items-center justify-center border-2 ${voidBattleStatus === 'won' ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-400' : 'bg-red-500/10 border-red-500/40 text-red-400'}`}>
+             {voidBattleStatus === 'won' ? <Trophy className="w-10 h-10" /> : <Skull className="w-10 h-10" />}
            </div>
-           <div className="text-center space-y-4">
-             <h3 className={`text-4xl font-orbitron font-black tracking-[0.2em] uppercase ${voidBattleStatus === 'won' ? 'text-emerald-400' : 'text-red-400'}`}>
+           <div className="text-center space-y-2">
+             <h3 className={`text-3xl font-orbitron font-black tracking-[0.2em] uppercase ${voidBattleStatus === 'won' ? 'text-emerald-400' : 'text-red-400'}`}>
                {voidBattleStatus === 'won' ? t('victory') : t('defeat')}
              </h3>
              {voidBattleStatus === 'won' && voidBattleResult && (
-               <div className="space-y-2">
-                 <p className="text-lg font-orbitron text-white">+{formatValue(voidBattleResult.reward)} QC</p>
+               <div className="space-y-1">
+                 <p className="text-base font-orbitron text-white">+{formatValue(voidBattleResult.reward)} QC</p>
                </div>
              )}
            </div>
@@ -9709,8 +9716,8 @@ export const GameDashboard = ({
     }
 
     return (
-      <div className="space-y-6">
-        <div className={`glass-panel border-2 rounded-2xl p-8 relative overflow-hidden transition-all duration-700 ${rStyle.container}`}>
+      <div className="space-y-4">
+        <div className={`glass-panel border-2 rounded-xl p-4 relative overflow-hidden transition-all duration-700 ${rStyle.container}`}>
           {stats.rarity === 'mythic' && (
             <motion.div
               animate={{
@@ -9724,19 +9731,19 @@ export const GameDashboard = ({
               className="absolute inset-0 opacity-50 pointer-events-none"
             />
           )}
-          <div className="flex flex-col lg:flex-row gap-8 items-center relative z-10">
+          <div className="flex flex-col lg:flex-row gap-4 items-center relative z-10">
             <div className="relative">
-              <div className={`w-48 h-48 rounded-full border-4 flex items-center justify-center transition-all duration-700 ${rStyle.swordContainer}`}>
+              <div className={`w-32 h-32 rounded-full border-4 flex items-center justify-center transition-all duration-700 ${rStyle.swordContainer}`}>
                 {stats.rarity === 'legendary' && (
                   <motion.div
                     animate={{ opacity: [0.3, 0.6, 0.3], scale: [1, 1.2, 1] }}
                     transition={{ duration: 1.5, repeat: Infinity }}
                     className="absolute inset-0 flex items-center justify-center pointer-events-none"
                   >
-                    <Flame className="w-32 h-32 text-orange-500/30 blur-md" />
+                    <Flame className="w-24 h-24 text-orange-500/30 blur-md" />
                   </motion.div>
                 )}
-                <Sword className={`w-24 h-24 animate-pulse transition-all duration-700 ${rStyle.sword}`} />
+                <Sword className={`w-16 h-16 animate-pulse transition-all duration-700 ${rStyle.sword}`} />
               </div>
               <div className={`absolute -bottom-2 -right-2 font-orbitron font-black px-4 py-1 rounded-full text-xs shadow-lg transition-all duration-700 ${rStyle.badge}`}>
                 {t('battleReady')}
@@ -9856,7 +9863,7 @@ export const GameDashboard = ({
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 {[
                   { label: t('baseDamage'), value: `${(effectiveStats.damage || 100).toFixed(0)}`, icon: Flame, color: 'text-orange-400' },
                   { label: t('criticalDamage'), value: `${((effectiveStats.damage || 100) * 10).toFixed(0)}`, icon: Zap, color: 'text-yellow-400' },
@@ -9873,28 +9880,28 @@ export const GameDashboard = ({
                 ))}
               </div>
 
-              <div className="flex gap-4">
+              <div className="flex gap-3">
                 <button
                   onClick={isVoidWarActive ? () => setShowVoidWarMap(true) : () => startVoidBattle()}
                   disabled={stats.hp <= 0}
-                  className={`flex-1 py-4 font-orbitron font-black rounded-xl transition-all active:scale-95 uppercase tracking-[0.2em] flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed ${
+                  className={`flex-1 py-3 font-orbitron font-black rounded-xl transition-all active:scale-95 uppercase tracking-[0.2em] flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed ${
                     isVoidWarActive 
                       ? 'bg-red-600 text-white shadow-[0_0_30px_rgba(220,38,38,0.6)] animate-pulse border-2 border-red-400' 
                       : 'bg-red-600 text-white shadow-[0_0_30px_rgba(239,68,68,0.4)] hover:bg-red-500'
                   }`}
                 >
-                  {isVoidWarActive ? <Skull className="w-5 h-5" /> : <Crosshair className="w-5 h-5" />}
+                  {isVoidWarActive ? <Skull className="w-4 h-4" /> : <Crosshair className="w-4 h-4" />}
                   {isVoidWarActive ? t('eliminateEnemies') : t('searchCombat')}
                 </button>
                 <button
                   onClick={repairVoidBattleShip}
                   disabled={stats.hp >= getEffectiveVoidStats(stats).maxHp && (stats.shield || 0) >= (getEffectiveVoidStats(stats).maxShield || 1000)}
-                  className="px-8 py-4 bg-white/10 text-white font-orbitron font-bold rounded-xl hover:bg-white/20 transition-all border border-white/20 active:scale-95 uppercase tracking-[0.2em] disabled:opacity-50 disabled:cursor-not-allowed group relative"
+                  className="px-6 py-3 bg-white/10 text-white font-orbitron font-bold rounded-xl hover:bg-white/20 transition-all border border-white/20 active:scale-95 uppercase tracking-[0.2em] disabled:opacity-50 disabled:cursor-not-allowed group relative"
                 >
                   <div className="flex flex-col items-center">
-                    <span>{t('repair')}</span>
-                    <span className="text-[8px] text-white/40 group-hover:text-white/60">
-                      {stats.hp < getEffectiveVoidStats(stats).maxHp ? '1.5k Energia | 1.5k Tech' : '1k Energia | 1k Tech'}
+                    <span className="text-xs">{t('repair')}</span>
+                    <span className="text-[7px] text-white/40 group-hover:text-white/60">
+                      {stats.hp < getEffectiveVoidStats(stats).maxHp ? '1.5k Ener | 1.5k Tech' : '1k Ener | 1k Tech'}
                     </span>
                   </div>
                 </button>
@@ -9941,8 +9948,8 @@ export const GameDashboard = ({
               <button
                 key={upg.id}
                 onClick={() => upgradeVoidBattleShip(upg.id as any)}
-                disabled={isMax || !canAfford}
-                className={`glass-panel border p-6 rounded-xl flex flex-col gap-4 transition-all relative overflow-hidden text-left ${isMax ? 'border-emerald-500/30 bg-emerald-500/5' : canAfford ? 'border-red-500/20 hover:border-red-500/50' : 'border-white/5 opacity-50 grayscale'}`}
+                disabled={isMax || !canAfford || isVoidWarActive}
+                className={`glass-panel border p-6 rounded-xl flex flex-col gap-4 transition-all relative overflow-hidden text-left ${isMax ? 'border-emerald-500/30 bg-emerald-500/5' : (canAfford && !isVoidWarActive) ? 'border-red-500/20 hover:border-red-500/50' : 'border-white/5 opacity-50 grayscale'}`}
               >
                 <div className="flex justify-between items-start">
                   <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20">
@@ -10181,46 +10188,41 @@ export const GameDashboard = ({
       <motion.div 
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        className="space-y-6 max-h-[75vh] overflow-y-auto pr-2 custom-scrollbar relative px-1"
+        className="space-y-4 relative px-1 flex flex-col"
       >
         {/* Header - Global Status */}
-        <div className="p-8 rounded-3xl bg-black/40 border border-emerald-500/30 relative overflow-hidden group">
+        <div className="p-4 rounded-xl bg-black/40 border border-emerald-500/30 relative overflow-hidden group shrink-0">
           <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/10 via-transparent to-blue-500/5 opacity-50" />
           
-          <div className="relative z-10 flex flex-col md:flex-row justify-between items-center gap-8">
-            <div className="flex flex-col items-center md:items-start text-center md:text-left space-y-4">
-               <div className="flex items-center gap-4">
-                  <div className="w-16 h-16 rounded-2xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center shadow-[0_0_30px_rgba(16,185,129,0.2)] group-hover:shadow-[0_0_50px_rgba(16,185,129,0.4)] transition-all duration-500">
-                     <Globe className="w-8 h-8 text-emerald-400 animate-pulse" />
+          <div className="relative z-10 flex flex-col md:flex-row justify-between items-center gap-4">
+            <div className="flex flex-col items-center md:items-start text-center md:text-left space-y-2">
+               <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center shadow-[0_0_20px_rgba(16,185,129,0.2)] group-hover:shadow-[0_0_40px_rgba(16,185,129,0.4)] transition-all duration-500">
+                     <Globe className="w-6 h-6 text-emerald-400 animate-pulse" />
                   </div>
                   <div>
-                    <h1 className="text-3xl font-orbitron font-black text-white uppercase tracking-tighter">Projeto Terra</h1>
-                    <div className="flex items-center gap-2 text-emerald-400/80 font-mono text-[10px] uppercase tracking-[0.2em]">
-                      <div className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+                    <h1 className="text-xl font-orbitron font-black text-white uppercase tracking-tighter">Projeto Terra</h1>
+                    <div className="flex items-center gap-2 text-emerald-400/80 font-mono text-[8px] uppercase tracking-[0.2em]">
+                      <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
                       {language === 'pt' ? 'Rota 4 - Evolução Ativa' : 'Route 4 - Active Evolution'}
                     </div>
                   </div>
                </div>
-               <p className="max-w-md text-slate-400 font-mono text-[10px] uppercase tracking-widest leading-relaxed">
-                 {language === 'pt' 
-                   ? 'O planeta está em processo de evolução autônoma. Observe o florescer da vida enquanto o tempo avança rapidamente.'
-                   : 'The planet is in a process of autonomous evolution. Observe the blossoming of life as time moves forward rapidly.'}
-               </p>
             </div>
 
-            <div className="flex gap-4">
-              <div className="flex flex-col items-center bg-white/5 border border-white/10 p-6 rounded-2xl min-w-[140px] relative overflow-hidden group/season">
+            <div className="flex gap-2">
+              <div className="flex flex-col items-center bg-white/5 border border-white/10 p-3 rounded-xl min-w-[100px] relative overflow-hidden group/season">
                  <div className="absolute inset-0 bg-emerald-500/5 group-hover/season:bg-emerald-500/10 transition-colors" />
-                 <div className="text-[10px] font-orbitron text-emerald-500/60 uppercase tracking-[0.3em] mb-1 z-10">{language === 'pt' ? 'ESTAÇÃO' : 'SEASON'}</div>
-                 <div className={`text-2xl font-orbitron font-black z-10 ${season.color}`}>
+                 <div className="text-[8px] font-orbitron text-emerald-500/60 uppercase tracking-[0.3em] mb-1 z-10">{language === 'pt' ? 'ESTAÇÃO' : 'SEASON'}</div>
+                 <div className={`text-sm font-orbitron font-black z-10 ${season.color}`}>
                    {language === 'pt' ? season.pt : season.en}
                  </div>
               </div>
 
-              <div className="flex flex-col items-center bg-white/5 border border-white/10 p-6 rounded-2xl min-w-[140px] relative overflow-hidden group/year">
+              <div className="flex flex-col items-center bg-white/5 border border-white/10 p-3 rounded-xl min-w-[100px] relative overflow-hidden group/year">
                  <div className="absolute inset-0 bg-emerald-500/5 group-hover/year:bg-emerald-500/10 transition-colors" />
-                 <div className="text-[10px] font-orbitron text-emerald-500/60 uppercase tracking-[0.3em] mb-1 z-10">{language === 'pt' ? 'ANO ATUAL' : 'CURRENT YEAR'}</div>
-                 <div className="text-4xl font-orbitron font-black text-white z-10 tabular-nums text-center">
+                 <div className="text-[8px] font-orbitron text-emerald-500/60 uppercase tracking-[0.3em] mb-1 z-10">{language === 'pt' ? 'ANO ATUAL' : 'CURRENT YEAR'}</div>
+                 <div className="text-xl font-orbitron font-black text-white z-10 tabular-nums text-center">
                    {gameTime.years}
                  </div>
               </div>
@@ -10229,60 +10231,37 @@ export const GameDashboard = ({
         </div>
 
         {/* Population & Main Indicators Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 shrink-0">
            {/* Population Card */}
-           <div className="glass-panel p-6 rounded-2xl border border-white/5 space-y-4 relative group">
+           <div className="glass-panel p-4 rounded-xl border border-white/5 space-y-3 relative group">
               <div className="flex justify-between items-center">
                  <div className="flex items-center gap-2">
-                    <div className="p-2 rounded-lg bg-blue-500/10 text-blue-400">
-                       <Activity size={18} />
+                    <div className="p-1.5 rounded-lg bg-blue-500/10 text-blue-400">
+                       <Activity size={14} />
                     </div>
-                    <span className="text-xs font-orbitron font-bold text-white uppercase tracking-widest">{language === 'pt' ? 'População Total' : 'Total Population'}</span>
+                    <span className="text-[10px] font-orbitron font-bold text-white uppercase tracking-widest">{language === 'pt' ? 'População Total' : 'Total Population'}</span>
                  </div>
-                 <div className="text-2xl font-orbitron font-black text-white tabular-nums">
+                 <div className="text-xl font-orbitron font-black text-white tabular-nums">
                     {formatValue(Math.floor(totalHumanPopulation))}
                  </div>
               </div>
 
-              <div className="flex justify-between items-center text-[10px] font-mono text-slate-400 uppercase tracking-widest">
-                 <span>{language === 'pt' ? 'População Humana' : 'Human Population'}</span>
-                 <span className="text-white">{formatValue(Math.floor(totalHumanPopulation))}</span>
-              </div>
-
-              <div className="pt-4 border-t border-white/5">
-                 <div className="space-y-2">
-                    <div className="text-[9px] font-mono text-slate-500 uppercase tracking-widest">{language === 'pt' ? 'Distribuição' : 'Distribution'}</div>
-                    <div className="flex flex-col gap-1.5">
-                       <div className="flex justify-between items-center">
-                          <span className="text-[10px] text-zinc-500">Terra</span>
-                          <span className="text-[10px] text-white font-bold">{formatValue(Math.floor(earthPopulation))}</span>
-                       </div>
-                       {colonies.map(col => (
-                          <div key={col.id} className="flex justify-between items-center">
-                             <span className="text-[10px] text-zinc-500">{col.name}</span>
-                             <span className="text-[10px] text-white font-bold">{formatValue(Math.floor(col.population))}</span>
-                          </div>
-                       ))}
-                    </div>
-                 </div>
-              </div>
-
-              <div className="pt-4 border-t border-white/5">
-                 <div className="space-y-2">
-                    <div className="text-[9px] font-mono text-slate-500 uppercase tracking-widest">{language === 'pt' ? 'Gêneros' : 'Genders'}</div>
+              <div className="pt-2 border-t border-white/5">
+                 <div className="space-y-1">
+                    <div className="text-[8px] font-mono text-slate-500 uppercase tracking-widest">{language === 'pt' ? 'Gêneros' : 'Genders'}</div>
                     <div className="flex items-center gap-3">
                        <div className="flex-1 space-y-1">
-                          <div className="flex justify-between text-[10px] font-bold">
-                             <span className="text-blue-400">{(earthMaleRatio * 100).toFixed(1)}% {language === 'pt' ? 'Homens' : 'Men'}</span>
-                             <span className="text-pink-400">{((1 - earthMaleRatio) * 100).toFixed(1)}% {language === 'pt' ? 'Mulheres' : 'Women'}</span>
+                          <div className="flex justify-between text-[8px] font-bold">
+                             <span className="text-blue-400">{(earthMaleRatio * 100).toFixed(1)}% {language === 'pt' ? 'H' : 'M'}</span>
+                             <span className="text-pink-400">{((1 - earthMaleRatio) * 100).toFixed(1)}% {language === 'pt' ? 'M' : 'W'}</span>
                           </div>
-                          <div className="h-1.5 bg-white/5 rounded-full overflow-hidden flex">
+                          <div className="h-1 bg-white/5 rounded-full overflow-hidden flex">
                              <motion.div 
-                               className="h-full bg-blue-500 shadow-[0_0_5px_rgba(59,130,246,0.5)]" 
+                               className="h-full bg-blue-500" 
                                animate={{ width: `${earthMaleRatio * 100}%` }} 
                              />
                              <motion.div 
-                               className="h-full bg-pink-500 shadow-[0_0_5px_rgba(236,72,153,0.5)]" 
+                               className="h-full bg-pink-500" 
                                animate={{ width: `${(1 - earthMaleRatio) * 100}%` }} 
                              />
                           </div>
@@ -10293,27 +10272,27 @@ export const GameDashboard = ({
            </div>
 
            {/* Biodiversity Card */}
-           <div className="glass-panel p-6 rounded-2xl border border-white/5 space-y-4 relative group">
+           <div className="glass-panel p-4 rounded-xl border border-white/5 space-y-3 relative group">
               <div className="flex justify-between items-center">
                  <div className="flex items-center gap-2">
-                    <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-400">
-                       <Heart size={18} />
+                    <div className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-400">
+                       <Heart size={14} />
                     </div>
-                    <span className="text-xs font-orbitron font-bold text-white uppercase tracking-widest">{language === 'pt' ? 'Biodiversidade' : 'Biodiversity'}</span>
+                    <span className="text-[10px] font-orbitron font-bold text-white uppercase tracking-widest">{language === 'pt' ? 'Biodiversidade' : 'Biodiversity'}</span>
                  </div>
-                 <div className={`text-[10px] font-orbitron font-bold uppercase tracking-widest ${getBiodiversityColor(earthBiodiversity)}`}>
+                 <div className={`text-[9px] font-orbitron font-bold uppercase tracking-widest ${getBiodiversityColor(earthBiodiversity)}`}>
                     {getBiodiversityQuality(earthBiodiversity)}
                  </div>
               </div>
 
-              <div className="space-y-2 pt-4">
+              <div className="space-y-1 pt-2 border-t border-white/5">
                  <div className="flex justify-between items-end">
-                    <span className="text-[9px] font-mono text-slate-500 uppercase">{language === 'pt' ? 'Índice de Vida' : 'Life Index'}</span>
-                    <span className="text-lg font-mono font-bold text-emerald-400 tabular-nums">{earthBiodiversity.toFixed(1)}%</span>
+                    <span className="text-[8px] font-mono text-slate-500 uppercase">{language === 'pt' ? 'Vida' : 'Life'}</span>
+                    <span className="text-md font-mono font-bold text-emerald-400 tabular-nums">{earthBiodiversity.toFixed(1)}%</span>
                  </div>
-                 <div className="h-2 bg-black/40 rounded-full overflow-hidden p-0.5 border border-white/10">
+                 <div className="h-1.5 bg-black/40 rounded-full overflow-hidden border border-white/10">
                     <motion.div 
-                      className="h-full bg-gradient-to-r from-emerald-600 to-emerald-400 rounded-full shadow-[0_0_10px_rgba(16,185,129,0.3)]"
+                      className="h-full bg-gradient-to-r from-emerald-600 to-emerald-400 rounded-full"
                       animate={{ width: `${earthBiodiversity}%` }}
                     />
                  </div>
@@ -10322,7 +10301,7 @@ export const GameDashboard = ({
         </div>
 
         {/* Quality Indicators Grid */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 shrink-0">
            {[
              { label: language === 'pt' ? 'Saúde' : 'Health', val: earthHealth, color: 'emerald', icon: Activity },
              { label: language === 'pt' ? 'Felicidade' : 'Happiness', val: earthHappiness, color: 'yellow', icon: TrendingUp },
@@ -11101,7 +11080,7 @@ export const GameDashboard = ({
             })}
           </div>
 
-          <div className={`flex-1 overflow-y-auto pr-2 custom-scrollbar flex flex-col ${(activeTab === 'routes' || activeTab === 'routes2' || activeTab === 'aircraft' || activeTab === 'technology' || activeTab === 'upgrades' || activeTab === 'auto' || activeTab === 'battleLevel' || activeTab === 'mining') ? 'lg:overflow-hidden' : ''}`}>
+          <div className={`flex-1 overflow-y-auto pr-2 custom-scrollbar flex flex-col ${(activeTab === 'routes' || activeTab === 'routes2' || activeTab === 'aircraft' || activeTab === 'technology' || activeTab === 'upgrades' || activeTab === 'auto' || activeTab === 'battleLevel' || activeTab === 'mining' || activeTab === 'void_aircraft' || activeTab === 'void_battle' || activeTab === 'void_map' || activeTab === 'void_war' || activeTab === 'colonies' || activeTab === 'void_earth' || activeTab === 'history') ? 'lg:overflow-hidden' : ''}`}>
             {isVoid && (
               <motion.div 
                 initial={{ opacity: 0, y: -10 }}
@@ -13249,29 +13228,29 @@ export const GameDashboard = ({
                                 </div>
                               </div>
                             ) : tier === 'Earth' ? (
-                              <div className="flex-1 space-y-8 py-4">
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                  <div className="bg-emerald-500/10 border border-emerald-500/20 p-6 rounded-2xl text-center space-y-2">
-                                     <div className="text-[10px] font-orbitron text-emerald-400 uppercase tracking-widest">{language === 'pt' ? 'ANOS DE EVOLUÇÃO' : 'YEARS OF EVOLUTION'}</div>
-                                     <div className="text-4xl font-orbitron font-black text-white">{gameTime.years}</div>
+                              <div className="flex-1 space-y-4 py-2">
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                  <div className="bg-emerald-500/10 border border-emerald-500/20 p-4 rounded-xl text-center space-y-1">
+                                     <div className="text-[9px] font-orbitron text-emerald-400 uppercase tracking-widest">{language === 'pt' ? 'ANOS DE EVOLUÇÃO' : 'YEARS OF EVOLUTION'}</div>
+                                     <div className="text-2xl font-orbitron font-black text-white">{gameTime.years}</div>
                                   </div>
-                                  <div className="bg-blue-500/10 border border-blue-500/20 p-6 rounded-2xl text-center space-y-2">
-                                     <div className="text-[10px] font-orbitron text-blue-400 uppercase tracking-widest">{language === 'pt' ? 'POPULAÇÃO FINAL' : 'FINAL POPULATION'}</div>
-                                     <div className="text-4xl font-orbitron font-black text-white">{formatValue(Math.floor(totalHumanPopulation))}</div>
+                                  <div className="bg-blue-500/10 border border-blue-500/20 p-4 rounded-xl text-center space-y-1">
+                                     <div className="text-[9px] font-orbitron text-blue-400 uppercase tracking-widest">{language === 'pt' ? 'POPULAÇÃO FINAL' : 'FINAL POPULATION'}</div>
+                                     <div className="text-2xl font-orbitron font-black text-white">{formatValue(Math.floor(totalHumanPopulation))}</div>
                                   </div>
-                                  <div className="bg-emerald-500/10 border border-emerald-500/20 p-6 rounded-2xl text-center space-y-2">
-                                     <div className="text-[10px] font-orbitron text-emerald-400 uppercase tracking-widest">{language === 'pt' ? 'BIODIVERSIDADE' : 'BIODIVERSITY'}</div>
-                                     <div className="text-4xl font-orbitron font-black text-white">{earthBiodiversity.toFixed(0)}%</div>
+                                  <div className="bg-emerald-500/10 border border-emerald-500/20 p-4 rounded-xl text-center space-y-1">
+                                     <div className="text-[9px] font-orbitron text-emerald-400 uppercase tracking-widest">{language === 'pt' ? 'BIODIVERSIDADE' : 'BIODIVERSITY'}</div>
+                                     <div className="text-2xl font-orbitron font-black text-white">{earthBiodiversity.toFixed(0)}%</div>
                                   </div>
                                 </div>
 
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                   <div className="space-y-4">
-                                      <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                                        <Activity className="w-4 h-4 text-emerald-400" />
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                   <div className="space-y-2">
+                                      <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+                                        <Activity className="w-3 h-3 text-emerald-400" />
                                         {language === 'pt' ? 'Indicadores Globais' : 'Global Indicators'}
                                       </h4>
-                                      <div className="space-y-4 bg-black/20 p-6 rounded-2xl border border-white/5">
+                                      <div className="space-y-2 bg-black/20 p-4 rounded-xl border border-white/5">
                                          {[
                                            { label: language === 'pt' ? 'Saúde' : 'Health', val: earthHealth, color: 'text-emerald-400' },
                                            { label: language === 'pt' ? 'Felicidade' : 'Happiness', val: earthHappiness, color: 'text-yellow-400' },
@@ -13294,21 +13273,21 @@ export const GameDashboard = ({
                                       </div>
                                    </div>
 
-                                   <div className="space-y-4">
-                                      <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                                        <HistoryIcon className="w-4 h-4 text-yellow-400" />
+                                   <div className="space-y-2">
+                                      <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+                                        <HistoryIcon className="w-3 h-3 text-yellow-400" />
                                         {language === 'pt' ? 'Resumo da Evolução' : 'Evolution Summary'}
                                       </h4>
-                                      <div className="bg-black/20 p-6 rounded-2xl border border-white/5 space-y-4">
-                                         <div className="flex justify-between items-center">
-                                            <span className="text-[10px] font-mono text-slate-500 uppercase">{language === 'pt' ? 'Eventos Ocorridos' : 'Events Occurred'}</span>
-                                            <span className="text-lg font-orbitron text-white">{earthEvents.length}</span>
+                                      <div className="bg-black/20 p-4 rounded-xl border border-white/5 space-y-3">
+                                         <div className="flex justify-between items-center text-[9px]">
+                                            <span className="font-mono text-slate-500 uppercase">{language === 'pt' ? 'Eventos Ocorridos' : 'Events Occurred'}</span>
+                                            <span className="font-orbitron text-white">{earthEvents.length}</span>
                                          </div>
-                                         <div className="pt-4 mt-4 border-t border-white/5">
-                                            <p className="text-[10px] text-slate-500 font-mono text-center uppercase leading-relaxed italic">
+                                         <div className="pt-2 mt-2 border-t border-white/5">
+                                            <p className="text-[8px] text-slate-500 font-mono text-center uppercase leading-relaxed italic">
                                                {language === 'pt' 
-                                                 ? 'O Ciclo de Terra continua... os dados estão sendo preservados para a posteridade.' 
-                                                 : 'The Earth Cycle continues... data is being preserved for posterity.'}
+                                                 ? 'O Ciclo de Terra continua... os dados estão sendo preservados.' 
+                                                 : 'The Earth Cycle continues... data is being preserved.'}
                                             </p>
                                          </div>
                                       </div>
@@ -13316,93 +13295,93 @@ export const GameDashboard = ({
                                 </div>
                               </div>
                             ) : (
-                              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 flex-1">
-                                <div className="space-y-6">
+                              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 flex-1">
+                                <div className="space-y-4">
                                 <div>
-                                  <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                                  <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-2">
                                     <Activity className="w-4 h-4 text-emerald-400" />
                                     {t('totalDeliveriesBattlesMining')}
                                   </h4>
-                                  <div className="space-y-3 bg-black/20 p-4 rounded-2xl border border-white/5">
-                                    <div className="flex justify-between items-center">
-                                      <span className="text-xs text-slate-500 uppercase font-mono">{t('randomBattlesFound')}</span>
-                                      <span className="text-sm font-mono text-white">{formatValue(stats.randomBattlesFound || 0)}</span>
+                                  <div className="space-y-2 bg-black/20 p-4 rounded-xl border border-white/5">
+                                    <div className="flex justify-between items-center text-[9px]">
+                                      <span className="text-slate-500 uppercase font-mono">{t('randomBattlesFound')}</span>
+                                      <span className="font-mono text-white">{formatValue(stats.randomBattlesFound || 0)}</span>
                                     </div>
-                                    <div className="flex justify-between items-center">
-                                      <span className="text-xs text-slate-500 uppercase font-mono">{t('radarBattlesFound')}</span>
-                                      <span className="text-sm font-mono text-white">{formatValue(stats.radarBattlesFound || 0)}</span>
+                                    <div className="flex justify-between items-center text-[9px]">
+                                      <span className="text-slate-500 uppercase font-mono">{t('radarBattlesFound')}</span>
+                                      <span className="font-mono text-white">{formatValue(stats.radarBattlesFound || 0)}</span>
                                     </div>
-                                    <div className="h-px bg-white/5 my-2" />
-                                    <div className="flex justify-between items-center">
-                                      <span className="text-xs text-slate-500 uppercase font-mono">{t('manualDeliveries')}</span>
-                                      <span className="text-sm font-mono text-white">{formatValue(stats.manualDeliveries)}</span>
+                                    <div className="h-px bg-white/5 my-1" />
+                                    <div className="flex justify-between items-center text-[9px]">
+                                      <span className="text-slate-500 uppercase font-mono">{t('manualDeliveries')}</span>
+                                      <span className="font-mono text-white">{formatValue(stats.manualDeliveries)}</span>
                                     </div>
-                                    <div className="flex justify-between items-center">
-                                      <span className="text-xs text-slate-500 uppercase font-mono">{t('autoDeliveries')}</span>
-                                      <span className="text-sm font-mono text-white">{formatValue(stats.autoDeliveries)}</span>
+                                    <div className="flex justify-between items-center text-[9px]">
+                                      <span className="text-slate-500 uppercase font-mono">{t('autoDeliveries')}</span>
+                                      <span className="font-mono text-white">{formatValue(stats.autoDeliveries)}</span>
                                     </div>
-                                    <div className="h-px bg-white/5 my-2" />
-                                    <div className="flex justify-between items-center">
-                                      <span className="text-xs text-slate-500 uppercase font-mono">{t('totalMiningPacksSold')}</span>
-                                      <span className="text-sm font-mono text-white">{formatValue((stats.manualMiningPacksSold || 0) + (stats.autoMiningPacksSold || 0))}</span>
+                                    <div className="h-px bg-white/5 my-1" />
+                                    <div className="flex justify-between items-center text-[9px]">
+                                      <span className="text-slate-500 uppercase font-mono">{t('totalMiningPacksSold')}</span>
+                                      <span className="font-mono text-white">{formatValue((stats.manualMiningPacksSold || 0) + (stats.autoMiningPacksSold || 0))}</span>
                                     </div>
-                                    <div className="flex justify-between items-center">
-                                      <span className="text-xs text-slate-500 uppercase font-mono">{t('totalExplorationMiningPacksSold')}</span>
-                                      <span className="text-sm font-mono text-white">{formatValue((stats.manualExtractionPacksSold || 0) + (stats.autoExtractionPacksSold || 0))}</span>
+                                    <div className="flex justify-between items-center text-[9px]">
+                                      <span className="text-slate-500 uppercase font-mono">{t('totalExplorationMiningPacksSold')}</span>
+                                      <span className="font-mono text-white">{formatValue((stats.manualExtractionPacksSold || 0) + (stats.autoExtractionPacksSold || 0))}</span>
                                     </div>
-                                    <div className="h-px bg-white/5 my-2" />
-                                    <div className="flex justify-between items-center">
-                                      <span className="text-xs text-slate-500 uppercase font-mono">{t('missionsCompleted')}</span>
-                                      <span className="text-sm font-mono text-white">{formatValue(stats.missionsCompleted)}</span>
+                                    <div className="h-px bg-white/5 my-1" />
+                                    <div className="flex justify-between items-center text-[9px]">
+                                      <span className="text-slate-500 uppercase font-mono">{t('missionsCompleted')}</span>
+                                      <span className="font-mono text-white">{formatValue(stats.missionsCompleted)}</span>
                                     </div>
                                   </div>
                                 </div>
                               </div>
 
-                              <div className="space-y-6">
+                              <div className="space-y-3">
                                 <div>
-                                  <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
-                                    <TrendingUp className="w-4 h-4 text-cyan-400" />
+                                  <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-2">
+                                    <TrendingUp className="w-3.5 h-3.5 text-cyan-400" />
                                     {t('totalQCAcquired')}
                                   </h4>
-                                  <div className="space-y-3 bg-black/20 p-4 rounded-2xl border border-white/5">
-                                    <div className="flex justify-between items-center">
-                                      <span className="text-xs text-slate-500 uppercase font-mono">{t('fromDeliveries')}</span>
-                                      <span className="text-sm font-mono text-emerald-400">+{formatValue(stats.qcFromDeliveries)}</span>
+                                  <div className="space-y-1.5 bg-black/20 p-3 rounded-xl border border-white/5">
+                                    <div className="flex justify-between items-center text-[9px]">
+                                      <span className="text-slate-500 uppercase font-mono">{t('fromDeliveries')}</span>
+                                      <span className="font-mono text-emerald-400">+{formatValue(stats.qcFromDeliveries)}</span>
                                     </div>
-                                    <div className="flex justify-between items-center">
-                                      <span className="text-xs text-slate-500 uppercase font-mono">{t('fromMining')}</span>
-                                      <span className="text-sm font-mono text-emerald-400">+{formatValue(stats.qcFromMining)}</span>
+                                    <div className="flex justify-between items-center text-[9px]">
+                                      <span className="text-slate-500 uppercase font-mono">{t('fromMining')}</span>
+                                      <span className="font-mono text-emerald-400">+{formatValue(stats.qcFromMining)}</span>
                                     </div>
-                                    <div className="flex justify-between items-center">
-                                      <span className="text-xs text-slate-500 uppercase font-mono">{t('fromExplorationMining')}</span>
-                                      <span className="text-sm font-mono text-emerald-400">+{formatValue(stats.qcFromExtraction || 0)}</span>
+                                    <div className="flex justify-between items-center text-[9px]">
+                                      <span className="text-slate-500 uppercase font-mono">{t('fromExplorationMining')}</span>
+                                      <span className="font-mono text-emerald-400">+{formatValue(stats.qcFromExtraction || 0)}</span>
                                     </div>
-                                    <div className="flex justify-between items-center">
-                                      <span className="text-xs text-slate-500 uppercase font-mono">{t('fromMissions')}</span>
-                                      <span className="text-sm font-mono text-emerald-400">+{formatValue((stats.qcFromMissions || 0) + (stats.qcFromTutorial || 0))}</span>
+                                    <div className="flex justify-between items-center text-[9px]">
+                                      <span className="text-slate-500 uppercase font-mono">{t('fromMissions')}</span>
+                                      <span className="font-mono text-emerald-400">+{formatValue((stats.qcFromMissions || 0) + (stats.qcFromTutorial || 0))}</span>
                                     </div>
-                                    <div className="flex justify-between items-center">
-                                      <span className="text-xs text-slate-500 uppercase font-mono">{t('fromAllBattles')}</span>
-                                      <span className="text-sm font-mono text-emerald-400">+{formatValue(stats.qcFromBattles || 0)}</span>
+                                    <div className="flex justify-between items-center text-[9px]">
+                                      <span className="text-slate-500 uppercase font-mono">{t('fromAllBattles')}</span>
+                                      <span className="font-mono text-emerald-400">+{formatValue(stats.qcFromBattles || 0)}</span>
                                     </div>
-                                    <div className="h-px bg-white/10 my-2" />
+                                    <div className="h-px bg-white/10 my-1" />
                                     <div className="flex justify-between items-center">
-                                      <span className="text-xs font-bold text-white uppercase font-orbitron">{t('totalQCAcquired')}</span>
-                                      <span className={`text-lg font-orbitron ${tierColor}`}>{formatValue(stats.qcTotalAcquired)}</span>
+                                      <span className="text-[10px] font-bold text-white uppercase font-orbitron">{t('totalQCAcquired')}</span>
+                                      <span className={`text-base font-orbitron ${tierColor}`}>{formatValue(stats.qcTotalAcquired)}</span>
                                     </div>
                                   </div>
                                 </div>
 
                                 <div>
-                                  <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
-                                    <LogOut className="w-4 h-4 text-pink-400 rotate-90" />
+                                  <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-2">
+                                    <LogOut className="w-3.5 h-3.5 text-pink-400 rotate-90" />
                                     {t('totalQCSpent')}
                                   </h4>
-                                  <div className="bg-pink-500/5 p-4 rounded-2xl border border-pink-500/20">
+                                  <div className="bg-pink-500/5 p-3 rounded-xl border border-pink-500/20">
                                     <div className="flex justify-between items-center">
-                                      <span className="text-xs text-slate-500 uppercase font-mono">{t('fromAllSources')}</span>
-                                      <span className="text-lg font-orbitron text-pink-400">-{formatValue(stats.qcSpent)}</span>
+                                      <span className="text-[9px] text-slate-500 uppercase font-mono">{t('fromAllSources')}</span>
+                                      <span className="text-base font-orbitron text-pink-400">-{formatValue(stats.qcSpent)}</span>
                                     </div>
                                   </div>
                                 </div>
