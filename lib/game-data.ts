@@ -756,7 +756,7 @@ export const SHIPS: Ship[] = [
     maxSpeed: 5000,
     technology: 'Reator de Pulso Interestelar',
     description: 'Uma nave experimental de travessia interestelar inicial. Equipada com um reator de pulso instável, ela marca o primeiro passo da humanidade além dos limites do sistema solar. Frágil, mas revolucionária.',
-    range: 5,
+    range: 4.5,
     cost: 0,
     tier: 'Interstellar',
     color: 'text-pink-400'
@@ -768,7 +768,7 @@ export const SHIPS: Ship[] = [
     maxSpeed: 8000,
     technology: 'Núcleo de Pulso Estabilizado',
     description: 'Versão refinada do protótipo original. Seu núcleo foi estabilizado, permitindo viagens mais longas com menor risco de colapso energético. Ainda limitada, mas muito mais confiável.',
-    range: 6,
+    range: 5,
     cost: 50000000,
     tier: 'Interstellar',
     color: 'text-rose-400'
@@ -780,7 +780,7 @@ export const SHIPS: Ship[] = [
     maxSpeed: 12000,
     technology: 'Captação de Energia Residual',
     description: 'Projetada para cortar o vazio interestelar com eficiência. Utiliza captação de energia residual de nebulosas e poeira cósmica para alimentar seus sistemas auxiliares.',
-    range: 8,
+    range: 6,
     cost: 250000000,
     tier: 'Interstellar',
     color: 'text-violet-400'
@@ -792,7 +792,7 @@ export const SHIPS: Ship[] = [
     maxSpeed: 18000,
     technology: 'Propulsão de Antimatéria Estágio I',
     description: 'O primeiro modelo a utilizar antimatéria como combustível principal. Seus motores de alta performance permitem alcançar sistemas estelares distantes em tempo recorde.',
-    range: 10,
+    range: 8,
     cost: 1000000000,
     tier: 'Interstellar',
     color: 'text-emerald-400'
@@ -804,7 +804,7 @@ export const SHIPS: Ship[] = [
     maxSpeed: 25000,
     technology: 'Vela de Fótons de Alta Densidade',
     description: 'Uma maravilha da engenharia óptica. Utiliza feixes de laser concentrados para impulsionar velas de fótons, atingindo velocidades próximas à da luz.',
-    range: 12,
+    range: 8.5,
     cost: 5000000000,
     tier: 'Interstellar',
     color: 'text-yellow-500'
@@ -816,7 +816,7 @@ export const SHIPS: Ship[] = [
     maxSpeed: 40000,
     technology: 'Núcleo de Singularidade Controlada',
     description: 'Utiliza uma micro-singularidade artificial para curvar o espaço-tempo à sua frente, permitindo viagens interestelares massivas com consumo mínimo de energia.',
-    range: 15,
+    range: 9,
     cost: 20000000000,
     tier: 'Interstellar',
     color: 'text-fuchsia-400'
@@ -828,7 +828,7 @@ export const SHIPS: Ship[] = [
     maxSpeed: 65000,
     technology: 'Motores de Fusão de Hélio-3',
     description: 'Uma nave de alta potência projetada para exploração profunda. Seus motores de fusão avançados fornecem empuxo constante para travessias de longo alcance.',
-    range: 18,
+    range: 9.5,
     cost: 100000000000,
     tier: 'Interstellar',
     color: 'text-red-600'
@@ -840,7 +840,7 @@ export const SHIPS: Ship[] = [
     maxSpeed: 90000,
     technology: 'Dobra Espacial de Quinta Geração',
     description: 'O ápice da tecnologia de dobra. Capaz de comprimir o espaço-tempo de forma tão eficiente que as distâncias interestelares parecem meros saltos orbitais.',
-    range: 22,
+    range: 10,
     cost: 500000000000,
     tier: 'Interstellar',
     color: 'text-sky-400'
@@ -852,7 +852,7 @@ export const SHIPS: Ship[] = [
     maxSpeed: 120000,
     technology: 'Motor de Probabilidade Infinita',
     description: 'A fronteira final da tecnologia. Utiliza flutuações quânticas para existir em múltiplos pontos do espaço simultaneamente, tornando a distância um conceito obsoleto.',
-    range: 25,
+    range: 15,
     cost: 2500000000000,
     tier: 'Interstellar',
     color: 'text-lime-400'

@@ -2009,7 +2009,7 @@ export const GameDashboard = ({
   const [activeTutorial, setActiveTutorial] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [saveProgress, setSaveProgress] = useState(0);
-  const [activeTab, setActiveTab] = useState<'routes' | 'routes2' | 'upgrades' | 'auto' | 'mining' | 'aircraft' | 'technology' | 'history' | 'missions' | 'exit' | 'void_aircraft' | 'void_battle' | 'void_map' | 'void_war' | 'void_earth' | 'mini_games' | 'colonies'>('routes');
+  const [activeTab, setActiveTab] = useState<'routes' | 'routes2' | 'upgrades' | 'auto' | 'mining' | 'aircraft' | 'technology' | 'history' | 'missions' | 'exit' | 'void_aircraft' | 'void_battle' | 'void_map' | 'void_war' | 'void_earth' | 'mini_games' | 'colonies' | 'battleLevel'>('routes');
   const [activeMiniGameId, setActiveMiniGameId] = useState<string | null>(null);
   const activeMiniGameIdRef = useRef(activeMiniGameId);
   useEffect(() => { activeMiniGameIdRef.current = activeMiniGameId; }, [activeMiniGameId]);
@@ -2127,6 +2127,7 @@ export const GameDashboard = ({
   const [foundBattle, setFoundBattle] = useState<Battle | null>(null);
   const [aircraftSubTab, setAircraftSubTab] = useState<'fleet' | 'battle'>('fleet');
   const [techSubTab, setTechSubTab] = useState<'research' | 'extraction'>('research');
+  const [extractionPageIndex, setExtractionPageIndex] = useState(0);
   const [warCoreLevel, setWarCoreLevel] = useState(0);
   const [fleetPower, setFleetPower] = useState(100);
   const [earthReconstructionProgress, setEarthReconstructionProgress] = useState<{ [key: string]: number }>({
@@ -3709,63 +3710,90 @@ export const GameDashboard = ({
                   </div>
                   
                   <div className="flex-1 flex flex-col space-y-3">
-                    <div className="mt-auto grid grid-cols-2 gap-3">
-                      <div className="bg-white/5 border border-white/10 rounded-xl p-2 flex flex-col items-center justify-center h-12">
-                        <div className="flex items-center gap-1.5 text-slate-500 text-[9px] font-bold uppercase mb-0.5">
-                          <Shield className="w-3 h-3 text-blue-400" />
-                          {language === 'pt' ? 'Vida' : 'HP'}
-                        </div>
-                        <div className="text-base font-black text-white leading-none">
-                          {Math.floor((100 + (battleLevel * 150)) * (battleLevel >= 25 ? 1.25 : 1))}
-                        </div>
-                      </div>
-                      <div className="bg-white/5 border border-white/10 rounded-xl p-2 flex flex-col items-center justify-center h-12">
-                        <div className="flex items-center gap-1.5 text-slate-500 text-[9px] font-bold uppercase mb-0.5">
-                          <Sword className="w-3 h-3 text-red-400" />
-                          {language === 'pt' ? 'Dano' : 'ATK'}
-                        </div>
-                        <div className="text-base font-black text-white leading-none">
-                          {battleLevel >= 25 ? '+125%' : (battleLevel >= 20 ? '+50%' : `+${battleLevel * 5}%`)}
-                        </div>
-                      </div>
-                    </div>
-
-                    {isInterstellar && (
-                      <div className="flex items-center justify-between p-3 rounded-xl bg-orange-500/10 border border-orange-500/20">
-                        <div className="flex items-center gap-3">
-                          <motion.button
-                            onClick={() => setShowCaptureInfo(true)}
-                            animate={{ 
-                              boxShadow: ["0 0 0px rgba(249, 115, 22, 0)", "0 0 10px rgba(249, 115, 22, 0.4)", "0 0 0px rgba(249, 115, 22, 0)"]
+                    {/* Exclusivamente Rota 2: Inverter posições de Captação e Vida/Dano */}
+                    {isInterstellar ? (
+                      <>
+                        {/* Captação em cima */}
+                        <div className="mt-auto flex items-center justify-between p-3 rounded-xl bg-orange-500/10 border border-orange-500/20">
+                          <div className="flex items-center gap-3">
+                            <motion.button
+                              onClick={() => setShowCaptureInfo(true)}
+                              animate={{ 
+                                boxShadow: ["0 0 0px rgba(249, 115, 22, 0)", "0 0 10px rgba(249, 115, 22, 0.4)", "0 0 0px rgba(249, 115, 22, 0)"]
+                              }}
+                              transition={{ duration: 2, repeat: Infinity }}
+                              className="w-8 h-8 rounded-lg bg-orange-500/20 flex items-center justify-center border border-orange-500/30 hover:bg-orange-500/30 transition-colors cursor-pointer"
+                            >
+                              <Zap className="w-4 h-4 text-orange-400" />
+                            </motion.button>
+                            <div>
+                              <span className="text-[9px] font-bold text-white uppercase tracking-wider block">{t('capture')}</span>
+                              <span className="text-[8px] text-orange-400 font-mono">Lvl {captureLevel}/10</span>
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => {
+                              if (canUpgradeCapture) {
+                                setQc(prev => prev - captureCost);
+                                setCaptureLevel(prev => prev + 1);
+                                playSfx('success');
+                                addLog(t('captureUpgraded'), 'success');
+                              }
                             }}
-                            transition={{ duration: 2, repeat: Infinity }}
-                            className="w-8 h-8 rounded-lg bg-orange-500/20 flex items-center justify-center border border-orange-500/30 hover:bg-orange-500/30 transition-colors cursor-pointer"
+                            disabled={!canUpgradeCapture}
+                            className={`px-4 py-1.5 rounded-lg font-bold text-[10px] transition-all ${
+                              canUpgradeCapture 
+                              ? 'bg-orange-600 text-white hover:bg-orange-500 shadow-[0_0_10px_rgba(249,115,22,0.3)]' 
+                              : 'bg-white/5 text-slate-600 cursor-not-allowed'
+                            }`}
                           >
-                            <Zap className="w-4 h-4 text-orange-400" />
-                          </motion.button>
-                          <div>
-                            <span className="text-[9px] font-bold text-white uppercase tracking-wider block">{t('capture')}</span>
-                            <span className="text-[8px] text-orange-400 font-mono">Lvl {captureLevel}/10</span>
+                            {captureLevel < 10 ? `${formatValue(captureCost)} QC` : t('max')}
+                          </button>
+                        </div>
+
+                        {/* Vida e Dano em baixo */}
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="bg-white/5 border border-white/10 rounded-xl p-2 flex flex-col items-center justify-center h-12">
+                            <div className="flex items-center gap-1.5 text-slate-500 text-[9px] font-bold uppercase mb-0.5">
+                              <Shield className="w-3 h-3 text-blue-400" />
+                              {language === 'pt' ? 'Vida' : 'HP'}
+                            </div>
+                            <div className="text-base font-black text-white leading-none">
+                              {Math.floor((100 + (battleLevel * 150)) * (battleLevel >= 25 ? 1.25 : 1))}
+                            </div>
+                          </div>
+                          <div className="bg-white/5 border border-white/10 rounded-xl p-2 flex flex-col items-center justify-center h-12">
+                            <div className="flex items-center gap-1.5 text-slate-500 text-[9px] font-bold uppercase mb-0.5">
+                              <Sword className="w-3 h-3 text-red-400" />
+                              {language === 'pt' ? 'Dano' : 'ATK'}
+                            </div>
+                            <div className="text-base font-black text-white leading-none">
+                              {battleLevel >= 25 ? '+125%' : (battleLevel >= 20 ? '+50%' : `+${battleLevel * 5}%`)}
+                            </div>
                           </div>
                         </div>
-                        <button
-                          onClick={() => {
-                            if (canUpgradeCapture) {
-                              setQc(prev => prev - captureCost);
-                              setCaptureLevel(prev => prev + 1);
-                              playSfx('success');
-                              addLog(t('captureUpgraded'), 'success');
-                            }
-                          }}
-                          disabled={!canUpgradeCapture}
-                          className={`px-4 py-1.5 rounded-lg font-bold text-[10px] transition-all ${
-                            canUpgradeCapture 
-                            ? 'bg-orange-600 text-white hover:bg-orange-500 shadow-[0_0_10px_rgba(249,115,22,0.3)]' 
-                            : 'bg-white/5 text-slate-600 cursor-not-allowed'
-                          }`}
-                        >
-                          {captureLevel < 10 ? `${formatValue(captureCost)} QC` : t('max')}
-                        </button>
+                      </>
+                    ) : (
+                      /* Rota 1 (Solar): Apenas Vida e Dano */
+                      <div className="mt-auto grid grid-cols-2 gap-3">
+                        <div className="bg-white/5 border border-white/10 rounded-xl p-2 flex flex-col items-center justify-center h-12">
+                          <div className="flex items-center gap-1.5 text-slate-500 text-[9px] font-bold uppercase mb-0.5">
+                            <Shield className="w-3 h-3 text-blue-400" />
+                            {language === 'pt' ? 'Vida' : 'HP'}
+                          </div>
+                          <div className="text-base font-black text-white leading-none">
+                            {Math.floor((100 + (battleLevel * 150)) * (battleLevel >= 25 ? 1.25 : 1))}
+                          </div>
+                        </div>
+                        <div className="bg-white/5 border border-white/10 rounded-xl p-2 flex flex-col items-center justify-center h-12">
+                          <div className="flex items-center gap-1.5 text-slate-500 text-[9px] font-bold uppercase mb-0.5">
+                            <Sword className="w-3 h-3 text-red-400" />
+                            {language === 'pt' ? 'Dano' : 'ATK'}
+                          </div>
+                          <div className="text-base font-black text-white leading-none">
+                            {battleLevel >= 25 ? '+125%' : (battleLevel >= 20 ? '+50%' : `+${battleLevel * 5}%`)}
+                          </div>
+                        </div>
                       </div>
                     )}
                   </div>
@@ -4952,7 +4980,15 @@ export const GameDashboard = ({
         if (data.miningCompressionLevels) setMiningCompressionLevels(data.miningCompressionLevels);
         if (data.unlockedTechLevels) setUnlockedTechLevels(data.unlockedTechLevels);
         if (data.seenTutorials) setSeenTutorials(data.seenTutorials);
-        if (data.routeTier) setRouteTier(data.routeTier);
+        if (data.routeTier) {
+          setRouteTier(data.routeTier);
+          
+          // Set sensible default tab for the tier
+          if (data.routeTier === 'Void') setActiveTab('void_aircraft');
+          else if (data.routeTier === 'Earth') setActiveTab('colonies');
+          else if (data.routeTier === 'Interstellar') setActiveTab('routes2');
+          else setActiveTab('routes');
+        }
         if (data.totalDeliveries) setTotalDeliveries(data.totalDeliveries);
         if (data.deliveriesByLocation) setDeliveriesByLocation(data.deliveriesByLocation);
         if (data.historyStats) setHistoryStats(data.historyStats);
@@ -5367,22 +5403,31 @@ export const GameDashboard = ({
     const tech = TECHNOLOGIES.find(t => t.tier === researchingTech.tier && t.level === researchingTech.level);
     if (!tech) return;
 
-    let researchTime = activeCodes['SLIKE'] && !isSpeedRun ? 3600000 : tech.researchTime;
-    if (researchingTech.tier === 'Interstellar') researchTime *= 0.5;
-    
-    const elapsed = Date.now() - researchingTech.startTime;
-    const remainingTime = Math.max(0, researchTime - elapsed);
-    
-    // Boost cost: 300 QC/sec for Solar (Route 1), 500 QC/sec for Interstellar (Route 2)
-    const boostRate = researchingTech.tier === 'Interstellar' ? 500 : 300;
-    const boostCost = Math.floor((remainingTime / 1000) * boostRate);
+    const multipliers = getEconomicMultipliers();
+    let boostCost = 0;
+
+    if (researchingTech.tier === 'Solar' || researchingTech.tier === 'Interstellar') {
+      // Valor fixo de 75% do valor de pesquisa da tecnologia
+      boostCost = Math.floor(tech.cost * multipliers.cost * 0.75);
+    } else {
+      // Original logic for Void/Earth
+      let researchTime = activeCodes['SLIKE'] && !isSpeedRun ? 3600000 : tech.researchTime;
+      // No more conditional for Interstellar here because it's handled in the if block above
+      
+      const elapsed = Date.now() - researchingTech.startTime;
+      const remainingTime = Math.max(0, researchTime - elapsed);
+      
+      const boostRate = 500;
+      boostCost = Math.floor((remainingTime / 1000) * boostRate);
+    }
 
     if (qc < boostCost) {
-      addLog(`Insufficient QC for boost. Need ${formatValue(boostCost)} QC`, 'error');
+      addLog(language === 'pt' ? `QC insuficiente para acelerar. Necessário ${formatValue(boostCost)} QC` : `Insufficient QC for boost. Need ${formatValue(boostCost)} QC`, 'error');
       return;
     }
 
     setQc(prev => prev - boostCost);
+    updateHistoryStats('spent', boostCost);
     setUnlockedTechLevels(prev => ({ ...prev, [researchingTech.tier]: researchingTech.level }));
     
     if (isSpeedRun) {
@@ -5394,7 +5439,7 @@ export const GameDashboard = ({
     
     setResearchingTech(null);
     playSfx('success');
-    addLog(`Pesquisa concluída com boost! (-${formatValue(boostCost)} QC)`, 'success');
+    addLog(language === 'pt' ? `Pesquisa concluída com boost! (-${formatValue(boostCost)} QC)` : `Research completed with boost! (-${formatValue(boostCost)} QC)`, 'success');
   };
 
   // Effect to show Route 2 unlock message
@@ -5557,6 +5602,13 @@ export const GameDashboard = ({
         if (data.seenTutorials) setSeenTutorials(data.seenTutorials);
         if (data.routeTier) {
           setRouteTier(data.routeTier);
+          
+          // Set sensible default tab for the tier
+          if (data.routeTier === 'Void') setActiveTab('void_aircraft');
+          else if (data.routeTier === 'Earth') setActiveTab('colonies');
+          else if (data.routeTier === 'Interstellar') setActiveTab('routes2');
+          else setActiveTab('routes');
+
           if (data.routeTier === 'Earth') {
             setIsVoidWarActive(false);
             setVoidWarAlertActive(false);
@@ -6379,9 +6431,19 @@ export const GameDashboard = ({
       // Auto-Travel Reactivation Logic
       Object.keys(autoTravelDesiredRef.current).forEach(routeId => {
         if (autoTravelDesiredRef.current[routeId] && !autoTravelActiveRef.current[routeId]) {
+          const route = ROUTES.find(r => r.id === routeId);
+          if (!route) return;
+
           const slots = autoTravelSlotsRef.current[routeId] || 0;
+          const locationTech = techLevelsRef.current[route.id] || { engine: 0, ai: 0, value: 0, rare: 0 };
+          const valueUpgrade = UPGRADES.find(u => u.id === 'value')!;
+          const valueTier = valueUpgrade.tiers.find(v => v.level === locationTech.value);
+          const costIncreaseMultiplier = 1 + ((valueTier?.value || 0) * 0.1);
+          const fuelCost = Math.floor(10 * costIncreaseMultiplier);
+          const attemptCost = fuelCost * slots;
           const aetherionTripCost = slots * (isInterstellar ? 8 : 4);
-          if (aetherionRef.current >= aetherionTripCost) {
+          
+          if (aetherionRef.current >= aetherionTripCost && qcRef.current >= attemptCost) {
             setAutoTravelActive(prev => ({ ...prev, [routeId]: true }));
           }
         }
@@ -11014,6 +11076,7 @@ export const GameDashboard = ({
               
               // Route 3 (Void) specific restrictions
               if (isVoid && tab === 'colonies') return null;
+              if (isVoid && tab === 'mini_games') return null;
 
               
               return (
@@ -11038,7 +11101,7 @@ export const GameDashboard = ({
             })}
           </div>
 
-          <div className={`flex-1 overflow-y-auto pr-2 custom-scrollbar flex flex-col ${(activeTab === 'routes' || activeTab === 'routes2' || activeTab === 'aircraft' || activeTab === 'technology' || activeTab === 'upgrades' || activeTab === 'battleLevel') ? 'lg:overflow-hidden' : ''}`}>
+          <div className={`flex-1 overflow-y-auto pr-2 custom-scrollbar flex flex-col ${(activeTab === 'routes' || activeTab === 'routes2' || activeTab === 'aircraft' || activeTab === 'technology' || activeTab === 'upgrades' || activeTab === 'auto' || activeTab === 'battleLevel' || activeTab === 'mining') ? 'lg:overflow-hidden' : ''}`}>
             {isVoid && (
               <motion.div 
                 initial={{ opacity: 0, y: -10 }}
@@ -11129,7 +11192,7 @@ export const GameDashboard = ({
                 >
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 lg:grid-rows-3 gap-4 lg:gap-3 flex-1 h-full overflow-hidden">
                   {/* Route 2 Unlock Banner */}
-              {!isInterstellar && isRoute2Unlocked() && !isSpeedRun && (
+              {routeTier === 'Solar' && isRoute2Unlocked() && !isSpeedRun && (
                 <motion.div 
                   initial={{ opacity: 0, scale: 0.95 }}
                   animate={{ opacity: 1, scale: 1 }}
@@ -11173,7 +11236,7 @@ export const GameDashboard = ({
               )}
 
               {/* Route 3 Unlock Banner */}
-              {isInterstellar && isRoute3Unlocked() && !isSpeedRun && (
+              {routeTier === 'Interstellar' && isRoute3Unlocked() && !isSpeedRun && (
                 <motion.div 
                   initial={{ opacity: 0, scale: 0.95 }}
                   animate={{ opacity: 1, scale: 1 }}
@@ -11334,7 +11397,7 @@ export const GameDashboard = ({
                             <div className="text-[10px] uppercase text-slate-500 leading-none tracking-[0.2em] font-orbitron font-bold mb-1 opacity-70">{t('range')}</div>
                             <div className="text-xs font-mono flex items-center gap-2 text-slate-300 leading-none font-bold">
                               <CompassIcon className="w-3.5 h-3.5 text-cyan-500" />
-                              {formatValue(route.distance)} {isInterstellar ? 'LY' : 'km'}
+                              {formatValue(route.distance)} {route.tier === 'Interstellar' ? 'LY' : 'km'}
                             </div>
                           </div>
                         </div>
@@ -11393,11 +11456,11 @@ export const GameDashboard = ({
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -10 }}
-                  className="space-y-4"
+                  className="flex flex-col h-full gap-3 overflow-hidden"
                 >
                   {/* CCE - Câmara de Contenção de Éteríon */}
-                  <div className={`glass-panel ${isInterstellar ? 'neon-border-orange' : 'neon-border-cyan'} p-4 rounded-xl overflow-hidden relative group`}>
-                    <div className="flex justify-between items-center mb-2">
+                  <div className={`glass-panel ${isInterstellar ? 'neon-border-orange' : 'neon-border-cyan'} p-4 rounded-xl overflow-hidden relative group shrink-0`}>
+                    <div className="flex justify-between items-center mb-3">
                       <div className="flex items-center gap-3">
                         <div className={`p-2 rounded-lg ${isInterstellar ? 'bg-orange-500/10 text-orange-400' : 'bg-cyan-500/10 text-cyan-400'}`}>
                           <Flame className="w-5 h-5" />
@@ -11407,55 +11470,37 @@ export const GameDashboard = ({
                           <p className="text-[8px] text-slate-500 font-mono uppercase tracking-widest">{t('cceConcept')}</p>
                         </div>
                       </div>
-                      <button 
-                        onClick={() => setIsCCEOpen(!isCCEOpen)}
-                        className={`p-1.5 rounded-full border ${isInterstellar ? 'border-orange-500/30 text-orange-400 hover:bg-orange-500/10' : 'border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/10'} transition-all`}
-                      >
-                        {isCCEOpen ? <ChevronLeft className="w-4 h-4 rotate-90" /> : <ChevronLeft className="w-4 h-4 -rotate-90" />}
-                      </button>
+                      <div className="flex flex-col items-end">
+                        <span className="text-[10px] font-orbitron text-slate-400 uppercase tracking-widest leading-none mb-1">{t('aetherion')}</span>
+                        <div className={`text-xl font-mono font-bold ${isInterstellar ? 'text-orange-400' : 'text-cyan-400'} leading-none`}>
+                          {Math.floor((aetherion / 10000) * 100)}%
+                        </div>
+                      </div>
                     </div>
 
-                    <AnimatePresence>
-                      {isCCEOpen && (
-                        <motion.div
-                          initial={{ height: 0, opacity: 0 }}
-                          animate={{ height: 'auto', opacity: 1 }}
-                          exit={{ height: 0, opacity: 0 }}
-                          className="overflow-hidden"
-                        >
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2 pb-4">
-                            <div className="space-y-3">
-                              <div className="flex justify-between items-end">
-                                <span className="text-[10px] font-orbitron text-slate-400 uppercase tracking-widest">{t('aetherion')}</span>
-                                <span className={`text-lg font-mono font-bold ${isInterstellar ? 'text-orange-400' : 'text-cyan-400'}`}>
-                                  {Math.floor((aetherion / 10000) * 100)}%
-                                </span>
-                              </div>
-                              <div className="h-4 bg-white/5 rounded-full border border-white/10 p-0.5 relative overflow-hidden">
-                                <motion.div 
-                                  className={`h-full rounded-full bg-gradient-to-r ${isInterstellar ? 'from-orange-600 via-orange-400 to-orange-600' : 'from-cyan-600 via-cyan-400 to-cyan-600'} shadow-[0_0_15px_rgba(6,182,212,0.3)]`}
-                                  animate={{ width: `${(aetherion / 10000) * 100}%` }}
-                                  transition={{ type: 'spring', bounce: 0, duration: 1 }}
-                                />
-                                <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-20" />
-                              </div>
-                              <div className="flex justify-between text-[8px] font-mono text-slate-500 uppercase tracking-tighter">
-                                <span>0</span>
-                                <span>{formatValue(aetherion)} / {formatValue(10000)} Units</span>
-                              </div>
-                            </div>
-                            <div className="flex flex-col justify-center">
-                              <p className="text-[9px] text-slate-400 font-mono leading-relaxed italic">
-                                &quot;{t('aetherionConcept')}&quot;
-                              </p>
-                            </div>
-                          </div>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
+                    <div className="grid grid-cols-1 md:grid-cols-[1fr_200px] gap-4 items-center">
+                      <div className="space-y-1.5">
+                        <div className="h-2.5 bg-white/5 rounded-full border border-white/10 p-0.5 relative overflow-hidden">
+                          <motion.div 
+                            className={`h-full rounded-full bg-gradient-to-r ${isInterstellar ? 'from-orange-600 via-orange-400 to-orange-600' : 'from-cyan-600 via-cyan-400 to-cyan-600'} shadow-[0_0_15px_rgba(6,182,212,0.3)]`}
+                            animate={{ width: `${(aetherion / 10000) * 100}%` }}
+                            transition={{ type: 'spring', bounce: 0, duration: 1 }}
+                          />
+                          <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-20" />
+                        </div>
+                        <div className="flex justify-end text-[8px] font-mono text-slate-500 uppercase tracking-tighter">
+                          <span>{formatValue(aetherion)} / {formatValue(10000)} Units</span>
+                        </div>
+                      </div>
+                      <div className="hidden md:block">
+                        <p className="text-[8px] text-slate-400 font-mono leading-tight italic border-l border-white/5 pl-4">
+                          &quot;{t('aetherionConcept')}&quot;
+                        </p>
+                      </div>
+                    </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 auto-rows-fr gap-3 flex-1 min-h-0 overflow-hidden">
                     {ROUTES.filter(r => unlockedRouteIds.includes(r.id)).map(route => {
                     const slots = autoTravelSlots[route.id] || 0;
                     const isActive = autoTravelActive[route.id];
@@ -11465,55 +11510,57 @@ export const GameDashboard = ({
                     const ship = SHIPS.find(s => s.level === route.requiredShipLevel && s.tier === route.tier);
                     
                     return (
-                      <div key={route.id} className={`glass-panel ${isInterstellar ? 'neon-border-orange' : 'neon-border-cyan'} rounded-lg p-3 flex flex-col gap-3 hover:bg-white/5 transition-colors`}>
-                        <div className="flex justify-between items-start">
-                          <div className="min-w-0">
-                            <h3 className={`font-orbitron text-[10px] font-bold ${ship?.color || 'text-white'} truncate leading-tight uppercase tracking-wider`}>{ship?.name || translateData(route.name)}</h3>
-                            <p className={`text-[8px] font-mono ${isInterstellar ? 'text-orange-500/60' : 'text-cyan-500/60'} leading-tight uppercase`}>{translateData(route.name)}</p>
+                      <div key={route.id} className={`glass-panel ${isInterstellar ? 'neon-border-orange' : 'neon-border-cyan'} rounded-lg p-3 flex flex-col gap-3 hover:bg-white/5 transition-colors h-full min-h-[160px] justify-between`}>
+                        <div className="space-y-3">
+                          <div className="flex justify-between items-start">
+                            <div className="min-w-0">
+                              <h3 className={`font-orbitron text-[10px] font-bold ${ship?.color || 'text-white'} truncate leading-tight uppercase tracking-wider`}>{ship?.name || translateData(route.name)}</h3>
+                              <p className={`text-[8px] font-mono ${isInterstellar ? 'text-orange-500/60' : 'text-cyan-500/60'} leading-tight uppercase`}>{translateData(route.name)}</p>
+                            </div>
+                            <div className={`px-1.5 py-0.5 rounded text-[7px] font-bold uppercase tracking-tighter border ${slots > 0 ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-white/5 text-slate-500 border-white/10'}`}>
+                              {slots > 0 ? t('active') : t('locked')}
+                            </div>
                           </div>
-                          <div className={`px-1.5 py-0.5 rounded text-[7px] font-bold uppercase tracking-tighter border ${slots > 0 ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-white/5 text-slate-500 border-white/10'}`}>
-                            {slots > 0 ? t('active') : t('locked')}
-                          </div>
-                        </div>
 
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="flex flex-col gap-1">
-                            <div className="flex gap-0.5">
-                              {[1, 2, 3, 4, 5].map((slot) => (
-                                <div 
-                                  key={slot} 
-                                  className={`w-2 h-2 rounded-sm border ${
-                                    slot <= slots 
-                                    ? (isSpeedMode ? 'bg-red-600 border-red-400 shadow-[0_0_5px_rgba(220,38,38,0.4)]' : (isInterstellar ? 'bg-orange-500 border-orange-400' : getAutoTravelColor(slot))) 
-                                    : 'bg-white/5 border-white/10'
-                                  }`}
-                                />
-                              ))}
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex flex-col gap-1">
+                              <div className="flex gap-0.5">
+                                {[1, 2, 3, 4, 5].map((slot) => (
+                                  <div 
+                                    key={slot} 
+                                    className={`w-2 h-2 rounded-sm border ${
+                                      slot <= slots 
+                                      ? (isSpeedMode ? 'bg-red-600 border-red-400 shadow-[0_0_5px_rgba(220,38,38,0.4)]' : (isInterstellar ? 'bg-orange-500 border-orange-400' : getAutoTravelColor(slot))) 
+                                      : 'bg-white/5 border-white/10'
+                                    }`}
+                                  />
+                                ))}
+                              </div>
+                              <span className="text-[7px] font-orbitron text-slate-500 uppercase tracking-widest">{t('autoTravelSlots')}</span>
                             </div>
-                            <span className="text-[7px] font-orbitron text-slate-500 uppercase tracking-widest">{t('autoTravelSlots')}</span>
+                            
+                            {slots < 5 ? (
+                              <div className="flex flex-col items-end gap-1">
+                                <button
+                                  onClick={() => buyAutoTravelSlot(route.id)}
+                                  className={`${isInterstellar ? 'bg-orange-600/20 hover:bg-orange-600/40 text-orange-400 border-orange-600/30' : 'bg-pink-600/20 hover:bg-pink-600/40 text-pink-400 border-pink-600/30'} border px-2 py-1 rounded text-[7px] font-orbitron font-bold tracking-widest transition-all flex items-center gap-1 uppercase`}
+                                >
+                                  {t('buy').toUpperCase()} <Coins className="w-2 h-2" /> {formatValue([1000, 5000, 10000, 15000, 20000][slots] * getLocationMultiplier(route.id) * getEconomicMultipliers().cost * (route.tier === 'Interstellar' ? 2 : 1) * (route.tier === 'Solar' ? 10 : 1))}
+                                </button>
+                                {route.id !== 'speed_run' && (
+                                  <div className="text-[6px] font-mono text-slate-500 uppercase tracking-tighter">
+                                    {t('aetherionRequired')}: {(slots + 1) * 2}
+                                  </div>
+                                )}
+                              </div>
+                            ) : (
+                              <div className="text-emerald-400 text-[7px] font-orbitron font-bold tracking-widest uppercase">{t('max')}</div>
+                            )}
                           </div>
-                          
-                          {slots < 5 ? (
-                            <div className="flex flex-col items-end gap-1">
-                              <button
-                                onClick={() => buyAutoTravelSlot(route.id)}
-                                className={`${isInterstellar ? 'bg-orange-600/20 hover:bg-orange-600/40 text-orange-400 border-orange-600/30' : 'bg-pink-600/20 hover:bg-pink-600/40 text-pink-400 border-pink-600/30'} border px-2 py-1 rounded text-[7px] font-orbitron font-bold tracking-widest transition-all flex items-center gap-1 uppercase`}
-                              >
-                                {t('buy').toUpperCase()} <Coins className="w-2 h-2" /> {formatValue([1000, 5000, 10000, 15000, 20000][slots] * getLocationMultiplier(route.id) * getEconomicMultipliers().cost * (route.tier === 'Interstellar' ? 2 : 1) * (route.tier === 'Solar' ? 10 : 1))}
-                              </button>
-                              {route.id !== 'speed_run' && (
-                                <div className="text-[6px] font-mono text-slate-500 uppercase tracking-tighter">
-                                  {t('aetherionRequired')}: {(slots + 1) * 2}
-                                </div>
-                              )}
-                            </div>
-                          ) : (
-                            <div className="text-emerald-400 text-[7px] font-orbitron font-bold tracking-widest uppercase">{t('max')}</div>
-                          )}
                         </div>
 
                         {slots > 0 && (
-                          <div className="pt-2 border-t border-white/5 flex flex-col gap-2">
+                          <div className="pt-2 border-t border-white/5 flex flex-col gap-2 mt-auto">
                             <div className="flex justify-between items-center">
                               <div className="flex flex-col gap-1">
                                 <button
@@ -11566,83 +11613,42 @@ export const GameDashboard = ({
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -10 }}
-                  className="space-y-6"
+                  className="flex-1 flex flex-col h-full min-h-0 gap-4"
                 >
                   {/* Mining Header */}
-                  <div className={`glass-panel ${isInterstellar ? 'neon-border-orange' : 'neon-border-cyan'} p-4 rounded-xl flex justify-between items-center`}>
+                  <div className={`glass-panel ${isInterstellar ? 'neon-border-orange' : 'neon-border-cyan'} p-4 rounded-xl flex justify-between items-center shrink-0`}>
                     <div>
                       <h2 className={`text-lg font-orbitron font-bold ${isInterstellar ? 'text-orange-400' : 'text-cyan-400'} uppercase tracking-tighter`}>{t('mining')}</h2>
                       <p className="text-[10px] text-slate-500 font-mono uppercase tracking-widest">{t('manageInfrastructure')}</p>
                     </div>
-                    <div className="flex items-center gap-4">
-                      <button 
-                        onClick={() => setMiningPageIndex(prev => Math.max(0, prev - 1))}
-                        disabled={miningPageIndex === 0}
-                        className={`p-1 rounded border ${isInterstellar ? 'border-orange-500/30' : 'border-cyan-500/30'} transition-all ${miningPageIndex === 0 ? 'opacity-20 cursor-not-allowed' : (isInterstellar ? 'hover:bg-orange-500/20 text-orange-400' : 'hover:bg-cyan-500/20 text-cyan-400')}`}
-                      >
-                        <ArrowRight className="w-4 h-4 rotate-180" />
-                      </button>
-                      <span className={`text-[10px] font-orbitron ${isInterstellar ? 'text-orange-500/60' : 'text-cyan-500/60'} uppercase tracking-widest`}>
-                        {miningPageIndex + 1} / {currentOres.length}
-                      </span>
-                      <button 
-                        onClick={() => setMiningPageIndex(prev => Math.min(currentOres.length - 1, prev + 1))}
-                        disabled={miningPageIndex === currentOres.length - 1}
-                        className={`p-1 rounded border ${isInterstellar ? 'border-orange-500/30' : 'border-cyan-500/30'} transition-all ${miningPageIndex === currentOres.length - 1 ? 'opacity-20 cursor-not-allowed' : (isInterstellar ? 'hover:bg-orange-500/20 text-orange-400' : 'hover:bg-cyan-500/20 text-cyan-400')}`}
-                      >
-                        <ArrowRight className="w-4 h-4" />
-                      </button>
-                    </div>
+                    {!isInterstellar && (
+                      <div className="flex items-center gap-4">
+                        <button 
+                          onClick={() => setMiningPageIndex(prev => Math.max(0, prev - 1))}
+                          disabled={miningPageIndex === 0}
+                          className={`p-1 rounded border ${isInterstellar ? 'border-orange-500/30' : 'border-cyan-500/30'} transition-all ${miningPageIndex === 0 ? 'opacity-20 cursor-not-allowed' : (isInterstellar ? 'hover:bg-orange-500/20 text-orange-400' : 'hover:bg-cyan-500/20 text-cyan-400')}`}
+                        >
+                          <ArrowRight className="w-4 h-4 rotate-180" />
+                        </button>
+                        <span className={`text-[10px] font-orbitron ${isInterstellar ? 'text-orange-500/60' : 'text-cyan-500/60'} uppercase tracking-widest`}>
+                          {miningPageIndex + 1} / {currentOres.length}
+                        </span>
+                        <button 
+                          onClick={() => setMiningPageIndex(prev => Math.min(currentOres.length - 1, prev + 1))}
+                          disabled={miningPageIndex === currentOres.length - 1}
+                          className={`p-1 rounded border ${isInterstellar ? 'border-orange-500/30' : 'border-cyan-500/30'} transition-all ${miningPageIndex === currentOres.length - 1 ? 'opacity-20 cursor-not-allowed' : (isInterstellar ? 'hover:bg-orange-500/20 text-orange-400' : 'hover:bg-cyan-500/20 text-cyan-400')}`}
+                        >
+                          <ArrowRight className="w-4 h-4" />
+                        </button>
+                      </div>
+                    )}
+                    {/* Removido Lucro Total e Vender Extração conforme solicitado */}
                   </div>
 
-                  {/* Mining & Extraction Summary */}
-                  {isInterstellar && (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div className="glass-panel border border-orange-500/20 bg-orange-500/5 p-3 rounded-xl flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-lg bg-orange-500/20 flex items-center justify-center border border-orange-500/40">
-                            <TrendingUp className="w-4 h-4 text-orange-400" />
-                          </div>
-                          <div>
-                            <div className="text-[9px] font-orbitron text-slate-500 uppercase tracking-widest">Lucro Total (Mineração)</div>
-                            <div className="text-sm font-bold text-orange-400">{formatValue(historyStats.Interstellar.qcFromMining || 0)} QC</div>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="glass-panel border border-orange-500/20 bg-orange-500/5 p-3 rounded-xl flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-lg bg-orange-500/20 flex items-center justify-center border border-orange-500/40">
-                            <Pickaxe className="w-4 h-4 text-orange-400" />
-                          </div>
-                          <div>
-                            <div className="text-[9px] font-orbitron text-slate-500 uppercase tracking-widest">Lucro Total (Extração)</div>
-                            <div className="text-sm font-bold text-orange-400">{formatValue(totalExtractionProfit)} QC</div>
-                          </div>
-                        </div>
-                        {Object.values(extractionPacks).some(p => p > 0) && (
-                          <button
-                            onClick={sellExtractionPacks}
-                            className="px-3 py-1 bg-orange-500 text-black text-[10px] font-bold rounded-lg hover:bg-orange-400 transition-all active:scale-95"
-                          >
-                            Vender Tudo
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Ore Page */}
-                  <AnimatePresence mode="wait">
-                    <motion.div
-                      key={miningPageIndex}
-                      initial={{ opacity: 0, scale: 0.98 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      exit={{ opacity: 0, scale: 1.02 }}
-                      className="flex-1"
-                    >
-                      {(() => {
-                        const ore = currentOres[miningPageIndex];
-                        if (!ore) return null;
+                  {isInterstellar ? (
+                    /* ROTA 2: 3x3 Grid of Ores */
+                    <div className="flex-1 min-h-0 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                      {currentOres.map((ore, index) => {
                         const robots = miningRobots[ore.id] || 0;
                         const level = miningRobotLevels[ore.id] || 1;
                         const upgrade = ROBOT_UPGRADES.find(u => u.level === level) || ROBOT_UPGRADES[0];
@@ -11650,248 +11656,356 @@ export const GameDashboard = ({
                         const amount = oresCollected[ore.id] || 0;
                         const packs = Math.floor(amount / ore.packSize);
                         const isAutoSell = autoSellByOre[ore.id];
-                        
+                        const isActive = robots > 0;
+                        const baseRate = 0.5;
+                        const ratePerRobot = baseRate * upgrade.speedBonus * upgrade.efficiencyBonus * upgrade.productionBonus;
+                        const totalRate = robots * ratePerRobot;
                         const isUnlocked = Object.entries(ownedShips).some(([key, count]) => {
                           const [tier, level] = key.split('-');
                           return tier === ore.tier && parseInt(level) >= ore.requiredShipLevel && count > 0;
                         });
-                        const robotCost = Math.floor(ore.robotBaseCost * Math.pow(1.1, robots) * getEconomicMultipliers().cost * (isInterstellar ? 0.4 : 1));
-                        const isActive = robots > 0;
-                        
-                        const baseRate = 0.5;
-                        const ratePerRobot = baseRate * upgrade.speedBonus * upgrade.efficiencyBonus * upgrade.productionBonus;
-                        const totalRate = robots * ratePerRobot;
+                        const robotCost = Math.floor(ore.robotBaseCost * Math.pow(1.1, robots) * getEconomicMultipliers().cost * 0.4);
+                        const compressionLevel = miningCompressionLevels[ore.id] || 0;
+                        const compressionCost = Math.floor(ore.robotBaseCost * Math.pow(1.6681, compressionLevel) * getEconomicMultipliers().cost * 0.2);
 
                         if (!isUnlocked) {
                           return (
-                            <div className="glass-panel border border-white/5 rounded-xl p-12 flex flex-col items-center justify-center text-center opacity-40 grayscale backdrop-blur-xl bg-white/5 relative group min-h-[400px]">
-                              <div className="absolute inset-0 bg-slate-900/20 group-hover:bg-slate-900/10 transition-colors" />
-                              <div className="relative z-10">
-                                <div className="w-20 h-20 rounded-full bg-slate-800/50 flex items-center justify-center mb-6 border border-slate-700/50">
-                                  <Lock className="w-10 h-10 text-slate-500" />
-                                </div>
-                                <div className="text-xl font-orbitron text-slate-500 uppercase tracking-widest mb-2">{t('locked')}</div>
-                                <div className="text-sm text-slate-600 uppercase font-mono tracking-widest">Ship Level {ore.requiredShipLevel} Required</div>
-                              </div>
+                            <div key={ore.id} className="glass-panel border border-white/5 rounded-xl flex flex-col items-center justify-center text-center opacity-30 grayscale p-4">
+                              <Lock className="w-5 h-5 text-slate-500 mb-2" />
+                              <div className="text-[10px] font-orbitron text-slate-500 uppercase tracking-widest">{ore.name}</div>
+                              <div className="text-[8px] text-slate-600 font-mono mt-1">LVL {ore.requiredShipLevel}+</div>
                             </div>
                           );
                         }
 
                         return (
-                          <div className={`glass-panel p-8 rounded-2xl space-y-8 hover:bg-white/5 transition-all relative overflow-hidden min-h-[400px] ${
-                            isActive ? (isInterstellar ? 'neon-border-orange shadow-[0_0_30px_rgba(249,115,22,0.1)]' : 'neon-border-cyan shadow-[0_0_30px_rgba(6,182,212,0.1)]') : 'border-white/10'
-                          }`}>
-                            {isActive && (
-                              <div className={`absolute inset-0 bg-gradient-to-br ${isInterstellar ? 'from-orange-500/5' : 'from-cyan-500/5'} via-transparent to-transparent pointer-events-none`} />
-                            )}
-                            
-                            <div className="flex justify-between items-start relative z-10">
+                          <div 
+                            key={ore.id} 
+                            className={`glass-panel p-3 rounded-xl border flex flex-col transition-all duration-300 ${
+                              isActive ? 'neon-border-orange bg-orange-900/5' : 'border-white/10'
+                            }`}
+                          >
+                            <div className="flex justify-between items-start mb-2">
                               <div>
-                                <div className={`text-[10px] font-orbitron ${isInterstellar ? 'text-orange-500/60' : 'text-cyan-500/60'} uppercase tracking-widest mb-1`}>Ore Type {miningPageIndex + 1}</div>
-                                <div className="flex items-center gap-4">
-                                  <h3 className={`font-orbitron text-lg font-bold text-white tracking-tighter ${isInterstellar ? 'group-hover:text-orange-400 neon-text-orange' : 'group-hover:text-cyan-400 neon-text-cyan'} transition-colors`}>{ore.name}</h3>
-                                  
-                                  {!isSpeedRun && (
-                                    <div className="flex flex-col items-center gap-1">
-                                      {(miningCompressionLevels[ore.id] || 0) < 10 && (
-                                        <div className="text-[8px] font-orbitron text-emerald-400 animate-pulse tracking-widest uppercase font-bold">
-                                          {formatValue(ore.robotBaseCost * Math.pow(1.6681, miningCompressionLevels[ore.id] || 0) * getEconomicMultipliers().cost * (isInterstellar ? 0.2 : 1))} QC
-                                        </div>
-                                      )}
-                                      <button
-                                        onClick={() => buyMiningCompression(ore.id)}
-                                        disabled={(miningCompressionLevels[ore.id] || 0) >= 10 || qc < Math.floor(ore.robotBaseCost * Math.pow(1.6681, miningCompressionLevels[ore.id] || 0) * getEconomicMultipliers().cost * (isInterstellar ? 0.2 : 1))}
-                                        className={`px-4 py-2 rounded-lg text-[9px] font-orbitron font-bold tracking-[0.15em] transition-all uppercase border relative overflow-hidden group/btn min-w-[140px] ${
-                                          (miningCompressionLevels[ore.id] || 0) >= 10
-                                          ? 'border-white/60 text-white shadow-[0_0_25px_rgba(255,255,255,0.4)] scale-105'
-                                          : 'bg-black/40 border-white/20 text-white hover:border-white/40'
-                                        }`}
-                                      >
-                                        {/* Flashing RGB Background - Gamer Style */}
-                                        <div className={`absolute inset-0 bg-gradient-to-r from-red-500 via-yellow-500 via-green-500 via-cyan-500 via-blue-500 via-purple-500 to-red-500 bg-[length:200%_100%] animate-[gradient_2s_linear_infinite] ${
-                                          (miningCompressionLevels[ore.id] || 0) >= 10 ? 'opacity-80' : 'opacity-30'
-                                        }`} />
-                                        
-                                        {/* Extra Glow for MAX */}
-                                        {(miningCompressionLevels[ore.id] || 0) >= 10 && (
-                                          <div className="absolute inset-0 bg-white/10 animate-pulse" />
-                                        )}
-                                        
-                                        <span className="relative z-10 flex items-center justify-center gap-2">
-                                          {(miningCompressionLevels[ore.id] || 0) < 10 ? (
-                                            <>
-                                              {t('refinedCompression')} 
-                                              <span className="text-yellow-400">Lvl {miningCompressionLevels[ore.id] || 0}</span>
-                                            </>
-                                          ) : (
-                                            <span className="text-white font-black text-[11px] tracking-[0.4em] drop-shadow-[0_0_12px_rgba(255,255,255,1)]">MAX</span>
-                                          )}
-                                        </span>
-                                      </button>
-                                    </div>
-                                  )}
-                                </div>
-                                <div className={`text-xs font-mono ${isInterstellar ? 'text-orange-500/60' : 'text-cyan-500/60'} uppercase flex items-center gap-2 mt-2`}>
-                                  <Cpu className={`w-4 h-4 ${isActive ? (isInterstellar ? 'text-orange-400 animate-pulse' : 'text-cyan-400 animate-pulse') : 'text-slate-600'}`} />
-                                  {t('robots')}: {robots}/5
-                                </div>
-                              </div>
-                              <div className="text-right flex flex-col items-end">
-                                <div className={`text-2xl font-orbitron ${isInterstellar ? 'text-orange-400' : 'text-cyan-400'} flex items-center justify-end gap-2`}>
-                                  <TrendingUp className="w-5 h-5" />
-                                  {totalRate.toFixed(2)} <span className="text-xs">{t('units')}/s</span>
-                                </div>
-                                <div className={`text-[10px] font-mono ${isInterstellar ? 'text-orange-500/60' : 'text-cyan-500/60'} uppercase flex items-center justify-end gap-1 mt-1`}>
-                                  <Coins className="w-3 h-3" />
-                                  {((totalRate / ore.packSize) * ore.baseValue * getEconomicMultipliers().profit * (1 + (miningCompressionLevels[ore.id] || 0) * 0.2)).toFixed(2)} QC/s
-                                </div>
-                                <div className="text-[10px] font-mono text-slate-500 uppercase mt-1 opacity-50">Lvl {level} {upgrade.name}</div>
-                              </div>
-                            </div>
-
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 py-6 border-y border-white/5 relative z-10">
-                              <div className="space-y-4">
-                                <div className="flex justify-between items-center text-xs font-orbitron text-slate-500 uppercase tracking-widest">
-                                  <span>{t('oreCollected')}</span>
-                                  <span className={amount >= ore.packSize ? 'text-yellow-400 font-bold animate-pulse' : (isInterstellar ? 'text-orange-400' : 'text-cyan-400')}>
-                                    {formatValue(Math.floor(amount))} / {formatValue(ore.packSize)}
-                                  </span>
-                                </div>
-                                <div className="h-4 bg-white/5 rounded-full overflow-hidden border border-white/10 p-[2px]">
-                                  <motion.div 
-                                    className={`h-full rounded-full ${
-                                      isSpeedMode
-                                      ? 'bg-gradient-to-r from-red-900 via-red-600 to-red-400 shadow-[0_0_20px_rgba(220,38,38,0.6)]'
-                                      : amount >= ore.packSize 
-                                        ? 'bg-gradient-to-r from-yellow-600 to-yellow-400 shadow-[0_0_20px_rgba(234,179,8,0.4)]' 
-                                        : (isInterstellar ? 'bg-gradient-to-r from-orange-600 to-orange-400' : 'bg-gradient-to-r from-cyan-600 to-cyan-400')
-                                    }`}
-                                    animate={{ width: `${(amount / ore.packSize) * 100}%` }}
-                                    transition={{ type: 'spring', bounce: 0, duration: 0.5 }}
-                                  />
-                                </div>
-                                <div className="flex justify-between items-center">
-                                  <div className="text-xs font-mono text-slate-500 uppercase">{t('sellPacks')}: {formatValue(packs)}</div>
-                                  <button
-                                    onClick={(e) => sellOrePack(ore.id, e)}
-                                    disabled={packs <= 0}
-                                    className={`px-4 py-1.5 rounded-lg text-xs font-orbitron font-bold tracking-widest transition-all uppercase ${
-                                      packs > 0 
-                                      ? 'bg-yellow-500 text-black hover:bg-yellow-400 shadow-[0_0_15px_rgba(234,179,8,0.3)]' 
-                                      : 'bg-white/5 text-slate-600 cursor-not-allowed'
-                                    }`}
-                                  >
-                                    {t('sellPacks')}
-                                  </button>
-                                </div>
-                              </div>
-
-                              <div className="flex flex-col justify-center gap-4">
-                                <div className={`flex items-center justify-between p-4 bg-white/5 rounded-xl border ${isInterstellar ? 'border-orange-500/20' : 'border-white/10'}`}>
-                                  <div className="flex items-center gap-3">
-                                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center border transition-all ${
-                                      isSpeedMode && isAutoSell
-                                      ? 'bg-red-900/40 border-red-500/60 text-red-400 shadow-[0_0_15px_rgba(220,38,38,0.4)]'
-                                      : isAutoSell 
-                                        ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-400' 
-                                        : 'bg-white/5 border-white/10 text-slate-600'
-                                    }`}>
-                                      <Zap className="w-5 h-5" />
-                                    </div>
-                                    <div>
-                                      <div className="text-xs font-orbitron text-white uppercase tracking-widest">{t('autoSell')}</div>
-                                      <div className="text-[10px] font-mono text-slate-500 uppercase">
-                                        {isAutoSell ? t('active') : t('inactive')}
-                                        {autoSellUnlockedByOre[ore.id] && !isSpeedRun && (
-                                          <span className="ml-2 text-orange-400/60">({t('aetherionConsumes')})</span>
-                                        )}
-                                      </div>
-                                    </div>
+                                <h3 className="font-orbitron text-[10px] font-bold text-white leading-tight uppercase truncate max-w-[100px]">{ore.name}</h3>
+                                <div className="flex items-center gap-2 mt-0.5">
+                                  <div className="flex items-center gap-1 text-[8px] font-mono text-orange-400">
+                                    <Cpu className="w-2.5 h-2.5" /> {robots}
                                   </div>
-                                  {!autoSellUnlockedByOre[ore.id] ? (
-                                    <button
-                                      onClick={() => buyAutoSell(ore.id)}
-                                      disabled={qc < (ore.autoSellCost * getEconomicMultipliers().cost * (isInterstellar ? 0.8 : 1)) || isSpeedRun}
-                                      className={`px-4 py-2 rounded-lg text-[10px] font-orbitron font-bold tracking-widest transition-all uppercase ${
-                                        qc >= (ore.autoSellCost * getEconomicMultipliers().cost * (isInterstellar ? 0.8 : 1)) && !isSpeedRun
-                                        ? (isInterstellar ? 'bg-orange-600 text-white hover:bg-orange-500 shadow-[0_0_15px_rgba(249,115,22,0.3)]' : 'bg-pink-600 text-white hover:bg-pink-500 shadow-[0_0_15px_rgba(219,39,119,0.3)]')
-                                        : 'bg-white/5 text-slate-600 cursor-not-allowed'
-                                      }`}
-                                    >
-                                      {isSpeedRun ? t('locked') : `${t('buy')} (${formatValue(ore.autoSellCost * getEconomicMultipliers().cost * (isInterstellar ? 0.8 : 1))})`}
-                                    </button>
-                                  ) : (
-                                    <button
-                                      onClick={() => buyAutoSell(ore.id)}
-                                      className={`px-4 py-2 rounded-lg text-[10px] font-orbitron font-bold tracking-widest transition-all uppercase border ${
-                                        isAutoSell 
-                                        ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-400' 
-                                        : 'bg-white/5 border-white/10 text-slate-500'
-                                      }`}
-                                    >
-                                      {isAutoSell ? t('on').toUpperCase() : t('off').toUpperCase()}
-                                    </button>
-                                  )}
+                                  <div className="flex items-center gap-1 text-[8px] font-mono text-emerald-400">
+                                    <TrendingUp className="w-2.5 h-2.5" /> {totalRate.toFixed(1)}
+                                  </div>
                                 </div>
+                              </div>
+                              <div className="flex flex-col items-end">
+                                <div className="text-[10px] font-bold text-orange-400 font-mono tracking-tighter">{formatValue(packs)} PKS</div>
+                                <button 
+                                  onClick={(e) => sellOrePack(ore.id, e)}
+                                  disabled={packs <= 0}
+                                  className={`mt-1 px-2 py-0.5 rounded text-[7px] font-bold transition-all uppercase ${packs > 0 ? 'bg-orange-500 text-black hover:bg-orange-400' : 'bg-white/5 text-slate-600 opacity-50 cursor-not-allowed'}`}
+                                >
+                                  VENDER
+                                </button>
                               </div>
                             </div>
 
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 relative z-10 mt-auto">
-                              <div className={`glass-panel p-4 rounded-xl border ${isInterstellar ? 'border-orange-500/10' : 'border-white/5'} space-y-3`}>
-                                <div className="flex justify-between items-center">
-                                  <span className="text-[10px] font-orbitron text-slate-500 uppercase tracking-widest">{t('buyRobot')}</span>
-                                  <span className="text-xs font-mono text-yellow-500">{formatValue(robotCost)} QC</span>
-                                </div>
+                            {/* Progress Bar */}
+                            <div className="h-2 bg-black/40 rounded-full overflow-hidden border border-white/5 p-[1px] mb-3">
+                              <motion.div 
+                                className={`h-full rounded-full bg-gradient-to-r from-orange-600 to-orange-400`}
+                                animate={{ width: `${(amount / ore.packSize) * 100}%` }}
+                              />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-2 mt-auto">
+                              {/* Left Column: Robot & Upgrade */}
+                              <div className="space-y-2">
                                 <button
                                   onClick={() => buyMiningRobot(ore.id)}
                                   disabled={robots >= 5 || qc < robotCost}
-                                  className={`w-full py-3 rounded-xl font-orbitron text-[10px] font-bold tracking-widest transition-all border uppercase ${
+                                  className={`w-full py-1.5 rounded-lg flex flex-col items-center gap-0.5 border transition-all ${
                                     robots < 5 && qc >= robotCost
-                                    ? `${isInterstellar ? 'bg-orange-500 text-black hover:bg-orange-400 shadow-[0_0_20px_rgba(249,115,22,0.3)]' : 'bg-cyan-500 text-black hover:bg-cyan-400 shadow-[0_0_20px_rgba(6,182,212,0.3)]'}`
-                                    : 'border-white/10 text-slate-600 cursor-not-allowed'
+                                    ? 'bg-slate-800 hover:bg-orange-500/20 border-orange-500/30 text-orange-400'
+                                    : 'border-white/5 text-slate-600 opacity-50 cursor-not-allowed'
                                   }`}
                                 >
-                                  {robots >= 5 ? t('max').toUpperCase() : t('buyRobot').toUpperCase()}
+                                  <span className="text-[7px] font-bold uppercase">Robô</span>
+                                  {robots < 5 && <span className="text-[8px] font-mono">{formatValue(robotCost)}</span>}
+                                </button>
+                                <button
+                                  onClick={() => upgradeMiningRobot(ore.id)}
+                                  disabled={!nextUpgrade || qc < (Math.floor(ore.robotBaseCost * nextUpgrade.costMultiplier * getEconomicMultipliers().cost * 0.2))}
+                                  className={`w-full py-1.5 rounded-lg flex flex-col items-center gap-0.5 border transition-all ${
+                                    nextUpgrade && qc >= (Math.floor(ore.robotBaseCost * nextUpgrade.costMultiplier * getEconomicMultipliers().cost * 0.2))
+                                    ? 'bg-slate-800 hover:bg-emerald-500/20 border-emerald-500/30 text-emerald-400'
+                                    : 'border-white/5 text-slate-600 opacity-50 cursor-not-allowed'
+                                  }`}
+                                >
+                                  <span className="text-[7px] font-bold uppercase">Upgrade</span>
+                                  {nextUpgrade && <span className="text-[8px] font-mono">{formatValue(Math.floor(ore.robotBaseCost * nextUpgrade.costMultiplier * getEconomicMultipliers().cost * 0.2))}</span>}
                                 </button>
                               </div>
 
-                              <div className={`glass-panel p-4 rounded-xl border ${isInterstellar ? 'border-orange-500/10' : 'border-white/5'} space-y-3`}>
-                                <div className="flex justify-between items-center">
-                                  <span className="text-[10px] font-orbitron text-slate-500 uppercase tracking-widest">{t('upgradeRobot')}</span>
-                                  <span className="text-xs font-mono text-yellow-500">
-                                    {nextUpgrade ? (
-                                      isSpeedRun 
-                                      ? formatValue(nextUpgrade.level === 2 ? 5000 : nextUpgrade.level === 3 ? 25000 : nextUpgrade.level === 4 ? 100000 : 500000)
-                                      : formatValue(Math.floor(ore.robotBaseCost * nextUpgrade.costMultiplier * getEconomicMultipliers().cost * (isInterstellar ? 0.2 : 1)))
-                                    ) : '---'} QC
-                                  </span>
-                                </div>
+                              {/* Right Column: Comp & Auto-Sell */}
+                              <div className="space-y-2">
                                 <button
-                                  onClick={() => upgradeMiningRobot(ore.id)}
-                                  disabled={!nextUpgrade || qc < (
-                                    isSpeedRun 
-                                    ? (nextUpgrade.level === 2 ? 5000 : nextUpgrade.level === 3 ? 25000 : nextUpgrade.level === 4 ? 100000 : 500000)
-                                    : Math.floor(ore.robotBaseCost * nextUpgrade.costMultiplier * getEconomicMultipliers().cost * (isInterstellar ? 0.2 : 1))
-                                  )}
-                                  className={`w-full py-3 rounded-xl font-orbitron text-[10px] font-bold tracking-widest transition-all border uppercase ${
-                                    nextUpgrade && qc >= (
-                                      isSpeedRun 
-                                      ? (nextUpgrade.level === 2 ? 5000 : nextUpgrade.level === 3 ? 25000 : nextUpgrade.level === 4 ? 100000 : 500000)
-                                      : Math.floor(ore.robotBaseCost * nextUpgrade.costMultiplier * getEconomicMultipliers().cost * (isInterstellar ? 0.2 : 1))
-                                    )
-                                    ? (isInterstellar ? 'bg-orange-500 text-black hover:bg-orange-400 shadow-[0_0_20px_rgba(249,115,22,0.3)]' : 'bg-emerald-500 text-black hover:bg-emerald-400 shadow-[0_0_20px_rgba(16,185,129,0.3)]')
-                                    : 'border-white/10 text-slate-600 cursor-not-allowed'
+                                  onClick={() => buyMiningCompression(ore.id)}
+                                  disabled={compressionLevel >= 10 || qc < compressionCost}
+                                  className={`w-full py-1.5 rounded-lg flex flex-col items-center gap-0.5 border transition-all ${
+                                    compressionLevel >= 10
+                                    ? 'bg-orange-500/20 border-orange-500/40 text-orange-400'
+                                    : qc >= compressionCost
+                                      ? 'bg-slate-800 hover:bg-pink-500/20 border-pink-500/30 text-pink-400'
+                                      : 'border-white/5 text-slate-600 opacity-50 cursor-not-allowed'
                                   }`}
                                 >
-                                  {!nextUpgrade ? t('max').toUpperCase() : t('upgradeRobot').toUpperCase()}
+                                  <span className="text-[7px] font-bold uppercase">Comp. {compressionLevel}/10</span>
+                                  {compressionLevel < 10 && <span className="text-[8px] font-mono">{formatValue(compressionCost)}</span>}
+                                </button>
+                                <button
+                                  onClick={() => buyAutoSell(ore.id)}
+                                  className={`w-full py-1.5 rounded-lg flex flex-col items-center justify-center border transition-all ${
+                                    autoSellUnlockedByOre[ore.id]
+                                    ? isAutoSell 
+                                      ? 'bg-orange-500/20 border-orange-500/40 text-orange-400 font-bold' 
+                                      : 'bg-slate-800 border-white/10 text-slate-500'
+                                    : 'bg-slate-900 border-white/5 text-slate-600 opacity-80'
+                                  }`}
+                                >
+                                  {!autoSellUnlockedByOre[ore.id] ? (
+                                    <>
+                                      <span className="text-[7px] uppercase leading-none">Desbloq. Auto</span>
+                                      <span className="text-[8px] font-mono mt-0.5">{formatValue(ore.autoSellCost * getEconomicMultipliers().cost * 0.8)}</span>
+                                    </>
+                                  ) : (
+                                    <span className="text-[8px] font-bold uppercase tracking-wider">{isAutoSell ? 'AUTO ON' : 'AUTO OFF'}</span>
+                                  )}
                                 </button>
                               </div>
                             </div>
                           </div>
                         );
-                      })()}
-                    </motion.div>
-                  </AnimatePresence>
+                      })}
+                    </div>
+                  ) : (
+                    <>
+                      {/* Mining Summary - SOLAR ONLY */}
+                      {!isInterstellar && isInterstellar && ( // Logic redundant but following user intent for absolute clear separation if I were to use a more complex check
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          {/* Summary cards omitted for Interstellar but kept for others if logic allowed */}
+                        </div>
+                      )}
+
+                      {/* Ore Page - PAGINATION VIEW FOR SOLAR */}
+                      <AnimatePresence mode="wait">
+                        <motion.div
+                          key={miningPageIndex}
+                          initial={{ opacity: 0, scale: 0.98 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          exit={{ opacity: 0, scale: 1.02 }}
+                          className="flex-1"
+                        >
+                          {(() => {
+                            const ore = currentOres[miningPageIndex];
+                            if (!ore) return null;
+                            const robots = miningRobots[ore.id] || 0;
+                            const level = miningRobotLevels[ore.id] || 1;
+                            const upgrade = ROBOT_UPGRADES.find(u => u.level === level) || ROBOT_UPGRADES[0];
+                            const nextUpgrade = ROBOT_UPGRADES.find(u => u.level === level + 1);
+                            const amount = oresCollected[ore.id] || 0;
+                            const packs = Math.floor(amount / ore.packSize);
+                            const isAutoSell = autoSellByOre[ore.id];
+                            
+                            const isUnlocked = Object.entries(ownedShips).some(([key, count]) => {
+                              const [tier, level] = key.split('-');
+                              return tier === ore.tier && parseInt(level) >= ore.requiredShipLevel && count > 0;
+                            });
+                            const robotCost = Math.floor(ore.robotBaseCost * Math.pow(1.1, robots) * getEconomicMultipliers().cost);
+                            const isActive = robots > 0;
+                            
+                            const baseRate = 0.5;
+                            const ratePerRobot = baseRate * upgrade.speedBonus * upgrade.efficiencyBonus * upgrade.productionBonus;
+                            const totalRate = robots * ratePerRobot;
+
+                            if (!isUnlocked) {
+                              return (
+                                <div className="glass-panel border border-white/5 rounded-xl p-12 flex flex-col items-center justify-center text-center opacity-40 grayscale backdrop-blur-xl bg-white/5 relative group min-h-[400px]">
+                                  <div className="absolute inset-0 bg-slate-900/20 group-hover:bg-slate-900/10 transition-colors" />
+                                  <div className="relative z-10">
+                                    <div className="w-20 h-20 rounded-full bg-slate-800/50 flex items-center justify-center mb-6 border border-slate-700/50">
+                                      <Lock className="w-10 h-10 text-slate-500" />
+                                    </div>
+                                    <div className="text-xl font-orbitron text-slate-500 uppercase tracking-widest mb-2">{t('locked')}</div>
+                                    <div className="text-sm text-slate-600 uppercase font-mono tracking-widest">Ship Level {ore.requiredShipLevel} Required</div>
+                                  </div>
+                                </div>
+                              );
+                            }
+
+                            return (
+                              <div className={`glass-panel p-8 rounded-2xl space-y-8 hover:bg-white/5 transition-all relative overflow-hidden min-h-[400px] ${
+                                isActive ? 'neon-border-cyan shadow-[0_0_30px_rgba(6,182,212,0.1)]' : 'border-white/10'
+                              }`}>
+                                <div className="flex justify-between items-start relative z-10">
+                                  <div>
+                                    <div className="text-[10px] font-orbitron text-cyan-500/60 uppercase tracking-widest mb-1">Ore Type {miningPageIndex + 1}</div>
+                                    <div className="flex items-center gap-4">
+                                      <h3 className="font-orbitron text-lg font-bold text-white tracking-tighter group-hover:text-cyan-400 neon-text-cyan transition-colors">{ore.name}</h3>
+                                      
+                                      {!isSpeedRun && (
+                                        <div className="flex flex-col items-center gap-1">
+                                          {(miningCompressionLevels[ore.id] || 0) < 10 && (
+                                            <div className="text-[8px] font-orbitron text-emerald-400 animate-pulse tracking-widest uppercase font-bold">
+                                              {formatValue(ore.robotBaseCost * Math.pow(1.6681, miningCompressionLevels[ore.id] || 0) * getEconomicMultipliers().cost)} QC
+                                            </div>
+                                          )}
+                                          <button
+                                            onClick={() => buyMiningCompression(ore.id)}
+                                            disabled={(miningCompressionLevels[ore.id] || 0) >= 10 || qc < Math.floor(ore.robotBaseCost * Math.pow(1.6681, miningCompressionLevels[ore.id] || 0) * getEconomicMultipliers().cost)}
+                                            className={`px-4 py-2 rounded-lg text-[9px] font-orbitron font-bold tracking-[0.15em] transition-all uppercase border relative overflow-hidden group/btn min-w-[140px] ${
+                                              (miningCompressionLevels[ore.id] || 0) >= 10
+                                              ? 'border-white/60 text-white shadow-[0_0_25px_rgba(255,255,255,0.4)] scale-105'
+                                              : 'bg-black/40 border-white/20 text-white hover:border-white/40'
+                                            }`}
+                                          >
+                                            <div className={`absolute inset-0 bg-gradient-to-r from-red-500 via-yellow-500 via-green-500 via-cyan-500 via-blue-500 via-purple-500 to-red-500 bg-[length:200%_100%] animate-[gradient_2s_linear_infinite] ${
+                                              (miningCompressionLevels[ore.id] || 0) >= 10 ? 'opacity-80' : 'opacity-30'
+                                            }`} />
+                                            {(miningCompressionLevels[ore.id] || 0) >= 10 && (
+                                              <div className="absolute inset-0 bg-white/10 animate-pulse" />
+                                            )}
+                                            <span className="relative z-10 flex items-center justify-center gap-2">
+                                              {(miningCompressionLevels[ore.id] || 0) < 10 ? (
+                                                <>
+                                                  Refined Compression
+                                                  <span className="text-yellow-400">Lvl {miningCompressionLevels[ore.id] || 0}</span>
+                                                </>
+                                              ) : (
+                                                <span className="text-white font-black text-[11px] tracking-[0.4em] drop-shadow-[0_0_12px_rgba(255,255,255,1)]">MAX</span>
+                                              )}
+                                            </span>
+                                          </button>
+                                        </div>
+                                      )}
+                                    </div>
+                                    <div className="text-xs font-mono text-cyan-500/60 uppercase flex items-center gap-2 mt-2">
+                                      <Cpu className={`w-4 h-4 ${isActive ? 'text-cyan-400 animate-pulse' : 'text-slate-600'}`} />
+                                      {t('robots')}: {robots}/5
+                                    </div>
+                                  </div>
+                                  <div className="text-right flex flex-col items-end">
+                                    <div className="text-2xl font-orbitron text-cyan-400 flex items-center justify-end gap-2">
+                                      <TrendingUp className="w-5 h-5" />
+                                      {totalRate.toFixed(2)} <span className="text-xs">{t('units')}/s</span>
+                                    </div>
+                                    <div className="text-[10px] font-mono text-cyan-500/60 uppercase flex items-center justify-end gap-1 mt-1">
+                                      <Coins className="w-3 h-3" />
+                                      {((totalRate / ore.packSize) * ore.baseValue * getEconomicMultipliers().profit * (1 + (miningCompressionLevels[ore.id] || 0) * 0.2)).toFixed(2)} QC/s
+                                    </div>
+                                    <div className="text-[10px] font-mono text-slate-500 uppercase mt-1 opacity-50">Lvl {level} {upgrade.name}</div>
+                                  </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 py-6 border-y border-white/5 relative z-10">
+                                  <div className="space-y-4">
+                                    <div className="flex justify-between items-center text-xs font-orbitron text-slate-500 uppercase tracking-widest">
+                                      <span>{t('oreCollected')}</span>
+                                      <span className={amount >= ore.packSize ? 'text-yellow-400 font-bold animate-pulse' : 'text-cyan-400'}>
+                                        {formatValue(Math.floor(amount))} / {formatValue(ore.packSize)}
+                                      </span>
+                                    </div>
+                                    <div className="h-4 bg-white/5 rounded-full overflow-hidden border border-white/10 p-[2px]">
+                                      <motion.div 
+                                        className={`h-full rounded-full ${amount >= ore.packSize ? 'bg-gradient-to-r from-yellow-600 to-yellow-400 shadow-[0_0_20px_rgba(234,179,8,0.4)]' : 'bg-gradient-to-r from-cyan-600 to-cyan-400'}`}
+                                        animate={{ width: `${(amount / ore.packSize) * 100}%` }}
+                                        transition={{ type: 'spring', bounce: 0, duration: 0.5 }}
+                                      />
+                                    </div>
+                                    <div className="flex justify-between items-center">
+                                      <div className="text-xs font-mono text-slate-500 uppercase">{t('sellPacks')}: {formatValue(packs)}</div>
+                                      <button
+                                        onClick={(e) => sellOrePack(ore.id, e)}
+                                        disabled={packs <= 0}
+                                        className={`px-4 py-1.5 rounded-lg text-xs font-orbitron font-bold tracking-widest transition-all uppercase ${
+                                          packs > 0 
+                                          ? 'bg-yellow-500 text-black hover:bg-yellow-400 shadow-[0_0_15px_rgba(234,179,8,0.3)]' 
+                                          : 'bg-white/5 text-slate-600 cursor-not-allowed'
+                                        }`}
+                                      >
+                                        {t('sellPacks')}
+                                      </button>
+                                    </div>
+                                  </div>
+
+                                  <div className="flex flex-col justify-center gap-4">
+                                    <div className="flex items-center justify-between p-4 bg-white/5 rounded-xl border border-white/10">
+                                      <div className="flex items-center gap-3">
+                                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center border transition-all ${isAutoSell ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-400' : 'bg-white/5 border-white/10 text-slate-600'}`}>
+                                          <Zap className="w-5 h-5" />
+                                        </div>
+                                        <div>
+                                          <div className="text-xs font-orbitron text-white uppercase tracking-widest">{t('autoSell')}</div>
+                                          <div className="text-[10px] font-mono text-slate-500 uppercase">{isAutoSell ? t('active') : t('inactive')}</div>
+                                        </div>
+                                      </div>
+                                      {!autoSellUnlockedByOre[ore.id] ? (
+                                        <button
+                                          onClick={() => buyAutoSell(ore.id)}
+                                          disabled={qc < (ore.autoSellCost * getEconomicMultipliers().cost)}
+                                          className={`px-4 py-2 rounded-lg text-[10px] font-orbitron font-bold tracking-widest transition-all uppercase ${qc >= (ore.autoSellCost * getEconomicMultipliers().cost) ? 'bg-pink-600 text-white hover:bg-pink-500 shadow-[0_0_15px_rgba(219,39,119,0.3)]' : 'bg-white/5 text-slate-600 cursor-not-allowed'}`}
+                                        >
+                                          {t('buy')} ({formatValue(ore.autoSellCost * getEconomicMultipliers().cost)})
+                                        </button>
+                                      ) : (
+                                        <button
+                                          onClick={() => buyAutoSell(ore.id)}
+                                          className={`px-4 py-2 rounded-lg text-[10px] font-orbitron font-bold tracking-widest transition-all uppercase border ${isAutoSell ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-400' : 'bg-white/5 border-white/10 text-slate-500'}`}
+                                        >
+                                          {isAutoSell ? t('on').toUpperCase() : t('off').toUpperCase()}
+                                        </button>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 relative z-10 mt-auto">
+                                  <div className="glass-panel p-4 rounded-xl border border-white/5 space-y-3">
+                                    <div className="flex justify-between items-center">
+                                      <span className="text-[10px] font-orbitron text-slate-500 uppercase tracking-widest">{t('buyRobot')}</span>
+                                      <span className="text-xs font-mono text-yellow-500">{formatValue(robotCost)} QC</span>
+                                    </div>
+                                    <button
+                                      onClick={() => buyMiningRobot(ore.id)}
+                                      disabled={robots >= 5 || qc < robotCost}
+                                      className={`w-full py-3 rounded-xl font-orbitron text-[10px] font-bold tracking-widest transition-all border uppercase ${robots < 5 && qc >= robotCost ? 'bg-cyan-500 text-black hover:bg-cyan-400 shadow-[0_0_20px_rgba(6,182,212,0.3)]' : 'border-white/10 text-slate-600 cursor-not-allowed'}`}
+                                    >
+                                      {robots >= 5 ? t('max').toUpperCase() : t('buyRobot').toUpperCase()}
+                                    </button>
+                                  </div>
+
+                                  <div className="glass-panel p-4 rounded-xl border border-white/5 space-y-3">
+                                    <div className="flex justify-between items-center">
+                                      <span className="text-[10px] font-orbitron text-slate-500 uppercase tracking-widest">{t('upgradeRobot')}</span>
+                                      <span className="text-xs font-mono text-yellow-500">
+                                        {nextUpgrade ? formatValue(Math.floor(ore.robotBaseCost * nextUpgrade.costMultiplier * getEconomicMultipliers().cost)) : '---'} QC
+                                      </span>
+                                    </div>
+                                    <button
+                                      onClick={() => upgradeMiningRobot(ore.id)}
+                                      disabled={!nextUpgrade || qc < Math.floor(ore.robotBaseCost * nextUpgrade.costMultiplier * getEconomicMultipliers().cost)}
+                                      className={`w-full py-3 rounded-xl font-orbitron text-[10px] font-bold tracking-widest transition-all border uppercase ${nextUpgrade && qc >= Math.floor(ore.robotBaseCost * nextUpgrade.costMultiplier * getEconomicMultipliers().cost) ? 'bg-emerald-500 text-black hover:bg-emerald-400 shadow-[0_0_20px_rgba(16,185,129,0.3)]' : 'border-white/10 text-slate-600 cursor-not-allowed'}`}
+                                    >
+                                      {!nextUpgrade ? t('max').toUpperCase() : t('upgradeRobot').toUpperCase()}
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })()}
+                        </motion.div>
+                      </AnimatePresence>
+                    </>
+                  )}
                 </motion.div>
               )}
 
@@ -12008,12 +12122,13 @@ export const GameDashboard = ({
                                         <span>
                                           {(() => {
                                             const val = currentShips[shipPageIndex].range;
+                                            if (isInterstellar) return val;
                                             if (val >= 1000000) return Math.floor(val / 1000000) + 'M';
                                             if (val >= 1000) return Math.floor(val / 1000) + (val >= 100000 ? 'k' : 'K');
                                             return val;
                                           })()}
                                         </span>
-                                        <span className="text-[10px] opacity-60 font-mono uppercase">Km</span>
+                                        <span className="text-[10px] opacity-60 font-mono uppercase">{isInterstellar ? 'LY' : 'Km'}</span>
                                       </div>
                                     </div>
                                     <div className="p-4 rounded-xl bg-slate-900/50 border border-slate-800/50 group/stat">
@@ -12155,29 +12270,14 @@ export const GameDashboard = ({
                   </div>
 
                   {techSubTab === 'extraction' && isInterstellar && allTechUnlocked ? (
-                    <div className="space-y-6 flex-1 flex flex-col">
-                      <div className="flex justify-between items-center bg-orange-900/10 p-4 rounded-xl border border-orange-500/20">
-                        <div>
-                          <h3 className="text-lg font-bold text-orange-400">Recursos Extraídos</h3>
-                          <p className="text-xs text-slate-400">Gerencie seus pontos de extração galácticos.</p>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <div className="px-4 py-2 bg-orange-900/20 border border-orange-500/30 rounded-lg flex flex-col items-end">
-                            <span className="text-[9px] font-orbitron text-orange-500/60 uppercase tracking-widest">Lucro Total (Extração)</span>
-                            <span className="text-sm font-bold text-orange-400">{formatValue(totalExtractionProfit)} QC</span>
-                          </div>
-                          <button
-                            onClick={sellExtractionPacks}
-                            className="px-6 py-2 bg-orange-600 hover:bg-orange-500 text-black rounded-lg font-bold text-sm transition-all flex items-center gap-2"
-                          >
-                            <Coins className="w-4 h-4" />
-                            Vender Tudo
-                          </button>
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {EXTRACTION_POINTS.map((point, index) => {
+                    <div className="flex-1 flex flex-col min-h-0 gap-4">
+                      {/* Extraction Points Grid */}
+                      <div className="flex-1 min-h-0 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 auto-rows-fr">
+                        {(extractionPageIndex === 0 
+                          ? EXTRACTION_POINTS.slice(0, 5) 
+                          : EXTRACTION_POINTS.slice(5, 9)
+                        ).map((point, pageIdx) => {
+                          const index = extractionPageIndex === 0 ? pageIdx : pageIdx + 5;
                           const isUnlocked = unlockedExtractionPoints.includes(point.id);
                           const isResearching = researchingExtractionPoint?.id === point.id;
                           const packs = extractionPacks[point.id] || 0;
@@ -12198,7 +12298,7 @@ export const GameDashboard = ({
                           return (
                             <div
                               key={point.id}
-                              className={`p-4 rounded-xl border transition-all duration-300 ${
+                              className={`p-4 rounded-xl border transition-all duration-300 flex flex-col h-full ${
                                 isUnlocked 
                                   ? `border-orange-500/40 bg-orange-900/10 shadow-[0_0_15px_rgba(234,88,12,0.2)]` 
                                   : isResearching
@@ -12208,7 +12308,7 @@ export const GameDashboard = ({
                             >
                               <div className="flex justify-between items-start mb-3">
                                   <div className="flex-1 pr-2">
-                                    <h3 className={`font-bold leading-tight h-[2.4em] line-clamp-2 text-xs sm:text-sm ${isUnlocked ? 'text-orange-400' : 'text-slate-200'}`}>
+                                    <h3 className={`font-bold leading-tight h-[2.8em] line-clamp-2 text-xs sm:text-sm ${isUnlocked ? 'text-orange-400' : 'text-slate-200'}`}>
                                       {point.name}
                                     </h3>
                                     {isUnlocked ? (
@@ -12219,7 +12319,7 @@ export const GameDashboard = ({
                                         </div>
                                         <div className="w-full h-1 bg-slate-800 rounded-full overflow-hidden border border-white/5">
                                           <motion.div 
-                                            className="h-full bg-gradient-to-r from-orange-600 to-orange-400"
+                                            className="h-full bg-gradient-to-r from-slate-400 via-white to-slate-400 shadow-[0_0_8px_rgba(255,255,255,0.4)]"
                                             initial={{ width: 0 }}
                                             animate={{ width: `${extractionCycleProgress[point.id] || 0}%` }}
                                             transition={{ duration: 0.1, ease: "linear" }}
@@ -12232,7 +12332,7 @@ export const GameDashboard = ({
                                       </p>
                                     )}
                                   </div>
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-2 shrink-0">
                                   {isUnlocked && (
                                     <div className="flex flex-col items-end">
                                       <span className="text-[9px] text-slate-500 uppercase font-mono">{point.resourceName}</span>
@@ -12245,7 +12345,7 @@ export const GameDashboard = ({
                                 </div>
                               </div>
 
-                              <div className="space-y-3">
+                              <div className="space-y-3 mt-auto">
                                 {isUnlocked ? (
                                   <div className="space-y-3">
                                     {/* Upgrades Grid */}
@@ -12255,7 +12355,7 @@ export const GameDashboard = ({
                                         disabled={robotLevel >= 5 || qc < (1000000000 * Math.pow(2, robotLevel))}
                                         className={`p-2 rounded-lg border flex flex-col items-center gap-1 transition-all ${
                                           robotLevel >= 5
-                                            ? 'bg-orange-500/20 border-orange-500/40 text-orange-400'
+                                            ? 'bg-orange-500/20 border-orange-500/40 text-orange-400 font-orbitron'
                                             : qc >= (1000000000 * Math.pow(2, robotLevel))
                                               ? 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-200'
                                               : 'bg-slate-900/50 border-slate-800 text-slate-600 cursor-not-allowed'
@@ -12264,7 +12364,7 @@ export const GameDashboard = ({
                                         <Bot className="w-4 h-4" />
                                         <span className="text-[9px] font-bold uppercase">Robô Lvl {robotLevel}</span>
                                         {robotLevel < 5 && (
-                                          <span className="text-[8px] opacity-60">{formatValue(1000000000 * Math.pow(2, robotLevel))}</span>
+                                          <span className="text-[8px] opacity-60 font-mono">{formatValue(1000000000 * Math.pow(2, robotLevel))}</span>
                                         )}
                                       </button>
 
@@ -12273,7 +12373,7 @@ export const GameDashboard = ({
                                         disabled={prodLevel >= 6 || qc < (EXTRACTION_PRODUCTION_COSTS[prodLevel + 1] * Math.pow(1.1, index))}
                                         className={`p-2 rounded-lg border flex flex-col items-center gap-1 transition-all ${
                                           prodLevel >= 6
-                                            ? 'bg-orange-500/20 border-orange-500/40 text-orange-400'
+                                            ? 'bg-orange-500/20 border-orange-500/40 text-orange-400 font-orbitron'
                                             : qc >= (EXTRACTION_PRODUCTION_COSTS[prodLevel + 1] * Math.pow(1.1, index))
                                               ? 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-200'
                                               : 'bg-slate-900/50 border-slate-800 text-slate-600 cursor-not-allowed'
@@ -12282,7 +12382,7 @@ export const GameDashboard = ({
                                         <Pickaxe className="w-4 h-4" />
                                         <span className="text-[9px] font-bold uppercase">Picareta Lvl {prodLevel}</span>
                                         {prodLevel < 6 && (
-                                          <span className="text-[8px] opacity-60">{formatValue(EXTRACTION_PRODUCTION_COSTS[prodLevel + 1] * Math.pow(1.1, index))}</span>
+                                          <span className="text-[8px] opacity-60 font-mono">{formatValue(EXTRACTION_PRODUCTION_COSTS[prodLevel + 1] * Math.pow(1.1, index))}</span>
                                         )}
                                       </button>
 
@@ -12291,7 +12391,7 @@ export const GameDashboard = ({
                                         disabled={compressionLevel >= 10 || qc < Math.floor(100000000 * Math.pow(1.2, compressionLevel))}
                                         className={`p-2 rounded-lg border flex flex-col items-center gap-1 transition-all ${
                                           compressionLevel >= 10
-                                            ? 'bg-orange-500/20 border-orange-500/40 text-orange-400'
+                                            ? 'bg-orange-500/20 border-orange-500/40 text-orange-400 font-orbitron'
                                             : qc >= Math.floor(100000000 * Math.pow(1.2, compressionLevel))
                                               ? 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-200'
                                               : 'bg-slate-900/50 border-slate-800 text-slate-600 cursor-not-allowed'
@@ -12300,7 +12400,7 @@ export const GameDashboard = ({
                                         <Zap className="w-4 h-4" />
                                         <span className="text-[9px] font-bold uppercase">Compactação Lvl {compressionLevel}</span>
                                         {compressionLevel < 10 && (
-                                          <span className="text-[8px] opacity-60">{formatValue(Math.floor(100000000 * Math.pow(1.2, compressionLevel)))}</span>
+                                          <span className="text-[8px] opacity-60 font-mono">{formatValue(Math.floor(100000000 * Math.pow(1.2, compressionLevel)))}</span>
                                         )}
                                       </button>
 
@@ -12309,12 +12409,12 @@ export const GameDashboard = ({
                                           onClick={() => toggleExtractionAutoSell(point.id)}
                                           className={`p-2 rounded-lg border flex flex-col items-center justify-center gap-1 transition-all ${
                                             isAutoSellActive 
-                                              ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-400 shadow-[0_0_10px_rgba(16,185,129,0.2)]' 
+                                              ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-400 shadow-[0_0_10px_rgba(16,185,129,0.2)] font-orbitron' 
                                               : 'bg-slate-800 border-slate-700 text-slate-400'
                                           }`}
                                         >
                                           <Cpu className={`w-4 h-4 ${isAutoSellActive ? 'animate-pulse' : ''}`} />
-                                          <span className="text-[8px] font-bold uppercase">{isAutoSellActive ? 'Auto Venda ON' : 'Auto Venda OFF'}</span>
+                                          <span className="text-[8px] font-bold uppercase">{isAutoSellActive ? 'Auto: ON' : 'Auto: OFF'}</span>
                                         </button>
                                       ) : (
                                         <button
@@ -12322,75 +12422,84 @@ export const GameDashboard = ({
                                           disabled={qc < 5000000000}
                                           className={`p-2 rounded-lg border flex flex-col items-center justify-center gap-1 transition-all ${
                                             qc >= 5000000000
-                                              ? 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-200'
+                                              ? 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-200 font-orbitron'
                                               : 'bg-slate-900/50 border-slate-800 text-slate-600 cursor-not-allowed'
                                           }`}
                                         >
                                           <Cpu className="w-4 h-4 opacity-40" />
                                           <span className="text-[8px] font-bold uppercase">Auto Venda</span>
-                                          <span className="text-[7px] opacity-60">5B QC</span>
+                                          <span className="text-[7px] opacity-60 font-mono">{formatValue(5000000000)}</span>
                                         </button>
                                       )}
                                     </div>
-
-                                    {/* Manual Sell Button */}
-                                    <button
-                                      onClick={() => sellExtractionPointPacks(point.id)}
-                                      disabled={packs < 1000}
-                                      className={`w-full py-2 rounded-lg font-bold text-xs transition-all flex items-center justify-center gap-2 ${
-                                        packs >= 1000
-                                          ? 'bg-orange-600 hover:bg-orange-500 text-black shadow-lg shadow-orange-900/20'
-                                          : 'bg-slate-800 text-slate-600 cursor-not-allowed'
-                                      }`}
-                                    >
-                                      <Coins className="w-4 h-4" />
-                                      Vender Packs ({formatValue(packs)})
-                                    </button>
                                   </div>
                                 ) : isResearching ? (
                                   <div className="space-y-2">
-                                    <div className="flex justify-between text-[10px] text-slate-400">
-                                      <span>Desbloqueando...</span>
-                                      <span>{Math.floor(progress)}%</span>
+                                    <div className="flex justify-between items-center text-[10px] text-orange-400 font-bold uppercase">
+                                      <span>Pesquisando Local...</span>
+                                      <span className="font-mono">{progress.toFixed(0)}%</span>
                                     </div>
-                                    <div className="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden">
+                                    <div className="w-full h-2 bg-black/40 rounded-full overflow-hidden border border-white/10">
                                       <motion.div 
-                                        className="h-full bg-orange-500"
+                                        className="h-full bg-gradient-to-r from-slate-400 via-white to-slate-400 shadow-[0_0_10px_rgba(255,255,255,0.5)]"
                                         initial={{ width: 0 }}
                                         animate={{ width: `${progress}%` }}
                                       />
                                     </div>
-                                    <button
-                                      onClick={boostExtractionResearch}
-                                      className="w-full py-1.5 rounded-lg bg-orange-500/20 hover:bg-orange-500/30 text-orange-400 text-[10px] font-bold flex items-center justify-center gap-1 transition-all"
-                                    >
-                                      <Zap className="w-3 h-3" />
-                                      Pular Tempo ({formatValue(Math.ceil((researchingExtractionPoint.endTime - Date.now()) / 1000) * 10000)} QC)
-                                    </button>
                                   </div>
                                 ) : (
-                                  <div className="space-y-2">
-                                    <div className="flex justify-between items-center text-[10px] text-slate-400">
-                                      <span>Custo: {formatValue(point.cost)} QC</span>
-                                      <span>Tempo: {point.researchTime / 60000} min</span>
-                                    </div>
-                                    <button
-                                      onClick={() => buyExtractionPoint(point)}
-                                      disabled={!canResearch}
-                                      className={`w-full py-2 rounded-lg text-xs font-bold transition-all ${
-                                        canResearch
-                                          ? 'bg-orange-600 hover:bg-orange-500 text-black shadow-lg'
-                                          : 'bg-slate-800 text-slate-500 cursor-not-allowed'
-                                      }`}
-                                    >
-                                      Desbloquear
-                                    </button>
-                                  </div>
+                                  <button
+                                    onClick={() => {
+                                      if (canResearch) {
+                                        setQc(c => c - point.cost);
+                                        updateHistoryStats('spent', point.cost);
+                                        setResearchingExtractionPoint({
+                                          id: point.id,
+                                          startTime: Date.now(),
+                                          endTime: Date.now() + point.researchTime
+                                        });
+                                        playSfx('buy');
+                                      }
+                                    }}
+                                    disabled={!canResearch}
+                                    className={`w-full py-2.5 rounded-lg font-bold text-xs transition-all flex items-center justify-center gap-2 ${
+                                      canResearch
+                                        ? 'bg-orange-600 hover:bg-orange-500 text-black shadow-lg shadow-orange-500/20'
+                                        : 'bg-slate-800 text-slate-500 cursor-not-allowed opacity-50'
+                                    }`}
+                                  >
+                                    <Search className="w-4 h-4" />
+                                    PESQUISAR PONTO
+                                  </button>
                                 )}
                               </div>
                             </div>
                           );
                         })}
+                        
+                        {/* Pagination Toggle Arrow */}
+                        <div className="flex items-center justify-center">
+                          <button
+                            onClick={() => setExtractionPageIndex(prev => prev === 0 ? 1 : 0)}
+                            className="group relative flex flex-col items-center gap-2 p-6 rounded-2xl border border-orange-500/20 bg-orange-900/5 hover:bg-orange-500/10 hover:border-orange-500/40 transition-all duration-300 transform hover:scale-105"
+                          >
+                            <div className="absolute inset-0 bg-orange-500/5 blur-xl group-hover:bg-orange-500/10 transition-all rounded-full" />
+                            <div className="relative">
+                              {extractionPageIndex === 0 ? (
+                                <ChevronRight className="w-10 h-10 text-orange-400 group-hover:translate-x-1 transition-transform" />
+                              ) : (
+                                <ChevronLeft className="w-10 h-10 text-orange-400 group-hover:-translate-x-1 transition-transform" />
+                              )}
+                            </div>
+                            <span className="text-[10px] font-orbitron font-bold text-orange-400 uppercase tracking-widest">
+                              {extractionPageIndex === 0 ? 'Ver outros 4 pontos' : 'Voltar para os 5 pontos'}
+                            </span>
+                            <div className="flex gap-1 mt-1">
+                              <div className={`w-1.5 h-1.5 rounded-full ${extractionPageIndex === 0 ? 'bg-orange-400 shadow-[0_0_5px_rgba(251,146,60,0.8)]' : 'bg-slate-700'}`} />
+                              <div className={`w-1.5 h-1.5 rounded-full ${extractionPageIndex === 1 ? 'bg-orange-400 shadow-[0_0_5px_rgba(251,146,60,0.8)]' : 'bg-slate-700'}`} />
+                            </div>
+                          </button>
+                        </div>
                       </div>
                     </div>
                   ) : (
@@ -12423,16 +12532,30 @@ export const GameDashboard = ({
                           >
                             <div className="flex justify-between items-start mb-2">
                               <div className="flex-1 overflow-hidden">
-                                <h3 className={`font-orbitron text-xs font-bold ${isUnlocked ? shipColorClass : 'text-slate-200'} uppercase tracking-tight truncate`}>
+                                <h3 className={`font-orbitron text-xs font-bold ${isUnlocked ? shipColorClass : 'text-slate-200'} uppercase tracking-tight`}>
                                   {translateData(tech.name)}
                                 </h3>
-                                <p className="text-[9px] text-slate-500 font-mono uppercase tracking-widest mt-0.5 truncate">
+                                <p className="text-[10px] text-slate-400 font-medium leading-tight mt-1 line-clamp-2">
                                   {translateData(tech.description)}
                                 </p>
                               </div>
-                              <div className={`shrink-0 w-8 h-8 rounded-lg flex items-center justify-center border ${isUnlocked ? `bg-emerald-500/20 border-emerald-500/40 text-emerald-400` : 'bg-white/5 border-white/10 text-slate-600'}`}>
-                                {isUnlocked ? <Check className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
-                              </div>
+                              {isUnlocked ? (
+                                <div className={`shrink-0 w-8 h-8 rounded-lg flex items-center justify-center border bg-emerald-500/20 border-emerald-500/40 text-emerald-400 shadow-[0_0_10px_rgba(16,185,129,0.2)]`}>
+                                  <Check className="w-4 h-4" />
+                                </div>
+                              ) : isResearching && (routeTier === 'Solar' || routeTier === 'Interstellar') ? (
+                                <button
+                                  onClick={boostResearch}
+                                  className={`shrink-0 w-8 h-8 rounded-lg flex items-center justify-center border bg-yellow-500/20 border-yellow-500/40 text-yellow-400 hover:bg-yellow-500/30 transition-all group/skip cursor-pointer shadow-[0_0_15px_rgba(234,179,8,0.3)] animate-pulse`}
+                                  title={language === 'pt' ? `Pular Tempo por ${formatValue(Math.floor(tech.cost * multipliers.cost * 0.75))} QC` : `Skip Time for ${formatValue(Math.floor(tech.cost * multipliers.cost * 0.75))} QC`}
+                                >
+                                  <Zap className="w-4 h-4 group-hover/skip:scale-110 transition-transform" />
+                                </button>
+                              ) : (
+                                <div className={`shrink-0 w-8 h-8 rounded-lg flex items-center justify-center border bg-white/5 border-white/10 text-slate-600`}>
+                                  <Lock className="w-4 h-4" />
+                                </div>
+                              )}
                             </div>
 
                             <div className="mt-auto space-y-2">
@@ -12442,14 +12565,14 @@ export const GameDashboard = ({
                               </div>
 
                               {isUnlocked ? (
-                                <div className={`py-1.5 rounded-lg bg-${shipColorClass.split('-')[1] || 'cyan'}-500/10 border border-${shipColorClass.split('-')[1] || 'cyan'}-500/20 flex items-center justify-center gap-2`}>
+                                <div className="py-1.5 rounded-lg bg-gradient-to-r from-slate-400 via-white to-slate-400 border border-white/30 flex items-center justify-center gap-2 shadow-[0_0_10px_rgba(255,255,255,0.4)]">
                                   <motion.div
                                     animate={{ scale: [1, 1.2, 1] }}
                                     transition={{ duration: 2, repeat: Infinity }}
                                   >
-                                    <Zap className={`w-3 h-3 ${shipColorClass}`} />
+                                    <Zap className="w-3 h-3 text-slate-900" />
                                   </motion.div>
-                                  <span className={`text-[9px] font-black uppercase tracking-widest ${shipColorClass}`}>
+                                  <span className="text-[9px] font-black uppercase tracking-widest text-slate-900">
                                     {t('unlocked')}
                                   </span>
                                 </div>
@@ -12459,9 +12582,9 @@ export const GameDashboard = ({
                                     <span>{t('researching')}</span>
                                     <span>{Math.floor(progress)}%</span>
                                   </div>
-                                  <div className="h-1 w-full bg-white/5 rounded-full overflow-hidden border border-white/10">
+                                  <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden border border-white/10">
                                     <motion.div 
-                                      className={`h-full ${isInterstellar ? 'bg-orange-500' : 'bg-cyan-500'}`}
+                                      className="h-full bg-gradient-to-r from-slate-400 via-white to-slate-400 shadow-[0_0_10px_rgba(255,255,255,0.5)]"
                                       initial={{ width: 0 }}
                                       animate={{ width: `${progress}%` }}
                                     />
@@ -12545,7 +12668,7 @@ export const GameDashboard = ({
                       {/* RHSE Content (Always Open) */}
                       <div className={`glass-panel ${isInterstellar ? 'neon-border-orange' : 'neon-border-cyan'} rounded-xl p-3 bg-white/5 space-y-4 shrink-0 mt-1`}>
                         {isInterstellar && (
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
                             {/* Extraction Technology Upgrade */}
                             <button
                               onClick={() => {
@@ -12558,7 +12681,7 @@ export const GameDashboard = ({
                                 }
                               }}
                               disabled={extractionTechLevel >= 10 || qc < (10000 * Math.pow(2.5, extractionTechLevel))}
-                              className={`p-2.5 rounded-lg border transition-all flex flex-col gap-1 ${
+                              className={`p-2.5 rounded-lg border transition-all flex flex-col gap-1 h-full ${
                                 extractionTechLevel >= 10 
                                   ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 cursor-default' 
                                   : qc >= (10000 * Math.pow(2.5, extractionTechLevel))
@@ -12571,7 +12694,7 @@ export const GameDashboard = ({
                                 <span className="text-[10px] font-mono font-bold">{extractionTechLevel >= 10 ? 'MAX' : `LVL ${extractionTechLevel}`}</span>
                               </div>
                               {extractionTechLevel < 10 && (
-                                <div className="mt-1 text-[9px] font-mono font-bold text-right">
+                                <div className="mt-auto text-[9px] font-mono font-bold text-right pt-1">
                                   {formatValue(10000 * Math.pow(2.5, extractionTechLevel))} QC
                                 </div>
                               )}
@@ -12589,7 +12712,7 @@ export const GameDashboard = ({
                                 }
                               }}
                               disabled={solarMappingLevel >= 10 || qc < (10000 * Math.pow(2.5, solarMappingLevel))}
-                              className={`p-2.5 rounded-lg border transition-all flex flex-col gap-1 ${
+                              className={`p-2.5 rounded-lg border transition-all flex flex-col gap-1 h-full ${
                                 solarMappingLevel >= 10 
                                   ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 cursor-default' 
                                   : qc >= (10000 * Math.pow(2.5, solarMappingLevel))
@@ -12602,8 +12725,70 @@ export const GameDashboard = ({
                                 <span className="text-[10px] font-mono font-bold">{solarMappingLevel >= 10 ? 'MAX' : `LVL ${solarMappingLevel}`}</span>
                               </div>
                               {solarMappingLevel < 10 && (
-                                <div className="mt-1 text-[9px] font-mono font-bold text-right">
+                                <div className="mt-auto text-[9px] font-mono font-bold text-right pt-1">
                                   {formatValue(10000 * Math.pow(2.5, solarMappingLevel))} QC
+                                </div>
+                              )}
+                            </button>
+
+                            {/* Double Route Upgrade (New) */}
+                            <button
+                              onClick={() => {
+                                const cost = DOUBLE_ROUTE_COSTS[doubleRouteLevel];
+                                if (qc >= cost && doubleRouteLevel < 5) {
+                                  setQc(prev => prev - cost);
+                                  setDoubleRouteLevel(prev => prev + 1);
+                                  playSfx('upgrade');
+                                  addLog(`${t('doubleRoute')} UPGRADED: Level ${doubleRouteLevel + 1}`, 'success');
+                                }
+                              }}
+                              disabled={doubleRouteLevel >= 5 || qc < (DOUBLE_ROUTE_COSTS[doubleRouteLevel] || 0)}
+                              className={`p-2.5 rounded-lg border transition-all flex flex-col gap-1 h-full ${
+                                doubleRouteLevel >= 5 
+                                  ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 cursor-default' 
+                                  : qc >= (DOUBLE_ROUTE_COSTS[doubleRouteLevel] || 0)
+                                    ? 'bg-orange-500/10 border-orange-500/30 text-orange-400 hover:bg-orange-500/20'
+                                    : 'bg-white/5 border-white/10 text-slate-500 cursor-not-allowed opacity-50'
+                              }`}
+                            >
+                              <div className="flex justify-between items-center w-full">
+                                <span className="text-[10px] font-orbitron font-bold uppercase tracking-wider">{t('doubleRoute')}</span>
+                                <span className="text-[10px] font-mono font-bold">{doubleRouteLevel >= 5 ? 'MAX' : `LVL ${doubleRouteLevel}`}</span>
+                              </div>
+                              {doubleRouteLevel < 5 && (
+                                <div className="mt-auto text-[9px] font-mono font-bold text-right pt-1">
+                                  {formatValue(DOUBLE_ROUTE_COSTS[doubleRouteLevel])} QC
+                                </div>
+                              )}
+                            </button>
+
+                            {/* Doom Protocol Upgrade (New) */}
+                            <button
+                              onClick={() => {
+                                const cost = DOOM_P_COSTS[doomPLevel];
+                                if (qc >= cost && doomPLevel < 10) {
+                                  setQc(prev => prev - cost);
+                                  setDoomPLevel(prev => prev + 1);
+                                  playSfx('upgrade');
+                                  addLog(`${t('doomP')} UPGRADED: Level ${doomPLevel + 1}`, 'success');
+                                }
+                              }}
+                              disabled={doomPLevel >= 10 || qc < (DOOM_P_COSTS[doomPLevel] || 0)}
+                              className={`p-2.5 rounded-lg border transition-all flex flex-col gap-1 h-full ${
+                                doomPLevel >= 10 
+                                  ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 cursor-default' 
+                                  : qc >= (DOOM_P_COSTS[doomPLevel] || 0)
+                                    ? 'bg-orange-500/10 border-orange-500/30 text-orange-400 hover:bg-orange-500/20'
+                                    : 'bg-white/5 border-white/10 text-slate-500 cursor-not-allowed opacity-50'
+                              }`}
+                            >
+                              <div className="flex justify-between items-center w-full">
+                                <span className="text-[10px] font-orbitron font-bold uppercase tracking-wider">{t('doomP')}</span>
+                                <span className="text-[10px] font-mono font-bold">{doomPLevel >= 10 ? 'MAX' : `LVL ${doomPLevel}`}</span>
+                              </div>
+                              {doomPLevel < 10 && (
+                                <div className="mt-auto text-[9px] font-mono font-bold text-right pt-1">
+                                  {formatValue(DOOM_P_COSTS[doomPLevel])} QC
                                 </div>
                               )}
                             </button>
@@ -12813,7 +12998,7 @@ export const GameDashboard = ({
                         {language === 'pt' ? 'CONFIRMAR E SAIR' : 'CONFIRM AND EXIT'}
                       </button>
                       <button
-                        onClick={() => setActiveTab('routes')}
+                        onClick={() => setActiveTab(isEarth ? 'colonies' : isVoid ? 'void_aircraft' : isInterstellar ? 'routes2' : 'routes')}
                         className="w-full py-2 text-[10px] font-orbitron text-slate-500 hover:text-white transition-colors uppercase tracking-widest"
                       >
                         {language === 'pt' ? 'VOLTAR' : 'BACK'}
