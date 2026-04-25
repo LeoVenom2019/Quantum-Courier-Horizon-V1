@@ -155,6 +155,10 @@ const ghostColors = [
     { base: '#ec4899', glow: '#ec4899', behavior: 'CHASE' }
 ];
 
+let ghostSpawnPoints = [];
+let lastGhostSpawnTime = 0;
+const GHOST_SPAWN_INTERVAL = 2000; // 2 seconds between spawns
+
 // Initialize
 function initLevel(phase) {
     currentPhase = phase % 3;
@@ -171,39 +175,13 @@ function initLevel(phase) {
     player.isPowered = false;
 
     ghosts = [];
-    let gIdx = 0;
-    const MIN_SPAWN_DIST = 5;
+    ghostSpawnPoints = [];
+    lastGhostSpawnTime = 0;
 
     for (let r = 0; r < map.length; r++) {
         for (let c = 0; c < map[r].length; c++) {
             if (map[r][c] === 4) {
-                let spawnX = c;
-                let spawnY = r;
-
-                // Safety Check: If spawn is too close to player start
-                if (dist(spawnX, spawnY, player.gridX, player.gridY) < MIN_SPAWN_DIST) {
-                    // Relocate to a random safe point for this session
-                    const safePos = findSafeSpawn(map, player.gridX, player.gridY, MIN_SPAWN_DIST);
-                    if (safePos) {
-                        spawnX = safePos.c;
-                        spawnY = safePos.r;
-                    }
-                }
-
-                const config = ghostColors[gIdx % ghostColors.length];
-                ghosts.push({
-                    x: spawnX * TILE_SIZE, y: spawnY * TILE_SIZE,
-                    gridX: spawnX, gridY: spawnY,
-                    spawnX: spawnX, spawnY: spawnY,
-                    dir: { x: 0, y: 0 },
-                    color: config,
-                    speed: 0.05 + (currentPhase * 0.02),
-                    frightened: false,
-                    dead: false,
-                    respawnTimer: 0,
-                    behavior: config.behavior
-                });
-                gIdx++;
+                ghostSpawnPoints.push({ r, c });
             }
         }
     }
@@ -211,6 +189,32 @@ function initLevel(phase) {
     canvas.width = map[0].length * TILE_SIZE;
     canvas.height = map.length * TILE_SIZE;
     document.getElementById('phase-display').innerText = THEMES[currentPhase].name;
+}
+
+function spawnGhost() {
+    const phaseLimits = [2, 3, 4]; // Phase 1: 2 ghosts, Phase 2: 3 ghosts, Last Phase: 4 ghosts
+    if (ghosts.length >= phaseLimits[currentPhase]) return;
+
+    const MIN_SPAWN_DIST = 7;
+    const validPoints = ghostSpawnPoints.filter(p => dist(p.c, p.r, player.gridX, player.gridY) >= MIN_SPAWN_DIST);
+    
+    if (validPoints.length === 0) return;
+
+    const point = validPoints[Math.floor(Math.random() * validPoints.length)];
+    const config = ghostColors[ghosts.length % ghostColors.length];
+
+    ghosts.push({
+        x: point.c * TILE_SIZE, y: point.r * TILE_SIZE,
+        gridX: point.c, gridY: point.r,
+        spawnX: point.c, spawnY: point.r,
+        dir: { x: 0, y: 0 },
+        color: config,
+        speed: 0.05 + (currentPhase * 0.02),
+        frightened: false,
+        dead: false,
+        respawnTimer: 0,
+        behavior: config.behavior
+    });
 }
 
 function update(dt) {
@@ -237,6 +241,10 @@ function update(dt) {
     
     // Ghost logic
     handleGhostAI(timeStep);
+
+    // Collision and collection logic (moved out of movement to ensure it runs even when stationary)
+    checkGhostCollisions();
+    checkItemCollection();
 
     // Scoring interpolation
     if (displayedScore < score) {
@@ -328,9 +336,6 @@ function handlePlayerMovement(ts) {
             player.y += (dy / d) * remaining;
             remaining = 0;
         }
-        
-        // Safety check for ghost collisions at every micro-step to prevent tunneling
-        if (checkGhostCollisions()) break; 
     }
 
     if (player.dir.x !== 0 || player.dir.y !== 0) {
@@ -347,15 +352,25 @@ function checkItemCollection() {
 
     if (map[gy][gx] === 2) {
         map[gy][gx] = 0; score += 10; player.boost = Math.min(100, player.boost + 3);
+        notifyParentOfScore();
         spawnParticles(player.x + TILE_SIZE/2, player.y + TILE_SIZE/2, THEMES[currentPhase].pellet, 5);
         updateBoostBar(); checkLevelWin();
     } else if (map[gy][gx] === 3) {
         map[gy][gx] = 0; score += 50; player.boost = Math.min(100, player.boost + 15);
+        notifyParentOfScore();
         spawnParticles(player.x + TILE_SIZE/2, player.y + TILE_SIZE/2, THEMES[currentPhase].power, 15);
         player.isPowered = true; player.powerTimer = POWER_DURATION;
         ghosts.forEach(g => g.frightened = true);
         updateBoostBar(); checkLevelWin();
     }
+}
+
+function notifyParentOfScore() {
+    window.parent.postMessage({ 
+        type: 'SCORE_UPDATE', 
+        gameId: 'robot-runner', 
+        score: score 
+    }, '*');
 }
 
 function checkGhostCollisions() {
@@ -369,10 +384,12 @@ function checkGhostCollisions() {
         if (d < TILE_SIZE * 0.75) {
             if (player.isPowered) {
                 g.dead = true; g.respawnTimer = GHOST_RESPAWN_TIME; score += 200;
+                notifyParentOfScore();
                 spawnParticles(g.x + TILE_SIZE/2, g.y + TILE_SIZE/2, '#FFFFFF', 30);
                 screenShake = 10;
             } else { 
                 gameState = 'GAMEOVER'; 
+                notifyParentOfScore();
                 document.getElementById('game-over').classList.remove('hidden');
                 collisionDetected = true;
             }
@@ -392,12 +409,18 @@ function canMove(gx, gy) {
 }
 
 function handleGhostAI(ts) {
+    // Spawning logic
+    if (Date.now() - lastGhostSpawnTime > GHOST_SPAWN_INTERVAL) {
+        spawnGhost();
+        lastGhostSpawnTime = Date.now();
+    }
+
     ghosts.forEach(ghost => {
         if (ghost.dead) {
             ghost.respawnTimer -= 16 * ts;
             if (ghost.respawnTimer <= 0) {
                 // Safety Check: Don't respawn on top of player or too close
-                if (dist(ghost.spawnX, ghost.spawnY, player.gridX, player.gridY) > 3) {
+                if (dist(ghost.spawnX, ghost.spawnY, player.gridX, player.gridY) > 6) {
                     ghost.dead = false;
                     ghost.x = ghost.spawnX * TILE_SIZE;
                     ghost.y = ghost.spawnY * TILE_SIZE;
@@ -614,8 +637,11 @@ document.getElementById('retry-btn').onclick = () => {
     document.getElementById('game-over').classList.add('hidden');
     gameState = 'PLAYING'; startTime = Date.now(); initLevel(currentPhase);
 };
+document.getElementById('exit-game-btn').onclick = () => {
+    window.parent.postMessage({ type: 'CLOSE_MINI_GAME' }, '*');
+};
 document.getElementById('finish-btn').onclick = () => {
-    window.parent.postMessage({ type: 'GAME_COMPLETE', gameId: 'robot-runner', score: score }, '*');
+    window.parent.postMessage({ type: 'CLOSE_MINI_GAME', gameId: 'robot-runner', score: score }, '*');
 };
 
 initLevel(0); requestAnimationFrame(gameLoop);

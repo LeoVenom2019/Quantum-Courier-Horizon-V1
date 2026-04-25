@@ -90,6 +90,13 @@ function init() {
 function updateScore(newScore) {
     score = newScore;
     scoreElement.innerText = score.toString().padStart(5, '0');
+    
+    // Notify parent of score update
+    window.parent.postMessage({ 
+        type: 'SCORE_UPDATE', 
+        gameId: 'salto-espacial', 
+        score: score 
+    }, '*');
 }
 
 function spawnFood() {
@@ -380,6 +387,13 @@ function gameOver() {
     statusElement.innerText = 'OFFLINE';
     statusElement.className = 'status-danger';
     updateHighScore();
+    
+    // Final score update on game over
+    window.parent.postMessage({ 
+        type: 'GAME_COMPLETE', 
+        gameId: 'salto-espacial', 
+        score: score 
+    }, '*');
 }
 
 function gameLoop(currentTime) {
@@ -412,6 +426,13 @@ restartBtn.addEventListener('click', () => {
 exitBtn.addEventListener('click', () => {
     window.parent.postMessage({ type: 'CLOSE_MINI_GAME' }, '*');
 });
+
+const exitGameBtn = document.getElementById('exit-game-btn');
+if (exitGameBtn) {
+    exitGameBtn.addEventListener('click', () => {
+        window.parent.postMessage({ type: 'CLOSE_MINI_GAME' }, '*');
+    });
+}
 
 // Start game
 init();

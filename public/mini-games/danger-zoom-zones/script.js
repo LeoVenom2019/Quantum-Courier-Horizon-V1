@@ -234,6 +234,15 @@ function updateDisplays() {
         triggerBump(timerDisplay);
     }
     
+    // Notify parent of progress/score update
+    if (gameStatus === 'active') {
+        window.parent.postMessage({ 
+            type: 'SCORE_UPDATE', 
+            gameId: 'danger-zoom-zones', 
+            score: timer 
+        }, '*');
+    }
+    
     const minesVal = (TOTAL_MINES - foundMines).toString();
     if (minesDisplay.innerText !== minesVal) {
         minesDisplay.innerText = minesVal;
@@ -288,6 +297,13 @@ function endGame(win) {
         const currentFinish = formatTime(remainingTime);
         currentTimeDisplay.innerText = currentFinish;
         
+        // Final score update on win
+        window.parent.postMessage({ 
+            type: 'GAME_COMPLETE', 
+            gameId: 'danger-zoom-zones', 
+            score: remainingTime 
+        }, '*');
+
         if (bestTime === '--:--' || remainingTime > parseTime(bestTime)) {
             bestTime = currentFinish;
             try {
@@ -401,6 +417,13 @@ if (restartBtn) {
     restartBtn.addEventListener('click', () => {
         if (overlay) overlay.classList.add('hidden');
         init();
+    });
+}
+
+const exitBtn = document.getElementById('exit-btn');
+if (exitBtn) {
+    exitBtn.addEventListener('click', () => {
+        window.parent.postMessage({ type: 'CLOSE_MINI_GAME' }, '*');
     });
 }
 

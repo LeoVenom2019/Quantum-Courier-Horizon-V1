@@ -357,6 +357,13 @@ function updateScore() {
     // Score animation handled in draw loop
     levelElement.innerText = level.toString().padStart(2, '0');
     linesElement.innerText = linesCleared.toString().padStart(3, '0');
+    
+    // Notify parent of score update for persistence
+    window.parent.postMessage({ 
+        type: 'SCORE_UPDATE', 
+        gameId: 'grid-collapse', 
+        score: score 
+    }, '*');
 }
 
 function handleGameOver() {
@@ -364,6 +371,13 @@ function handleGameOver() {
     gameActive = false;
     finalScoreElement.innerText = score.toString().padStart(5, '0');
     overlay.classList.remove('hidden');
+    
+    // Final score update on game over
+    window.parent.postMessage({ 
+        type: 'GAME_COMPLETE', 
+        gameId: 'grid-collapse', 
+        score: score 
+    }, '*');
 }
 
 function spawnScoreFloater(value, x, y) {
@@ -703,6 +717,11 @@ restartBtn.addEventListener('click', () => {
     spawnPiece();
     lastTime = performance.now();
     requestAnimationFrame(update);
+});
+
+const exitBtn = document.getElementById('exit-btn');
+exitBtn.addEventListener('click', () => {
+    window.parent.postMessage({ type: 'CLOSE_MINI_GAME' }, '*');
 });
 
 // Start

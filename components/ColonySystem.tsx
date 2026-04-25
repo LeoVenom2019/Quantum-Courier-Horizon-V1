@@ -55,6 +55,7 @@ export interface ColonySystemProps {
   setEarthPopulation: React.Dispatch<React.SetStateAction<number>>;
   colonies: Colony[];
   setColonies: React.Dispatch<React.SetStateAction<Colony[]>>;
+  onBuildingComplete?: (type: ConstructionType, level: number) => void;
 }
 
 // --- Configuration ---
@@ -193,7 +194,8 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
   earthPopulation,
   setEarthPopulation,
   colonies,
-  setColonies
+  setColonies,
+  onBuildingComplete
 }) => {
   const [activeColonyId, setActiveColonyId] = useState<string | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
@@ -283,6 +285,7 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
 
           if (isNowAtLevelComplete) {
             const nextLevel = con.level + 1;
+            if (onBuildingComplete) onBuildingComplete(con.type, nextLevel);
             return {
               ...con,
               progress: 0,
@@ -394,22 +397,42 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
     });
   };
 
-  const allocatePopulation = (amount: number) => {
-    if (!activeColony || !activeColony.isHabitable) return;
-    
-    // Check global population
-    if (earthPopulation < amount) amount = earthPopulation;
-    
-    // Check colony capacity
-    const space = activeColony.maxPopulation - activeColony.population;
-    if (amount > space) amount = space;
+  const allocatePopulation = (requestedAmount: number) => {
+    if (!activeColonyId || !activeColony) return;
+    if (!activeColony.isHabitable) return;
 
-    if (amount <= 0) return;
+    // Use a unified update or sequential updates outside of each other
+    // Since earthPopulation is a prop, we can't easily get its next value without a ref or functional update
+    // But we can trigger setColonies and inside it, use the requestedAmount, 
+    // and then call setEarthPopulation with the actual amount that was moved.
+    
+    setColonies(prevColonies => {
+      const activeIdx = prevColonies.findIndex(c => c.id === activeColonyId);
+      if (activeIdx === -1) return prevColonies;
+      
+      const colony = prevColonies[activeIdx];
+      const space = colony.maxPopulation - colony.population;
+      
+      if (space <= 0 || earthPopulation <= 0) return prevColonies;
 
-    setEarthPopulation(prev => prev - amount);
-    setColonies(prev => prev.map(c => 
-      c.id === activeColonyId ? { ...c, population: c.population + amount } : c
-    ));
+      let actualAmount = Math.min(requestedAmount, space);
+      if (earthPopulation < actualAmount) {
+        actualAmount = earthPopulation;
+      }
+
+      if (actualAmount <= 0) return prevColonies;
+
+      // Update Earth population (sequentially, React handles batching)
+      setEarthPopulation(prev => Math.max(0, prev - actualAmount));
+
+      const nextColonies = [...prevColonies];
+      nextColonies[activeIdx] = {
+        ...colony,
+        population: colony.population + actualAmount
+      };
+      
+      return nextColonies;
+    });
   };
 
   if (!activeColony) return null;
@@ -475,23 +498,21 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
         </motion.div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-2.5 flex-1 overflow-hidden">
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-3 flex-1 overflow-hidden min-h-0">
         {/* Management Left Panel (Always Visible) */}
-        <div className="lg:col-span-1 bg-zinc-900/30 border border-zinc-800 rounded-xl p-3 flex flex-col space-y-3">
-          <h4 className="text-[10px] font-mono text-zinc-400 uppercase tracking-widest flex items-center gap-2">
-            <Users size={14} /> {t('Migration & Growth', 'Migração e Crescimento')}
+        <div className="lg:col-span-1 bg-zinc-900/40 border border-zinc-800 rounded-2xl p-4 flex flex-col space-y-4 shadow-xl">
+          <h4 className="text-xs font-orbitron font-bold text-white uppercase tracking-[0.2em] flex items-center gap-2">
+            <Users size={16} className="text-emerald-400" /> {t('Migration & Growth', 'Migração e Crescimento')}
           </h4>
           
-          <div className="flex-1 flex flex-col items-center justify-center text-center p-3 border border-zinc-800/50 rounded-xl bg-zinc-900/20">
+          <div className="flex-1 flex flex-col items-center justify-center text-center p-4 border border-zinc-800/50 rounded-2xl bg-black/40 relative overflow-hidden group">
+             <div className="absolute inset-0 bg-emerald-500/5 opacity-0 group-hover:opacity-100 transition-opacity" />
              {!activeColony.isHabitable ? (
                <>
                  <div className="p-3 rounded-full bg-red-500/10 text-red-500 mb-2 animate-pulse shrink-0">
                     <Shield size={32} />
                  </div>
                  <h5 className="text-white text-xs font-bold mb-1 shrink-0">{t('Migration Locked', 'Migração Bloqueada')}</h5>
-                 <p className="text-[9px] text-zinc-500 leading-tight">
-                   {t('The population can ONLY move when ALL 10 of EACH infrastructure category are constructed.', 'A população só poderá se mudar quando TODOS os 10 de cada infraestrutura forem construídos.')}
-                 </p>
                  
                  <div className="mt-4 w-full space-y-1.5 text-[9px] font-mono text-left">
                     <div className="flex justify-between items-center bg-zinc-900 p-1.5 rounded">
@@ -508,61 +529,55 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
                     <CheckCircle2 size={32} />
                  </div>
                  <h5 className="text-white text-xs font-bold mb-1 shrink-0">{t('Migration Open', 'Migração Aberta')}</h5>
-                 <p className="text-[9px] text-zinc-400 mb-4">
-                    {t('Colony status: Ready. Select amount to move from Earth.', 'Status: Pronta. Selecione a quantidade para mudar da Terra.')}
-                 </p>
                  
-                 <div className="w-full space-y-1.5">
-                    <button 
-                      onClick={() => allocatePopulation(250)}
-                      className="w-full py-1.5 text-[9px] font-bold bg-green-600/20 border border-green-500/50 hover:bg-green-600 hover:text-black text-green-400 rounded transition-all"
-                    >
-                      +250 {t('People', 'Pessoas')}
-                    </button>
-                    <button 
-                      onClick={() => allocatePopulation(1000)}
-                      className="w-full py-1.5 text-[9px] font-bold bg-green-600/20 border border-green-500/50 hover:bg-green-600 hover:text-black text-green-400 rounded transition-all"
-                    >
-                      +1.000 {t('People', 'Pessoas')}
-                    </button>
-                    <button 
-                      onClick={() => allocatePopulation(5000)}
-                      className="w-full py-1.5 text-[9px] font-bold bg-green-700/30 border border-green-600/50 hover:bg-green-700 hover:text-white text-green-300 rounded transition-all"
-                    >
-                      +5.000 {t('People', 'Pessoas')}
-                    </button>
+                 <div className="w-full space-y-1.5 mt-auto">
+                    {[250, 1000, 5000].map((amount) => {
+                      const space = activeColony.maxPopulation - activeColony.population;
+                      const canAfford = earthPopulation > 0;
+                      const hasSpace = space > 0;
+                      const isDisabled = !canAfford || !hasSpace;
+                      
+                      return (
+                        <button 
+                          key={amount}
+                          onClick={() => allocatePopulation(amount)}
+                          disabled={isDisabled}
+                          className={`w-full py-1.5 text-[9px] font-bold rounded transition-all flex flex-col items-center justify-center ${
+                            isDisabled 
+                              ? 'bg-zinc-800 text-zinc-600 cursor-not-allowed border border-zinc-700/50' 
+                              : amount === 5000
+                                ? 'bg-green-700/30 border border-green-600/50 hover:bg-green-700 hover:text-white text-green-300'
+                                : 'bg-green-600/20 border border-green-500/50 hover:bg-green-600 hover:text-black text-green-400'
+                          }`}
+                        >
+                          <span>+{amount.toLocaleString()} {t('People', 'Pessoas')}</span>
+                          {isDisabled && space <= 0 && <span className="text-[7px] uppercase tracking-tighter opacity-70">({t('Colony Full', 'Colônia Cheia')})</span>}
+                          {isDisabled && earthPopulation <= 0 && <span className="text-[7px] uppercase tracking-tighter opacity-70">({t('Earth Empty', 'Terra Vazia')})</span>}
+                        </button>
+                      );
+                    })}
                  </div>
                </>
              )}
           </div>
-
-          <div className="p-2 rounded-lg bg-blue-500/5 border border-blue-500/20 shrink-0">
-             <div className="flex items-center gap-1.5 mb-1 text-blue-400">
-                <TrendingUp size={12} />
-                <span className="text-[8px] font-bold uppercase">{t('Growth Factor', 'Fator de Crescimento')}</span>
-             </div>
-             <p className="text-[8px] text-zinc-500 leading-tight">
-                {t('Population grows relative to colony age. Reaches 10% after 10 years.', 'População cresce conforme a idade da colônia. Chega a 10% após 10 anos.')}
-             </p>
-          </div>
         </div>
 
         {/* Construction Grid (Always 6 cards in 3xGrid) */}
-        <div className="lg:col-span-3 bg-zinc-900/10 border border-zinc-800/50 rounded-xl p-3 overflow-y-auto custom-scrollbar">
-          <div className="flex items-center justify-between mb-3">
-            <h4 className="text-base font-bold text-white uppercase tracking-tighter flex items-center gap-2.5">
-              <span className="w-1 h-5 bg-blue-500 rounded-full"></span>
+        <div className="lg:col-span-3 bg-zinc-900/20 border border-zinc-800/50 rounded-2xl p-4 flex flex-col overflow-hidden">
+          <div className="flex items-center justify-between mb-4">
+            <h4 className="text-lg font-orbitron font-black text-white uppercase tracking-tighter flex items-center gap-3">
+              <span className="w-1.5 h-6 bg-emerald-500 rounded-full shadow-[0_0_10px_rgba(16,185,129,0.5)]"></span>
               {t('Infrastructure Nodes', 'Nódulos de Infraestrutura')}
             </h4>
-            <div className="flex items-center gap-3 text-[9px] font-mono text-zinc-500">
-               <div className="flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></span>
+            <div className="flex items-center gap-4 text-[10px] font-orbitron font-bold text-zinc-500 uppercase tracking-widest">
+               <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span>
                   {t('Process Active', 'Processo Ativo')}
                </div>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 flex-1">
             {activeColony.constructions.map((con) => {
               const config = CONSTRUCTION_CONFIG[con.type];
               const isMaxed = con.level >= 10;
@@ -570,12 +585,12 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
               
               // Custom colors mapping
               const colorClasses: Record<string, string> = {
-                emerald: 'border-emerald-500/80 shadow-[0_0_15px_rgba(16,185,129,0.4)]',
-                zinc: 'border-zinc-400/80 shadow-[0_0_15px_rgba(161,161,170,0.4)]',
-                yellow: 'border-yellow-400/80 shadow-[0_0_15px_rgba(234,179,8,0.4)]',
-                blue: 'border-blue-400/80 shadow-[0_0_15px_rgba(59,130,246,0.4)]',
-                red: 'border-red-500/80 shadow-[0_0_15px_rgba(239,68,68,0.4)]',
-                'restaurant-mix': 'border-l-emerald-400 border-t-emerald-400 border-r-red-400 border-b-red-400 shadow-[0_0_15px_rgba(16,185,129,0.3),0_0_15px_rgba(239,68,68,0.2)]'
+                emerald: 'border-emerald-500/60 shadow-[0_0_20px_rgba(16,185,129,0.15)] hover:border-emerald-500',
+                zinc: 'border-zinc-500/60 shadow-[0_0_20px_rgba(161,161,170,0.15)] hover:border-zinc-400',
+                yellow: 'border-yellow-500/60 shadow-[0_0_20px_rgba(234,179,8,0.15)] hover:border-yellow-400',
+                blue: 'border-blue-500/60 shadow-[0_0_20px_rgba(59,130,246,0.15)] hover:border-blue-400',
+                red: 'border-red-500/60 shadow-[0_0_20px_rgba(239,68,68,0.15)] hover:border-red-400',
+                'restaurant-mix': 'border-l-emerald-400/60 border-t-emerald-400/60 border-r-red-400/60 border-b-red-400/60 shadow-[0_0_20px_rgba(16,185,129,0.1),0_0_20px_rgba(239,68,68,0.1)] hover:border-emerald-400'
               };
 
               const accentColor: Record<string, string> = {
@@ -591,65 +606,75 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
                 <motion.div
                   key={con.id}
                   layout
-                  className={`relative p-2.5 rounded-xl border-2 bg-black/40 flex flex-col ${colorClasses[config.color]} ${isMaxed ? 'opacity-80' : ''}`}
+                  className={`relative p-4 rounded-2xl border-2 bg-black/60 flex flex-col transition-all duration-300 min-h-[180px] lg:min-h-[200px] xl:min-h-[220px] ${colorClasses[config.color]} ${isMaxed ? 'opacity-90' : ''}`}
                 >
-                  <div className="flex items-center justify-between mb-1.5">
-                    <div className={`p-1.5 rounded-lg ${accentColor[config.color]}`}>
-                      <config.icon size={18} />
+                  <div className="flex items-center justify-between mb-3">
+                    <div className={`p-2.5 rounded-xl ${accentColor[config.color]} shadow-inner`}>
+                      <config.icon size={22} />
                     </div>
                     <div className="text-right leading-none">
-                       <span className="text-[8px] font-mono text-zinc-500 block uppercase mb-0.5">{t('Units Built', 'Unidades')}</span>
-                       <span className="text-base font-michroma text-white">{con.level} / 10</span>
+                       <span className="text-[10px] font-orbitron font-bold text-zinc-500 block uppercase mb-1">{t('Units Built', 'Unidade')}</span>
+                       <span className="text-2xl font-orbitron font-black text-white tracking-widest">{con.level} <span className="text-xs text-zinc-600">/ 10</span></span>
+                    </div>
+                  </div>
+                  
+                  <div className="mb-4">
+                    <h5 className="font-orbitron font-bold text-white text-xs mb-2 leading-tight uppercase tracking-widest truncate">{config.label[language]}</h5>
+                    <div className="flex items-center gap-3">
+                       <div className={`h-1.5 flex-1 rounded-full bg-zinc-800/50 overflow-hidden relative border border-white/5`}>
+                          <motion.div 
+                            initial={{ width: 0 }}
+                            animate={{ width: `${isMaxed ? 100 : con.progress}%` }}
+                            className={`h-full relative z-10 ${isMaxed ? 'bg-emerald-500' : 'bg-blue-500'}`}
+                          />
+                          {isWorking && (
+                            <motion.div
+                              animate={{ x: ['-100%', '100%'] }}
+                              transition={{ repeat: Infinity, duration: 1.5, ease: "linear" }}
+                              className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent z-20"
+                            />
+                          )}
+                       </div>
+                       {!isMaxed && (
+                         <span className="text-[10px] font-mono text-zinc-500 w-8 text-right">{Math.floor(con.progress)}%</span>
+                       )}
                     </div>
                   </div>
 
-                  <h5 className="font-bold text-white text-[11px] mb-1 leading-tight">{config.label[language]}</h5>
-                  <div className="flex items-center gap-2 mb-2">
-                     <div className={`h-1 flex-1 rounded-full bg-zinc-800 overflow-hidden`}>
-                        <motion.div 
-                          initial={{ width: 0 }}
-                          animate={{ width: `${isMaxed ? 100 : con.progress}%` }}
-                          className={`h-full ${isMaxed ? 'bg-green-500 shadow-[0_0_6px_rgba(34,197,94,0.5)]' : 'bg-blue-500 animate-[pulse_2s_infinite]'}`}
-                        />
-                     </div>
-                     {!isMaxed && (
-                       <span className="text-[8px] font-mono text-zinc-500 w-6">{Math.floor(con.progress)}%</span>
-                     )}
-                  </div>
-
-                  <div className="mt-auto space-y-1.5">
+                  <div className="mt-auto space-y-4">
                     {!isMaxed ? (
-                      <div className="flex flex-col gap-1.5">
-                        <div className="flex items-center justify-between text-[9px] font-mono text-zinc-400 px-1 leading-none">
+                      <div className="flex flex-col gap-3">
+                        <div className="flex items-center justify-between text-[10px] font-orbitron font-bold text-zinc-400 px-1 leading-none uppercase tracking-widest">
                            <span>{t('Robots:', 'Robôs:')}</span>
-                           <span className="text-white">{con.assignedConstructors}</span>
+                           <span className="text-white text-sm">{con.assignedConstructors.toLocaleString()}</span>
                         </div>
-                        <div className="flex gap-1">
+                        <div className="flex gap-2">
                            <button 
                              onClick={() => updateConstructors(con.id, -50)}
                              disabled={con.assignedConstructors === 0}
-                             className="flex-1 py-1 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-500 text-[9px] transition-colors disabled:opacity-20"
+                             className="flex-1 py-2.5 rounded-xl bg-zinc-800/80 hover:bg-zinc-700 text-zinc-500 text-[10px] font-bold transition-colors disabled:opacity-20 border border-white/5"
                            >
                               -50
                            </button>
                            <button 
                              onClick={() => updateConstructors(con.id, 50)}
-                             className="flex-1 py-1 rounded-lg bg-blue-600/20 border border-blue-500/40 text-blue-400 hover:bg-blue-600 hover:text-white font-bold text-[9px] transition-all"
+                             className="flex-1 py-2.5 rounded-xl bg-blue-600/20 border border-blue-500/40 text-blue-400 hover:bg-blue-600 hover:text-white font-black text-[10px] uppercase tracking-widest transition-all"
                            >
                               +50
                            </button>
                            <button 
                              onClick={() => updateConstructors(con.id, 250)}
-                             className="flex-1 py-1 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-400 font-bold text-[9px] transition-colors"
+                             className="flex-1 py-2.5 rounded-xl bg-zinc-800/80 hover:bg-zinc-700 text-zinc-300 font-bold text-[10px] transition-colors border border-white/5"
                            >
                               +250
                            </button>
                         </div>
                       </div>
                     ) : (
-                      <div className="flex items-center justify-center py-1.5 rounded-lg bg-green-500/10 border border-green-500/20 text-green-500 text-[9px] font-mono uppercase tracking-widest gap-1.5 leading-none">
-                         <CheckCircle2 size={10} />
-                         {t('Done', 'Concluído')}
+                      <div className="flex items-center justify-center py-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-orbitron font-black uppercase tracking-[0.3em] gap-3 relative overflow-hidden group/done">
+                         <div className="absolute inset-0 bg-emerald-500/5 animate-pulse" />
+                         <CheckCircle2 size={16} className="relative z-10" />
+                         <span className="relative z-10">{t('Done', 'Concluído')}</span>
                       </div>
                     )}
                   </div>

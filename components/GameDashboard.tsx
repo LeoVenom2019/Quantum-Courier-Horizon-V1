@@ -2217,6 +2217,7 @@ export const GameDashboard = ({
     playSfx('click');
   };
   const [activeDonationModal, setActiveDonationModal] = useState<string | null>(null);
+  const [arcadeScores, setArcadeScores] = useState<{ [gameId: string]: number }>({});
   const [voidBattleStatus, setVoidBattleStatus] = useState<'idle' | 'searching' | 'choosing' | 'fighting' | 'won' | 'lost'>('idle');
   const [voidBattleOptions, setVoidBattleOptions] = useState<VoidBattleEnemy[]>([]);
   const [activeVoidBattle, setActiveVoidBattle] = useState<VoidBattleState | null>(null);
@@ -2256,7 +2257,7 @@ export const GameDashboard = ({
 
   // Derived Game Time
   const gameTime = useMemo(() => {
-    const totalDays = Math.floor(gameTimeSeconds * 0.75); // 1 sec = 0.75 days (360 days / 480 sec)
+    const totalDays = Math.floor(gameTimeSeconds * 0.3); // 1 sec = 0.3 days (360 days / 1200 sec)
     return {
       years: Math.floor(totalDays / 360),
       months: Math.floor((totalDays % 360) / 30) + 1,
@@ -2267,7 +2268,7 @@ export const GameDashboard = ({
 
   // Earth Simulation States (Route 4)
   const [earthSeason, setEarthSeason] = useState(0); 
-  const [earthPopulation, setEarthPopulation] = useState(150);
+  const [earthPopulation, setEarthPopulation] = useState(500000);
   const [earthMaleRatio, setEarthMaleRatio] = useState(0.5);
   const [earthBiodiversity, setEarthBiodiversity] = useState(50);
   const [earthHealth, setEarthHealth] = useState(50);
@@ -2362,7 +2363,7 @@ export const GameDashboard = ({
   useEffect(() => {
     if (!isLoaded) return;
 
-    const BASE_YEAR_SECONDS = 480; // 8 minutes = 480 seconds
+    const BASE_YEAR_SECONDS = 1200; // 20 minutes = 1200 seconds (Reduced speed by 60%)
     
     const interval = setInterval(() => {
       // 0. Time Acceleration Factor
@@ -2402,7 +2403,8 @@ export const GameDashboard = ({
         setEarthBiodiversity(prev => Math.min(100, prev + bioGrowth));
 
         const curHealth = earthHealthRef.current;
-        const healthGrowth = 0.005 * (1 - (curHealth / 100)) * yearFraction;
+        const healthBonus = isPlaying ? (0.01 * yearFraction) : 0;
+        const healthGrowth = 0.005 * (1 - (curHealth / 100)) * yearFraction + healthBonus;
         setEarthHealth(prev => Math.min(100, prev + healthGrowth));
 
         const curHappy = earthHappinessRef.current;
@@ -2411,7 +2413,8 @@ export const GameDashboard = ({
         setEarthHappiness(prev => Math.min(100, prev + happyGrowth));
 
         const curSec = earthSecurityRef.current;
-        const secGrowth = 0.005 * (1 - (curSec / 100)) * yearFraction;
+        const secBonus = isPlaying ? (0.01 * yearFraction) : 0;
+        const secGrowth = 0.005 * (1 - (curSec / 100)) * yearFraction + secBonus;
         setEarthSecurity(prev => Math.min(100, prev + secGrowth));
 
         const curQoL = earthQualityOfLifeRef.current;
@@ -2419,11 +2422,11 @@ export const GameDashboard = ({
         const qolGrowth = 0.008 * (1 - (curQoL / 100)) * yearFraction + qolBonus;
         setEarthQualityOfLife(prev => Math.min(100, prev + qolGrowth));
 
-        // 4. Random Events
+        // 4. Random Events (Route 4 Event frequency increased)
         earthEventTimerRef.current -= timeFactor;
         if (earthEventTimerRef.current <= 0) {
           generateEarthEvent();
-          earthEventTimerRef.current = Math.random() * 120 + 120;
+          earthEventTimerRef.current = Math.random() * 40 + 40; // Increased frequency (was 120-240)
         }
       }
     }, 1000);
@@ -2432,19 +2435,23 @@ export const GameDashboard = ({
   }, [isLoaded, isArcadeUnlocked, isColoniesUnlocked, generateEarthEvent]);
 
   // Year Change Events (Population Growth & Events)
+  const lastProcessedYearRef = useRef(-1);
   useEffect(() => {
-    if (!isLoaded || gameTime.years === 0) return;
+    if (!isLoaded || gameTime.years === 0 || lastProcessedYearRef.current === gameTime.years) return;
+    lastProcessedYearRef.current = gameTime.years;
     
     // 1. Calculate Growth Rate based on current year
-    let minRate = 0.05;
-    let maxRate = 0.09;
+    // User asked for slower growth targeting 1M in 20 years from 500k.
+    // Factor 2 over 20 years = ~3.5% annual growth.
+    let minRate = 0.03;
+    let maxRate = 0.04;
     
-    if (gameTime.years > 8) {
-      minRate = 0.06;
-      maxRate = 0.10;
-    } else if (gameTime.years > 4) {
-      minRate = 0.03;
-      maxRate = 0.06;
+    if (gameTime.years > 15) {
+      minRate = 0.025; // Slow down slightly
+      maxRate = 0.035;
+    } else if (gameTime.years > 10) {
+      minRate = 0.032;
+      maxRate = 0.038;
     }
     
     const rate = minRate + Math.random() * (maxRate - minRate);
@@ -2475,11 +2482,6 @@ export const GameDashboard = ({
     }
     
   }, [gameTime.years, isLoaded, language, colonies]);
-
-  // Earth Simulation Functions
-  const addEarthYears = useCallback((years: number) => {
-    setGameTimeSeconds(prev => prev + (years * 480));
-  }, []);
 
   const [selectedUpgradePoint, setSelectedUpgradePoint] = useState<number | null>(null);
   const extractionPacksRef = useRef(extractionPacks);
@@ -2650,16 +2652,50 @@ export const GameDashboard = ({
   const [hasSeenRoute2UnlockMessage, setHasSeenRoute2UnlockMessage] = useState(false);
 
   useEffect(() => {
-    const handleMessage = (event: MessageEvent) => {
-      if (event.data && (event.data.type === 'CLOSE_MINI_GAME' || event.data.type === 'GAME_COMPLETE')) {
-        setActiveMiniGameId(null);
-        if (event.data.score && event.data.gameId) {
-          const key = `${event.data.gameId.replace(/-/g, '_')}_high_score`;
-          const current = localStorage.getItem(key);
-          if (!current || event.data.score > parseInt(current)) {
-            localStorage.setItem(key, event.data.score.toString());
-          }
+    // Load arcade scores from localStorage initially
+    const scores: { [key: string]: number } = {};
+    if (typeof window !== 'undefined') {
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.endsWith('_high_score')) {
+          const gameId = key.replace(/_/g, '-').replace('-high-score', '');
+          const saved = localStorage.getItem(key);
+          if (saved) scores[gameId] = parseInt(saved);
         }
+      }
+    }
+    setArcadeScores(scores);
+
+    const handleMessage = (event: MessageEvent) => {
+      if (!event.data) return;
+
+      if (event.data.type === 'CLOSE_MINI_GAME') {
+        const wasMiniGameActive = !!activeMiniGameIdRef.current;
+        setActiveMiniGameId(null);
+        
+        // Boost Earth stats on game play/finish (Route 4 only)
+        if (routeTierRef.current === 'Earth' && wasMiniGameActive) {
+          const arcadeBoost = 0.15; // Immediate small boost
+          setEarthHealth(prev => Math.min(100, prev + arcadeBoost * 0.8));
+          setEarthHappiness(prev => Math.min(100, prev + arcadeBoost * 1.5));
+          setEarthSecurity(prev => Math.min(100, prev + arcadeBoost * 0.5));
+          setEarthQualityOfLife(prev => Math.min(100, prev + arcadeBoost));
+        }
+      }
+
+      if (event.data.score !== undefined && event.data.gameId) {
+        const gameId = event.data.gameId;
+        const score = event.data.score;
+        setArcadeScores(prev => {
+          // Check if this game is time-based (where lower is better)
+          // For now, all current games are "higher is better" either by points or remaining time
+          if (!prev[gameId] || score > prev[gameId]) {
+            const key = `${gameId.replace(/-/g, '_')}_high_score`;
+            localStorage.setItem(key, String(score));
+            return { ...prev, [gameId]: score };
+          }
+          return prev;
+        });
       }
     };
     window.addEventListener('message', handleMessage);
@@ -2744,6 +2780,34 @@ export const GameDashboard = ({
     const text = Array.isArray(val) ? val[0] : val;
     return text;
   }, [language, routeTier]);
+
+  // Earth Simulation Functions
+  const addEarthYears = useCallback((years: number) => {
+    setGameTimeSeconds(prev => prev + (years * 1200));
+    addLog(`${language === 'pt' ? 'História avançou ' : 'History advanced '}${years}${language === 'pt' ? ' anos devido ao progresso monumental!' : ' years due to monumental progress!'}`, 'success');
+  }, [language, addLog]);
+
+  const handleBuildingComplete = useCallback((type: string, level: number) => {
+    // Permanent boost when building levels up
+    const unit = 0.3; // 0.3% boost
+    
+    if (type === 'forest') {
+      setEarthHealth(prev => Math.min(100, prev + unit));
+      setEarthBiodiversity(prev => Math.min(100, prev + unit * 1.5));
+    } else if (type === 'factory') {
+      setEarthQualityOfLife(prev => Math.min(100, prev + unit));
+    } else if (type === 'school') {
+      setEarthHappiness(prev => Math.min(100, prev + unit));
+      setEarthQualityOfLife(prev => Math.min(100, prev + unit));
+    } else if (type === 'culture') {
+      setEarthHappiness(prev => Math.min(100, prev + unit * 1.5));
+    } else if (type === 'defense') {
+      setEarthSecurity(prev => Math.min(100, prev + unit * 1.5));
+    } else if (type === 'restaurant') {
+      setEarthQualityOfLife(prev => Math.min(100, prev + unit));
+      setEarthHappiness(prev => Math.min(100, prev + unit * 0.5));
+    }
+  }, []);
 
   const getEconomicMultipliers = useCallback(() => {
     const isEasy = activeCodes['EASY'] && !isSpeedRun;
@@ -4835,103 +4899,92 @@ export const GameDashboard = ({
   const isSpeedMode = activeCodes['SPEED'] && isSpeedRun;
 
   const exportGameData = useCallback(() => {
-    const saveData: any = {};
-    
-    if (exportOptions.everything || exportOptions.campaign) {
-      saveData.qc = qc;
-      saveData.aetherion = aetherion;
-      saveData.miningWaste = miningWaste;
-      saveData.solarEnergy = solarEnergy;
-      saveData.aetherionTubes = aetherionTubes;
-      saveData.unlockedRouteIds = unlockedRouteIds;
-      saveData.ownedShips = ownedShips;
-      saveData.techLevels = techLevels;
-      saveData.autoTravelSlots = autoTravelSlots;
-      saveData.miningRobots = miningRobots;
-      saveData.miningRobotLevels = miningRobotLevels;
-      saveData.oresCollected = oresCollected;
-      saveData.autoSellByOre = autoSellByOre;
-      saveData.autoSellUnlockedByOre = autoSellUnlockedByOre;
-      saveData.miningCompressionLevels = miningCompressionLevels;
-      saveData.unlockedTechLevels = unlockedTechLevels;
-      saveData.seenTutorials = seenTutorials;
-      saveData.routeTier = routeTier;
-      saveData.totalDeliveries = totalDeliveries;
-      saveData.deliveriesByLocation = deliveriesByLocation;
-      saveData.historyStats = historyStats;
-      saveData.missions = missions;
-      saveData.missionMythicBonus = missionMythicBonus;
-      saveData.missionAlienBonus = missionAlienBonus;
-      saveData.missionLegendaryBonus = missionLegendaryBonus;
-      saveData.missionRewardLevel = missionRewardLevel;
-      saveData.autoClaimMissions = autoClaimMissions;
-      saveData.radarUnlocked = radarUnlocked;
-      saveData.completedInitialMissions = completedInitialMissions;
-      saveData.shipXP = shipXP;
-      saveData.shipLevel = shipLevel;
-      saveData.isRetributionActive = isRetributionActive;
-      saveData.isFatigueActive = isFatigueActive;
-      saveData.battleLevel = battleLevel;
-      saveData.radarLevel = radarLevel;
-      saveData.privatePoliceLevel = privatePoliceLevel;
-      saveData.autoSkipRandomBattles = autoSkipRandomBattles;
-      saveData.warCoreLevel = warCoreLevel;
-      saveData.fleetPower = fleetPower;
-      saveData.extractionTechLevel = extractionTechLevel;
-      saveData.solarMappingLevel = solarMappingLevel;
-      saveData.doubleRouteLevel = doubleRouteLevel;
-      saveData.doomPLevel = doomPLevel;
-      saveData.captureLevel = captureLevel;
-      saveData.earthReconstructionProgress = earthReconstructionProgress;
-      saveData.isVoidWarActive = isVoidWarActive;
-      saveData.voidWarProgress = voidWarProgress;
-      saveData.voidResources = voidResources;
-      saveData.voidCompactedResources = voidCompactedResources;
-      saveData.voidAircraftMissions = voidAircraftMissions;
-      saveData.voidAircraftUpgrades = voidAircraftUpgrades;
-      saveData.voidAircraftAutoToggles = voidAircraftAutoToggles;
-      saveData.gameTimeSeconds = gameTimeSeconds;
-      saveData.earthPopulation = earthPopulation;
-      saveData.earthMaleRatio = earthMaleRatio;
-      saveData.earthBiodiversity = earthBiodiversity;
-      saveData.earthEvents = earthEvents;
-      saveData.voidBattleShipStats = voidBattleShipStats;
-      saveData.voidPOIsInspiration = voidPOIsInspiration;
-      saveData.voidPOIQCDonations = voidPOIQCDonations;
-      saveData.voidDonationModes = voidDonationModes;
-      saveData.unlockedExtractionPoints = unlockedExtractionPoints;
-      saveData.extractionPacks = extractionPacks;
-      saveData.extractionRobotLevels = extractionRobotLevels;
-      saveData.extractionProductionLevels = extractionProductionLevels;
-      saveData.extractionAutoSell = extractionAutoSell;
-      saveData.extractionAutoSellUnlocked = extractionAutoSellUnlocked;
-      saveData.extractionCompressionLevels = extractionCompressionLevels;
-      saveData.totalExtractionProfit = totalExtractionProfit;
-      saveData.skillLendariaLevel = skillLendariaLevel;
-      saveData.skillMiticaLevel = skillMiticaLevel;
-      saveData.skillAlienLevel = skillAlienLevel;
-      saveData.skillTempoDinheiroLevel = skillTempoDinheiroLevel;
-      saveData.skillRobosOlimpicosLevel = skillRobosOlimpicosLevel;
-      saveData.hasSeenRoute2UnlockMessage = hasSeenRoute2UnlockMessage;
-    }
-    
-    if (exportOptions.everything || exportOptions.speedRun) {
-      saveData.speedRunRecords = localRecords;
-    }
-    
-    if (exportOptions.everything || exportOptions.secretCodes) {
-      saveData.activeCodes = activeCodes;
-      saveData.unlockedCodes = unlockedCodes;
-    }
-    
-    if (exportOptions.everything || exportOptions.achievements) {
-      saveData.unlockedAchievements = unlockedAchievements;
-      saveData.achievementProgress = achievementProgress;
-    }
+    const saveData: any = {
+      // Basic Info
+      qc,
+      aetherion,
+      miningWaste,
+      solarEnergy,
+      aetherionTubes,
+      unlockedRouteIds,
+      ownedShips,
+      techLevels,
+      autoTravelSlots,
+      miningRobots,
+      miningRobotLevels,
+      oresCollected,
+      autoSellByOre,
+      autoSellUnlockedByOre,
+      miningCompressionLevels,
+      unlockedTechLevels,
+      seenTutorials,
+      routeTier,
+      totalDeliveries,
+      deliveriesByLocation,
+      historyStats,
+      missions,
+      missionMythicBonus,
+      missionAlienBonus,
+      missionLegendaryBonus,
+      missionRewardLevel,
+      autoClaimMissions,
+      radarUnlocked,
+      completedInitialMissions,
+      shipXP,
+      shipLevel,
+      isRetributionActive,
+      isFatigueActive,
+      battleLevel,
+      radarLevel,
+      privatePoliceLevel,
+      autoSkipRandomBattles,
+      warCoreLevel,
+      fleetPower,
+      extractionTechLevel,
+      solarMappingLevel,
+      doubleRouteLevel,
+      doomPLevel,
+      captureLevel,
+      earthReconstructionProgress,
+      isVoidWarActive,
+      voidWarProgress,
+      voidResources,
+      voidCompactedResources,
+      voidAircraftMissions,
+      voidAircraftUpgrades,
+      voidAircraftAutoToggles,
+      gameTimeSeconds,
+      // Status
+      activeCodes,
+      unlockedCodes,
+      unlockedAchievements,
+      achievementProgress,
+      localRecords,
+      hasSeenRoute2UnlockMessage,
+      arcadeScores, // Arcade scores included
+      // Route 4 Specifics
+      route4Unlocked,
+      earthPopulation,
+      earthMaleRatio,
+      earthBiodiversity,
+      earthHealth,
+      earthHappiness,
+      earthSecurity,
+      earthQualityOfLife,
+      earthEvents,
+      earthCouples,
+      earthBirthRegistry,
+      colonies // All colony progress
+    };
 
     const jsonString = JSON.stringify(saveData);
-    // Simple obfuscation/encryption
-    const encryptedData = btoa(unescape(encodeURIComponent(jsonString)));
+    
+    // Improved obfuscation/encryption as requested (XOR cipher)
+    const SECRET_KEY = 73; // Unique key for this app
+    const xored = jsonString.split('').map((char, i) => 
+      String.fromCharCode(char.charCodeAt(0) ^ (SECRET_KEY + (i % 17)))
+    ).join('');
+    const encryptedData = btoa(unescape(encodeURIComponent(xored)));
     
     const blob = new Blob([encryptedData], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
@@ -4943,9 +4996,8 @@ export const GameDashboard = ({
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
     
-    addLog(t('importSuccess'), 'success');
-    setShowExportModal(false);
-  }, [qc, aetherion, miningWaste, solarEnergy, aetherionTubes, unlockedRouteIds, ownedShips, techLevels, autoTravelSlots, miningRobots, miningRobotLevels, oresCollected, autoSellByOre, autoSellUnlockedByOre, unlockedTechLevels, seenTutorials, routeTier, totalDeliveries, deliveriesByLocation, historyStats, activeCodes, unlockedCodes, localRecords, missions, missionMythicBonus, missionAlienBonus, missionLegendaryBonus, autoClaimMissions, radarUnlocked, missionRewardLevel, miningCompressionLevels, completedInitialMissions, shipXP, shipLevel, addLog, exportOptions, t, isFatigueActive, isRetributionActive, battleLevel, radarLevel, privatePoliceLevel, autoSkipRandomBattles, warCoreLevel, fleetPower, extractionTechLevel, solarMappingLevel, doubleRouteLevel, doomPLevel, captureLevel, earthReconstructionProgress, voidResources, voidCompactedResources, voidAircraftMissions, voidAircraftUpgrades, voidBattleShipStats, voidPOIsInspiration, voidPOIQCDonations, voidDonationModes, unlockedExtractionPoints, extractionPacks, extractionRobotLevels, extractionProductionLevels, extractionAutoSell, extractionAutoSellUnlocked, extractionCompressionLevels, totalExtractionProfit, skillLendariaLevel, skillMiticaLevel, skillAlienLevel, skillTempoDinheiroLevel, skillRobosOlimpicosLevel, unlockedAchievements, achievementProgress, hasSeenRoute2UnlockMessage, isVoidWarActive, voidWarProgress, gameTimeSeconds, earthPopulation, earthMaleRatio, earthBiodiversity, earthEvents, voidAircraftAutoToggles]);
+    addLog(t('exportSuccess' as any), 'success');
+  }, [qc, aetherion, miningWaste, solarEnergy, aetherionTubes, unlockedRouteIds, ownedShips, techLevels, autoTravelSlots, miningRobots, miningRobotLevels, oresCollected, autoSellByOre, autoSellUnlockedByOre, unlockedTechLevels, seenTutorials, routeTier, totalDeliveries, deliveriesByLocation, historyStats, activeCodes, unlockedCodes, localRecords, missions, missionMythicBonus, missionAlienBonus, missionLegendaryBonus, autoClaimMissions, radarUnlocked, missionRewardLevel, miningCompressionLevels, completedInitialMissions, shipXP, shipLevel, addLog, t, isFatigueActive, isRetributionActive, battleLevel, radarLevel, privatePoliceLevel, autoSkipRandomBattles, warCoreLevel, fleetPower, extractionTechLevel, solarMappingLevel, doubleRouteLevel, doomPLevel, captureLevel, earthReconstructionProgress, voidResources, voidCompactedResources, voidAircraftMissions, voidAircraftUpgrades, voidBattleShipStats, voidPOIsInspiration, voidPOIQCDonations, voidDonationModes, unlockedExtractionPoints, extractionPacks, extractionRobotLevels, extractionProductionLevels, extractionAutoSell, extractionAutoSellUnlocked, extractionCompressionLevels, totalExtractionProfit, skillLendariaLevel, skillMiticaLevel, skillAlienLevel, skillTempoDinheiroLevel, skillRobosOlimpicosLevel, unlockedAchievements, achievementProgress, hasSeenRoute2UnlockMessage, isVoidWarActive, voidWarProgress, gameTimeSeconds, earthPopulation, earthMaleRatio, earthBiodiversity, earthEvents, voidAircraftAutoToggles, arcadeScores, route4Unlocked, earthHealth, earthHappiness, earthSecurity, earthQualityOfLife, earthCouples, earthBirthRegistry, colonies]);
 
   const importGameData = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -4955,7 +5007,20 @@ export const GameDashboard = ({
     reader.onload = (e) => {
       try {
         const encryptedData = e.target?.result as string;
-        const jsonString = decodeURIComponent(escape(atob(encryptedData)));
+        
+        let jsonString = '';
+        try {
+          // Decrypt XOR encryption
+          const SECRET_KEY = 73;
+          const xored = decodeURIComponent(escape(atob(encryptedData)));
+          jsonString = xored.split('').map((char, i) => 
+            String.fromCharCode(char.charCodeAt(0) ^ (SECRET_KEY + (i % 17)))
+          ).join('');
+        } catch (xorErr) {
+          // Fallback legacy decryption (plain base64)
+          jsonString = decodeURIComponent(escape(atob(encryptedData)));
+        }
+
         const data = JSON.parse(jsonString);
         
         // Merge data
@@ -4973,19 +5038,12 @@ export const GameDashboard = ({
         if (data.miningRobotLevels) setMiningRobotLevels(data.miningRobotLevels);
         if (data.oresCollected) setOresCollected(data.oresCollected);
         if (data.autoSellByOre) setAutoSellByOre(data.autoSellByOre);
-        if (data.autoSellUnlockedByOre) {
-          setAutoSellUnlockedByOre(data.autoSellUnlockedByOre);
-        } else if (data.autoSellByOre) {
-          // Migration: if they had auto-sell active, they must have unlocked it
-          setAutoSellUnlockedByOre(data.autoSellByOre);
-        }
+        if (data.autoSellUnlockedByOre) setAutoSellUnlockedByOre(data.autoSellUnlockedByOre);
         if (data.miningCompressionLevels) setMiningCompressionLevels(data.miningCompressionLevels);
         if (data.unlockedTechLevels) setUnlockedTechLevels(data.unlockedTechLevels);
         if (data.seenTutorials) setSeenTutorials(data.seenTutorials);
         if (data.routeTier) {
           setRouteTier(data.routeTier);
-          
-          // Set sensible default tab for the tier
           if (data.routeTier === 'Void') setActiveTab('void_aircraft');
           else if (data.routeTier === 'Earth') setActiveTab('colonies');
           else if (data.routeTier === 'Interstellar') setActiveTab('routes2');
@@ -5005,11 +5063,7 @@ export const GameDashboard = ({
         if (data.radarLevel !== undefined) setRadarLevel(data.radarLevel);
         if (data.privatePoliceLevel !== undefined) setPrivatePoliceLevel(data.privatePoliceLevel);
         if (data.autoSkipRandomBattles !== undefined) setAutoSkipRandomBattles(data.autoSkipRandomBattles);
-        if (data.gameTimeSeconds !== undefined) {
-          setGameTimeSeconds(data.gameTimeSeconds);
-        } else if (data.earthYear !== undefined) {
-          setGameTimeSeconds(data.earthYear * 480);
-        }
+        if (data.gameTimeSeconds !== undefined) setGameTimeSeconds(data.gameTimeSeconds);
         if (data.warCoreLevel !== undefined) setWarCoreLevel(data.warCoreLevel);
         if (data.fleetPower !== undefined) setFleetPower(data.fleetPower);
         if (data.extractionTechLevel !== undefined) setExtractionTechLevel(data.extractionTechLevel);
@@ -5028,7 +5082,14 @@ export const GameDashboard = ({
         if (data.earthPopulation) setEarthPopulation(data.earthPopulation);
         if (data.earthMaleRatio) setEarthMaleRatio(data.earthMaleRatio);
         if (data.earthBiodiversity) setEarthBiodiversity(data.earthBiodiversity);
+        if (data.earthHealth) setEarthHealth(data.earthHealth);
+        if (data.earthHappiness) setEarthHappiness(data.earthHappiness);
+        if (data.earthSecurity) setEarthSecurity(data.earthSecurity);
+        if (data.earthQualityOfLife) setEarthQualityOfLife(data.earthQualityOfLife);
         if (data.earthEvents) setEarthEvents(data.earthEvents);
+        if (data.earthCouples) setEarthCouples(data.earthCouples);
+        if (data.earthBirthRegistry) setEarthBirthRegistry(data.earthBirthRegistry);
+        if (data.colonies) setColonies(data.colonies);
         if (data.voidBattleShipStats) setVoidBattleShipStats(data.voidBattleShipStats);
         if (data.voidPOIsInspiration) setVoidPOIsInspiration(data.voidPOIsInspiration);
         if (data.voidPOIQCDonations) setVoidPOIQCDonations(data.voidPOIQCDonations);
@@ -5046,23 +5107,29 @@ export const GameDashboard = ({
         if (data.skillAlienLevel) setSkillAlienLevel(data.skillAlienLevel);
         if (data.skillTempoDinheiroLevel) setSkillTempoDinheiroLevel(data.skillTempoDinheiroLevel);
         if (data.skillRobosOlimpicosLevel) setSkillRobosOlimpicosLevel(data.skillRobosOlimpicosLevel);
-        if (data.hasSeenRoute2UnlockMessage !== undefined) setHasSeenRoute2UnlockMessage(data.hasSeenRoute2UnlockMessage);
         if (data.unlockedAchievements) setUnlockedAchievements(data.unlockedAchievements);
         if (data.achievementProgress) setAchievementProgress(data.achievementProgress);
+        if (data.hasSeenRoute2UnlockMessage !== undefined) setHasSeenRoute2UnlockMessage(data.hasSeenRoute2UnlockMessage);
         
-        if (data.speedRunRecords && setLocalRecords) {
-          setLocalRecords(data.speedRunRecords);
+        // Restore Arcade Scores
+        if (data.arcadeScores) {
+          setArcadeScores(data.arcadeScores);
+          Object.entries(data.arcadeScores).forEach(([gameId, score]) => {
+             const key = `${gameId.replace(/-/g, '_')}_high_score`;
+             localStorage.setItem(key, String(score));
+          });
         }
+        
+        if (data.speedRunRecords && setLocalRecords) setLocalRecords(data.speedRunRecords);
 
         addLog(t('importSuccess'), 'success');
-      } catch (error) {
-        console.error('Import error:', error);
-        addLog(t('importError'), 'error');
+      } catch (err) {
+        console.error('Import error:', err);
+        addLog(t('error' as any), 'error');
       }
     };
     reader.readAsText(file);
-  }, [setQc, setAetherion, setMiningWaste, setSolarEnergy, setAetherionTubes, setUnlockedRouteIds, setOwnedShips, setTechLevels, setAutoTravelSlots, setMiningRobots, setMiningRobotLevels, setOresCollected, setAutoSellByOre, setAutoSellUnlockedByOre, setMiningCompressionLevels, setUnlockedTechLevels, setSeenTutorials, setRouteTier, setTotalDeliveries, setDeliveriesByLocation, setHistoryStats, setActiveCodes, setUnlockedCodes, setShipXP, setShipLevel, setLocalRecords, addLog, t, setIsRetributionActive, setIsFatigueActive, setBattleLevel, setRadarLevel, setPrivatePoliceLevel, setAutoSkipRandomBattles, setWarCoreLevel, setFleetPower, setExtractionTechLevel, setSolarMappingLevel, setDoubleRouteLevel, setDoomPLevel, setCaptureLevel, setEarthReconstructionProgress, setVoidResources, setVoidCompactedResources, setVoidAircraftMissions, setVoidAircraftUpgrades, setVoidBattleShipStats, setVoidPOIsInspiration, setVoidPOIQCDonations, setUnlockedExtractionPoints, setExtractionPacks, setExtractionRobotLevels, setExtractionProductionLevels, setExtractionAutoSell, setExtractionAutoSellUnlocked, setExtractionCompressionLevels, setTotalExtractionProfit, setSkillLendariaLevel, setSkillMiticaLevel, setSkillAlienLevel, setSkillTempoDinheiroLevel, setSkillRobosOlimpicosLevel, setUnlockedAchievements, setAchievementProgress, setHasSeenRoute2UnlockMessage]);
-
+  }, [setQc, setAetherion, setMiningWaste, setSolarEnergy, setAetherionTubes, setUnlockedRouteIds, setOwnedShips, setTechLevels, setAutoTravelSlots, setMiningRobots, setMiningRobotLevels, setOresCollected, setAutoSellByOre, setAutoSellUnlockedByOre, setMiningCompressionLevels, setUnlockedTechLevels, setSeenTutorials, setRouteTier, setTotalDeliveries, setDeliveriesByLocation, setHistoryStats, setActiveCodes, setUnlockedCodes, setShipXP, setShipLevel, setLocalRecords, addLog, t, setIsRetributionActive, setIsFatigueActive, setBattleLevel, setRadarLevel, setPrivatePoliceLevel, setAutoSkipRandomBattles, setWarCoreLevel, setFleetPower, setExtractionTechLevel, setSolarMappingLevel, setDoubleRouteLevel, setDoomPLevel, setCaptureLevel, setEarthReconstructionProgress, setVoidResources, setVoidCompactedResources, setVoidAircraftMissions, setVoidAircraftUpgrades, setVoidBattleShipStats, setVoidPOIsInspiration, setVoidPOIQCDonations, setUnlockedExtractionPoints, setExtractionPacks, setExtractionRobotLevels, setExtractionProductionLevels, setExtractionAutoSell, setExtractionAutoSellUnlocked, setExtractionCompressionLevels, setTotalExtractionProfit, setSkillLendariaLevel, setSkillMiticaLevel, setSkillAlienLevel, setSkillTempoDinheiroLevel, setSkillRobosOlimpicosLevel, setUnlockedAchievements, setAchievementProgress, setHasSeenRoute2UnlockMessage, setRoute4Unlocked, setEarthPopulation, setEarthMaleRatio, setEarthBiodiversity, setEarthHealth, setEarthHappiness, setEarthSecurity, setEarthQualityOfLife, setEarthEvents, setEarthCouples, setEarthBirthRegistry, setColonies, setGameTimeSeconds, setVoidAircraftAutoToggles, setArcadeScores]);
   const incrementDeliveries = useCallback((source: 'manual' | 'auto', count: number = 1) => {
     const tier = routeTier;
     setHistoryStats(prev => {
@@ -7377,8 +7444,8 @@ export const GameDashboard = ({
     const currentLevel = voidBattleShipStats.upgrades[type];
     const maxLevel = 5 + (battleShipUpgradeLevelRef.current * 10);
 
-    if (isVoidWarActive) {
-      addLog(t('cannotUpgradeDuringAttack'), 'error');
+    if (isVoidWarActive || voidWarAlertActive) {
+      addLog(t('cannotUpgradeDuringAttack' as any), 'error');
       playSfx('error');
       return;
     }
@@ -9891,7 +9958,7 @@ export const GameDashboard = ({
                   }`}
                 >
                   {isVoidWarActive ? <Skull className="w-4 h-4" /> : <Crosshair className="w-4 h-4" />}
-                  {isVoidWarActive ? t('eliminateEnemies') : t('searchCombat')}
+                  {isVoidWarActive || voidWarAlertActive ? t('eliminateEnemies') : t('searchCombat')}
                 </button>
                 <button
                   onClick={repairVoidBattleShip}
@@ -9910,7 +9977,7 @@ export const GameDashboard = ({
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-3 gap-4">
           {[
             { id: 'damage', name: t('weaponSystem'), desc: `+10% ${t('dmgBonus')}`, icon: Sword, max: 5 },
             { id: 'shield', name: t('reinforcedShields'), desc: `+15% ${t('shield')}`, icon: Shield, max: 5 },
@@ -9948,8 +10015,8 @@ export const GameDashboard = ({
               <button
                 key={upg.id}
                 onClick={() => upgradeVoidBattleShip(upg.id as any)}
-                disabled={isMax || !canAfford || isVoidWarActive}
-                className={`glass-panel border p-6 rounded-xl flex flex-col gap-4 transition-all relative overflow-hidden text-left ${isMax ? 'border-emerald-500/30 bg-emerald-500/5' : (canAfford && !isVoidWarActive) ? 'border-red-500/20 hover:border-red-500/50' : 'border-white/5 opacity-50 grayscale'}`}
+                disabled={isMax || !canAfford || isVoidWarActive || voidWarAlertActive}
+                className={`glass-panel border p-6 rounded-xl flex flex-col gap-4 transition-all relative overflow-hidden text-left min-h-[160px] ${isMax ? 'border-emerald-500/30 bg-emerald-500/5' : (canAfford && !isVoidWarActive && !voidWarAlertActive) ? 'border-red-500/20 hover:border-red-500/50 shadow-[0_0_20px_rgba(239,68,68,0.05)]' : 'border-white/5 opacity-50 grayscale'}`}
               >
                 <div className="flex justify-between items-start">
                   <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20">
@@ -13039,6 +13106,7 @@ export const GameDashboard = ({
                     language={language as any}
                     onAddYear={addEarthYears}
                     onTabStatusChange={(isOpen) => { isColoniesOpenRef.current = isOpen; }}
+                    onBuildingComplete={handleBuildingComplete}
                     earthPopulation={earthPopulation}
                     setEarthPopulation={setEarthPopulation}
                     colonies={colonies}
@@ -13064,21 +13132,143 @@ export const GameDashboard = ({
                   exit={{ opacity: 0, y: -10 }}
                   className="space-y-6"
                 >
-                  <div className={`glass-panel ${isInterstellar ? 'neon-border-orange' : isVoid ? 'neon-border-purple' : 'neon-border-cyan'} p-4 rounded-xl flex justify-between items-center`}>
+                  {isEarth ? (
+                    <>
+                      <div className="glass-panel neon-border-emerald p-4 rounded-xl flex justify-between items-center">
+                        <div>
+                          <h2 className="text-lg font-orbitron font-bold text-emerald-400 uppercase tracking-tighter">{t('history')}</h2>
+                          <p className="text-[10px] text-slate-500 font-mono uppercase tracking-widest">{t('gameStatsByRoute')}</p>
+                        </div>
+                        <div className="flex gap-2">
+                          <button 
+                            onClick={exportGameData}
+                            className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-[10px] font-mono uppercase tracking-widest transition-all bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border border-white/5"
+                          >
+                            <Download size={12} />
+                            {t('export')}
+                          </button>
+                          <label className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-[10px] font-mono uppercase tracking-widest transition-all cursor-pointer bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border border-white/5">
+                            <Upload size={12} />
+                            {t('import')}
+                            <input type="file" className="hidden" accept=".dat" onChange={importGameData} />
+                          </label>
+                        </div>
+                      </div>
+                      <div className="glass-panel neon-border-emerald bg-emerald-500/5 p-8 rounded-3xl min-h-[600px] flex flex-col items-center justify-center space-y-12 shadow-[0_0_50px_rgba(16,185,129,0.1)] relative overflow-hidden">
+                      {/* Decorative Background Elements */}
+                      <div className="absolute inset-0 pointer-events-none">
+                        <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_center,rgba(16,185,129,0.05)_0%,transparent_70%)]" />
+                        <div className="absolute top-0 left-0 w-full h-full opacity-10 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')]" />
+                      </div>
+
+                      <motion.div 
+                        className="relative w-64 h-64 z-10"
+                        animate={{ 
+                          y: [0, -15, 0],
+                          rotate: [-1, 1, -1]
+                        }}
+                        transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
+                      >
+                        {/* Happy Robot UI */}
+                        <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/20 via-emerald-900/40 to-black/60 rounded-[3rem] border-2 border-emerald-400/50 shadow-[0_0_60px_rgba(16,185,129,0.2)] overflow-hidden backdrop-blur-md">
+                          {/* Scan Effect */}
+                          <motion.div 
+                            className="absolute inset-x-0 h-1/2 bg-gradient-to-b from-emerald-400/10 to-transparent z-10"
+                            animate={{ top: ["-50%", "100%", "-50%"] }}
+                            transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
+                          />
+                          
+                          {/* Eyes Container */}
+                          <div className="absolute top-1/3 left-0 right-0 flex justify-around px-12">
+                            {/* Left Eye */}
+                            <motion.div 
+                              className="w-8 h-8 bg-emerald-400 rounded-full shadow-[0_0_20px_rgba(16,185,129,0.8)] relative"
+                              animate={{ scaleY: [1, 1, 0.1, 1, 1] }}
+                              transition={{ duration: 3, repeat: Infinity, times: [0, 0.9, 0.92, 0.94, 1] }}
+                            >
+                              <div className="absolute top-2 left-2 w-2 h-2 bg-white rounded-full opacity-90" />
+                            </motion.div>
+                            {/* Right Eye */}
+                            <motion.div 
+                              className="w-8 h-8 bg-emerald-400 rounded-full shadow-[0_0_20px_rgba(16,185,129,0.8)] relative"
+                              animate={{ scaleY: [1, 1, 0.1, 1, 1] }}
+                              transition={{ duration: 3, repeat: Infinity, times: [0, 0.9, 0.92, 0.94, 1] }}
+                            >
+                              <div className="absolute top-2 left-2 w-2 h-2 bg-white rounded-full opacity-90" />
+                            </motion.div>
+                          </div>
+                          
+                          {/* Happy Mouth */}
+                          <div className="absolute bottom-[20%] left-1/2 -translate-x-1/2 w-20 h-10">
+                            <svg viewBox="0 0 100 50" className="w-full h-full fill-none stroke-emerald-400 stroke-[6]">
+                              <path d="M10,10 Q50,50 90,10" />
+                            </svg>
+                          </div>
+
+                          {/* Glossy Overlay */}
+                          <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/5 to-white/20 pointer-events-none" />
+                        </div>
+
+                        {/* Floating Hearts/Sparkles */}
+                        {[...Array(6)].map((_, i) => (
+                          <motion.div
+                            key={i}
+                            className="absolute text-emerald-400"
+                            initial={{ opacity: 0, scale: 0 }}
+                            animate={{ 
+                              y: [-20, -100], 
+                              x: [(i - 2.5) * 40, (i - 2.5) * 60],
+                              opacity: [0, 1, 0],
+                              scale: [0.5, 1.2, 0.5],
+                              rotate: [0, 45, -45]
+                            }}
+                            transition={{ 
+                              duration: 3 + Math.random() * 2, 
+                              repeat: Infinity, 
+                              delay: i * 0.5 
+                            }}
+                            style={{ bottom: '20%', left: '50%' }}
+                          >
+                            ✨
+                          </motion.div>
+                        ))}
+                      </motion.div>
+                      
+                      <div className="text-center space-y-6 relative z-10">
+                        <motion.h4 
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="text-5xl font-orbitron font-black text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 via-white to-emerald-400 uppercase tracking-[0.2em]"
+                        >
+                          {language === 'pt' ? 'Obrigado por jogar' : 'Thanks for playing'}
+                        </motion.h4>
+                        <div className="flex items-center justify-center gap-6">
+                          <div className="h-px w-24 bg-gradient-to-r from-transparent to-emerald-500/50" />
+                          <div className="w-3 h-3 rounded-full bg-emerald-500/50 animate-ping" />
+                          <div className="h-px w-24 bg-gradient-to-l from-transparent to-emerald-500/50" />
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                  ) : (
+                    <>
+                      <div className={`glass-panel ${isInterstellar ? 'neon-border-orange' : isVoid ? 'neon-border-purple' : 'neon-border-cyan'} p-4 rounded-xl flex justify-between items-center`}>
                     <div>
                       <h2 className={`text-lg font-orbitron font-bold ${isInterstellar ? 'text-orange-400' : isVoid ? 'text-purple-400' : 'text-cyan-400'} uppercase tracking-tighter`}>{t('history')}</h2>
                       <p className="text-[10px] text-slate-500 font-mono uppercase tracking-widest">{t('gameStatsByRoute')}</p>
                     </div>
                     <div className="flex gap-2">
+                      {!isEarth && (
+                        <button 
+                          onClick={() => setShowRoute2Goals(true)}
+                          className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-[10px] font-orbitron font-bold uppercase tracking-widest transition-all bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/30 shadow-[0_0_15px_rgba(16,185,129,0.1)]`}
+                        >
+                          <Target size={12} />
+                          {isVoid ? (language === 'pt' ? 'Metas Projeto Terra' : 'Project Earth Goals') : isInterstellar ? (language === 'pt' ? 'Metas Rota 3' : 'Route 3 Goals') : (language === 'pt' ? 'Metas Rota 2' : 'Route 2 Goals')}
+                        </button>
+                      )}
                       <button 
-                        onClick={() => setShowRoute2Goals(true)}
-                        className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-[10px] font-orbitron font-bold uppercase tracking-widest transition-all bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/30 shadow-[0_0_15px_rgba(16,185,129,0.1)]`}
-                      >
-                        <Target size={12} />
-                        {isVoid ? (language === 'pt' ? 'Metas Projeto Terra' : 'Project Earth Goals') : isInterstellar ? (language === 'pt' ? 'Metas Rota 3' : 'Route 3 Goals') : (language === 'pt' ? 'Metas Rota 2' : 'Route 2 Goals')}
-                      </button>
-                      <button 
-                        onClick={() => setShowExportModal(true)}
+                        onClick={exportGameData}
                         className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-[10px] font-mono uppercase tracking-widest transition-all ${isInterstellar ? 'bg-orange-500/10 text-orange-400 hover:bg-orange-500/20' : 'bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20'} border border-white/5`}
                       >
                         <Download size={12} />
@@ -13135,167 +13325,100 @@ export const GameDashboard = ({
                               </button>
                             </div>
 
-                            {tier === 'Void' ? (
-                              <div className="flex-1 flex flex-col items-center justify-center space-y-8 py-12">
-                                <motion.div 
-                                  className="relative w-48 h-48"
-                                  animate={{ y: [0, -10, 0] }}
-                                  transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-                                >
-                                  {/* Stylized Robot Head */}
-                                  <div className="absolute inset-0 bg-gradient-to-br from-purple-500/20 via-purple-900/40 to-black/60 rounded-[2.5rem] border-2 border-purple-400/50 shadow-[0_0_40px_rgba(168,85,247,0.2)] overflow-hidden backdrop-blur-sm">
-                                    {/* Scanning Line */}
-                                    <motion.div 
-                                      className="absolute inset-x-0 h-px bg-purple-400/30 z-10"
-                                      animate={{ top: ["0%", "100%", "0%"] }}
-                                      transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
-                                    />
-                                    
-                                    {/* Eyes Container */}
-                                    <motion.div 
-                                      className="absolute top-1/3 left-0 right-0 flex justify-around px-10"
-                                      animate={{ x: [-8, 8, -8] }}
-                                      transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
-                                    >
-                                      {/* Left Eye */}
-                                      <div className="w-6 h-6 bg-purple-400 rounded-full shadow-[0_0_15px_rgba(168,85,247,0.8)] relative">
-                                        <div className="absolute top-1.5 left-1.5 w-2 h-2 bg-white rounded-full opacity-90" />
-                                        <motion.div 
-                                          className="absolute inset-0 bg-black/40"
-                                          animate={{ height: ["0%", "0%", "100%", "0%", "0%"] }}
-                                          transition={{ duration: 4, repeat: Infinity, times: [0, 0.8, 0.85, 0.9, 1] }}
-                                        />
+                              {tier === 'Void' ? (
+                                <div className="flex-1 flex flex-col items-center justify-center space-y-8 py-12">
+                                  <motion.div 
+                                    className="relative w-48 h-48"
+                                    animate={{ y: [0, -10, 0] }}
+                                    transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+                                  >
+                                    {/* Stylized Robot Head */}
+                                    <div className="absolute inset-0 bg-gradient-to-br from-purple-500/20 via-purple-900/40 to-black/60 rounded-[2.5rem] border-2 border-purple-400/50 shadow-[0_0_40px_rgba(168,85,247,0.2)] overflow-hidden backdrop-blur-sm">
+                                      {/* Scanning Line */}
+                                      <motion.div 
+                                        className="absolute inset-x-0 h-px bg-purple-400/30 z-10"
+                                        animate={{ top: ["0%", "100%", "0%"] }}
+                                        transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
+                                      />
+                                      
+                                      {/* Eyes Container */}
+                                      <motion.div 
+                                        className="absolute top-1/3 left-0 right-0 flex justify-around px-10"
+                                        animate={{ x: [-8, 8, -8] }}
+                                        transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
+                                      >
+                                        {/* Left Eye */}
+                                        <div className="w-6 h-6 bg-purple-400 rounded-full shadow-[0_0_15px_rgba(168,85,247,0.8)] relative">
+                                          <div className="absolute top-1.5 left-1.5 w-2 h-2 bg-white rounded-full opacity-90" />
+                                          <motion.div 
+                                            className="absolute inset-0 bg-black/40"
+                                            animate={{ height: ["0%", "0%", "100%", "0%", "0%"] }}
+                                            transition={{ duration: 4, repeat: Infinity, times: [0, 0.8, 0.85, 0.9, 1] }}
+                                          />
+                                        </div>
+                                        {/* Right Eye */}
+                                        <div className="w-6 h-6 bg-purple-400 rounded-full shadow-[0_0_15px_rgba(168,85,247,0.8)] relative">
+                                          <div className="absolute top-1.5 left-1.5 w-2 h-2 bg-white rounded-full opacity-90" />
+                                          <motion.div 
+                                            className="absolute inset-0 bg-black/40"
+                                            animate={{ height: ["0%", "0%", "100%", "0%", "0%"] }}
+                                            transition={{ duration: 4, repeat: Infinity, times: [0, 0.8, 0.85, 0.9, 1] }}
+                                          />
+                                        </div>
+                                      </motion.div>
+                                      
+                                      {/* Sad Mouth */}
+                                      <div className="absolute bottom-1/4 left-1/2 -translate-x-1/2 w-12 h-4">
+                                        <svg viewBox="0 0 100 40" className="w-full h-full fill-none stroke-purple-400/60 stroke-[4]">
+                                          <path d="M10,30 Q50,0 90,30" />
+                                        </svg>
                                       </div>
-                                      {/* Right Eye */}
-                                      <div className="w-6 h-6 bg-purple-400 rounded-full shadow-[0_0_15px_rgba(168,85,247,0.8)] relative">
-                                        <div className="absolute top-1.5 left-1.5 w-2 h-2 bg-white rounded-full opacity-90" />
-                                        <motion.div 
-                                          className="absolute inset-0 bg-black/40"
-                                          animate={{ height: ["0%", "0%", "100%", "0%", "0%"] }}
-                                          transition={{ duration: 4, repeat: Infinity, times: [0, 0.8, 0.85, 0.9, 1] }}
-                                        />
-                                      </div>
-                                    </motion.div>
-                                    
-                                    {/* Sad Mouth */}
-                                    <div className="absolute bottom-1/4 left-1/2 -translate-x-1/2 w-12 h-4">
-                                      <svg viewBox="0 0 100 40" className="w-full h-full fill-none stroke-purple-400/60 stroke-[4]">
-                                        <path d="M10,30 Q50,0 90,30" />
-                                      </svg>
+
+                                      {/* Glossy Overlay */}
+                                      <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/5 to-white/10 pointer-events-none" />
                                     </div>
 
-                                    {/* Glossy Overlay */}
-                                    <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/5 to-white/10 pointer-events-none" />
-                                  </div>
-
-                                  {/* Antennas */}
-                                  <div className="absolute -top-6 left-1/3 w-1.5 h-8 bg-gradient-to-t from-purple-400/50 to-transparent rounded-full" />
-                                  <div className="absolute -top-6 right-1/3 w-1.5 h-8 bg-gradient-to-t from-purple-400/50 to-transparent rounded-full" />
+                                    {/* Antennas */}
+                                    <div className="absolute -top-6 left-1/3 w-1.5 h-8 bg-gradient-to-t from-purple-400/50 to-transparent rounded-full" />
+                                    <div className="absolute -top-6 right-1/3 w-1.5 h-8 bg-gradient-to-t from-purple-400/50 to-transparent rounded-full" />
+                                    
+                                    {/* Floating Particles */}
+                                    {[...Array(5)].map((_, i) => (
+                                      <motion.div
+                                        key={i}
+                                        className="absolute w-1 h-1 bg-purple-400/40 rounded-full"
+                                        animate={{ 
+                                          y: [0, -40], 
+                                          x: [0, (i - 2) * 20],
+                                          opacity: [0, 1, 0] 
+                                        }}
+                                        transition={{ 
+                                          duration: 2 + i, 
+                                          repeat: Infinity, 
+                                          delay: i * 0.4 
+                                        }}
+                                        style={{ bottom: '10%', left: '50%' }}
+                                      />
+                                    ))}
+                                  </motion.div>
                                   
-                                  {/* Floating Particles */}
-                                  {[...Array(5)].map((_, i) => (
-                                    <motion.div
-                                      key={i}
-                                      className="absolute w-1 h-1 bg-purple-400/40 rounded-full"
-                                      animate={{ 
-                                        y: [0, -40], 
-                                        x: [0, (i - 2) * 20],
-                                        opacity: [0, 1, 0] 
-                                      }}
-                                      transition={{ 
-                                        duration: 2 + i, 
-                                        repeat: Infinity, 
-                                        delay: i * 0.4 
-                                      }}
-                                      style={{ bottom: '10%', left: '50%' }}
-                                    />
-                                  ))}
-                                </motion.div>
-                                
-                                <div className="text-center space-y-4">
-                                  <motion.h4 
-                                    initial={{ opacity: 0 }}
-                                    animate={{ opacity: 1 }}
-                                    className="text-3xl font-orbitron font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-purple-200 to-purple-400 uppercase tracking-[0.4em] italic"
-                                  >
-                                    {t('dataLostInTime')}
-                                  </motion.h4>
-                                  <div className="flex items-center justify-center gap-4">
-                                    <div className="h-px w-16 bg-gradient-to-r from-transparent to-purple-500/50" />
-                                    <div className="w-2 h-2 rounded-full bg-purple-500/50 animate-ping" />
-                                    <div className="h-px w-16 bg-gradient-to-l from-transparent to-purple-500/50" />
+                                  <div className="text-center space-y-4">
+                                    <motion.h4 
+                                      initial={{ opacity: 0 }}
+                                      animate={{ opacity: 1 }}
+                                      className="text-3xl font-orbitron font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-purple-200 to-purple-400 uppercase tracking-[0.4em] italic"
+                                    >
+                                      {t('dataLostInTime')}
+                                    </motion.h4>
+                                    <div className="flex items-center justify-center gap-4">
+                                      <div className="h-px w-16 bg-gradient-to-r from-transparent to-purple-500/50" />
+                                      <div className="w-2 h-2 rounded-full bg-purple-500/50 animate-ping" />
+                                      <div className="h-px w-16 bg-gradient-to-l from-transparent to-purple-500/50" />
+                                    </div>
                                   </div>
                                 </div>
-                              </div>
-                            ) : tier === 'Earth' ? (
-                              <div className="flex-1 space-y-4 py-2">
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                                  <div className="bg-emerald-500/10 border border-emerald-500/20 p-4 rounded-xl text-center space-y-1">
-                                     <div className="text-[9px] font-orbitron text-emerald-400 uppercase tracking-widest">{language === 'pt' ? 'ANOS DE EVOLUÇÃO' : 'YEARS OF EVOLUTION'}</div>
-                                     <div className="text-2xl font-orbitron font-black text-white">{gameTime.years}</div>
-                                  </div>
-                                  <div className="bg-blue-500/10 border border-blue-500/20 p-4 rounded-xl text-center space-y-1">
-                                     <div className="text-[9px] font-orbitron text-blue-400 uppercase tracking-widest">{language === 'pt' ? 'POPULAÇÃO FINAL' : 'FINAL POPULATION'}</div>
-                                     <div className="text-2xl font-orbitron font-black text-white">{formatValue(Math.floor(totalHumanPopulation))}</div>
-                                  </div>
-                                  <div className="bg-emerald-500/10 border border-emerald-500/20 p-4 rounded-xl text-center space-y-1">
-                                     <div className="text-[9px] font-orbitron text-emerald-400 uppercase tracking-widest">{language === 'pt' ? 'BIODIVERSIDADE' : 'BIODIVERSITY'}</div>
-                                     <div className="text-2xl font-orbitron font-black text-white">{earthBiodiversity.toFixed(0)}%</div>
-                                  </div>
-                                </div>
-
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                   <div className="space-y-2">
-                                      <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
-                                        <Activity className="w-3 h-3 text-emerald-400" />
-                                        {language === 'pt' ? 'Indicadores Globais' : 'Global Indicators'}
-                                      </h4>
-                                      <div className="space-y-2 bg-black/20 p-4 rounded-xl border border-white/5">
-                                         {[
-                                           { label: language === 'pt' ? 'Saúde' : 'Health', val: earthHealth, color: 'text-emerald-400' },
-                                           { label: language === 'pt' ? 'Felicidade' : 'Happiness', val: earthHappiness, color: 'text-yellow-400' },
-                                           { label: language === 'pt' ? 'Segurança' : 'Safety', val: earthSecurity, color: 'text-blue-400' },
-                                           { label: language === 'pt' ? 'Qualidade de Vida' : 'Quality of Life', val: earthQualityOfLife, color: 'text-cyan-400' }
-                                         ].map((stat, i) => (
-                                           <div key={i} className="space-y-2">
-                                              <div className="flex justify-between text-[10px] font-mono uppercase tracking-widest">
-                                                 <span className="text-slate-500">{stat.label}</span>
-                                                 <span className={stat.color}>{stat.val.toFixed(1)}%</span>
-                                              </div>
-                                              <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
-                                                 <div 
-                                                   className={`h-full bg-current ${stat.color.replace('text-', 'bg-')}`} 
-                                                   style={{ width: `${stat.val}%` }} 
-                                                 />
-                                              </div>
-                                           </div>
-                                         ))}
-                                      </div>
-                                   </div>
-
-                                   <div className="space-y-2">
-                                      <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
-                                        <HistoryIcon className="w-3 h-3 text-yellow-400" />
-                                        {language === 'pt' ? 'Resumo da Evolução' : 'Evolution Summary'}
-                                      </h4>
-                                      <div className="bg-black/20 p-4 rounded-xl border border-white/5 space-y-3">
-                                         <div className="flex justify-between items-center text-[9px]">
-                                            <span className="font-mono text-slate-500 uppercase">{language === 'pt' ? 'Eventos Ocorridos' : 'Events Occurred'}</span>
-                                            <span className="font-orbitron text-white">{earthEvents.length}</span>
-                                         </div>
-                                         <div className="pt-2 mt-2 border-t border-white/5">
-                                            <p className="text-[8px] text-slate-500 font-mono text-center uppercase leading-relaxed italic">
-                                               {language === 'pt' 
-                                                 ? 'O Ciclo de Terra continua... os dados estão sendo preservados.' 
-                                                 : 'The Earth Cycle continues... data is being preserved.'}
-                                            </p>
-                                         </div>
-                                      </div>
-                                   </div>
-                                </div>
-                              </div>
-                            ) : (
-                              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 flex-1">
+                              ) : (
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 flex-1">
                                 <div className="space-y-4">
                                 <div>
                                   <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-2">
@@ -13393,6 +13516,8 @@ export const GameDashboard = ({
                       })()}
                     </AnimatePresence>
                   </div>
+                    </>
+                  )}
                 </motion.div>
               )}
 

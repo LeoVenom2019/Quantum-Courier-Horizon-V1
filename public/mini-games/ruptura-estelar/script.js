@@ -141,6 +141,13 @@ function init() {
 function updateScore(val) {
     score = val;
     scoreElement.innerText = score.toLocaleString('pt-BR', { minimumIntegerDigits: 5, useGrouping: true });
+    
+    // Notify parent of score update
+    window.parent.postMessage({ 
+        type: 'SCORE_UPDATE', 
+        gameId: 'ruptura-estelar', 
+        score: score 
+    }, '*');
 }
 
 function updateStatus() {
@@ -863,6 +870,13 @@ function gameOver() {
     finalScoreElement.innerText = score.toLocaleString('pt-BR');
     overlay.classList.remove('hidden');
     localStorage.setItem('ruptura_estelar_high_score', Math.max(score, parseInt(localStorage.getItem('ruptura_estelar_high_score')) || 0).toString());
+    
+    // Final score update on game over
+    window.parent.postMessage({ 
+        type: 'GAME_COMPLETE', 
+        gameId: 'ruptura-estelar', 
+        score: score 
+    }, '*');
 }
 
 function gameLoop() {
@@ -876,5 +890,12 @@ window.addEventListener('keydown', e => { if (keys.hasOwnProperty(e.key)) keys[e
 window.addEventListener('keyup', e => { if (keys.hasOwnProperty(e.key)) keys[e.key] = false; });
 restartBtn.addEventListener('click', init);
 exitBtn.addEventListener('click', () => { window.parent.postMessage({ type: 'CLOSE_MINI_GAME' }, '*'); });
+
+const exitGameBtn = document.getElementById('exit-game-btn');
+if (exitGameBtn) {
+    exitGameBtn.addEventListener('click', () => {
+        window.parent.postMessage({ type: 'CLOSE_MINI_GAME' }, '*');
+    });
+}
 
 init();
