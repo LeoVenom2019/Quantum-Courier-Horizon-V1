@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Neo Catcher - QCH Arcade</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div id="game-container">
+        <div class="side-panel left">
+            <div class="stat-box">
+                <label>PHASE</label>
+                <div id="phase-name">STREET</div>
+                <div id="phase-number" class="sub-label">01/04</div>
+            </div>
+            <div class="stat-box">
+                <label>TIMER</label>
+                <div id="timer">50</div>
+            </div>
+            <div class="stat-box">
+                <label>COMBO</label>
+                <div id="combo-multiplier">x1.0</div>
+            </div>
+        </div>
+
+        <div class="main-screen">
+            <div class="scanlines"></div>
+            <div id="phase-announcement" class="hidden">
+                <h2 id="phase-title">PHASE 1</h2>
+                <p id="phase-desc">STREET</p>
+            </div>
+            <canvas id="gameCanvas"></canvas>
+            
+            <div id="overlay" class="hidden">
+                <div class="overlay-content">
+                    <h1 id="game-status">PHASE COMPLETE</h1>
+                    
+                    <div id="phase-results" class="hidden">
+                        <div class="stat-row">
+                            <span>PHASE SCORE:</span>
+                            <span id="phase-score-val">0</span>
+                        </div>
+                        <div class="progress-container">
+                            <div class="progress-label">TARGET PROGRESS</div>
+                            <div class="progress-bar-bg">
+                                <div id="phase-progress-fill"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="final-results" class="hidden">
+                        <div class="final-score-box">
+                            <label>TOTAL SCORE</label>
+                            <div id="final-score">00000</div>
+                        </div>
+                    </div>
+
+                    <div class="button-group">
+                        <button id="next-btn" class="hidden">CONTINUE</button>
+                        <button id="restart-btn" class="hidden">RETRY</button>
+                        <button id="exit-btn">EXIT ARCADE</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="side-panel right">
+            <div class="stat-box">
+                <label>SCORE</label>
+                <div id="score">00000</div>
+            </div>
+            <div class="stat-box">
+                <label>RECORD</label>
+                <div id="high-score">00000</div>
+            </div>
+            <div class="controls-hint">
+                <p><span>A</span> LEFT</p>
+                <p><span>D</span> RIGHT</p>
+                <p>CATCH FALLING ITEMS</p>
+            </div>
+        </div>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>

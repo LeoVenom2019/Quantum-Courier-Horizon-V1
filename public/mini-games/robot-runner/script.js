@@ -80,11 +80,11 @@ const LabyrinthMaps = [
         [1,2,2,2,2,2,1,1,2,2,2,1,1,2,2,2,2,2,2,1],
         [1,2,1,1,1,2,2,2,2,1,2,2,2,2,1,1,1,2,1,1],
         [1,2,1,4,1,1,1,1,2,1,2,1,1,1,1,4,1,2,1,1],
-        [1,2,1,0,1,2,2,2,2,0,2,2,2,2,1,0,1,2,1,1],
+        [1,2,1,0,0,2,2,2,2,0,2,2,2,2,0,0,1,2,1,1],
         [1,2,1,4,1,2,1,1,1,0,1,1,1,2,1,4,1,2,1,1],
         [1,2,1,1,1,2,1,0,0,0,0,0,1,2,1,1,1,2,1,1],
         [1,2,2,2,2,2,1,0,1,1,1,0,1,2,2,2,2,2,2,1],
-        [1,1,1,1,1,2,1,0,1,4,1,0,1,2,1,1,1,1,1,1],
+        [1,1,1,1,1,2,1,0,0,4,0,0,1,2,1,1,1,1,1,1],
         [1,2,2,2,2,2,2,0,1,1,1,0,2,2,2,2,2,2,2,1],
         [1,2,1,1,1,1,1,2,2,2,2,2,1,1,1,1,1,2,1,1],
         [1,2,2,2,2,2,2,2,1,1,1,2,2,2,2,2,2,2,2,1],
@@ -127,6 +127,7 @@ class Particle {
 // Game State
 let currentPhase = 0;
 let score = 0;
+let lives = 3;
 let gameState = 'MENU';
 let startTime = 0;
 let totalTime = 0;
@@ -365,6 +366,32 @@ function checkItemCollection() {
     }
 }
 
+function updateLivesUI() {
+    const el = document.getElementById('lives-display');
+    if (el) el.innerText = lives;
+}
+
+function resetPositions() {
+    player.gridX = 1;
+    player.gridY = 10;
+    player.x = player.gridX * TILE_SIZE;
+    player.y = player.gridY * TILE_SIZE;
+    player.dir = { x: 0, y: 0 };
+    player.nextDir = { x: 0, y: 0 };
+    player.isBoosting = false;
+    player.isPowered = false;
+
+    ghosts.forEach(g => {
+        g.gridX = g.spawnX;
+        g.gridY = g.spawnY;
+        g.x = g.spawnX * TILE_SIZE;
+        g.y = g.spawnY * TILE_SIZE;
+        g.dir = { x: 0, y: 0 };
+        g.dead = false;
+        g.frightened = false;
+    });
+}
+
 function notifyParentOfScore() {
     window.parent.postMessage({ 
         type: 'SCORE_UPDATE', 
@@ -388,9 +415,18 @@ function checkGhostCollisions() {
                 spawnParticles(g.x + TILE_SIZE/2, g.y + TILE_SIZE/2, '#FFFFFF', 30);
                 screenShake = 10;
             } else { 
-                gameState = 'GAMEOVER'; 
-                notifyParentOfScore();
-                document.getElementById('game-over').classList.remove('hidden');
+                lives--;
+                updateLivesUI();
+                screenShake = 20;
+                spawnParticles(player.x + TILE_SIZE/2, player.y + TILE_SIZE/2, '#FF0000', 50);
+
+                if (lives <= 0) {
+                    gameState = 'GAMEOVER'; 
+                    notifyParentOfScore();
+                    document.getElementById('game-over').classList.remove('hidden');
+                } else {
+                    resetPositions();
+                }
                 collisionDetected = true;
             }
         } else if (d < TILE_SIZE * 2) { isNear = true; }
@@ -627,7 +663,10 @@ window.addEventListener('keydown', e => {
 
 document.getElementById('start-btn').onclick = () => {
     document.getElementById('start-screen').classList.add('hidden');
-    gameState = 'PLAYING'; score = 0; displayedScore = 0; totalTime = 0; startTime = Date.now(); initLevel(0);
+    gameState = 'PLAYING'; score = 0; lives = 3; displayedScore = 0; totalTime = 0; startTime = Date.now(); 
+    document.getElementById('score-display').innerText = '000000';
+    updateLivesUI();
+    initLevel(0);
 };
 document.getElementById('next-btn').onclick = () => {
     document.getElementById('level-complete').classList.add('hidden');
@@ -635,7 +674,9 @@ document.getElementById('next-btn').onclick = () => {
 };
 document.getElementById('retry-btn').onclick = () => {
     document.getElementById('game-over').classList.add('hidden');
-    gameState = 'PLAYING'; startTime = Date.now(); initLevel(currentPhase);
+    gameState = 'PLAYING'; lives = 3; score = 0; displayedScore = 0; startTime = Date.now(); initLevel(currentPhase);
+    document.getElementById('score-display').innerText = '000000';
+    updateLivesUI();
 };
 document.getElementById('exit-game-btn').onclick = () => {
     window.parent.postMessage({ type: 'CLOSE_MINI_GAME' }, '*');

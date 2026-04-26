@@ -2276,6 +2276,7 @@ export const GameDashboard = ({
   const [earthSecurity, setEarthSecurity] = useState(50);
   const [earthQualityOfLife, setEarthQualityOfLife] = useState(50);
   const [earthEvents, setEarthEvents] = useState<any[]>([]);
+  const [earthProjectBoostCount, setEarthProjectBoostCount] = useState(0);
 
   // Detailed population state for reproduction logic
   // Tracking last birth time for segments of the population to avoid heavy calculations
@@ -2320,42 +2321,141 @@ export const GameDashboard = ({
     const totalDays = Math.floor(gameTimeSecondsRef.current * 0.75);
     const year = Math.floor(totalDays / 360);
     
-    // Define some types of events
-    const eventPoolSource = [
-      { name: { pt: 'Grande Floresta Descoberta', en: 'Great Forest Discovered' }, desc: { pt: 'Uma vasta área verde se expandiu, trazendo novos habitats e biodiversidade.', en: 'A vast green area has expanded, bringing new habitats and biodiversity.' }, impactType: 'biodiversity', impact: 5 },
-      { name: { pt: 'Avanço Agrícola Primordial', en: 'Primordial Agricultural Breakthrough' }, desc: { pt: 'Novas técnicas de colheita natural aumentam a oferta de subsistência.', en: 'New natural harvesting techniques increase subsistence supply.' }, impactType: 'health', impact: 4 },
-      { name: { pt: 'Clima Estável Estelar', en: 'Stellar Stable Climate' }, desc: { pt: 'Um período de harmonia climática favorece a saúde e o bem-estar.', en: 'A period of climatic harmony favors health and well-being.' }, impactType: 'happiness', impact: 5 },
-      { name: { pt: 'A Primeira Grande Migração', en: 'The First Great Migration' }, desc: { pt: 'A população se espalha por novos continentes férteis e seguros.', en: 'The population spreads across new fertile and safe continents.' }, impactType: 'security', impact: 3 },
-      { name: { pt: 'Descoberta de Fontes Termais', en: 'Discovery of Hot Springs' }, desc: { pt: 'Fontes de energia natural melhoram a saúde e longevidade básica.', en: 'Natural energy sources improve basic health and longevity.' }, impactType: 'health', impact: 6 },
-      { name: { pt: 'O Despertar da Fauna', en: 'The Awakening of Fauna' }, desc: { pt: 'Novas espécies animais surgem dos santuários ecológicos.', en: 'New animal species emerge from ecological sanctuaries.' }, impactType: 'biodiversity', impact: 8 },
-      { name: { pt: 'Simbose Botânica', en: 'Botanical Symbiosis' }, desc: { pt: 'Plantas alienígenas adaptadas aceleram o oxigênio e a vida vegetal.', en: 'Adapted alien plants accelerate oxygen and plant life.' }, impactType: 'qualityOfLife', impact: 5 },
-      { name: { pt: 'Era da Abundância', en: 'Age of Abundance' }, desc: { pt: 'Recursos naturais brotam em todas as zonas de colonização.', en: 'Natural resources sprout in all colonization zones.' }, impactType: 'happiness', impact: 7 },
-      { name: { pt: 'Sistema de Patrulha Iniciado', en: 'Patrol System Initiated' }, desc: { pt: 'Drones de vigilância garantem a paz nas novas colônias.', en: 'Surveillance drones ensure peace in the new colonies.' }, impactType: 'security', impact: 10 },
-      { name: { pt: 'Festival da Terra', en: 'Earth Festival' }, desc: { pt: 'Uma celebração global aumenta o moral e a união da população.', en: 'A global celebration boosts morale and population unity.' }, impactType: 'happiness', impact: 12 },
-      { name: { pt: 'Otimização de Sanitarismo', en: 'Sanitation Optimization' }, desc: { pt: 'Novos sistemas de purificação de água reduzem doenças.', en: 'New water purification systems reduce diseases.' }, impactType: 'health', impact: 8 },
+    // Fixed Comic Events
+    const fixedEvents = [
+      { 
+        year: 520, 
+        name: { pt: '🔮 Profecia do Pão', en: '🔮 Bread Prophecy' }, 
+        desc: { 
+          pt: '"Houve uma profecia dizendo que o mundo acabaria em 1524... Será que agora vai? Tem gente já vendendo tudo e comprando pão. Humanidade em leve desespero!"', 
+          en: '"There was a prophecy saying the world would end in 1524... Could it be now? People are already selling everything and buying bread. Humanity in mild despair!"' 
+        },
+        isFixed: true,
+        specialColor: 'text-purple-400',
+        specialBg: 'bg-purple-500/10',
+        specialBorder: 'border-purple-500/30'
+      },
+      { 
+        year: 662, 
+        name: { pt: '⚠️ O Número da Besta?', en: '⚠️ The Beast Number?' }, 
+        desc: { 
+          pt: '"Corre o boato de que o ano 1666 será o fim de tudo! Mas por quê 666? Alguém claramente levou esse número a sério demais... clima de pânico e teorias estranhas no ar."', 
+          en: '"Rumor has it that the year 1666 will be the end of it all! But why 666? Someone clearly took that number too seriously... panic and strange theories in the air."' 
+        },
+        isFixed: true,
+        specialColor: 'text-red-500',
+        specialBg: 'bg-red-500/10',
+        specialBorder: 'border-red-500/30'
+      },
+      { 
+        year: 840, 
+        name: { pt: '🔮 O Sinal nas Nuvens', en: '🔮 Cloud Signal' }, 
+        desc: { 
+          pt: '"Um grupo garante que em 1844 tudo acaba! Já tem gente olhando pro céu esperando algum sinal... até agora só nuvem mesmo."', 
+          en: '"A group guarantees that in 1844 everything ends! People are already looking at the sky waiting for some sign... so far just clouds."' 
+        },
+        isFixed: true,
+        specialColor: 'text-amber-400',
+        specialBg: 'bg-amber-500/10',
+        specialBorder: 'border-amber-500/30'
+      },
+      { 
+        year: 906, 
+        name: { pt: '⚠️ Máscaras Anti-Cometa', en: '⚠️ Anti-Comet Masks' }, 
+        desc: { 
+          pt: '"Descobriram que um cometa vai passar em 1910! Tem gente achando que é o fim... outros estão vendendo ‘máscaras anti-cometa’. Negócio lucrativo!"', 
+          en: '"They discovered that a comet will pass in 1910! Some people think it\'s the end... others are selling \'anti-comet masks\'. Lucrative business!"' 
+        },
+        isFixed: true,
+        specialColor: 'text-red-400',
+        specialBg: 'bg-red-400/10',
+        specialBorder: 'border-red-400/30'
+      },
+      { 
+        year: 995, 
+        name: { pt: '🔮 Bug do Milênio Antecipado', en: '🔮 Early Millennium Bug' }, 
+        desc: { 
+          pt: '"Segundo um tal de profeta antigo, 1999 será o fim do mundo! Enquanto isso, a humanidade segue normalmente... alguns já desistiram de fazer planos de longo prazo 😅"', 
+          en: '"According to an old prophet, 1999 will be the end of the world! Meanwhile, humanity goes on normally... some have already given up on making long-term plans 😅"' 
+        },
+        isFixed: true,
+        specialColor: 'text-purple-400',
+        specialBg: 'bg-purple-400/10',
+        specialBorder: 'border-purple-400/30'
+      },
+      { 
+        year: 1008, 
+        name: { pt: '⚠️ Calendário Maia?', en: '⚠️ Mayan Calendar?' }, 
+        desc: { 
+          pt: '"Boatos dizem que 2012 será o fim de tudo! Uns estão preocupados... outros só querem saber se ainda dá tempo de terminar aquela série."', 
+          en: '"Rumors say that 2012 will be the end of it all! Some are worried... others just want to know if there\'s still time to finish that series."' 
+        },
+        isFixed: true,
+        specialColor: 'text-amber-500',
+        specialBg: 'bg-amber-500/10',
+        specialBorder: 'border-amber-500/30'
+      }
     ];
 
-    const eventSource = eventPoolSource[Math.floor(Math.random() * eventPoolSource.length)];
+    // Check for fixed event first
+    const currentFixed = fixedEvents.find(fe => year >= fe.year && !earthEventsRef.current.some(ee => ee.isFixed && ee.year === fe.year));
+
+    let eventSource;
+    let isFixed = false;
+    let specialStyles = {};
+
+    if (currentFixed) {
+      eventSource = currentFixed;
+      isFixed = true;
+      specialStyles = {
+        color: currentFixed.specialColor,
+        bg: currentFixed.specialBg,
+        border: currentFixed.specialBorder
+      };
+    } else {
+      // Define some types of events
+      const eventPoolSource = [
+        { name: { pt: 'Grande Floresta Descoberta', en: 'Great Forest Discovered' }, desc: { pt: 'Uma vasta área verde se expandiu, trazendo novos habitats e biodiversidade.', en: 'A vast green area has expanded, bringing new habitats and biodiversity.' }, impactType: 'biodiversity', impact: 5 },
+        { name: { pt: 'Avanço Agrícola Primordial', en: 'Primordial Agricultural Breakthrough' }, desc: { pt: 'Novas técnicas de colheita natural aumentam a oferta de subsistência.', en: 'New natural harvesting techniques increase subsistence supply.' }, impactType: 'health', impact: 4 },
+        { name: { pt: 'Clima Estável Estelar', en: 'Stellar Stable Climate' }, desc: { pt: 'Um período de harmonia climática favorece a saúde e o bem-estar.', en: 'A period of climatic harmony favors health and well-being.' }, impactType: 'happiness', impact: 5 },
+        { name: { pt: 'A Primeira Grande Migração', en: 'The First Great Migration' }, desc: { pt: 'A população se espalha por novos continentes férteis e seguros.', en: 'The population spreads across new fertile and safe continents.' }, impactType: 'security', impact: 3 },
+        { name: { pt: 'Descoberta de Fontes Termais', en: 'Discovery of Hot Springs' }, desc: { pt: 'Fontes de energia natural melhoram a saúde e longevidade básica.', en: 'Natural energy sources improve basic health and longevity.' }, impactType: 'health', impact: 6 },
+        { name: { pt: 'O Despertar da Fauna', en: 'The Awakening of Fauna' }, desc: { pt: 'Novas espécies animais surgem dos santuários ecológicos.', en: 'New animal species emerge from ecological sanctuaries.' }, impactType: 'biodiversity', impact: 8 },
+        { name: { pt: 'Simbose Botânica', en: 'Botanical Symbiosis' }, desc: { pt: 'Plantas alienígenas adaptadas aceleram o oxigênio e a vida vegetal.', en: 'Adapted alien plants accelerate oxygen and plant life.' }, impactType: 'qualityOfLife', impact: 5 },
+        { name: { pt: 'Era da Abundância', en: 'Age of Abundance' }, desc: { pt: 'Recursos naturais brotam em todas as zonas de colonização.', en: 'Natural resources sprout in all colonization zones.' }, impactType: 'happiness', impact: 7 },
+        { name: { pt: 'Sistema de Patrulha Iniciado', en: 'Patrol System Initiated' }, desc: { pt: 'Drones de vigilância garantem a paz nas novas colônias.', en: 'Surveillance drones ensure peace in the new colonies.' }, impactType: 'security', impact: 10 },
+        { name: { pt: 'Festival da Terra', en: 'Earth Festival' }, desc: { pt: 'Uma celebração global aumenta o moral e a união da população.', en: 'A global celebration boosts morale and population unity.' }, impactType: 'happiness', impact: 12 },
+        { name: { pt: 'Otimização de Sanitarismo', en: 'Sanitation Optimization' }, desc: { pt: 'Novos sistemas de purificação de água reduzem doenças.', en: 'New water purification systems reduce diseases.' }, impactType: 'health', impact: 8 },
+      ];
+      eventSource = eventPoolSource[Math.floor(Math.random() * eventPoolSource.length)];
+    }
     
     const newEvent = {
         id: `ev-${Date.now()}`,
-        year,
+        year: isFixed ? eventSource.year : year,
         name: language === 'pt' ? eventSource.name.pt : eventSource.name.en,
         description: language === 'pt' ? eventSource.desc.pt : eventSource.desc.en,
-        type: eventSource.impactType,
+        type: isFixed ? 'fixed' : eventSource.impactType,
+        isFixed,
+        specialStyles,
         timestamp: Date.now()
     };
 
     setEarthEvents(prev => [newEvent, ...prev].slice(0, 50));
     
-    // Apply impacts
-    const impact = eventSource.impact;
-    switch(eventSource.impactType) {
-      case 'biodiversity': setEarthBiodiversity(prev => Math.min(100, Math.max(0, prev + impact))); break;
-      case 'health': setEarthHealth(prev => Math.min(100, Math.max(0, prev + impact))); break;
-      case 'happiness': setEarthHappiness(prev => Math.min(100, Math.max(0, prev + impact))); break;
-      case 'security': setEarthSecurity(prev => Math.min(100, Math.max(0, prev + impact))); break;
-      case 'qualityOfLife': setEarthQualityOfLife(prev => Math.min(100, Math.max(0, prev + impact))); break;
+    // Apply impacts if not fixed (or add minor boost if fixed)
+    if (!isFixed) {
+      const impact = eventSource.impact;
+      switch(eventSource.impactType) {
+        case 'biodiversity': setEarthBiodiversity(prev => Math.min(100, Math.max(0, prev + impact))); break;
+        case 'health': setEarthHealth(prev => Math.min(100, Math.max(0, prev + impact))); break;
+        case 'happiness': setEarthHappiness(prev => Math.min(100, Math.max(0, prev + impact))); break;
+        case 'security': setEarthSecurity(prev => Math.min(100, Math.max(0, prev + impact))); break;
+        case 'qualityOfLife': setEarthQualityOfLife(prev => Math.min(100, Math.max(0, prev + impact))); break;
+      }
+    } else {
+      // Fixed events give a small global boost
+      setEarthHappiness(prev => Math.min(100, prev + 2));
     }
   }, [language]);
 
@@ -2397,29 +2497,31 @@ export const GameDashboard = ({
 
         // 3. Indicators Evolution (Natural growth)
         const yearFraction = timeFactor / BASE_YEAR_SECONDS;
+        const boostPerYear = earthProjectBoostCount * 0.05; // 0.05% boost per year per 10k allocation
+        const boostFraction = (boostPerYear * yearFraction) / 100;
         
         const curBio = earthBiodiversityRef.current;
-        const bioGrowth = 0.01 * (1 - (curBio / 100)) * yearFraction;
+        const bioGrowth = 0.01 * (1 - (curBio / 100)) * yearFraction + boostFraction;
         setEarthBiodiversity(prev => Math.min(100, prev + bioGrowth));
 
         const curHealth = earthHealthRef.current;
         const healthBonus = isPlaying ? (0.01 * yearFraction) : 0;
-        const healthGrowth = 0.005 * (1 - (curHealth / 100)) * yearFraction + healthBonus;
+        const healthGrowth = 0.005 * (1 - (curHealth / 100)) * yearFraction + healthBonus + boostFraction;
         setEarthHealth(prev => Math.min(100, prev + healthGrowth));
 
         const curHappy = earthHappinessRef.current;
         const happyBonus = isPlaying ? (0.02 * yearFraction) : 0;
-        const happyGrowth = 0.005 * (1 - (curHappy / 100)) * yearFraction + happyBonus;
+        const happyGrowth = 0.005 * (1 - (curHappy / 100)) * yearFraction + happyBonus + boostFraction;
         setEarthHappiness(prev => Math.min(100, prev + happyGrowth));
 
         const curSec = earthSecurityRef.current;
         const secBonus = isPlaying ? (0.01 * yearFraction) : 0;
-        const secGrowth = 0.005 * (1 - (curSec / 100)) * yearFraction + secBonus;
+        const secGrowth = 0.005 * (1 - (curSec / 100)) * yearFraction + secBonus + boostFraction;
         setEarthSecurity(prev => Math.min(100, prev + secGrowth));
 
         const curQoL = earthQualityOfLifeRef.current;
         const qolBonus = isPlaying ? (0.015 * yearFraction) : 0;
-        const qolGrowth = 0.008 * (1 - (curQoL / 100)) * yearFraction + qolBonus;
+        const qolGrowth = 0.008 * (1 - (curQoL / 100)) * yearFraction + qolBonus + boostFraction;
         setEarthQualityOfLife(prev => Math.min(100, prev + qolGrowth));
 
         // 4. Random Events (Route 4 Event frequency increased)
@@ -9087,17 +9189,17 @@ export const GameDashboard = ({
                     initial={{ opacity: 0, x: -10 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: idx * 0.1 }}
-                    className="p-3 rounded-xl bg-white/5 border border-white/5 hover:border-emerald-500/20 transition-colors group"
+                    className={`p-3 rounded-xl transition-all group ${event.isFixed ? `${event.specialStyles.bg} ${event.specialStyles.border} border-2 shadow-[0_0_15px_rgba(0,0,0,0.3)]` : 'bg-white/5 border border-white/5 hover:border-emerald-500/20'}`}
                   >
                     <div className="flex justify-between items-start mb-1">
-                      <span className="text-[10px] font-bold text-emerald-400/80 uppercase tracking-tight group-hover:text-emerald-400 transition-colors">
+                      <span className={`text-[10px] font-bold uppercase tracking-tight transition-colors ${event.isFixed ? event.specialStyles.color : 'text-emerald-400/80 group-hover:text-emerald-400'}`}>
                         {event.name}
                       </span>
                       <span className="text-[8px] font-mono text-white/20">
                         {language === 'pt' ? 'ANO' : 'YEAR'} {event.year}
                       </span>
                     </div>
-                    <p className="text-[9px] text-white/40 leading-relaxed italic">
+                    <p className={`text-[9px] leading-relaxed italic ${event.isFixed ? 'text-white/80 font-medium' : 'text-white/40'}`}>
                       {event.description}
                     </p>
                   </motion.div>
@@ -13107,6 +13209,7 @@ export const GameDashboard = ({
                     onAddYear={addEarthYears}
                     onTabStatusChange={(isOpen) => { isColoniesOpenRef.current = isOpen; }}
                     onBuildingComplete={handleBuildingComplete}
+                    onAllocate10k={() => setEarthProjectBoostCount(prev => prev + 1)}
                     earthPopulation={earthPopulation}
                     setEarthPopulation={setEarthPopulation}
                     colonies={colonies}

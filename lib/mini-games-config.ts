@@ -48,5 +48,13 @@ export const MINI_GAMES_CONFIG: MiniGameConfig[] = [
     image: "/assets/games/robot-runner/preview.png",
     status: "available",
     path: "/mini-games/robot-runner/index.html"
+  },
+  {
+    id: "neo-catcher",
+    name: { pt: "Neo Catcher", en: "Neo Catcher" },
+    description: { pt: "Capture objetos em queda e proteja o núcleo da Terra.", en: "Catch falling objects and protect the Earth's core." },
+    image: "/assets/games/neo-catcher/preview.png",
+    status: "available",
+    path: "/mini-games/neo-catcher/index.html"
   }
 ];

@@ -125,7 +125,8 @@ export const MiniGames: React.FC<MiniGamesProps> = ({ onGameSelect, language }) 
                 'ruptura-estelar': { primary: '#ef4444', secondary: '#b91c1c', visual: 'war' },
                 'danger-zoom-zones': { primary: '#00ff9d', secondary: '#059669', visual: 'sci-fi' },
                 'grid-collapse': { primary: '#fbbf24', secondary: '#92400e', visual: 'sci-fi' },
-                'robot-runner': { primary: '#38bdf8', secondary: '#0ea5e9', visual: 'sci-fi' }
+                'robot-runner': { primary: '#38bdf8', secondary: '#0ea5e9', visual: 'sci-fi' },
+                'neo-catcher': { primary: '#00f2ff', secondary: '#0891b2', visual: 'nebula' }
               };
               const theme = themes[game.id] || { primary: '#06b6d4', secondary: '#0891b2', visual: 'sci-fi' };
 
@@ -232,6 +233,11 @@ export const MiniGames: React.FC<MiniGamesProps> = ({ onGameSelect, language }) 
                     language === 'pt'
                       ? 'Guie o robô pelo labirinto coletando esferas de energia azul. Colete as esferas vermelhas para ganhar invencibilidade temporária e destruir os fantasmas. Use ESPAÇO para ativar o boost de velocidade quando a barra estiver carregada. Movimente-se com WASD.'
                       : 'Guide the robot through the maze collecting blue energy spheres. Collect red spheres for temporary invincibility and to destroy ghosts. Use SPACE to activate the speed boost when the bar is charged. Move with WASD.'
+                  )}
+                  {selectedGameInfo.id === 'neo-catcher' && (
+                    language === 'pt'
+                      ? 'Controle o robô coletor na base da tela e capture os itens que caem do céu. Itens raros (dourados) valem mais pontos. Colete sequencialmente para aumentar seu combo e multiplicador. Sobreviva às 4 fases (Rua, Praia, Ponte e Vulcão) alcancando a pontuação mínima de cada uma. Use A/D para se mover.'
+                      : 'Control the collector robot at the bottom and catch items falling from the sky. Rare (gold) items are worth more points. Catch sequentially to increase your combo and multiplier. Survive all 4 phases (Street, Beach, Bridge, and Volcano) by reaching the minimum score for each. Use A/D to move.'
                   )}
                 </p>
               </div>

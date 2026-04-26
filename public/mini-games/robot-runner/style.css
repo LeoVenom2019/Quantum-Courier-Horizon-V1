@@ -90,7 +90,7 @@ canvas {
     font-weight: 700;
 }
 
-#phase-display, #score-display, #time-display {
+#phase-display, #score-display, #lives-display, #time-display {
     font-size: 24px;
     font-weight: 900;
     color: white;
@@ -101,6 +101,11 @@ canvas {
 #score-display {
     color: var(--yellow);
     filter: drop-shadow(0 0 5px rgba(251, 191, 36, 0.5));
+}
+
+#lives-display {
+    color: var(--pink);
+    filter: drop-shadow(0 0 5px rgba(236, 72, 153, 0.5));
 }
 
 /* Boost Bar */

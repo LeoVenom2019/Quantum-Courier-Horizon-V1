@@ -56,6 +56,7 @@ export interface ColonySystemProps {
   colonies: Colony[];
   setColonies: React.Dispatch<React.SetStateAction<Colony[]>>;
   onBuildingComplete?: (type: ConstructionType, level: number) => void;
+  onAllocate10k?: () => void;
 }
 
 // --- Configuration ---
@@ -195,10 +196,12 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
   setEarthPopulation,
   colonies,
   setColonies,
-  onBuildingComplete
+  onBuildingComplete,
+  onAllocate10k
 }) => {
   const [activeColonyId, setActiveColonyId] = useState<string | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
+  const [showConfirmAllocate, setShowConfirmAllocate] = useState(false);
   const lastCompletedCountRef = useRef<Record<string, number>>({});
 
   const t = (en: string, pt: string) => language === 'pt' ? pt : en;
@@ -530,33 +533,47 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
                  </div>
                  <h5 className="text-white text-xs font-bold mb-1 shrink-0">{t('Migration Open', 'Migração Aberta')}</h5>
                  
-                 <div className="w-full space-y-1.5 mt-auto">
-                    {[250, 1000, 5000].map((amount) => {
-                      const space = activeColony.maxPopulation - activeColony.population;
-                      const canAfford = earthPopulation > 0;
-                      const hasSpace = space > 0;
-                      const isDisabled = !canAfford || !hasSpace;
-                      
-                      return (
-                        <button 
-                          key={amount}
-                          onClick={() => allocatePopulation(amount)}
-                          disabled={isDisabled}
-                          className={`w-full py-1.5 text-[9px] font-bold rounded transition-all flex flex-col items-center justify-center ${
-                            isDisabled 
-                              ? 'bg-zinc-800 text-zinc-600 cursor-not-allowed border border-zinc-700/50' 
-                              : amount === 5000
-                                ? 'bg-green-700/30 border border-green-600/50 hover:bg-green-700 hover:text-white text-green-300'
-                                : 'bg-green-600/20 border border-green-500/50 hover:bg-green-600 hover:text-black text-green-400'
-                          }`}
-                        >
-                          <span>+{amount.toLocaleString()} {t('People', 'Pessoas')}</span>
-                          {isDisabled && space <= 0 && <span className="text-[7px] uppercase tracking-tighter opacity-70">({t('Colony Full', 'Colônia Cheia')})</span>}
-                          {isDisabled && earthPopulation <= 0 && <span className="text-[7px] uppercase tracking-tighter opacity-70">({t('Earth Empty', 'Terra Vazia')})</span>}
-                        </button>
-                      );
-                    })}
-                 </div>
+                  <div className="w-full space-y-1.5 mt-auto">
+                    {showConfirmAllocate ? (
+                      <div className="bg-black/80 border border-emerald-500/50 rounded-xl p-3 space-y-3 animate-in fade-in zoom-in duration-200">
+                        <p className="text-[10px] text-white font-bold leading-tight">
+                          {t('Colony ready to receive people: Allocate 10,000 people?', 'Colônia preparada para receber pessoas: Alocar 10.000 pessoas?')}
+                        </p>
+                        <div className="flex gap-2">
+                          <button 
+                            onClick={() => {
+                              allocatePopulation(10000);
+                              onAllocate10k?.();
+                              setShowConfirmAllocate(false);
+                            }}
+                            className="flex-1 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-black text-[10px] font-black rounded uppercase transition-all"
+                          >
+                            {t('Yes', 'Sim')}
+                          </button>
+                          <button 
+                            onClick={() => setShowConfirmAllocate(false)}
+                            className="flex-1 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-white text-[10px] font-black rounded uppercase transition-all"
+                          >
+                            {t('No', 'Não')}
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <button 
+                         onClick={() => setShowConfirmAllocate(true)}
+                         disabled={activeColony.population >= activeColony.maxPopulation || earthPopulation <= 0}
+                         className={`w-full py-2.5 text-xs font-orbitron font-black rounded-xl transition-all flex flex-col items-center justify-center uppercase tracking-widest shadow-lg ${
+                           activeColony.population >= activeColony.maxPopulation || earthPopulation <= 0
+                             ? 'bg-zinc-800 text-zinc-600 cursor-not-allowed border border-zinc-700/50' 
+                             : 'bg-emerald-600 border border-emerald-400 hover:bg-emerald-500 hover:text-black text-white hover:scale-105 active:scale-95 shadow-emerald-500/20'
+                         }`}
+                      >
+                         <span>{t('Allocate', 'Alocar')}</span>
+                         {activeColony.population >= activeColony.maxPopulation && <span className="text-[7px] opacity-70">({t('Colony Full', 'Colônia Cheia')})</span>}
+                         {earthPopulation <= 0 && <span className="text-[7px] opacity-70">({t('Earth Empty', 'Terra Vazia')})</span>}
+                      </button>
+                    )}
+                  </div>
                </>
              )}
           </div>
