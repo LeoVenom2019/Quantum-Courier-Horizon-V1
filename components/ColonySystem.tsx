@@ -454,8 +454,8 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
         >
           <div>
             <div className="flex items-center gap-1.5">
-               <p className="text-zinc-500 text-[10px] font-mono uppercase tracking-wider">{t('Active Colony', 'Colônia Ativa')}</p>
-               <span className="text-[8px] px-1 py-0.5 bg-blue-500/20 text-blue-400 rounded font-mono">
+               <p className="text-zinc-500 text-base font-mono uppercase tracking-wider">{t('Active Colony', 'Colônia Ativa')}</p>
+               <span className="text-[14px] px-1 py-0.5 bg-blue-500/20 text-blue-400 rounded font-mono">
                 {activeColony.age || 0} {t('Years', 'Anos')}
               </span>
             </div>
@@ -471,7 +471,7 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
           className="bg-zinc-900/50 border border-zinc-800 p-3 rounded-xl flex items-center justify-between"
         >
           <div>
-            <p className="text-zinc-500 text-[10px] font-mono uppercase tracking-wider">{t('Available Constructors', 'Construtores Disponíveis')}</p>
+            <p className="text-zinc-500 text-base font-mono uppercase tracking-wider">{t('Available Constructors', 'Construtores Disponíveis')}</p>
             <h3 className="text-lg font-bold text-blue-400">{availableConstructors} / {activeColony.constructors}</h3>
           </div>
           <Bot className="text-blue-400 opacity-50" size={24} />
@@ -484,13 +484,13 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
           className="bg-zinc-900/50 border border-zinc-800 p-3 rounded-xl flex items-center justify-between"
         >
           <div>
-            <p className="text-zinc-500 text-[10px] font-mono uppercase tracking-wider">{t('Population', 'População')}</p>
+            <p className="text-zinc-500 text-base font-mono uppercase tracking-wider">{t('Population', 'População')}</p>
             <div className="flex items-baseline gap-1.5">
               <h3 className={`text-lg font-bold ${activeColony.population > 0 ? 'text-green-400' : 'text-zinc-500'}`}>
                 {activeColony.population.toLocaleString()} / {activeColony.maxPopulation.toLocaleString()}
               </h3>
               {activeColony.population > 0 && (
-                <span className="text-[8px] text-green-500 font-mono flex items-center">
+                <span className="text-[14px] text-green-500 font-mono flex items-center">
                   <TrendingUp size={8} className="mr-0.5" />
                   {activeColony.age <= 4 ? '5-9%' : activeColony.age <= 8 ? '3-6%' : '6-10%'}
                 </span>
@@ -504,7 +504,7 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-3 flex-1 overflow-hidden min-h-0">
         {/* Management Left Panel (Always Visible) */}
         <div className="lg:col-span-1 bg-zinc-900/40 border border-zinc-800 rounded-2xl p-4 flex flex-col space-y-4 shadow-xl">
-          <h4 className="text-xs font-orbitron font-bold text-white uppercase tracking-[0.2em] flex items-center gap-2">
+          <h4 className="text-[14px] font-orbitron font-bold text-white uppercase tracking-[0.2em] flex items-center gap-2">
             <Users size={16} className="text-emerald-400" /> {t('Migration & Growth', 'Migração e Crescimento')}
           </h4>
           
@@ -515,9 +515,9 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
                  <div className="p-3 rounded-full bg-red-500/10 text-red-500 mb-2 animate-pulse shrink-0">
                     <Shield size={32} />
                  </div>
-                 <h5 className="text-white text-xs font-bold mb-1 shrink-0">{t('Migration Locked', 'Migração Bloqueada')}</h5>
+                 <h5 className="text-white text-[14px] font-bold mb-1 shrink-0">{t('Migration Locked', 'Migração Bloqueada')}</h5>
                  
-                 <div className="mt-4 w-full space-y-1.5 text-[9px] font-mono text-left">
+                 <div className="mt-4 w-full space-y-1.5 text-[15px] font-mono text-left">
                     <div className="flex justify-between items-center bg-zinc-900 p-1.5 rounded">
                        <span className="text-zinc-500">{t('Progress:', 'Progresso:')}</span>
                        <span className="text-blue-400">
@@ -531,12 +531,12 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
                  <div className="p-3 rounded-full bg-green-500/10 text-green-500 mb-2 shrink-0">
                     <CheckCircle2 size={32} />
                  </div>
-                 <h5 className="text-white text-xs font-bold mb-1 shrink-0">{t('Migration Open', 'Migração Aberta')}</h5>
+                 <h5 className="text-white text-[14px] font-bold mb-1 shrink-0">{t('Migration Open', 'Migração Aberta')}</h5>
                  
                   <div className="w-full space-y-1.5 mt-auto">
                     {showConfirmAllocate ? (
                       <div className="bg-black/80 border border-emerald-500/50 rounded-xl p-3 space-y-3 animate-in fade-in zoom-in duration-200">
-                        <p className="text-[10px] text-white font-bold leading-tight">
+                        <p className="text-base text-white font-bold leading-tight">
                           {t('Colony ready to receive people: Allocate 10,000 people?', 'Colônia preparada para receber pessoas: Alocar 10.000 pessoas?')}
                         </p>
                         <div className="flex gap-2">
@@ -546,13 +546,13 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
                               onAllocate10k?.();
                               setShowConfirmAllocate(false);
                             }}
-                            className="flex-1 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-black text-[10px] font-black rounded uppercase transition-all"
+                            className="flex-1 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-black text-base font-black rounded uppercase transition-all"
                           >
                             {t('Yes', 'Sim')}
                           </button>
                           <button 
                             onClick={() => setShowConfirmAllocate(false)}
-                            className="flex-1 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-white text-[10px] font-black rounded uppercase transition-all"
+                            className="flex-1 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-white text-base font-black rounded uppercase transition-all"
                           >
                             {t('No', 'Não')}
                           </button>
@@ -562,7 +562,7 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
                       <button 
                          onClick={() => setShowConfirmAllocate(true)}
                          disabled={activeColony.population >= activeColony.maxPopulation || earthPopulation <= 0}
-                         className={`w-full py-2.5 text-xs font-orbitron font-black rounded-xl transition-all flex flex-col items-center justify-center uppercase tracking-widest shadow-lg ${
+                         className={`w-full py-2.5 text-[14px] font-orbitron font-black rounded-xl transition-all flex flex-col items-center justify-center uppercase tracking-widest shadow-lg ${
                            activeColony.population >= activeColony.maxPopulation || earthPopulation <= 0
                              ? 'bg-zinc-800 text-zinc-600 cursor-not-allowed border border-zinc-700/50' 
                              : 'bg-emerald-600 border border-emerald-400 hover:bg-emerald-500 hover:text-black text-white hover:scale-105 active:scale-95 shadow-emerald-500/20'
@@ -586,7 +586,7 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
               <span className="w-1.5 h-6 bg-emerald-500 rounded-full shadow-[0_0_10px_rgba(16,185,129,0.5)]"></span>
               {t('Infrastructure Nodes', 'Nódulos de Infraestrutura')}
             </h4>
-            <div className="flex items-center gap-4 text-[10px] font-orbitron font-bold text-zinc-500 uppercase tracking-widest">
+            <div className="flex items-center gap-4 text-base font-orbitron font-bold text-zinc-500 uppercase tracking-widest">
                <div className="flex items-center gap-2">
                   <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span>
                   {t('Process Active', 'Processo Ativo')}
@@ -630,13 +630,13 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
                       <config.icon size={22} />
                     </div>
                     <div className="text-right leading-none">
-                       <span className="text-[10px] font-orbitron font-bold text-zinc-500 block uppercase mb-1">{t('Units Built', 'Unidade')}</span>
-                       <span className="text-2xl font-orbitron font-black text-white tracking-widest">{con.level} <span className="text-xs text-zinc-600">/ 10</span></span>
+                       <span className="text-base font-orbitron font-bold text-zinc-500 block uppercase mb-1">{t('Units Built', 'Unidade')}</span>
+                       <span className="text-2xl font-orbitron font-black text-white tracking-widest">{con.level} <span className="text-[14px] text-zinc-600">/ 10</span></span>
                     </div>
                   </div>
                   
                   <div className="mb-4">
-                    <h5 className="font-orbitron font-bold text-white text-xs mb-2 leading-tight uppercase tracking-widest truncate">{config.label[language]}</h5>
+                    <h5 className="font-orbitron font-bold text-white text-[14px] mb-2 leading-tight uppercase tracking-widest truncate">{config.label[language]}</h5>
                     <div className="flex items-center gap-3">
                        <div className={`h-1.5 flex-1 rounded-full bg-zinc-800/50 overflow-hidden relative border border-white/5`}>
                           <motion.div 
@@ -653,7 +653,7 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
                           )}
                        </div>
                        {!isMaxed && (
-                         <span className="text-[10px] font-mono text-zinc-500 w-8 text-right">{Math.floor(con.progress)}%</span>
+                         <span className="text-base font-mono text-zinc-500 w-8 text-right">{Math.floor(con.progress)}%</span>
                        )}
                     </div>
                   </div>
@@ -661,34 +661,34 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
                   <div className="mt-auto space-y-4">
                     {!isMaxed ? (
                       <div className="flex flex-col gap-3">
-                        <div className="flex items-center justify-between text-[10px] font-orbitron font-bold text-zinc-400 px-1 leading-none uppercase tracking-widest">
+                        <div className="flex items-center justify-between text-base font-orbitron font-bold text-zinc-400 px-1 leading-none uppercase tracking-widest">
                            <span>{t('Robots:', 'Robôs:')}</span>
-                           <span className="text-white text-sm">{con.assignedConstructors.toLocaleString()}</span>
+                           <span className="text-white text-base">{con.assignedConstructors.toLocaleString()}</span>
                         </div>
                         <div className="flex gap-2">
                            <button 
                              onClick={() => updateConstructors(con.id, -50)}
                              disabled={con.assignedConstructors === 0}
-                             className="flex-1 py-2.5 rounded-xl bg-zinc-800/80 hover:bg-zinc-700 text-zinc-500 text-[10px] font-bold transition-colors disabled:opacity-20 border border-white/5"
+                             className="flex-1 py-2.5 rounded-xl bg-zinc-800/80 hover:bg-zinc-700 text-zinc-500 text-base font-bold transition-colors disabled:opacity-20 border border-white/5"
                            >
                               -50
                            </button>
                            <button 
                              onClick={() => updateConstructors(con.id, 50)}
-                             className="flex-1 py-2.5 rounded-xl bg-blue-600/20 border border-blue-500/40 text-blue-400 hover:bg-blue-600 hover:text-white font-black text-[10px] uppercase tracking-widest transition-all"
+                             className="flex-1 py-2.5 rounded-xl bg-blue-600/20 border border-blue-500/40 text-blue-400 hover:bg-blue-600 hover:text-white font-black text-base uppercase tracking-widest transition-all"
                            >
                               +50
                            </button>
                            <button 
                              onClick={() => updateConstructors(con.id, 250)}
-                             className="flex-1 py-2.5 rounded-xl bg-zinc-800/80 hover:bg-zinc-700 text-zinc-300 font-bold text-[10px] transition-colors border border-white/5"
+                             className="flex-1 py-2.5 rounded-xl bg-zinc-800/80 hover:bg-zinc-700 text-zinc-300 font-bold text-base transition-colors border border-white/5"
                            >
                               +250
                            </button>
                         </div>
                       </div>
                     ) : (
-                      <div className="flex items-center justify-center py-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-orbitron font-black uppercase tracking-[0.3em] gap-3 relative overflow-hidden group/done">
+                      <div className="flex items-center justify-center py-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[14px] font-orbitron font-black uppercase tracking-[0.3em] gap-3 relative overflow-hidden group/done">
                          <div className="absolute inset-0 bg-emerald-500/5 animate-pulse" />
                          <CheckCircle2 size={16} className="relative z-10" />
                          <span className="relative z-10">{t('Done', 'Concluído')}</span>

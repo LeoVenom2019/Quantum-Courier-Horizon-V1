@@ -1,12 +1,14 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Rocket, Settings, Trophy, Play, Music, Volume2, Globe, X, Timer, Trash2, ShieldCheck, Clock, Navigation, Database, Coffee, ArrowRight, ChevronRight, ChevronLeft } from 'lucide-react';
 import { IntroNarrative } from '@/components/IntroNarrative';
 import { GameDashboard } from '@/components/GameDashboard';
 import { AchievementsModal } from '@/components/AchievementsModal';
 import { ThemeInfoWindow } from '@/components/ThemeInfoWindow';
+import { Jukebox } from '@/components/Jukebox';
+import { useJukebox } from '@/hooks/useJukebox';
 import { GameStorage } from '@/lib/game-storage';
 import { Language, t } from '@/lib/i18n';
 import { ThemeColor, GAME_THEMES } from '@/lib/game-data';
@@ -303,400 +305,164 @@ const Nebula = () => (
 );
 
 const MoonVisual = () => {
-  const stars = [
-    { top: '15%', left: '10%', delay: 0.1 },
-    { top: '25%', left: '90%', delay: 0.6 },
-    { top: '60%', left: '5%', delay: 1.3 },
-    { top: '80%', left: '80%', delay: 0.8 },
-    { top: '10%', left: '50%', delay: 2.2 },
-    { top: '75%', left: '30%', delay: 1.0 },
-  ];
-
-  return (
-    <motion.div 
-      initial={{ opacity: 0, scale: 0.8 }}
-      animate={{ opacity: 1, scale: 1 }}
-      className="relative w-80 h-80 flex items-center justify-center"
-    >
-      {/* Background Stars */}
-      <div className="absolute inset-0 z-0">
-        {stars.map((star, i) => (
-          <motion.div
-            key={i}
-            animate={{ opacity: [0.2, 0.8, 0.2] }}
-            transition={{ duration: 3, repeat: Infinity, delay: star.delay }}
-            className="absolute w-1 h-1 bg-white rounded-full"
-            style={{ top: star.top, left: star.left, filter: 'blur(0.5px)' }}
-          />
-        ))}
-      </div>
-
-      {/* Moon Sphere */}
-      <div className="relative w-60 h-60 rounded-full bg-[#d1d5db] shadow-[inset_-30px_-30px_60px_rgba(0,0,0,0.8),0_0_40px_rgba(255,255,255,0.1)] overflow-hidden z-20">
-        {/* Surface Texture / Maria (Dark Patches) */}
-        <div className="absolute inset-0 opacity-40">
-          <svg viewBox="0 0 200 200" className="w-full h-full">
-            {/* Large Maria */}
-            <path d="M40,40 Q80,20 120,50 T160,80 T120,110 T60,90 Z" fill="#4b5563" filter="blur(15px)" />
-            <path d="M100,120 Q140,130 150,160 T120,180 T80,150 Z" fill="#374151" filter="blur(12px)" />
-            <path d="M30,110 Q50,130 40,160 T20,180 Z" fill="#4b5563" filter="blur(10px)" />
-          </svg>
-        </div>
-
-        {/* Craters (Detailed Texture) */}
-        <div className="absolute inset-0 z-10">
-          {/* Large Crater with Ray System */}
-          <div className="absolute top-[25%] left-[65%] w-12 h-12 rounded-full bg-slate-400/30 border border-white/10 shadow-[inset_2px_2px_4px_rgba(0,0,0,0.4)]">
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.2)_0%,transparent_70%)]" />
-          </div>
-          
-          {/* Scattered Craters */}
-          <div className="absolute top-[15%] left-[30%] w-6 h-6 rounded-full bg-slate-500/20 border border-black/10 shadow-[inset_1px_1px_2px_rgba(0,0,0,0.5)]" />
-          <div className="absolute top-[45%] left-[20%] w-8 h-8 rounded-full bg-slate-500/20 border border-black/10 shadow-[inset_1px_1px_2px_rgba(0,0,0,0.5)]" />
-          <div className="absolute top-[70%] left-[50%] w-10 h-10 rounded-full bg-slate-500/20 border border-black/10 shadow-[inset_1px_1px_2px_rgba(0,0,0,0.5)]" />
-          <div className="absolute top-[60%] left-[75%] w-5 h-5 rounded-full bg-slate-500/20 border border-black/10 shadow-[inset_1px_1px_2px_rgba(0,0,0,0.5)]" />
-          <div className="absolute top-[35%] left-[45%] w-4 h-4 rounded-full bg-slate-500/20 border border-black/10 shadow-[inset_1px_1px_2px_rgba(0,0,0,0.5)]" />
-          <div className="absolute top-[80%] left-[25%] w-7 h-7 rounded-full bg-slate-500/20 border border-black/10 shadow-[inset_1px_1px_2px_rgba(0,0,0,0.5)]" />
-          <div className="absolute top-[10%] left-[70%] w-4 h-4 rounded-full bg-slate-500/20 border border-black/10 shadow-[inset_1px_1px_2px_rgba(0,0,0,0.5)]" />
-        </div>
-
-        {/* Directional Lighting (Terminator) */}
-        <div className="absolute inset-0 bg-gradient-to-br from-white/20 via-transparent to-black/60 z-30" />
-        
-        {/* Rim Light */}
-        <div className="absolute inset-0 rounded-full border border-white/10 z-40" />
-      </div>
-
-      {/* Outer Glow */}
-      <div className="absolute w-60 h-60 rounded-full shadow-[0_0_50px_rgba(255,255,255,0.1)] z-10" />
-    </motion.div>
-  );
-};
-
-const EarthVisual = () => {
-  const stars = [
-    { top: '10%', left: '20%', delay: 0 },
-    { top: '30%', left: '80%', delay: 0.5 },
-    { top: '50%', left: '10%', delay: 1.2 },
-    { top: '70%', left: '90%', delay: 0.8 },
-    { top: '20%', left: '50%', delay: 2.1 },
-    { top: '85%', left: '30%', delay: 1.5 },
-    { top: '15%', left: '75%', delay: 0.3 },
-    { top: '45%', left: '65%', delay: 1.7 },
-    { top: '60%', left: '40%', delay: 0.9 },
-    { top: '90%', left: '70%', delay: 2.5 },
-  ];
-
-  return (
-    <motion.div 
-      initial={{ opacity: 0, scale: 0.8 }}
-      animate={{ opacity: 1, scale: 1 }}
-      className="relative w-80 h-80 flex items-center justify-center"
-    >
-      {/* Background Stars & Backlight */}
-      <div className="absolute inset-0 z-0">
-        {stars.map((star, i) => (
-          <motion.div
-            key={i}
-            animate={{ opacity: [0.2, 0.8, 0.2] }}
-            transition={{ duration: 3, repeat: Infinity, delay: star.delay }}
-            className="absolute w-1 h-1 bg-white rounded-full"
-            style={{ 
-              top: star.top, 
-              left: star.left,
-              filter: 'blur(0.5px)'
-            }}
-          />
-        ))}
-        <div className="absolute inset-0 bg-blue-500/5 rounded-full blur-[80px]" />
-      </div>
-
-      {/* Atmosphere Halo - Sharp outer rim */}
-      <div className="absolute w-[242px] h-[242px] rounded-full border border-cyan-300/40 shadow-[0_0_15px_rgba(34,211,238,0.4)] z-10" />
-      
-      {/* Planet Sphere */}
-      <div className="relative w-60 h-60 rounded-full bg-[#1a365d] shadow-[inset_-40px_-40px_80px_rgba(0,0,0,0.9),0_0_40px_rgba(59,130,246,0.1)] overflow-hidden z-20">
-        {/* Deep Ocean Base */}
-        <div className="absolute inset-0 bg-gradient-to-br from-[#2b6cb0]/30 via-transparent to-black/60" />
-        
-        {/* Landmasses (Inspired by the photo's tan/brownish land) */}
-        <motion.div 
-          animate={{ x: [-5, 5, -5], y: [-2, 2, -2] }}
-          transition={{ duration: 25, repeat: Infinity, ease: "easeInOut" }}
-          className="absolute inset-0 opacity-70"
-        >
-          <svg viewBox="0 0 200 200" className="w-[150%] h-[150%] translate-x-[-10%] translate-y-[10%]">
-            {/* Main Landmass - Tan/Brownish like Australia in the photo */}
-            <path 
-              d="M40,130 C60,110 90,120 110,140 C130,160 110,190 80,185 C50,180 30,150 40,130 Z" 
-              fill="#a88a64" 
-              filter="blur(8px)" 
-            />
-            {/* Smaller islands/details */}
-            <circle cx="130" cy="150" r="8" fill="#8b7355" filter="blur(4px)" />
-            <circle cx="30" cy="110" r="5" fill="#8b7355" filter="blur(3px)" />
-          </svg>
-        </motion.div>
-
-        {/* Swirly Clouds Layer (Inspired by the photo's organic patterns) */}
-        <motion.div 
-          animate={{ rotate: 360 }}
-          transition={{ duration: 180, repeat: Infinity, ease: "linear" }}
-          className="absolute inset-[-50%] z-30 pointer-events-none opacity-60"
-        >
-          <svg viewBox="0 0 400 400" className="w-full h-full">
-            <path d="M100,100 Q200,50 300,100 T350,250 T200,350 T50,200 Z" fill="none" stroke="white" strokeWidth="40" strokeLinecap="round" filter="blur(30px)" opacity="0.4" />
-            <path d="M150,150 Q250,100 350,150" fill="none" stroke="white" strokeWidth="20" strokeLinecap="round" filter="blur(20px)" opacity="0.3" />
-            <path d="M50,250 Q150,300 250,250" fill="none" stroke="white" strokeWidth="25" strokeLinecap="round" filter="blur(25px)" opacity="0.3" />
-            <circle cx="200" cy="200" r="100" fill="none" stroke="white" strokeWidth="15" strokeDasharray="50 100" filter="blur(15px)" opacity="0.2" />
-          </svg>
-        </motion.div>
-
-        {/* Atmospheric Rim Light (Inside) */}
-        <div className="absolute inset-0 rounded-full shadow-[inset_10px_10px_20px_rgba(255,255,255,0.15),inset_-2px_-2px_10px_rgba(0,0,0,0.5)] z-40" />
-        
-        {/* Specular Highlight on Water */}
-        <div className="absolute top-[20%] left-[30%] w-32 h-16 bg-white/5 rounded-full blur-3xl rotate-[-30deg] z-50" />
-      </div>
-
-      {/* Atmosphere Outer Glow (Soft) */}
-      <div className="absolute w-60 h-60 rounded-full shadow-[0_0_40px_rgba(34,211,238,0.2)] z-10" />
-    </motion.div>
-  );
-};
-
-const SaturnVisual = () => {
-  const stars = [
-    { top: '15%', left: '15%', delay: 0.2 },
-    { top: '25%', left: '85%', delay: 0.7 },
-    { top: '65%', left: '10%', delay: 1.4 },
-    { top: '80%', left: '90%', delay: 0.9 },
-    { top: '10%', left: '45%', delay: 2.3 },
-    { top: '75%', left: '25%', delay: 1.1 },
-  ];
-
-  return (
-    <motion.div 
-      initial={{ opacity: 0, scale: 0.8 }}
-      animate={{ opacity: 1, scale: 1 }}
-      className="relative w-80 h-80 flex items-center justify-center"
-    >
-      {/* Background Stars */}
-      <div className="absolute inset-0 z-0">
-        {stars.map((star, i) => (
-          <motion.div
-            key={i}
-            animate={{ opacity: [0.2, 0.8, 0.2] }}
-            transition={{ duration: 3, repeat: Infinity, delay: star.delay }}
-            className="absolute w-1 h-1 bg-white rounded-full"
-            style={{ top: star.top, left: star.left, filter: 'blur(0.5px)' }}
-          />
-        ))}
-      </div>
-
-      {/* Back Rings (Behind Planet) */}
-      <div className="absolute w-[360px] h-[120px] rotate-[15deg] z-0 opacity-70">
-        <svg viewBox="0 0 360 120" className="w-full h-full">
-          <defs>
-            <radialGradient id="saturnRingGradientBack" cx="50%" cy="50%" r="50%">
-              <stop offset="55%" stopColor="transparent" />
-              <stop offset="58%" stopColor="#2d3748" stopOpacity="0.8" />
-              <stop offset="65%" stopColor="#718096" stopOpacity="0.6" />
-              <stop offset="75%" stopColor="#cbd5e0" stopOpacity="0.9" />
-              <stop offset="85%" stopColor="#a0aec0" stopOpacity="0.7" />
-              <stop offset="95%" stopColor="#4a5568" stopOpacity="0.5" />
-              <stop offset="100%" stopColor="transparent" />
-            </radialGradient>
-            <mask id="backRingMask">
-              <rect x="0" y="0" width="360" height="60" fill="white" />
-            </mask>
-          </defs>
-          <ellipse cx="180" cy="60" rx="170" ry="50" fill="none" stroke="url(#saturnRingGradientBack)" strokeWidth="40" mask="url(#backRingMask)" />
-        </svg>
-      </div>
-
-      {/* Planet Sphere */}
-      <div className="relative w-44 h-44 rounded-full bg-[#d4b483] shadow-[inset_-25px_-25px_50px_rgba(0,0,0,0.8),0_0_30px_rgba(212,180,131,0.2)] overflow-hidden z-10">
-        {/* Atmospheric Bands (Inspired by photo) */}
-        <div className="absolute inset-0 flex flex-col">
-          <div className="h-[12%] bg-[#b08d5b] opacity-30" />
-          <div className="h-[8%] bg-[#d4b483] opacity-50" />
-          <div className="h-[15%] bg-[#e6cc9f] opacity-40" />
-          <div className="h-[10%] bg-[#c5a372] opacity-60" />
-          <div className="h-[20%] bg-[#d4b483] opacity-40" />
-          <div className="h-[15%] bg-[#b08d5b] opacity-50" />
-          <div className="h-[20%] bg-[#8b7355] opacity-30" />
-        </div>
-        {/* Soft Lighting & Volume */}
-        <div className="absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-black/50" />
-        {/* Subtle Rim Light */}
-        <div className="absolute inset-0 rounded-full border border-white/5" />
-      </div>
-
-      {/* Front Rings (In front of Planet) */}
-      <div className="absolute w-[360px] h-[120px] rotate-[15deg] z-20 pointer-events-none">
-        <svg viewBox="0 0 360 120" className="w-full h-full opacity-90">
-          <defs>
-            <radialGradient id="saturnRingGradientFront" cx="50%" cy="50%" r="50%">
-              <stop offset="55%" stopColor="transparent" />
-              <stop offset="58%" stopColor="#2d3748" stopOpacity="0.9" />
-              <stop offset="65%" stopColor="#718096" stopOpacity="0.7" />
-              <stop offset="75%" stopColor="#cbd5e0" stopOpacity="1" />
-              <stop offset="85%" stopColor="#a0aec0" stopOpacity="0.8" />
-              <stop offset="95%" stopColor="#4a5568" stopOpacity="0.6" />
-              <stop offset="100%" stopColor="transparent" />
-            </radialGradient>
-            <mask id="frontRingMask">
-              <rect x="0" y="60" width="360" height="60" fill="white" />
-            </mask>
-          </defs>
-          <ellipse cx="180" cy="60" rx="170" ry="50" fill="none" stroke="url(#saturnRingGradientFront)" strokeWidth="40" mask="url(#frontRingMask)" />
-        </svg>
-        
-        {/* Shadow of the planet on the rings (Crucial for realism) */}
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-44 h-44 bg-black/70 blur-2xl rounded-full scale-x-[1.8] translate-x-14 translate-y-4 opacity-50 z-30" />
-      </div>
-
-      {/* Outer Glow */}
-      <div className="absolute w-44 h-44 rounded-full shadow-[0_0_60px_rgba(212,180,131,0.1)] z-0" />
-    </motion.div>
-  );
-};
-
-const MuskVisual = () => (
-  <motion.div 
-    initial={{ opacity: 0, scale: 0.5 }}
-    animate={{ opacity: 1, scale: 1 }}
-    className="relative w-64 h-64 flex items-center justify-center"
-    style={{ perspective: 1000 }}
-  >
-    <motion.div
-      animate={{ rotateY: [0, 360], rotateX: [0, 10, 0] }}
-      transition={{ duration: 6, repeat: Infinity, ease: "linear" }}
-      className="relative w-48 h-48 flex items-center justify-center preserve-3d"
-    >
-      {/* Modern X Design - Sleek and Minimalist */}
-      <div className="absolute w-full h-1 bg-white shadow-[0_0_25px_rgba(255,255,255,1)] rotate-45" />
-      <div className="absolute w-full h-1 bg-white shadow-[0_0_25px_rgba(255,255,255,1)] -rotate-45" />
-      
-      {/* Secondary lines for depth */}
-      <div className="absolute w-full h-[1px] bg-cyan-400/50 shadow-[0_0_10px_rgba(6,182,212,0.5)] rotate-45 translate-z-4" />
-      <div className="absolute w-full h-[1px] bg-cyan-400/50 shadow-[0_0_10px_rgba(6,182,212,0.5)] -rotate-45 translate-z-4" />
-      
-      {/* Core Glow */}
-      <div className="absolute w-8 h-8 bg-white rounded-full blur-md opacity-50" />
-    </motion.div>
-    
-    {/* Outer Ring */}
-    <div className="absolute w-56 h-56 border border-white/10 rounded-full animate-[spin_10s_linear_infinite]" />
-    <div className="absolute w-60 h-60 border border-white/5 rounded-full animate-[spin_15s_linear_infinite_reverse]" />
-    
-    <div className="absolute inset-0 bg-white/5 rounded-full blur-3xl animate-pulse" />
-  </motion.div>
-);
-
-const BlackHoleVisual = () => {
-  const stars = [
-    { top: '10%', left: '15%', delay: 0.1 },
-    { top: '20%', left: '80%', delay: 0.6 },
-    { top: '60%', left: '10%', delay: 1.3 },
-    { top: '85%', left: '85%', delay: 0.8 },
-    { top: '15%', left: '40%', delay: 2.2 },
-    { top: '70%', left: '20%', delay: 1.0 },
-  ];
-
   return (
     <motion.div 
       initial={{ opacity: 0, scale: 0.8 }}
       animate={{ opacity: 1, scale: 1 }}
       className="relative w-96 h-96 flex items-center justify-center"
     >
-      {/* Background Stars & Nebula Glow */}
-      <div className="absolute inset-0 z-0">
-        {stars.map((star, i) => (
-          <motion.div
-            key={i}
-            animate={{ opacity: [0.2, 0.8, 0.2] }}
-            transition={{ duration: 3, repeat: Infinity, delay: star.delay }}
-            className="absolute w-1 h-1 bg-white rounded-full"
-            style={{ top: star.top, left: star.left, filter: 'blur(0.5px)' }}
-          />
-        ))}
-        <div className="absolute inset-0 bg-indigo-900/10 rounded-full blur-[100px]" />
-      </div>
-
-      {/* Gravitational Lensing / Accretion Disk (Back Part) */}
-      <div className="absolute inset-0 z-10 opacity-80">
-        <svg viewBox="0 0 400 400" className="w-full h-full">
-          <defs>
-            <radialGradient id="diskGradient" cx="50%" cy="50%" r="50%">
-              <stop offset="0%" stopColor="#fff" stopOpacity="0.9" />
-              <stop offset="20%" stopColor="#60a5fa" stopOpacity="0.7" />
-              <stop offset="50%" stopColor="#f97316" stopOpacity="0.4" />
-              <stop offset="80%" stopColor="#7c2d12" stopOpacity="0.1" />
-              <stop offset="100%" stopColor="transparent" />
-            </radialGradient>
-            <filter id="diskBlur">
-              <feGaussianBlur stdDeviation="10" />
-            </filter>
-          </defs>
-          
-          {/* Lensed Disk (Top Halo) */}
-          <ellipse 
-            cx="200" cy="180" rx="140" ry="100" 
-            fill="none" stroke="url(#diskGradient)" strokeWidth="30" 
-            filter="url(#diskBlur)"
-            className="opacity-60"
-          />
-          
-          {/* Lensed Disk (Bottom Halo) */}
-          <ellipse 
-            cx="200" cy="220" rx="140" ry="100" 
-            fill="none" stroke="#ea580c" strokeWidth="40" 
-            filter="url(#diskBlur)"
-            className="opacity-40"
-          />
-        </svg>
-      </div>
-
-      {/* Accretion Disk (Middle Layer - Horizontal) */}
-      <motion.div 
-        animate={{ rotate: 360 }}
-        transition={{ duration: 60, repeat: Infinity, ease: "linear" }}
-        className="absolute w-[450px] h-[100px] z-30 pointer-events-none opacity-90"
+      <div className="absolute w-72 h-72 bg-slate-400/5 rounded-full blur-[80px] pointer-events-none" />
+      
+      <motion.div
+        animate={{ 
+          y: [5, -5, 5],
+          rotate: [0, -1, 0]
+        }}
+        transition={{ 
+          duration: 12, 
+          repeat: Infinity, 
+          ease: "easeInOut" 
+        }}
+        className="relative z-20 w-72 h-72"
       >
-        <svg viewBox="0 0 450 100" className="w-full h-full">
-          <ellipse 
-            cx="225" cy="50" rx="220" ry="20" 
-            fill="none" stroke="url(#diskGradient)" strokeWidth="15" 
-            filter="url(#diskBlur)"
-          />
-        </svg>
+        <img 
+          src="/cinematic_moon_asset_qch_1777340494996.png" 
+          alt="Moon"
+          className="w-full h-full object-contain"
+          style={{ mixBlendMode: 'screen' }}
+        />
       </motion.div>
+    </motion.div>
+  );
+};
 
-      {/* Event Horizon & Photon Sphere */}
-      <div className="relative z-40 flex items-center justify-center">
-        {/* Photon Sphere (Bright Blue Rim) */}
-        <div className="absolute w-44 h-44 rounded-full border-4 border-blue-400 shadow-[0_0_40px_rgba(96,165,250,1),inset_0_0_20px_rgba(96,165,250,0.8)] blur-[2px]" />
+const EarthVisual = () => {
+  return (
+    <motion.div 
+      initial={{ opacity: 0, scale: 0.8 }}
+      animate={{ opacity: 1, scale: 1 }}
+      className="relative w-96 h-96 flex items-center justify-center"
+    >
+      {/* Soft Background Glow - Blends better with the asset */}
+      <div className="absolute w-80 h-80 bg-blue-600/10 rounded-full blur-[100px] pointer-events-none" />
+      
+      {/* Cinematic Earth Asset */}
+      <motion.div
+        animate={{ 
+          y: [-10, 10, -10],
+          rotate: [0, 2, 0]
+        }}
+        transition={{ 
+          duration: 10, 
+          repeat: Infinity, 
+          ease: "easeInOut" 
+        }}
+        className="relative z-20 w-80 h-80"
+      >
+        <img 
+          src="/cinematic_earth_asset_qch_1777340390078.png" 
+          alt="Earth"
+          className="w-full h-full object-contain"
+          style={{ mixBlendMode: 'screen' }}
+        />
         
-        {/* Event Horizon (Pure Black) */}
-        <div className="w-40 h-40 rounded-full bg-black shadow-[0_0_60px_rgba(0,0,0,1)]" />
-      </div>
+        {/* Subtle Glow Overlay - To hide any remaining edge artifacts */}
+        <div className="absolute inset-0 rounded-full shadow-[inset_0_0_60px_rgba(0,0,0,0.5),0_0_30px_rgba(59,130,246,0.1)] pointer-events-none" />
+      </motion.div>
+    </motion.div>
+  );
+};
 
-      {/* Accretion Disk (Front Part - Lensing effect) */}
-      <div className="absolute inset-0 z-50 pointer-events-none opacity-70">
-        <svg viewBox="0 0 400 400" className="w-full h-full">
-          <path 
-            d="M60,200 Q200,160 340,200" 
-            fill="none" stroke="url(#diskGradient)" strokeWidth="25" 
-            filter="url(#diskBlur)"
-          />
-        </svg>
-      </div>
+const SaturnVisual = () => {
+  return (
+    <motion.div 
+      initial={{ opacity: 0, scale: 0.8 }}
+      animate={{ opacity: 1, scale: 1 }}
+      className="relative w-[500px] h-96 flex items-center justify-center"
+    >
+      <div className="absolute w-[400px] h-64 bg-orange-500/5 rounded-full blur-[120px] pointer-events-none" />
+      
+      <motion.div
+        animate={{ 
+          y: [-15, 15, -15],
+          rotate: [-1, 1, -1]
+        }}
+        transition={{ 
+          duration: 15, 
+          repeat: Infinity, 
+          ease: "easeInOut" 
+        }}
+        className="relative z-20 w-[450px] h-80"
+      >
+        <img 
+          src="/cinematic_saturn_asset_qch_1777340512619.png" 
+          alt="Saturn"
+          className="w-full h-full object-contain"
+          style={{ mixBlendMode: 'screen' }}
+        />
+      </motion.div>
+    </motion.div>
+  );
+};
 
-      {/* Core Glows */}
-      <div className="absolute w-64 h-64 bg-orange-600/10 rounded-full blur-[80px] z-0" />
-      <div className="absolute w-48 h-48 bg-blue-600/10 rounded-full blur-[60px] z-0" />
+
+
+
+const MuskVisual = () => (
+  <motion.div 
+    initial={{ opacity: 0, scale: 0.5 }}
+    animate={{ opacity: 1, scale: 1 }}
+    className="relative w-80 h-80 flex items-center justify-center"
+  >
+    <div className="absolute inset-0 border border-white/5 rounded-full animate-[spin_40s_linear_infinite]" />
+    
+    <motion.div
+      animate={{ 
+        rotateY: [0, 360],
+        scale: [1, 1.1, 1]
+      }}
+      transition={{ 
+        rotateY: { duration: 10, repeat: Infinity, ease: "linear" },
+        scale: { duration: 5, repeat: Infinity, ease: "easeInOut" }
+      }}
+      className="relative z-20 w-56 h-56"
+    >
+      <img 
+        src="/cinematic_x_asset_qch_1777340742793.png" 
+        alt="X Logo"
+        className="w-full h-full object-contain"
+        style={{ mixBlendMode: 'screen' }}
+      />
+    </motion.div>
+  </motion.div>
+);
+const BlackHoleVisual = () => {
+  return (
+    <motion.div 
+      initial={{ opacity: 0, scale: 0.8 }}
+      animate={{ opacity: 1, scale: 1 }}
+      className="relative w-[500px] h-[500px] flex items-center justify-center"
+    >
+      <div className="absolute inset-0 bg-white/5 rounded-full blur-[150px] animate-pulse" />
+      
+      <motion.div
+        animate={{ 
+          rotate: 360,
+          scale: [1, 1.05, 1]
+        }}
+        transition={{ 
+          rotate: { duration: 60, repeat: Infinity, ease: "linear" },
+          scale: { duration: 8, repeat: Infinity, ease: "easeInOut" }
+        }}
+        className="relative z-20 w-full h-full p-10"
+      >
+        <img 
+          src="/cinematic_blackhole_asset_qch_1777340542328.png" 
+          alt="Black Hole"
+          className="w-full h-full object-contain"
+          style={{ mixBlendMode: 'screen' }}
+        />
+      </motion.div>
     </motion.div>
   );
 };
@@ -705,61 +471,58 @@ const SunVisual = () => (
   <motion.div 
     initial={{ opacity: 0, scale: 0.5 }}
     animate={{ opacity: 1, scale: 1 }}
-    className="relative w-64 h-64 flex items-center justify-center"
+    className="relative w-96 h-96 flex items-center justify-center"
   >
-    <div className="w-48 h-48 rounded-full bg-gradient-to-br from-yellow-300 via-orange-500 to-red-600 shadow-[0_0_100px_rgba(251,191,36,0.8),inset_-10px_-10px_40px_rgba(0,0,0,0.4)] relative z-10 overflow-hidden">
-      <motion.div 
-        animate={{ x: [-20, 20, -20], y: [-10, 10, -10] }}
-        transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
-        className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.2)_0%,transparent_70%)] opacity-50"
+    <div className="absolute inset-0 bg-yellow-500/10 rounded-full blur-[100px] animate-pulse pointer-events-none" />
+    
+    <motion.div
+      animate={{ 
+        scale: [1, 1.05, 1],
+        rotate: [0, 1, 0]
+      }}
+      transition={{ 
+        duration: 8, 
+        repeat: Infinity, 
+        ease: "easeInOut" 
+      }}
+      className="relative z-20 w-80 h-80"
+    >
+      <img 
+        src="/cinematic_sun_asset_qch_1777340630570.png" 
+        alt="Sun"
+        className="w-full h-full object-contain"
+        style={{ mixBlendMode: 'screen' }}
       />
-    </div>
-    <motion.div 
-      animate={{ scale: [1, 1.1, 1], opacity: [0.3, 0.6, 0.3] }}
-      transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
-      className="absolute w-64 h-64 bg-yellow-400/30 rounded-full blur-3xl z-0"
-    />
-    <motion.div 
-      animate={{ scale: [1.1, 1.2, 1.1], opacity: [0.2, 0.4, 0.2] }}
-      transition={{ duration: 5, repeat: Infinity, ease: "easeInOut", delay: 1 }}
-      className="absolute w-80 h-80 bg-orange-500/20 rounded-full blur-[60px] z-0"
-    />
+    </motion.div>
   </motion.div>
 );
-
 const RobotVisual = () => (
   <motion.div 
     initial={{ opacity: 0, y: 20 }}
     animate={{ opacity: 1, y: 0 }}
-    className="relative w-64 h-64 flex flex-col items-center justify-center"
+    className="relative w-80 h-80 flex flex-col items-center justify-center"
   >
-    <div className="relative w-32 h-32 bg-slate-700 border-4 border-cyan-500 rounded-2xl shadow-[0_0_30px_rgba(6,182,212,0.3)] flex flex-col items-center justify-center gap-4">
-      <div className="flex gap-6">
-        <motion.div 
-          animate={{ opacity: [1, 0.5, 1] }}
-          transition={{ duration: 2, repeat: Infinity }}
-          className="w-4 h-4 bg-cyan-400 rounded-full shadow-[0_0_10px_rgba(34,211,238,1)]" 
-        />
-        <motion.div 
-          animate={{ opacity: [1, 0.5, 1] }}
-          transition={{ duration: 2, repeat: Infinity, delay: 0.5 }}
-          className="w-4 h-4 bg-cyan-400 rounded-full shadow-[0_0_10px_rgba(34,211,238,1)]" 
-        />
-      </div>
-      <div className="w-16 h-2 bg-cyan-500/30 rounded-full overflow-hidden">
-        <motion.div 
-          animate={{ x: [-20, 20, -20] }}
-          transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}
-          className="w-8 h-full bg-cyan-400" 
-        />
-      </div>
-      <div className="absolute -top-8 left-1/2 -translate-x-1/2 w-1 h-8 bg-slate-600">
-        <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-3 h-3 bg-red-500 rounded-full animate-pulse" />
-      </div>
-    </div>
-    <div className="w-40 h-12 bg-slate-800 border-x-4 border-b-4 border-cyan-500 rounded-b-3xl mt-[-4px] relative">
-      <div className="absolute top-2 left-1/2 -translate-x-1/2 w-24 h-4 bg-slate-900 rounded-full border border-cyan-500/20" />
-    </div>
+    <div className="absolute inset-0 border border-cyan-500/5 rounded-full animate-[spin_20s_linear_infinite] pointer-events-none" />
+    
+    <motion.div
+      animate={{ 
+        y: [-10, 10, -10],
+        rotateY: [-5, 5, -5]
+      }}
+      transition={{ 
+        duration: 6, 
+        repeat: Infinity, 
+        ease: "easeInOut" 
+      }}
+      className="relative z-20 w-64 h-64"
+    >
+      <img 
+        src="/cinematic_robot_asset_qch_1777340647368.png" 
+        alt="Robot"
+        className="w-full h-full object-contain"
+        style={{ mixBlendMode: 'screen' }}
+      />
+    </motion.div>
   </motion.div>
 );
 
@@ -767,62 +530,29 @@ const ChessBoardVisual = () => (
   <motion.div 
     initial={{ opacity: 0, scale: 0.8 }}
     animate={{ opacity: 1, scale: 1 }}
-    className="relative w-80 h-80 flex items-center justify-center [perspective:1200px]"
+    className="relative w-96 h-96 flex items-center justify-center"
   >
-    <motion.div 
+    <div className="absolute inset-0 bg-amber-500/5 rounded-full blur-[100px] pointer-events-none" />
+    
+    <motion.div
       animate={{ 
-        rotateX: [55, 60, 55],
-        rotateZ: [40, 45, 40],
+        y: [-10, 10, -10],
+        rotateZ: [-2, 2, -2]
       }}
-      transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
-      className="relative w-64 h-64 [transform-style:preserve-3d]"
+      transition={{ 
+        duration: 10, 
+        repeat: Infinity, 
+        ease: "easeInOut" 
+      }}
+      className="relative z-20 w-80 h-80"
     >
-      {/* Board Base / Depth */}
-      <div className="absolute inset-0 bg-slate-800 border-2 border-slate-700 rounded-sm [transform:translateZ(-10px)] shadow-[0_20px_50px_rgba(0,0,0,0.5)]" />
-      <div className="absolute inset-0 bg-slate-900 border border-slate-700 rounded-sm [transform:translateZ(-20px)]" />
-      
-      {/* The Board Surface */}
-      <div className="absolute inset-0 bg-slate-950 border-2 border-amber-500/30 rounded-sm overflow-hidden shadow-[0_0_30px_rgba(245,158,11,0.1)]">
-        {/* Grid Pattern */}
-        <div className="grid grid-cols-8 grid-rows-8 w-full h-full">
-          {[...Array(64)].map((_, i) => {
-            const row = Math.floor(i / 8);
-            const col = i % 8;
-            const isDark = (row + col) % 2 === 1;
-            return (
-              <div 
-                key={i} 
-                className={`w-full h-full border-[0.5px] border-white/5 ${
-                  isDark ? 'bg-black/40' : 'bg-gradient-to-br from-white/30 to-white/10 shadow-[inset_1px_1px_0px_rgba(255,255,255,0.4)]'
-                } relative group`}
-              >
-                {/* Random tech highlights - Glowing squares */}
-                {((i * 17) % 9 === 0) && (
-                  <motion.div 
-                    animate={{ opacity: [0, 0.6, 0] }}
-                    transition={{ 
-                      duration: 4 + (i % 4), 
-                      repeat: Infinity, 
-                      ease: "easeInOut",
-                      delay: (i % 7) * 0.5 
-                    }}
-                    className="absolute inset-0 bg-amber-500/30 blur-[2px]"
-                  />
-                )}
-              </div>
-            );
-          })}
-        </div>
-        
-        {/* Digital Grid Lines */}
-        <div className="absolute inset-0 pointer-events-none">
-          <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(245,158,11,0.05)_1px,transparent_1px),linear-gradient(0deg,rgba(245,158,11,0.05)_1px,transparent_1px)] bg-[size:12.5%_12.5%]" />
-        </div>
-      </div>
+      <img 
+        src="/cinematic_chessboard_asset_qch_1777340695618.png" 
+        alt="Chess Board"
+        className="w-full h-full object-contain"
+        style={{ mixBlendMode: 'screen' }}
+      />
     </motion.div>
-
-    {/* Floor Shadow / Reflection */}
-    <div className="absolute bottom-0 w-64 h-32 bg-black/40 blur-3xl rounded-[100%] z-0" />
   </motion.div>
 );
 
@@ -830,62 +560,29 @@ const AlienVisual = () => (
   <motion.div 
     initial={{ opacity: 0, scale: 0.8 }}
     animate={{ opacity: 1, scale: 1 }}
-    className="relative w-64 h-64 flex items-center justify-center"
+    className="relative w-96 h-96 flex items-center justify-center"
   >
-    <div className="relative w-48 h-64 flex items-center justify-center">
-      {/* Alien Head Shape */}
-      <svg viewBox="0 0 200 250" className="w-full h-full drop-shadow-[0_0_30px_rgba(16,185,129,0.4)]">
-        <defs>
-          <linearGradient id="alienGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-            <stop offset="0%" stopColor="#6ee7b7" />
-            <stop offset="50%" stopColor="#10b981" />
-            <stop offset="100%" stopColor="#065f46" />
-          </linearGradient>
-          <filter id="eyeGlow">
-            <feGaussianBlur stdDeviation="2" result="blur" />
-            <feComposite in="SourceGraphic" in2="blur" operator="over" />
-          </filter>
-        </defs>
-        
-        {/* Head - More rounded and tapered like the image */}
-        <path 
-          d="M100,30 C155,30 185,80 185,135 C185,195 145,235 100,235 C55,235 15,195 15,135 C15,80 45,30 100,30 Z" 
-          fill="url(#alienGradient)"
-          stroke="#059669"
-          strokeWidth="1"
-        />
-        
-        {/* Eyes - Large, dark and glossy */}
-        <g style={{ transform: 'rotate(-10deg)', transformOrigin: '70px 120px' }}>
-          <ellipse 
-            cx="70" cy="120" rx="28" ry="38" 
-            fill="#111827" 
-          />
-          <circle cx="82" cy="105" r="5" fill="white" opacity="0.6" />
-        </g>
-        
-        <g style={{ transform: 'rotate(10deg)', transformOrigin: '130px 120px' }}>
-          <ellipse 
-            cx="130" cy="120" rx="28" ry="38" 
-            fill="#111827" 
-          />
-          <circle cx="142" cy="105" r="5" fill="white" opacity="0.6" />
-        </g>
-        
-        {/* Smile - Small and subtle */}
-        <path 
-          d="M85,190 Q100,205 115,190" 
-          fill="none" 
-          stroke="#064e3b" 
-          strokeWidth="3" 
-          strokeLinecap="round"
-          opacity="0.8"
-        />
-      </svg>
-      
-      {/* Background Aura */}
-      <div className="absolute inset-0 bg-emerald-500/10 blur-[60px] rounded-full z-[-1] animate-pulse" />
-    </div>
+    <div className="absolute inset-0 bg-emerald-500/5 rounded-full blur-[100px] pointer-events-none" />
+    
+    <motion.div
+      animate={{ 
+        y: [10, -10, 10],
+        rotate: [-3, 3, -3]
+      }}
+      transition={{ 
+        duration: 8, 
+        repeat: Infinity, 
+        ease: "easeInOut" 
+      }}
+      className="relative z-20 w-80 h-80"
+    >
+      <img 
+        src="/cinematic_alien_asset_qch_1777340712376.png" 
+        alt="Alien"
+        className="w-full h-full object-contain"
+        style={{ mixBlendMode: 'screen' }}
+      />
+    </motion.div>
   </motion.div>
 );
 
@@ -1073,7 +770,7 @@ const MenuButton = ({ label, icon: Icon, onClick, disabled = false, theme = 'cya
       
       <div className="relative z-10 flex items-center gap-4">
         <Icon className={`w-5 h-5 ${disabled ? 'text-slate-600' : `${accentText} group-hover:${accentHoverText}`} transition-all duration-300 group-hover:scale-125 group-hover:rotate-12`} />
-        <span className={`text-sm font-orbitron tracking-[0.4em] ${disabled ? 'text-slate-500' : `text-white ${accentGlow}`} transition-all duration-300`}>
+        <span className={`text-base font-orbitron tracking-[0.4em] ${disabled ? 'text-slate-500' : `text-white ${accentGlow}`} transition-all duration-300`}>
           {label}
         </span>
       </div>
@@ -1124,6 +821,7 @@ export default function GameHome() {
   const [showLocalRecords, setShowLocalRecords] = useState(false);
   const [showOnlineRecords, setShowOnlineRecords] = useState(false);
   const [showAchievements, setShowAchievements] = useState(false);
+  const [showJukeboxModal, setShowJukeboxModal] = useState(false);
   const [unlockedAchievements, setUnlockedAchievements] = useState<string[]>([]);
   const [achievementProgress, setAchievementProgress] = useState<{ [key: string]: number }>({});
   const [showCodesModal, setShowCodesModal] = useState(false);
@@ -1136,6 +834,81 @@ export default function GameHome() {
   const [codeSuccess, setCodeSuccess] = useState('');
   const [localRecords, setLocalRecords] = useState<{ name: string; time: number; date: string }[]>([]);
   const [isMounted, setIsMounted] = useState(false);
+  const [randomVisual, setRandomVisual] = useState<React.ReactNode | null>(null);
+
+  useEffect(() => {
+    if (view === 'landing') {
+      if (Math.random() > 0.5) {
+        const visuals = [
+          <EarthVisual key="earth" />,
+          <MoonVisual key="moon" />,
+          <SaturnVisual key="saturn" />,
+          <MuskVisual key="musk" />,
+          <BlackHoleVisual key="blackhole" />,
+          <SunVisual key="sun" />,
+          <RobotVisual key="robot" />,
+          <ChessBoardVisual key="chess" />
+        ];
+        const randomIndex = Math.floor(Math.random() * visuals.length);
+        setRandomVisual(visuals[randomIndex]);
+      } else {
+        setRandomVisual(null);
+      }
+    }
+  }, [view]);
+
+  // Jukebox Hook
+  const jukeboxState = useJukebox();
+
+  // BGM da tela inicial
+  const bgmRef = useRef<HTMLAudioElement | null>(null);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    if (!bgmRef.current) {
+      const audio = new Audio('/audio/bgm_landing.ogg');
+      audio.loop = true;
+      audio.volume = 0;
+      bgmRef.current = audio;
+    }
+
+    const bgm = bgmRef.current;
+
+    if (view === 'landing' && musicOn && !jukeboxState.isPlaying) {
+      // Fade in
+      bgm.play().catch(() => {});
+      let vol = bgm.volume;
+      const fadeIn = setInterval(() => {
+        vol = Math.min(vol + 0.02, 0.45);
+        bgm.volume = vol;
+        if (vol >= 0.45) clearInterval(fadeIn);
+      }, 80);
+      return () => clearInterval(fadeIn);
+    } else {
+      // Fade out
+      let vol = bgm.volume;
+      const fadeOut = setInterval(() => {
+        vol = Math.max(vol - 0.04, 0);
+        bgm.volume = vol;
+        if (vol <= 0) {
+          clearInterval(fadeOut);
+          bgm.pause();
+        }
+      }, 80);
+      return () => clearInterval(fadeOut);
+    }
+  }, [view, musicOn, jukeboxState.isPlaying]);
+
+  // Cleanup ao desmontar
+  useEffect(() => {
+    return () => {
+      if (bgmRef.current) {
+        bgmRef.current.pause();
+        bgmRef.current = null;
+      }
+    };
+  }, []);
 
   const getThemeGlowColor = (themeColor: ThemeColor) => {
     const colorMap: Record<ThemeColor, string> = {
@@ -1576,6 +1349,21 @@ export default function GameHome() {
       <MotherShip />
       <SpaceTraffic />
 
+      {/* Random Visual Event */}
+      <AnimatePresence mode="wait">
+        {randomVisual && (
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.8 }}
+            transition={{ duration: 1.5, ease: "easeInOut" }}
+            className="absolute top-1/2 right-[10%] md:right-[20%] -translate-y-1/2 z-10 pointer-events-none hidden md:flex"
+          >
+            {randomVisual}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Futuristic Frame */}
       <div className={`absolute inset-4 border ${theme === 'cyan' ? 'border-cyan-500/20' : 'border-orange-500/20'} pointer-events-none z-50`}>
         <div className={`absolute top-0 left-0 w-32 h-32 border-t-4 border-l-4 ${theme === 'cyan' ? 'border-cyan-500/40' : 'border-orange-500/40'} rounded-tl-3xl`} />
@@ -1641,14 +1429,6 @@ export default function GameHome() {
             />
           </motion.h1>
           
-          <motion.p 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 1 }}
-            className={`mt-6 ${theme === 'cyan' ? 'text-cyan-400/60' : 'text-orange-400/60'} font-orbitron tracking-[0.8em] text-[10px] md:text-xs uppercase`}
-          >
-            {tl('Galactic Delivery Service', 'Serviço de Entrega Galáctica')}
-          </motion.p>
         </motion.div>
 
         {/* Menu Section */}
@@ -1675,7 +1455,7 @@ export default function GameHome() {
           <MenuButton label={tl('OPTIONS', 'OPÇÕES')} icon={Settings} onClick={() => setShowOptions(true)} theme={theme} />
           <MenuButton label={tl('ACHIEVEMENTS', 'CONQUISTAS')} icon={Trophy} onClick={() => setShowAchievements(true)} theme={theme} />
           
-          <div className={`mt-4 flex flex-col gap-1 text-[9px] font-mono ${theme === 'cyan' ? 'text-cyan-500/40' : 'text-orange-500/40'} uppercase tracking-widest`}>
+          <div className={`mt-4 flex flex-col gap-1 text-[15px] font-mono ${theme === 'cyan' ? 'text-cyan-500/40' : 'text-orange-500/40'} uppercase tracking-widest`}>
             <div className="flex justify-between">
               <span>{tl('System: Online', 'Sistema: Online')}</span>
               <span>{tl('Signal: Stable', 'Sinal: Estável')}</span>
@@ -1720,20 +1500,20 @@ export default function GameHome() {
 
               <div className="space-y-8">
                 {/* Music */}
-                <div className="space-y-4">
-                  <h3 className="text-xs font-orbitron text-cyan-400 uppercase tracking-widest flex items-center gap-2">
+                <div className="space-y-3">
+                  <h3 className="text-[14px] font-orbitron text-cyan-400 uppercase tracking-widest flex items-center gap-2">
                     <Music className="w-4 h-4" /> {tl('MUSIC', 'MÚSICA')}
                   </h3>
                   <div className="flex gap-2">
                     <button 
                       onClick={() => setMusicOn(true)}
-                      className={`flex-1 py-2 rounded font-orbitron text-[10px] border transition-all ${musicOn ? 'bg-cyan-500 text-black border-cyan-500' : 'bg-transparent text-cyan-500/40 border-cyan-500/20'}`}
+                      className={`flex-1 py-1.5 rounded font-orbitron text-sm border transition-all ${musicOn ? 'bg-cyan-500 text-black border-cyan-500' : 'bg-transparent text-cyan-500/40 border-cyan-500/20'}`}
                     >
                       {tl('ON', 'LIGADO')}
                     </button>
                     <button 
                       onClick={() => setMusicOn(false)}
-                      className={`flex-1 py-2 rounded font-orbitron text-[10px] border transition-all ${!musicOn ? 'bg-cyan-500 text-black border-cyan-500' : 'bg-transparent text-cyan-500/40 border-cyan-500/20'}`}
+                      className={`flex-1 py-1.5 rounded font-orbitron text-sm border transition-all ${!musicOn ? 'bg-cyan-500 text-black border-cyan-500' : 'bg-transparent text-cyan-500/40 border-cyan-500/20'}`}
                     >
                       {tl('OFF', 'DESLIGADO')}
                     </button>
@@ -1741,20 +1521,20 @@ export default function GameHome() {
                 </div>
 
                 {/* SFX */}
-                <div className="space-y-4">
-                  <h3 className="text-xs font-orbitron text-cyan-400 uppercase tracking-widest flex items-center gap-2">
+                <div className="space-y-3">
+                  <h3 className="text-[14px] font-orbitron text-cyan-400 uppercase tracking-widest flex items-center gap-2">
                     <Volume2 className="w-4 h-4" /> {tl('SOUND EFFECTS', 'EFEITOS SONOROS')}
                   </h3>
                   <div className="flex gap-2">
                     <button 
                       onClick={() => setSfxOn(true)}
-                      className={`flex-1 py-2 rounded font-orbitron text-[10px] border transition-all ${sfxOn ? 'bg-cyan-500 text-black border-cyan-500' : 'bg-transparent text-cyan-500/40 border-cyan-500/20'}`}
+                      className={`flex-1 py-1.5 rounded font-orbitron text-sm border transition-all ${sfxOn ? 'bg-cyan-500 text-black border-cyan-500' : 'bg-transparent text-cyan-500/40 border-cyan-500/20'}`}
                     >
                       {tl('ON', 'LIGADO')}
                     </button>
                     <button 
                       onClick={() => setSfxOn(false)}
-                      className={`flex-1 py-2 rounded font-orbitron text-[10px] border transition-all ${!sfxOn ? 'bg-cyan-500 text-black border-cyan-500' : 'bg-transparent text-cyan-500/40 border-cyan-500/20'}`}
+                      className={`flex-1 py-1.5 rounded font-orbitron text-sm border transition-all ${!sfxOn ? 'bg-cyan-500 text-black border-cyan-500' : 'bg-transparent text-cyan-500/40 border-cyan-500/20'}`}
                     >
                       {tl('OFF', 'DESLIGADO')}
                     </button>
@@ -1762,43 +1542,53 @@ export default function GameHome() {
                 </div>
 
                 {/* Language */}
-                <div className="space-y-4">
-                  <h3 className="text-xs font-orbitron text-cyan-400 uppercase tracking-widest flex items-center gap-2">
+                <div className="space-y-3">
+                  <h3 className="text-[14px] font-orbitron text-cyan-400 uppercase tracking-widest flex items-center gap-2">
                     <Globe className="w-4 h-4" /> {tl('LANGUAGE', 'IDIOMA')}
                   </h3>
                   <div className="grid grid-cols-1 gap-2">
                     <button 
                       onClick={() => setLanguage('pt')}
-                      className={`w-full py-2 rounded font-orbitron text-[10px] border transition-all ${language === 'pt' ? 'bg-cyan-500 text-black border-cyan-500' : 'bg-transparent text-cyan-500/40 border-cyan-500/20'}`}
+                      className={`w-full py-1.5 rounded font-orbitron text-sm border transition-all ${language === 'pt' ? 'bg-cyan-500 text-black border-cyan-500' : 'bg-transparent text-cyan-500/40 border-cyan-500/20'}`}
                     >
                       {tl('PORTUGUESE', 'PORTUGUÊS')}
                     </button>
                     <button 
                       onClick={() => setLanguage('en')}
-                      className={`w-full py-2 rounded font-orbitron text-[10px] border transition-all ${language === 'en' ? 'bg-cyan-500 text-black border-cyan-500' : 'bg-transparent text-cyan-500/40 border-cyan-500/20'}`}
+                      className={`w-full py-1.5 rounded font-orbitron text-sm border transition-all ${language === 'en' ? 'bg-cyan-500 text-black border-cyan-500' : 'bg-transparent text-cyan-500/40 border-cyan-500/20'}`}
                     >
                       {tl('ENGLISH', 'INGLÊS')}
                     </button>
                   </div>
                 </div>
 
-                {/* Codes Button */}
-                <div className="pt-4 border-t border-cyan-500/30">
+                {/* Jukebox & Codes Buttons */}
+                <div className="grid grid-cols-2 gap-3 pt-3 border-t border-cyan-500/30">
+                  <button 
+                    onClick={() => {
+                      setShowOptions(false);
+                      setShowJukeboxModal(true);
+                    }}
+                    className="w-full py-3 bg-slate-800/40 border border-cyan-500/30 text-cyan-400 font-orbitron text-sm tracking-widest rounded-lg hover:bg-cyan-500/20 hover:border-cyan-500 transition-all uppercase flex items-center justify-center gap-2 group"
+                  >
+                    <Music className="w-4 h-4 group-hover:scale-110 transition-transform" /> JUKEBOX
+                  </button>
+
                   <button 
                     onClick={() => setShowCodesModal(true)}
-                    className="w-full py-4 bg-slate-800/40 border border-cyan-500/30 text-cyan-400 font-orbitron tracking-widest rounded-lg hover:bg-cyan-500/20 hover:border-cyan-500 transition-all uppercase flex items-center justify-center gap-3 group"
+                    className="w-full py-3 bg-slate-800/40 border border-cyan-500/30 text-cyan-400 font-orbitron text-sm tracking-widest rounded-lg hover:bg-cyan-500/20 hover:border-cyan-500 transition-all uppercase flex items-center justify-center gap-2 group"
                   >
-                    <ShieldCheck className="w-5 h-5 group-hover:scale-110 transition-transform" /> {tl('CODES', 'CÓDIGOS')}
+                    <ShieldCheck className="w-4 h-4 group-hover:scale-110 transition-transform" /> {tl('CODES', 'CÓDIGOS')}
                   </button>
                 </div>
 
                 {/* Reset Progress */}
-                <div className="space-y-4 pt-4 border-t border-cyan-500/20">
+                <div className="pt-3 border-t border-cyan-500/20">
                   <button 
                     onClick={() => {
                       setShowResetConfirm(true);
                     }}
-                    className="w-full py-3 rounded font-orbitron text-[10px] bg-rose-600/20 text-rose-400 border border-rose-500/50 hover:bg-rose-600 hover:text-white transition-all flex items-center justify-center gap-2"
+                    className="w-full py-2 rounded font-orbitron text-sm bg-rose-600/20 text-rose-400 border border-rose-500/50 hover:bg-rose-600 hover:text-white transition-all flex items-center justify-center gap-2"
                   >
                     <Trash2 className="w-4 h-4" /> {tl('RESET PROGRESS', 'RESETAR PROGRESSO')}
                   </button>
@@ -1952,16 +1742,16 @@ export default function GameHome() {
                             )}
                           </div>
                           <div>
-                            <p className="text-white font-orbitron text-sm uppercase tracking-wider flex items-center gap-2">
+                            <p className="text-white font-orbitron text-base uppercase tracking-wider flex items-center gap-2">
                               {record.name}
-                              {index === 0 && <span className="text-[8px] bg-yellow-400 text-black px-1 rounded font-bold animate-pulse">CHAMPION</span>}
+                              {index === 0 && <span className="text-[14px] bg-yellow-400 text-black px-1 rounded font-bold animate-pulse">CHAMPION</span>}
                             </p>
-                            <p className="text-[10px] text-slate-500 font-mono">{record.date}</p>
+                            <p className="text-base text-slate-500 font-mono">{record.date}</p>
                           </div>
                         </div>
                         
                         <div className="flex items-center gap-4 relative z-10">
-                          <span className={`font-orbitron text-sm ${index === 0 ? 'text-yellow-400' : 'text-cyan-400'}`}>
+                          <span className={`font-orbitron text-base ${index === 0 ? 'text-yellow-400' : 'text-cyan-400'}`}>
                             {formatTime(record.time)}
                           </span>
                           <button 
@@ -2010,10 +1800,10 @@ export default function GameHome() {
 
               <div className="text-center py-12 space-y-4">
                 <Globe className="w-16 h-16 text-pink-500/50 mx-auto animate-pulse" />
-                <p className="text-pink-400 font-orbitron text-sm uppercase tracking-widest">
+                <p className="text-pink-400 font-orbitron text-base uppercase tracking-widest">
                   {tl('Coming Soon in v3.0', 'Em breve na v3.0')}
                 </p>
-                <p className="text-slate-500 text-xs font-orbitron">
+                <p className="text-slate-500 text-[14px] font-orbitron">
                   {tl('Global leaderboards are under development.', 'Placares globais estão em desenvolvimento.')}
                 </p>
               </div>
@@ -2044,7 +1834,7 @@ export default function GameHome() {
               </h2>
 
               <div className="space-y-4 text-center mb-8">
-                <p className="text-rose-400 font-orbitron text-sm leading-relaxed">
+                <p className="text-rose-400 font-orbitron text-base leading-relaxed">
                   {tl('This will permanently delete ALL your speed run records. This action cannot be undone.', 'Isso excluirá permanentemente TODOS os seus recordes de speed run. Esta ação não pode ser desfeita.')}
                 </p>
               </div>
@@ -2058,7 +1848,7 @@ export default function GameHome() {
                 </button>
                 <button 
                   onClick={() => setShowClearRecordsConfirm(false)}
-                  className="w-full py-3 text-white/40 font-orbitron text-[10px] hover:text-white transition-colors uppercase"
+                  className="w-full py-3 text-white/40 font-orbitron text-base hover:text-white transition-colors uppercase"
                 >
                   {tl('CANCEL', 'CANCELAR')}
                 </button>
@@ -2090,7 +1880,7 @@ export default function GameHome() {
               </h2>
 
               <div className="space-y-4 text-center mb-8">
-                <p className="text-rose-400 font-orbitron text-sm leading-relaxed">
+                <p className="text-rose-400 font-orbitron text-base leading-relaxed">
                   {tl('This will permanently delete all your progress, ships, and upgrades. This action cannot be undone.', 'Isso excluirá permanentemente todo o seu progresso, naves e melhorias. Esta ação não pode ser desfeita.')}
                 </p>
               </div>
@@ -2104,7 +1894,7 @@ export default function GameHome() {
                 </button>
                 <button 
                   onClick={() => setShowResetConfirm(false)}
-                  className="w-full py-3 text-white/40 font-orbitron text-[10px] hover:text-white transition-colors uppercase"
+                  className="w-full py-3 text-white/40 font-orbitron text-base hover:text-white transition-colors uppercase"
                 >
                   {tl('CANCEL', 'CANCELAR')}
                 </button>
@@ -2136,24 +1926,24 @@ export default function GameHome() {
               </h2>
 
               <div className="space-y-4 text-center mb-8">
-                <p className="text-cyan-400 font-orbitron text-sm leading-relaxed">
+                <p className="text-cyan-400 font-orbitron text-base leading-relaxed">
                   {tl('Start a new game focused on Route 1.', 'Inicie uma nova partida focada na Rota 1.')}
                 </p>
                 
                 <div className="py-6 border-y border-white/5 space-y-4">
-                  <p className="text-white/60 text-[10px] font-orbitron uppercase tracking-[0.2em]">{tl('OBJECTIVE:', 'OBJETIVO:')}</p>
-                  <p className="text-white text-sm font-orbitron leading-relaxed uppercase tracking-wider">
+                  <p className="text-white/60 text-base font-orbitron uppercase tracking-[0.2em]">{tl('OBJECTIVE:', 'OBJETIVO:')}</p>
+                  <p className="text-white text-base font-orbitron leading-relaxed uppercase tracking-wider">
                     {tl('Buy, Unlock, Upgrade, Automate...', 'Compre, Desbloqueie, Melhore, automatize...')}
                   </p>
-                  <p className="text-cyan-400 text-xs font-orbitron font-bold uppercase tracking-widest animate-pulse">
+                  <p className="text-cyan-400 text-[14px] font-orbitron font-bold uppercase tracking-widest animate-pulse">
                     {tl('Rule Route 1 as fast as you can.', 'Reine na Rota 1 o mais rápido que puder.')}
                   </p>
                 </div>
 
-                <p className="text-pink-400 font-orbitron text-xs">
+                <p className="text-pink-400 font-orbitron text-[14px]">
                   ⏱️ {tl('The game ends when everything is completed.', 'O jogo termina ao completar tudo.')}
                 </p>
-                <p className="text-white font-orbitron text-xs italic">
+                <p className="text-white font-orbitron text-[14px] italic">
                   {tl('Be fast. Every second counts.', 'Seja rápido. Cada segundo conta.')}
                 </p>
               </div>
@@ -2171,7 +1961,7 @@ export default function GameHome() {
                 </button>
                 <button 
                   onClick={() => setShowSpeedRunConfirm(false)}
-                  className="w-full py-3 text-white/40 font-orbitron text-[10px] hover:text-white transition-colors uppercase"
+                  className="w-full py-3 text-white/40 font-orbitron text-base hover:text-white transition-colors uppercase"
                 >
                   {tl('CANCEL', 'CANCELAR')}
                 </button>
@@ -2219,7 +2009,7 @@ export default function GameHome() {
 
               {isSpeedRun && (
                 <div className="mb-6 p-4 bg-rose-500/20 border border-rose-500/50 rounded-lg text-center">
-                  <p className="text-rose-500 font-orbitron text-[10px] uppercase tracking-widest">
+                  <p className="text-rose-500 font-orbitron text-base uppercase tracking-widest">
                     {tl('CODES DISABLED IN SPEED RUN MODE', 'CÓDIGOS DESCOBERTOS DESATIVADOS NO MODO SPEED RUN')}
                   </p>
                 </div>
@@ -2237,7 +2027,7 @@ export default function GameHome() {
                     >
                       {/* Input Section */}
                       <div className="space-y-4">
-                        <label className="text-[10px] font-orbitron text-cyan-400 uppercase tracking-widest block">
+                        <label className="text-base font-orbitron text-cyan-400 uppercase tracking-widest block">
                           {tl('INSERT CODE', 'INSERIR CÓDIGO')}
                         </label>
                         <div className="flex gap-2">
@@ -2246,7 +2036,7 @@ export default function GameHome() {
                             value={codeInput}
                             onChange={(e) => setCodeInput(e.target.value.toUpperCase())}
                             placeholder="********"
-                            className="flex-1 bg-slate-800 border border-cyan-500/30 rounded px-4 py-3 text-white font-orbitron text-sm focus:outline-none focus:border-cyan-500 transition-colors uppercase"
+                            className="flex-1 bg-slate-800 border border-cyan-500/30 rounded px-4 py-3 text-white font-orbitron text-base focus:outline-none focus:border-cyan-500 transition-colors uppercase"
                           />
                           <button 
                             onClick={handleActivateCode}
@@ -2261,7 +2051,7 @@ export default function GameHome() {
                               initial={{ opacity: 0, y: -10 }}
                               animate={{ opacity: 1, y: 0 }}
                               exit={{ opacity: 0 }}
-                              className="text-rose-500 font-orbitron text-[10px] uppercase tracking-widest"
+                              className="text-rose-500 font-orbitron text-base uppercase tracking-widest"
                             >
                               {codeError}
                             </motion.p>
@@ -2271,7 +2061,7 @@ export default function GameHome() {
                               initial={{ opacity: 0, y: -10 }}
                               animate={{ opacity: 1, y: 0 }}
                               exit={{ opacity: 0 }}
-                              className="text-emerald-500 font-orbitron text-[10px] uppercase tracking-widest"
+                              className="text-emerald-500 font-orbitron text-base uppercase tracking-widest"
                             >
                               {codeSuccess}
                             </motion.p>
@@ -2286,7 +2076,7 @@ export default function GameHome() {
                             onClick={() => setCodesView('list')}
                             className="flex items-center gap-2 text-cyan-500 hover:text-white transition-all group"
                           >
-                            <span className="text-[10px] font-orbitron uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity">
+                            <span className="text-base font-orbitron uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity">
                               {tl('DISCOVERED', 'DESCOBERTOS')}
                             </span>
                             <div className="w-10 h-10 rounded-full border border-cyan-500/30 flex items-center justify-center group-hover:border-cyan-500 group-hover:bg-cyan-500/10 transition-all">
@@ -2311,7 +2101,7 @@ export default function GameHome() {
                         >
                           <ChevronLeft className="w-5 h-5 text-white" />
                         </button>
-                        <span className="text-[10px] font-orbitron text-white/40 uppercase tracking-[0.3em]">
+                        <span className="text-base font-orbitron text-white/40 uppercase tracking-[0.3em]">
                           {tl('BACK TO INPUT', 'VOLTAR AO INÍCIO')}
                         </span>
                       </div>
@@ -2387,11 +2177,11 @@ export default function GameHome() {
                                 <div className="flex-1">
                                   <div className="flex items-center gap-3">
                                     <div className={`w-2 h-2 rounded-full animate-pulse ${dotClass}`} />
-                                    <p className={`font-orbitron text-sm uppercase tracking-wider transition-colors ${colorClass}`}>
+                                    <p className={`font-orbitron text-base uppercase tracking-wider transition-colors ${colorClass}`}>
                                       {info?.name || code}
                                     </p>
                                   </div>
-                                  <p className="text-[10px] text-slate-400 font-orbitron uppercase tracking-widest mt-2 leading-relaxed">
+                                  <p className="text-base text-slate-400 font-orbitron uppercase tracking-widest mt-2 leading-relaxed">
                                     {tl(info?.description.en || '', info?.description.pt || '')}
                                   </p>
                                 </div>
@@ -2407,7 +2197,7 @@ export default function GameHome() {
                                   >
                                     <div className="w-2 h-2 rounded-full bg-white/40" />
                                   </motion.div>
-                                  <span className={`absolute ${isActive ? 'left-3' : 'right-3'} text-[9px] font-orbitron font-bold tracking-tighter`}>
+                                  <span className={`absolute ${isActive ? 'left-3' : 'right-3'} text-[15px] font-orbitron font-bold tracking-tighter`}>
                                     {isActive ? 'ON' : 'OFF'}
                                   </span>
                                 </button>
@@ -2435,8 +2225,13 @@ export default function GameHome() {
         theme={theme}
       />
 
-      {/* Footer Accents - Removed as per user request */}
-
+      {/* Jukebox Modal */}
+      <Jukebox 
+        isOpen={showJukeboxModal} 
+        onClose={() => setShowJukeboxModal(false)} 
+        language={language}
+        {...jukeboxState} 
+      />
 
       <style jsx global>{`
         @keyframes scan {

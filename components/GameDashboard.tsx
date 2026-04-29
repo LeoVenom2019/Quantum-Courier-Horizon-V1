@@ -92,10 +92,56 @@ import {
 import { Language } from '@/lib/i18n';
 import { useGameAudio } from '@/hooks/useGameAudio';
 import { GameStorage } from '@/lib/game-storage';
+import { SaveManager } from '@/lib/save-manager';
 import { SpaceAmbience } from './SpaceAmbience';
 import { MINI_GAMES_CONFIG } from '@/lib/mini-games-config';
 import { MiniGames } from './MiniGames';
 import { ColonySystem, Colony, cleanColoniesData } from './ColonySystem';
+import Lottie from 'lottie-react';
+
+const ShipVisual = ({ ship, className = "" }: { ship: Ship; className?: string }) => {
+  const [lottieData, setLottieData] = React.useState<any>(null);
+
+  React.useEffect(() => {
+    if (ship.lottie) {
+      fetch(ship.lottie)
+        .then(res => {
+          const ct = res.headers.get('content-type') || '';
+          if (!res.ok || !ct.includes('json')) {
+            throw new Error(`Lottie fetch failed: ${res.status} (${ct})`);
+          }
+          return res.json();
+        })
+        .then(data => setLottieData(data))
+        .catch(() => setLottieData(null));
+    } else {
+      setLottieData(null);
+    }
+  }, [ship.lottie]);
+
+  if (ship.image) {
+    return (
+      <div className={`flex items-center justify-center ${className}`}>
+        <img 
+          src={ship.image} 
+          alt={ship.name} 
+          className="max-w-full max-h-full object-contain drop-shadow-2xl"
+          style={{ filter: 'drop-shadow(0 0 20px rgba(255,255,255,0.2))' }}
+        />
+      </div>
+    );
+  }
+
+  if (ship.lottie && lottieData) {
+    return (
+      <div className={className}>
+        <Lottie animationData={lottieData} loop={true} />
+      </div>
+    );
+  }
+
+  return <Rocket className={`${className} ${ship.color}`} />;
+};
 
 const EXTRACTION_PRODUCTION_VALUES = [1, 2, 4, 6, 8, 10, 15];
 const EXTRACTION_PRODUCTION_COSTS = [0, 1000000, 4000000, 10000000, 30000000, 50000000, 500000000];
@@ -622,7 +668,7 @@ const translations = {
     rewardsReceived: 'REWARDS RECEIVED',
     shipDestroyedCargoLost: 'YOUR SHIP WAS DESTROYED AND CARGO LOST',
     continue: 'CONTINUE',
-    manualDeliveryLimit: 'Manual delivery limit of 10 reached!',
+    manualDeliveryLimit: 'Manual delivery limit of 25 reached!',
     synthesisComplete: 'SYNTHESIS COMPLETE: +',
     alertDeliveryUnderAttack: 'ALERT: Delivery to',
     shieldDeactivated: 'SHIELD DEACTIVATED',
@@ -1264,7 +1310,7 @@ const translations = {
     rewardsReceived: 'RECOMPENSAS RECEBIDAS',
     shipDestroyedCargoLost: 'SUA NAVE FOI DESTRUÍDA E A CARGA PERDIDA',
     continue: 'CONTINUAR',
-    manualDeliveryLimit: 'Limite de 10 entregas manuais atingido!',
+    manualDeliveryLimit: 'Limite de 25 entregas manuais atingido!',
     synthesisComplete: 'SÍNTESE CONCLUÍDA: +',
     alertDeliveryUnderAttack: 'ALERTA: Entrega para',
     shieldDeactivated: 'ESCUDO DESATIVADO',
@@ -1715,6 +1761,10 @@ interface Battle {
   isDefeat?: boolean;
   winProbability?: number;
   enemyTier?: number;
+  predeterminedResult?: 'victory' | 'defeat';
+  isCinematicFinished?: boolean;
+  playerImage?: string;
+  enemyImage?: string;
 }
 
 interface BattleLogEntry {
@@ -1725,6 +1775,17 @@ interface BattleLogEntry {
   time: number;
   enemyName: string;
 }
+
+const getDoubleRouteMultiplier = (level: number) => {
+  switch (level) {
+    case 1: return 25;
+    case 2: return 75;
+    case 3: return 150;
+    case 4: return 300;
+    case 5: return 750;
+    default: return 1;
+  }
+};
 
 interface GameDashboardProps {
   language: Language;
@@ -1755,16 +1816,6 @@ const PRIVATE_POLICE_COSTS = [10000, 50000, 250000, 1250000, 5000000, 25000000];
 const getPoliceBonus = (level: number) => level === 6 ? 85 : level * 10;
 
 const DOUBLE_ROUTE_COSTS = [1000000, 3000000, 5000000, 7000000, 10000000];
-const getDoubleRouteMultiplier = (level: number) => {
-  switch (level) {
-    case 1: return 50;
-    case 2: return 100;
-    case 3: return 150;
-    case 4: return 200;
-    case 5: return 500;
-    default: return 1;
-  }
-};
 
 const DOOM_P_COSTS = [1000000, 5000000, 10000000, 20000000, 50000000, 150000000, 400000000, 1000000000, 2500000000, 6000000000];
 const getDoomPBonus = (level: number) => level * 10;
@@ -1998,6 +2049,51 @@ export const GameDashboard = ({
   const [autoTravelDesired, setAutoTravelDesired] = useState<{ [key: string]: boolean }>({});
   const [autoTravelProgress, setAutoTravelProgress] = useState<{ [key: string]: number }>({});
   const [activeDeliveries, setActiveDeliveries] = useState<ActiveDelivery[]>([]);
+  
+  // Grouped Deliveries Memoization for the new UI
+  const groupedDeliveries = useMemo(() => {
+    const groups: { [routeId: string]: {
+      routeId: string;
+      manualCount: number;
+      autoActive: boolean;
+      totalCount: number;
+      avgProgress: number;
+      status: string;
+      tier: string;
+      shipLevel: number;
+    }} = {};
+
+    // Process Manual Deliveries
+    activeDeliveries.forEach(d => {
+      if (!groups[d.routeId]) {
+        groups[d.routeId] = {
+          routeId: d.routeId,
+          manualCount: 0,
+          autoActive: false,
+          totalCount: 0,
+          avgProgress: 0,
+          status: d.status,
+          tier: d.tier,
+          shipLevel: d.shipLevel
+        };
+      }
+      groups[d.routeId].manualCount++;
+      groups[d.routeId].totalCount++;
+      groups[d.routeId].avgProgress += d.progress;
+      // If any is combat, status is combat
+      if (d.status === 'combat') groups[d.routeId].status = 'combat';
+    });
+
+    // Finalize averages
+    Object.values(groups).forEach(g => {
+      if (g.totalCount > 0) {
+        g.avgProgress = g.avgProgress / g.totalCount;
+      }
+    });
+
+    return Object.values(groups).sort((a, b) => b.totalCount - a.totalCount);
+  }, [activeDeliveries]);
+
   const [ownedShips, setOwnedShips] = useState<{ [key: string]: number }>(isSpeedRun ? { 'Solar-1': 1 } : {});
   const [miningRobots, setMiningRobots] = useState<{ [oreId: string]: number }>({});
   const [miningRobotLevels, setMiningRobotLevels] = useState<{ [oreId: string]: number }>({});
@@ -3466,11 +3562,26 @@ export const GameDashboard = ({
           const enemyTimeToKill = playerHp / enemyDps;
           let winProb = Math.min(100, Math.max(0, Math.floor((enemyTimeToKill / (playerTimeToKill + enemyTimeToKill)) * 100)));
 
-          // Add Doom P bonus to win probability for display
+          // Add Bonuses to win probability
           const doomPBonus = getDoomPBonus(doomPLevelRef.current);
-          winProb = Math.min(100, winProb + doomPBonus);
+          const policeBonus = getPoliceBonus(privatePoliceLevelRef.current);
+          const totalWinProb = winProb + doomPBonus + policeBonus;
 
           const rewardMultiplier = isBoss ? 6 : (isElite ? 3 : 1);
+
+          const result = (Math.random() * 100 < totalWinProb) ? 'victory' : 'defeat';
+
+          const getEnemyImage = () => {
+            if (isBoss) return '/images/battle/enemy_boss.png';
+            if (isElite) return '/images/battle/enemy_elite.png';
+            if (enemyTier > 15) return '/images/battle/enemy_raider.png';
+            if (enemyTier > 5) return '/images/battle/enemy_alien.png';
+            return '/images/battle/enemy_scout.png';
+          };
+
+          const getPlayerImage = () => {
+            return battleLevelRef.current >= 25 ? '/images/battle/skyring.png' : '/images/battle/standard_ship.png';
+          };
 
           const battle: Battle = {
             id: Math.random().toString(36).substr(2, 9),
@@ -3482,14 +3593,18 @@ export const GameDashboard = ({
             enemyHp: enemyHp,
             playerMaxHp: playerHp,
             playerHp: playerHp,
-            reward: Math.floor((routeTier === 'Interstellar' ? 1000000 : 200000) * enemyTier * multipliers.profit * rewardMultiplier), // Increased reward base
+            reward: Math.floor((routeTier === 'Interstellar' ? 500000000 : 200000) * enemyTier * multipliers.profit * rewardMultiplier), // Increased reward base (500M for Interstellar)
             startTime: Date.now(),
             lastPlayerAttack: { laser: 0, plasma: 0, special: 0, shield: 0 },
-            lastEnemyAttack: Date.now() + 2000,
+            lastEnemyAttack: Date.now() + 1000,
             shieldActive: false,
             lastShieldTime: 0,
             winProbability: winProb,
-            enemyTier: enemyTier
+            enemyTier: enemyTier,
+            predeterminedResult: result,
+            isCinematicFinished: false,
+            playerImage: getPlayerImage(),
+            enemyImage: getEnemyImage()
           };
           
           setTimeout(() => {
@@ -3514,7 +3629,7 @@ export const GameDashboard = ({
     const targetLevel = battleLevel + 1;
     let upgradeCost = targetLevel <= 25 
       ? Math.floor(1000 * Math.pow(50000, (targetLevel - 1) / 24))
-      : Math.floor(55000000 * Math.pow(1000 / 55, (targetLevel - 26) / 29) * (routeTier === 'Interstellar' ? 1.2 : 1));
+      : Math.floor(2500000000 * Math.pow(20000, (targetLevel - 26) / 29) * (routeTier === 'Interstellar' ? 1 : 1));
     
     const canUpgrade = qc >= upgradeCost && battleLevel < maxLevel;
     
@@ -3550,17 +3665,17 @@ export const GameDashboard = ({
             <div className={`glass-panel p-3 rounded-2xl border ${themeBorder} ${themeBg} relative overflow-hidden flex flex-col items-center justify-center min-h-[180px]`}>
               <div className="absolute top-3 left-4 flex items-center gap-2">
                 <Radar className={`w-4 h-4 ${!isCooldownActive ? 'text-cyan-400' : 'text-slate-500'}`} />
-                <h4 className="text-[11px] font-bold text-white uppercase tracking-widest">
+                <h4 className="text-[14px] font-bold text-white uppercase tracking-widest">
                   {language === 'pt' ? 'Radar de Busca de Setor' : 'Sector Radar'}
                 </h4>
               </div>
               
               <div className="absolute top-3 right-4 flex items-center gap-3">
-                <div className="text-sm font-black text-cyan-400 uppercase tracking-wider">
+                <div className="text-base font-black text-cyan-400 uppercase tracking-wider">
                   {language === 'pt' ? 'CHANCE:' : 'CHANCE:'} {50 + (radarLevel * 5)}%
                 </div>
                 {isCooldownActive && !isScanning && (
-                  <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-500 bg-black/20 px-2 py-0.5 rounded-full border border-white/5">
+                  <div className="flex items-center gap-1.5 text-base font-bold text-slate-500 bg-black/20 px-2 py-0.5 rounded-full border border-white/5">
                     <Clock className="w-3 h-3" />
                     {scanCooldownRemaining}s
                   </div>
@@ -3590,28 +3705,28 @@ export const GameDashboard = ({
                     scanResult === 'success' ? (
                       <div className="text-center">
                         <ShieldAlert className="w-8 h-8 text-emerald-400 mx-auto mb-1 animate-bounce" />
-                        <div className="text-[10px] font-black text-emerald-400 uppercase tracking-tighter">TARGET FOUND</div>
+                        <div className="text-base font-black text-emerald-400 uppercase tracking-tighter">TARGET FOUND</div>
                       </div>
                     ) : scanResult === 'failure' ? (
                       <div className="text-center">
                         <ZapOff className="w-8 h-8 text-red-400 mx-auto mb-1" />
-                        <div className="text-[10px] font-black text-red-400 uppercase tracking-tighter">NO SIGNAL</div>
+                        <div className="text-base font-black text-red-400 uppercase tracking-tighter">NO SIGNAL</div>
                       </div>
                     ) : (
                       <div className="text-center">
                         <div className="text-2xl font-black text-cyan-400 leading-none">{scanProgress}%</div>
-                        <div className="text-[9px] text-cyan-500 uppercase font-bold tracking-widest mt-1">SCANNING</div>
+                        <div className="text-[15px] text-cyan-500 uppercase font-bold tracking-widest mt-1">SCANNING</div>
                       </div>
                     )
                   ) : !isCooldownActive ? (
                     <div className="text-center">
                       <Radar className="w-8 h-8 text-cyan-400 mx-auto mb-1 animate-pulse" />
-                      <div className="text-[10px] text-cyan-400 uppercase font-black tracking-widest">READY</div>
+                      <div className="text-base text-cyan-400 uppercase font-black tracking-widest">READY</div>
                     </div>
                   ) : (
                     <div className="text-center">
                       <Radar className="w-8 h-8 text-slate-700 mx-auto mb-1" />
-                      <div className="text-[10px] text-slate-600 uppercase font-black tracking-widest">COOLDOWN</div>
+                      <div className="text-base text-slate-600 uppercase font-black tracking-widest">COOLDOWN</div>
                     </div>
                   )}
                 </div>
@@ -3621,7 +3736,7 @@ export const GameDashboard = ({
                 <button
                   onClick={findBattle}
                   disabled={battleLevel < 1 || isScanning || isCooldownActive}
-                  className={`py-3 rounded-xl border transition-all flex items-center justify-center gap-2 font-black uppercase tracking-widest text-xs relative overflow-hidden group ${
+                  className={`py-3 rounded-xl border transition-all flex items-center justify-center gap-2 font-black uppercase tracking-widest text-[14px] relative overflow-hidden group ${
                     battleLevel >= 1 && !isScanning && !isCooldownActive
                     ? 'bg-cyan-600 text-white border-cyan-400 shadow-[0_0_20px_rgba(6,182,212,0.4)] hover:bg-cyan-500 scale-105 active:scale-95'
                     : 'bg-white/5 border-white/10 text-slate-600 cursor-not-allowed'
@@ -3634,7 +3749,7 @@ export const GameDashboard = ({
                 <button
                   onClick={upgradeRadar}
                   disabled={!canUpgradeRadar}
-                  className={`py-3 rounded-xl border transition-all flex items-center justify-center gap-2 font-black uppercase tracking-widest text-xs relative overflow-hidden group ${
+                  className={`py-3 rounded-xl border transition-all flex items-center justify-center gap-2 font-black uppercase tracking-widest text-[14px] relative overflow-hidden group ${
                     canUpgradeRadar
                     ? 'bg-orange-600 text-white border-orange-400 shadow-[0_0_20px_rgba(249,115,22,0.4)] hover:bg-orange-500 scale-105 active:scale-95'
                     : 'bg-white/5 border-white/10 text-slate-600 cursor-not-allowed'
@@ -3664,10 +3779,10 @@ export const GameDashboard = ({
                     <ShieldAlert className="w-5 h-5 text-blue-400" />
                   </motion.button>
                   <div>
-                    <h4 className="text-[11px] font-bold text-white uppercase tracking-widest leading-tight">
+                    <h4 className="text-[14px] font-bold text-white uppercase tracking-widest leading-tight">
                       DOOM PROTOCOL
                     </h4>
-                    <p className="text-[9px] text-slate-500 font-mono">
+                    <p className="text-[15px] text-slate-500 font-mono">
                       {language === 'pt' ? `Nível ${privatePoliceLevel} / 6` : `Level ${privatePoliceLevel} / 6`}
                     </p>
                   </div>
@@ -3682,7 +3797,7 @@ export const GameDashboard = ({
                     }
                   }}
                   disabled={!canUpgradePrivatePolice}
-                  className={`px-5 py-2 rounded-xl font-bold transition-all text-xs ${
+                  className={`px-5 py-2 rounded-xl font-bold transition-all text-[14px] ${
                     canUpgradePrivatePolice 
                     ? 'bg-blue-600 text-white hover:bg-blue-500 shadow-[0_0_15px_rgba(37,99,235,0.3)]' 
                     : 'bg-white/5 text-slate-600 cursor-not-allowed'
@@ -3696,7 +3811,7 @@ export const GameDashboard = ({
               <div className="mt-auto flex items-center justify-between p-3 rounded-xl bg-white/5 border border-white/10">
                 <div className="flex items-center gap-2">
                   <FastForward className="w-4 h-4 text-orange-400" />
-                  <span className="text-[10px] font-bold text-white uppercase tracking-wider">{language === 'pt' ? 'Pular Batalhas' : 'Skip Battles'}</span>
+                  <span className="text-base font-bold text-white uppercase tracking-wider">{language === 'pt' ? 'Pular Batalhas' : 'Skip Battles'}</span>
                 </div>
                 <button
                   onClick={() => {
@@ -3727,7 +3842,7 @@ export const GameDashboard = ({
                     <h3 className={`text-lg font-bold ${themeText} leading-tight`}>
                       {language === 'pt' ? `Nível de Batalha ${battleLevel}` : `Battle Level ${battleLevel}`}
                     </h3>
-                    <p className="text-slate-400 text-[11px]">
+                    <p className="text-slate-400 text-[14px]">
                       {language === 'pt' ? 'Sua proficiência em combate' : 'Your combat proficiency'}
                     </p>
                   </div>
@@ -3735,17 +3850,17 @@ export const GameDashboard = ({
                 
                 <div className="flex items-center gap-4">
                   <div className="flex flex-col items-end">
-                    <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+                    <div className="text-base font-bold text-slate-500 uppercase tracking-widest">
                       {language === 'pt' ? 'Próximo Nível' : 'Next Level'}
                     </div>
-                    <div className="text-sm font-bold text-white">
+                    <div className="text-base font-bold text-white">
                       {battleLevel < (routeTier === 'Solar' ? 25 : 55) ? `${formatValue(upgradeCost)} QC` : t('max')}
                     </div>
                   </div>
                   <button
                     onClick={upgradeBattleLevel}
                     disabled={!canUpgrade}
-                    className={`px-6 py-2.5 rounded-xl font-bold transition-all text-xs flex items-center justify-center gap-2 ${
+                    className={`px-6 py-2.5 rounded-xl font-bold transition-all text-[14px] flex items-center justify-center gap-2 ${
                       canUpgrade 
                       ? 'bg-purple-600 text-white hover:bg-purple-500 shadow-[0_0_20px_rgba(147,51,234,0.4)] scale-105 active:scale-95' 
                       : 'bg-white/5 text-slate-600 cursor-not-allowed'
@@ -3760,7 +3875,7 @@ export const GameDashboard = ({
 
             {/* Recompensas de Nível */}
             <div className={`glass-panel p-3 rounded-2xl border ${themeBorder} ${themeBg} relative overflow-hidden flex-1 flex flex-col`}>
-              <h4 className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+              <h4 className="text-[14px] font-bold text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
                 <Star className="w-4 h-4 text-yellow-400" />
                 {language === 'pt' ? 'Recompensas de Nível' : 'Level Rewards'}
               </h4>
@@ -3795,10 +3910,10 @@ export const GameDashboard = ({
                       : 'bg-white/5 border-white/5 opacity-40 cursor-not-allowed'
                     }`}
                   >
-                    <div className={`text-[10px] font-black ${battleLevel >= reward.level ? (routeTier === 'Solar' ? 'text-emerald-400' : 'text-purple-400') : 'text-slate-500'}`}>
+                    <div className={`text-base font-black ${battleLevel >= reward.level ? (routeTier === 'Solar' ? 'text-emerald-400' : 'text-purple-400') : 'text-slate-500'}`}>
                       LVL {reward.level}
                     </div>
-                    <div className="text-[8px] font-bold text-white leading-tight text-center uppercase tracking-tighter h-6 flex items-center">
+                    <div className="text-[14px] font-bold text-white leading-tight text-center uppercase tracking-tighter h-6 flex items-center">
                       {reward.title}
                     </div>
                     {battleLevel >= reward.level && (
@@ -3819,12 +3934,12 @@ export const GameDashboard = ({
                   <div className="flex items-center justify-between">
                     <div className="flex items-center px-3 py-1.5 rounded-xl bg-gradient-to-b from-white/15 to-white/5 border border-white/20 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2)] backdrop-blur-md relative overflow-hidden group/title">
                       <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover/title:translate-x-full transition-transform duration-1000" />
-                      <h4 className="text-[10px] font-bold text-white uppercase tracking-widest flex items-center gap-2 relative z-10">
+                      <h4 className="text-base font-bold text-white uppercase tracking-widest flex items-center gap-2 relative z-10">
                         <TrendingUp className="w-4 h-4 text-emerald-400" />
                         {language === 'pt' ? 'Status da Nave' : 'Ship Status'}
                       </h4>
                     </div>
-                    <div className={`px-2 py-0.5 rounded-lg text-[9px] font-bold ${shipLevel >= (routeTier === 'Solar' ? 10 : 20) ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40' : 'bg-white/10 text-white border border-white/20'}`}>
+                    <div className={`px-2 py-0.5 rounded-lg text-[15px] font-bold ${shipLevel >= (routeTier === 'Solar' ? 10 : 20) ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40' : 'bg-white/10 text-white border border-white/20'}`}>
                       {shipLevel >= (routeTier === 'Solar' ? 10 : 20) ? 'MAX LEVEL' : `LEVEL ${shipLevel}`}
                     </div>
                   </div>
@@ -3832,10 +3947,10 @@ export const GameDashboard = ({
                   <div className="space-y-3 flex-1 flex flex-col">
                     <div className="relative">
                       <div className="flex mb-1 items-center justify-between">
-                        <span className="text-[9px] font-bold uppercase text-emerald-400">
+                        <span className="text-[15px] font-bold uppercase text-emerald-400">
                           {language === 'pt' ? 'Progresso de XP' : 'XP Progress'}
                         </span>
-                        <span className="text-[9px] font-bold text-white">
+                        <span className="text-[15px] font-bold text-white">
                           {shipLevel >= (routeTier === 'Solar' ? 10 : 20) ? '---' : `${formatValue(shipXP)} / ${formatValue(shipLevel * 500)}`}
                         </span>
                       </div>
@@ -3852,13 +3967,13 @@ export const GameDashboard = ({
 
                     <div className="mt-auto grid grid-cols-2 gap-3">
                       <div className="bg-white/5 border border-white/10 rounded-xl p-2 flex flex-col items-center justify-center h-12">
-                        <div className="text-[9px] font-bold text-slate-500 uppercase mb-0.5">{language === 'pt' ? 'Bônus QC' : 'QC Bonus'}</div>
+                        <div className="text-[15px] font-bold text-slate-500 uppercase mb-0.5">{language === 'pt' ? 'Bônus QC' : 'QC Bonus'}</div>
                         <div className="text-base font-black text-emerald-400 leading-none">
                           +{shipLevel <= 10 ? shipLevel * 10 : 100 + (shipLevel - 10) * 20}%
                         </div>
                       </div>
                       <div className="bg-white/5 border border-white/10 rounded-xl p-2 flex flex-col items-center justify-center h-12">
-                        <div className="text-[9px] font-bold text-slate-500 uppercase mb-0.5">{language === 'pt' ? 'Bônus Etérion' : 'Aetherion Bonus'}</div>
+                        <div className="text-[15px] font-bold text-slate-500 uppercase mb-0.5">{language === 'pt' ? 'Bônus Etérion' : 'Aetherion Bonus'}</div>
                         <div className="text-base font-black text-orange-400 leading-none">
                           +{shipLevel <= 10 ? shipLevel * 5 : 50 + (shipLevel - 10) * 10}%
                         </div>
@@ -3871,7 +3986,7 @@ export const GameDashboard = ({
                 <div className="space-y-3 flex flex-col h-full">
                   <div className="flex items-center px-4 py-1.5 rounded-xl bg-gradient-to-b from-white/15 to-white/5 border border-white/20 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2)] backdrop-blur-md self-start relative overflow-hidden group/title">
                     <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover/title:translate-x-full transition-transform duration-1000" />
-                    <h4 className="text-[10px] font-bold text-white uppercase tracking-widest flex items-center gap-2 relative z-10">
+                    <h4 className="text-base font-bold text-white uppercase tracking-widest flex items-center gap-2 relative z-10">
                       <Sword className="w-4 h-4 text-red-400" />
                       {language === 'pt' ? 'Status de Combate' : 'Combat Status'}
                     </h4>
@@ -3895,8 +4010,8 @@ export const GameDashboard = ({
                               <Zap className="w-4 h-4 text-orange-400" />
                             </motion.button>
                             <div>
-                              <span className="text-[9px] font-bold text-white uppercase tracking-wider block">{t('capture')}</span>
-                              <span className="text-[8px] text-orange-400 font-mono">Lvl {captureLevel}/10</span>
+                              <span className="text-[15px] font-bold text-white uppercase tracking-wider block">{t('capture')}</span>
+                              <span className="text-[14px] text-orange-400 font-mono">Lvl {captureLevel}/10</span>
                             </div>
                           </div>
                           <button
@@ -3909,7 +4024,7 @@ export const GameDashboard = ({
                               }
                             }}
                             disabled={!canUpgradeCapture}
-                            className={`px-4 py-1.5 rounded-lg font-bold text-[10px] transition-all ${
+                            className={`px-4 py-1.5 rounded-lg font-bold text-base transition-all ${
                               canUpgradeCapture 
                               ? 'bg-orange-600 text-white hover:bg-orange-500 shadow-[0_0_10px_rgba(249,115,22,0.3)]' 
                               : 'bg-white/5 text-slate-600 cursor-not-allowed'
@@ -3922,7 +4037,7 @@ export const GameDashboard = ({
                         {/* Vida e Dano em baixo */}
                         <div className="grid grid-cols-2 gap-3">
                           <div className="bg-white/5 border border-white/10 rounded-xl p-2 flex flex-col items-center justify-center h-12">
-                            <div className="flex items-center gap-1.5 text-slate-500 text-[9px] font-bold uppercase mb-0.5">
+                            <div className="flex items-center gap-1.5 text-slate-500 text-[15px] font-bold uppercase mb-0.5">
                               <Shield className="w-3 h-3 text-blue-400" />
                               {language === 'pt' ? 'Vida' : 'HP'}
                             </div>
@@ -3931,7 +4046,7 @@ export const GameDashboard = ({
                             </div>
                           </div>
                           <div className="bg-white/5 border border-white/10 rounded-xl p-2 flex flex-col items-center justify-center h-12">
-                            <div className="flex items-center gap-1.5 text-slate-500 text-[9px] font-bold uppercase mb-0.5">
+                            <div className="flex items-center gap-1.5 text-slate-500 text-[15px] font-bold uppercase mb-0.5">
                               <Sword className="w-3 h-3 text-red-400" />
                               {language === 'pt' ? 'Dano' : 'ATK'}
                             </div>
@@ -3945,7 +4060,7 @@ export const GameDashboard = ({
                       /* Rota 1 (Solar): Apenas Vida e Dano */
                       <div className="mt-auto grid grid-cols-2 gap-3">
                         <div className="bg-white/5 border border-white/10 rounded-xl p-2 flex flex-col items-center justify-center h-12">
-                          <div className="flex items-center gap-1.5 text-slate-500 text-[9px] font-bold uppercase mb-0.5">
+                          <div className="flex items-center gap-1.5 text-slate-500 text-[15px] font-bold uppercase mb-0.5">
                             <Shield className="w-3 h-3 text-blue-400" />
                             {language === 'pt' ? 'Vida' : 'HP'}
                           </div>
@@ -3954,7 +4069,7 @@ export const GameDashboard = ({
                           </div>
                         </div>
                         <div className="bg-white/5 border border-white/10 rounded-xl p-2 flex flex-col items-center justify-center h-12">
-                          <div className="flex items-center gap-1.5 text-slate-500 text-[9px] font-bold uppercase mb-0.5">
+                          <div className="flex items-center gap-1.5 text-slate-500 text-[15px] font-bold uppercase mb-0.5">
                             <Sword className="w-3 h-3 text-red-400" />
                             {language === 'pt' ? 'Dano' : 'ATK'}
                           </div>
@@ -4077,17 +4192,14 @@ export const GameDashboard = ({
     setAetherion(prev => prev - skipCost);
     playSfx('success');
 
-    const policeBonus = getPoliceBonus(privatePoliceLevelRef.current);
-    const doomPBonus = getDoomPBonus(doomPLevelRef.current);
-    const winProb = (activeBattleRef.current.winProbability || 50) + policeBonus + doomPBonus;
-    const isVictory = Math.random() * 100 < winProb;
+    const battle = { ...activeBattleRef.current };
     
-    if (isVictory) {
-      resolveBattleVictory(activeBattleRef.current);
-      setActiveBattle(prev => prev ? { ...prev, isVictory: true, isDefeat: false, playerHp: prev.playerMaxHp, enemyHp: 0 } : null);
+    if (battle.predeterminedResult === 'victory') {
+      resolveBattleVictory(battle);
+      setActiveBattle(prev => prev ? { ...prev, isVictory: true, isDefeat: false, playerHp: prev.playerMaxHp, enemyHp: 0, isCinematicFinished: true } : null);
     } else {
-      resolveBattleDefeat(activeBattleRef.current);
-      setActiveBattle(prev => prev ? { ...prev, isVictory: false, isDefeat: true, playerHp: 0, enemyHp: prev.enemyMaxHp } : null);
+      resolveBattleDefeat(battle);
+      setActiveBattle(prev => prev ? { ...prev, isVictory: false, isDefeat: true, playerHp: 0, enemyHp: prev.enemyMaxHp, isCinematicFinished: true } : null);
     }
   };
 
@@ -4096,10 +4208,7 @@ export const GameDashboard = ({
 
     setAetherion(prev => prev - skipCost);
     
-    const policeBonus = getPoliceBonus(privatePoliceLevelRef.current);
-    const doomPBonus = getDoomPBonus(doomPLevelRef.current);
-    const winProb = (battle.winProbability || 50) + policeBonus + doomPBonus;
-    const isVictory = Math.random() * 100 < winProb;
+    const isVictory = battle.predeterminedResult === 'victory';
 
     if (isVictory) {
       resolveBattleVictory(battle);
@@ -4228,7 +4337,7 @@ export const GameDashboard = ({
           {/* Space Background for Battle */}
           <div className="absolute inset-0 z-0 opacity-40">
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.05)_0%,transparent_70%)]" />
-            {[...Array(50)].map((_, i) => (
+            {[...Array(20)].map((_, i) => (
               <motion.div
                 key={i}
                 className="absolute w-1 h-1 bg-white rounded-full"
@@ -4264,13 +4373,13 @@ export const GameDashboard = ({
                   <h2 className="text-2xl font-orbitron font-bold text-white tracking-widest uppercase neon-text-cyan">
                     {language === 'pt' ? 'COMBATE ESPACIAL' : 'SPACE COMBAT'}
                   </h2>
-                  <p className="text-[10px] font-orbitron text-cyan-400/60 tracking-[0.2em] uppercase">
+                  <p className="text-base font-orbitron text-cyan-400/60 tracking-[0.2em] uppercase">
                     {activeBattle.enemyName} detected - LVL {activeBattle.enemyTier || 1}
                   </p>
                 </div>
               </div>
               <div className="text-right">
-                <div className="text-[10px] font-orbitron text-slate-500 tracking-widest uppercase mb-1">
+                <div className="text-base font-orbitron text-slate-500 tracking-widest uppercase mb-1">
                   {language === 'pt' ? 'NÍVEL DA FROTA' : 'FLEET LEVEL'}
                 </div>
                 <div className="text-xl font-orbitron font-bold text-white">
@@ -4345,11 +4454,23 @@ export const GameDashboard = ({
                     )}
                   </AnimatePresence>
 
-                  <Navigation className="w-32 h-32 text-cyan-400 rotate-90 relative z-10 drop-shadow-[0_0_20px_rgba(6,182,212,0.6)]" />
+                  <div className="relative w-48 h-48 flex items-center justify-center">
+                    <img 
+                      src={activeBattle.playerImage || '/images/battle/skyring.png'} 
+                      alt="Skyring"
+                      className="w-full h-full object-contain relative z-10 drop-shadow-[0_0_30px_rgba(6,182,212,0.8)]"
+                    />
+                    {/* Skyring Name Overlay (Aggressive Visual) */}
+                    {battleLevel >= 25 && (
+                      <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-black/60 backdrop-blur-md border border-cyan-500/50 px-3 py-0.5 rounded skew-x-[-15deg] z-20">
+                        <span className="text-[12px] font-orbitron font-black text-cyan-400 tracking-[0.2em]">SKYRING</span>
+                      </div>
+                    )}
+                  </div>
                 </div>
                 <div className="w-48 space-y-2">
-                  <div className="flex justify-between text-[10px] font-orbitron font-bold text-cyan-400 uppercase tracking-widest">
-                    <span>{battleLevel >= 25 ? 'Skyring' : (playerName || 'COMMANDER')}</span>
+                  <div className="flex justify-between text-base font-orbitron font-bold text-cyan-400 uppercase tracking-widest">
+                    <span>{battleLevel >= 25 ? 'SKYRING' : (language === 'pt' ? 'NAVE DE BATALHA' : 'BATTLE SHIP')}</span>
                     <span>{Math.floor(activeBattle.playerHp)} HP</span>
                   </div>
                   <div className="h-3 bg-white/5 rounded-full overflow-hidden border border-white/10 p-0.5">
@@ -4384,13 +4505,16 @@ export const GameDashboard = ({
               >
                 <div className="relative">
                   <div className="absolute -inset-4 bg-red-500/20 blur-2xl rounded-full animate-pulse" />
-                  <Navigation 
-                    className="w-32 h-32 -rotate-90 relative z-10 drop-shadow-[0_0_20px_rgba(239,68,68,0.6)]" 
-                    style={{ color: activeBattle.enemyColor }}
-                  />
+                  <div className="relative w-48 h-48 flex items-center justify-center">
+                    <img 
+                      src={activeBattle.enemyImage || '/images/battle/enemy_scout.png'} 
+                      alt={activeBattle.enemyName}
+                      className="w-full h-full object-contain relative z-10 drop-shadow-[0_0_30px_rgba(239,68,68,0.8)] scale-x-[-1]"
+                    />
+                  </div>
                 </div>
                 <div className="w-48 space-y-2">
-                  <div className="flex justify-between text-[10px] font-orbitron font-bold text-red-400 uppercase tracking-widest">
+                  <div className="flex justify-between text-base font-orbitron font-bold text-red-400 uppercase tracking-widest">
                     <span>{activeBattle.enemyName}</span>
                     <span>{Math.floor(activeBattle.enemyHp)} HP</span>
                   </div>
@@ -4405,74 +4529,76 @@ export const GameDashboard = ({
               </motion.div>
             </div>
 
-            {/* Battle Controls */}
-            <div className="mt-8 grid grid-cols-4 gap-4">
-              {[
-                { id: 'laser', name: language === 'pt' ? 'RAIO LASER' : 'LASER BEAM', icon: Zap, color: 'cyan' },
-                { id: 'plasma', name: language === 'pt' ? 'RAIO PLASMA' : 'PLASMA BEAM', icon: Flame, color: 'orange' },
-                { id: 'special', name: language === 'pt' ? 'RAIO ESPECIAL' : 'SPECIAL BEAM', icon: Crosshair, color: 'purple' },
-                { id: 'shield', name: language === 'pt' ? 'ESCUDO' : 'SHIELD', icon: Shield, color: 'blue' }
-              ].map((attack) => {
-                const progress = getCooldownProgress(attack.id as any);
-                const isReady = progress >= 100;
-                
-                return (
-                  <button
-                    key={attack.id}
-                    onClick={() => playerAttack(attack.id as any)}
-                    disabled={!isReady || activeBattle.isVictory || activeBattle.isDefeat}
-                    className={`relative group overflow-hidden rounded-2xl p-4 transition-all border ${
-                      isReady 
-                        ? `bg-${attack.color}-500/10 border-${attack.color}-500/30 hover:bg-${attack.color}-500/20` 
-                        : 'bg-white/5 border-white/10 cursor-not-allowed opacity-50'
-                    }`}
+            {/* Cinematic Battle Status */}
+            <div className="mt-8 flex flex-col items-center justify-center p-6 bg-white/5 rounded-2xl border border-white/10 relative overflow-hidden group">
+              <div className="absolute inset-0 bg-gradient-to-r from-cyan-500/5 via-transparent to-red-500/5 opacity-50" />
+              
+              <AnimatePresence mode="wait">
+                {!(activeBattle.isVictory || activeBattle.isDefeat) ? (
+                  <motion.div 
+                    key="combat-status"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    className="flex flex-col items-center gap-2 relative z-10"
                   >
-                    <div className="flex flex-col items-center gap-3 relative z-10">
-                      <attack.icon className={`w-8 h-8 ${isReady ? `text-${attack.color}-400` : 'text-slate-600'}`} />
-                      <span className={`text-[10px] font-orbitron font-bold tracking-widest uppercase ${isReady ? 'text-white' : 'text-slate-600'}`}>
-                        {attack.name}
+                    <div className="flex items-center gap-3">
+                      <Zap className="w-5 h-5 text-cyan-400 animate-pulse" />
+                      <span className="text-xl font-orbitron font-bold text-white tracking-[0.3em] uppercase">
+                        {language === 'pt' ? 'COMBATE EM ANDAMENTO' : 'COMBAT IN PROGRESS'}
                       </span>
-                      <div className="w-full h-1 bg-white/5 rounded-full overflow-hidden">
-                        <motion.div 
-                          className={`h-full bg-${attack.color}-500`}
-                          animate={{ width: `${progress}%` }}
-                          transition={{ duration: 0.1 }}
-                        />
-                      </div>
                     </div>
-                    {isReady && (
-                      <motion.div 
-                        className={`absolute inset-0 bg-${attack.color}-500/5`}
-                        animate={{ opacity: [0, 0.2, 0] }}
-                        transition={{ duration: 1, repeat: Infinity }}
-                      />
-                    )}
-                  </button>
-                );
-              })}
+                    <div className="flex items-center gap-2 text-[14px] font-mono text-cyan-400/60 uppercase">
+                      <span className="animate-pulse">●</span>
+                      <span>{language === 'pt' ? 'SISTEMAS AUTÔNOMOS ATIVOS' : 'AUTONOMOUS SYSTEMS ACTIVE'}</span>
+                    </div>
+                  </motion.div>
+                ) : (
+                  <motion.div 
+                    key="result-status"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="flex flex-col items-center gap-2 relative z-10"
+                  >
+                    <span className={`text-xl font-orbitron font-bold tracking-[0.3em] uppercase ${activeBattle.isVictory ? 'text-emerald-400' : 'text-rose-500'}`}>
+                      {activeBattle.isVictory ? (language === 'pt' ? 'OBJETIVO CONCLUÍDO' : 'OBJECTIVE COMPLETE') : (language === 'pt' ? 'MISSÃO FRACASSADA' : 'MISSION FAILED')}
+                    </span>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {/* Progress Scanline */}
+              {!(activeBattle.isVictory || activeBattle.isDefeat) && (
+                <motion.div 
+                  className="absolute bottom-0 left-0 h-1 bg-cyan-500 shadow-[0_0_10px_rgba(6,182,212,0.8)]"
+                  initial={{ width: "0%" }}
+                  animate={{ width: "100%" }}
+                  transition={{ duration: 6, ease: "linear" }}
+                />
+              )}
             </div>
 
             <div className="mt-6 flex justify-center">
               <button
                 onClick={skipBattle}
-                disabled={activeBattle.isVictory || activeBattle.isDefeat || aetherion < 10}
+                disabled={activeBattle.isVictory || activeBattle.isDefeat}
                 className={`relative group overflow-hidden rounded-xl px-8 py-3 transition-all border ${
-                  activeBattle.isVictory || activeBattle.isDefeat || aetherion < 10
+                  activeBattle.isVictory || activeBattle.isDefeat
                     ? 'bg-white/5 border-white/10 cursor-not-allowed opacity-50'
                     : 'bg-amber-500/10 border-amber-500/30 hover:bg-amber-500/20 text-amber-400'
                 }`}
               >
                 <div className="flex items-center gap-3 relative z-10">
-                  <FastForward className="w-5 h-5" />
+                  <Zap className="w-5 h-5" />
                   <div className="flex flex-col items-start">
-                    <span className="text-xs font-orbitron font-bold tracking-widest uppercase">
-                      {language === 'pt' ? 'PULAR BATALHA' : 'SKIP BATTLE'}
+                    <span className="text-[14px] font-orbitron font-bold tracking-widest uppercase">
+                      {language === 'pt' ? 'RESOLVER AGORA' : 'QUICK RESOLVE'}
                     </span>
                     <div className="flex items-center gap-2">
-                      <span className="text-[8px] font-mono opacity-70">
+                      <span className="text-[14px] font-mono opacity-70">
                         10 {t('aetherion').toUpperCase()}
                       </span>
-                      <span className="text-[9px] font-bold text-emerald-400">
+                      <span className="text-[15px] font-bold text-emerald-400">
                         {(activeBattle.winProbability || 50) + getPoliceBonus(privatePoliceLevel)}% CHANCE
                       </span>
                     </div>
@@ -4496,7 +4622,7 @@ export const GameDashboard = ({
                     
                     {activeBattle.isVictory ? (
                       <div className="space-y-2">
-                        <p className="text-slate-300 font-orbitron text-xs tracking-widest uppercase">
+                        <p className="text-slate-300 font-orbitron text-[14px] tracking-widest uppercase">
                           {language === 'pt' ? 'RECOMPENSAS RECEBIDAS' : 'REWARDS RECEIVED'}
                         </p>
                         <div className="flex flex-wrap items-center justify-center gap-4">
@@ -4519,14 +4645,14 @@ export const GameDashboard = ({
                         </div>
                       </div>
                     ) : (
-                      <p className="text-slate-400 font-orbitron text-xs tracking-widest uppercase">
+                      <p className="text-slate-400 font-orbitron text-[14px] tracking-widest uppercase">
                         {language === 'pt' ? 'SUA NAVE FOI DESTRUÍDA E A CARGA PERDIDA' : 'YOUR SHIP WAS DESTROYED AND CARGO LOST'}
                       </p>
                     )}
 
                     <button
                       onClick={finishBattle}
-                      className={`px-12 py-4 rounded-xl font-orbitron font-bold text-xs tracking-[0.4em] uppercase transition-all ${
+                      className={`px-12 py-4 rounded-xl font-orbitron font-bold text-[14px] tracking-[0.4em] uppercase transition-all ${
                         activeBattle.isVictory 
                           ? 'bg-emerald-500 text-black hover:bg-emerald-400 shadow-[0_0_30px_rgba(16,185,129,0.4)]' 
                           : 'bg-rose-600 text-white hover:bg-rose-500 shadow-[0_0_30px_rgba(225,29,72,0.4)]'
@@ -5079,7 +5205,8 @@ export const GameDashboard = ({
       colonies // All colony progress
     };
 
-    const jsonString = JSON.stringify(saveData);
+    const modularSave = SaveManager.createSave(saveData);
+    const jsonString = JSON.stringify(modularSave, null, 2);
     
     // Improved obfuscation/encryption as requested (XOR cipher)
     const SECRET_KEY = 73; // Unique key for this app
@@ -5123,7 +5250,8 @@ export const GameDashboard = ({
           jsonString = decodeURIComponent(escape(atob(encryptedData)));
         }
 
-        const data = JSON.parse(jsonString);
+        const parsedData = JSON.parse(jsonString);
+        const data = SaveManager.loadSave(parsedData);
         
         // Merge data
         if (data.route4Unlocked !== undefined) setRoute4Unlocked(data.route4Unlocked);
@@ -5309,13 +5437,12 @@ export const GameDashboard = ({
     });
     if (!allOresMaxed) return false;
 
-    // 5. Todos os slots de todas as naves comprados e ligados
-    const allSlotsMaxedAndActive = solarRoutes.every(r => {
+    // 5. Todos os slots de todas as naves comprados
+    const allSlotsMaxed = solarRoutes.every(r => {
       const slots = autoTravelSlots[r.id] || 0;
-      const active = autoTravelActive[r.id] || false;
-      return slots >= 5 && active;
+      return slots >= 5;
     });
-    if (!allSlotsMaxedAndActive) return false;
+    if (!allSlotsMaxed) return false;
 
     // 6. Fortuna acumulada de 1 Trilhão de QC (Total Acquired)
     const currentQC = historyStats['Solar']?.qcTotalAcquired || 0;
@@ -5362,13 +5489,12 @@ export const GameDashboard = ({
     });
     if (!allOresMaxed) return false;
 
-    // 5. Todos os slots de todas as naves comprados e ligados
-    const allSlotsMaxedAndActive = interstellarRoutes.every(r => {
+    // 5. Todos os slots de todas as naves comprados
+    const allSlotsMaxed = interstellarRoutes.every(r => {
       const slots = autoTravelSlots[r.id] || 0;
-      const active = autoTravelActive[r.id] || false;
-      return slots >= 5 && active;
+      return slots >= 5;
     });
-    if (!allSlotsMaxedAndActive) return false;
+    if (!allSlotsMaxed) return false;
 
     // 6. Fortuna acumulada de 999 Trilhões de QC (Total Acquired)
     const currentQC = historyStats['Interstellar']?.qcTotalAcquired || 0;
@@ -5722,7 +5848,8 @@ export const GameDashboard = ({
         earthEvents: earthEventsRef.current
       };
       const saveToStorage = async () => {
-        await GameStorage.save(saveData, 'time_travel_save');
+        const modularSave = SaveManager.createSave(saveData);
+        await GameStorage.save(modularSave, 'time_travel_save');
       };
       saveToStorage();
     }, 30000); // Auto-save every 30 seconds
@@ -5743,7 +5870,7 @@ export const GameDashboard = ({
       const saved = await GameStorage.load('time_travel_save');
       if (saved) {
         try {
-          const data = saved;
+          const data = SaveManager.loadSave(saved);
           setQc(data.qc);
           if (data.aetherion !== undefined) setAetherion(data.aetherion);
           if (data.miningWaste !== undefined) setMiningWaste(data.miningWaste);
@@ -6013,9 +6140,9 @@ export const GameDashboard = ({
       }
     });
     
-    // Hangar check (Max 10 simultaneous manual deliveries)
+    // Hangar check (Max 25 simultaneous manual deliveries)
     const activeManual = activeDeliveriesRef.current.filter(d => !d.id.startsWith('auto-')).length;
-    if (activeManual >= 10) {
+    if (activeManual >= 25) {
       addLog(t('manualDeliveryLimit'), 'warning');
       return false;
     }
@@ -6213,6 +6340,10 @@ export const GameDashboard = ({
       extractionAutoSellUnlocked,
       route4Unlocked,
       totalExtractionProfit,
+      aetherion,
+      miningWaste,
+      solarEnergy,
+      aetherionTubes,
       lastScanTime,
       hasSeenRoute2UnlockMessage,
       speedRunTime,
@@ -6239,7 +6370,8 @@ export const GameDashboard = ({
     };
 
     try {
-      await GameStorage.save(saveData, 'time_travel_save');
+      const modularSave = SaveManager.createSave(saveData);
+      await GameStorage.save(modularSave, 'time_travel_save');
       playSfx('success');
       onReturnToMenu();
     } catch (error) {
@@ -6442,13 +6574,29 @@ export const GameDashboard = ({
               winProb = Math.min(100, winProb + 25);
             }
 
-            // Add Doom P bonus to win probability for display
+            // Add Bonuses to win probability
             const doomPBonus = getDoomPBonus(doomPLevelRef.current);
-            winProb = Math.min(100, winProb + doomPBonus);
+            const policeBonus = getPoliceBonus(privatePoliceLevelRef.current);
+            const totalWinProb = winProb + doomPBonus + policeBonus;
 
             const multipliers = getEconomicMultipliers();
             const rewardMultiplier = isBoss ? 6 : (isElite ? 3 : 1);
             
+            // If totalWinProb is >= 100, it's a guaranteed victory
+            const result = (Math.random() * 100 < totalWinProb) ? 'victory' : 'defeat';
+            
+            const getEnemyImage = () => {
+              if (isBoss) return '/images/battle/enemy_boss.png';
+              if (isElite) return '/images/battle/enemy_elite.png';
+              if (enemyTier > 15) return '/images/battle/enemy_raider.png';
+              if (enemyTier > 5) return '/images/battle/enemy_alien.png';
+              return '/images/battle/enemy_scout.png';
+            };
+
+            const getPlayerImage = () => {
+              return battleLevelRef.current >= 25 ? '/images/battle/skyring.png' : '/images/battle/standard_ship.png';
+            };
+
             const battle: Battle = {
               id: Math.random().toString(36).substr(2, 9),
               deliveryId: targetId,
@@ -6459,14 +6607,18 @@ export const GameDashboard = ({
               enemyHp: enemyHp,
               playerMaxHp: playerHp,
               playerHp: playerHp,
-              reward: Math.floor(route.reward * (0.2 + enemyTier * 0.05) * (isBoss ? 5 : (isElite ? 2 : 1)) * multipliers.profit * rewardMultiplier),
+              reward: Math.floor(route.reward * (0.5 + enemyTier * 0.1) * (isBoss ? 5 : (isElite ? 2 : 1)) * multipliers.profit * rewardMultiplier),
               startTime: Date.now(),
               lastPlayerAttack: { laser: 0, plasma: 0, special: 0, shield: 0 },
-              lastEnemyAttack: Date.now() + 2000, 
+              lastEnemyAttack: Date.now() + 1000, 
               shieldActive: false,
               lastShieldTime: 0,
               winProbability: winProb,
-              enemyTier: enemyTier
+              enemyTier: enemyTier,
+              predeterminedResult: result,
+              isCinematicFinished: false,
+              playerImage: getPlayerImage(),
+              enemyImage: getEnemyImage()
             };
 
             lastRandomBattleTimeRef.current = Date.now();
@@ -6542,34 +6694,47 @@ export const GameDashboard = ({
         }
       }
 
-      // Process Battle Tick
+      // Process Battle Tick (AUTOMATIC CINEMATIC RESOLVE)
       if (activeBattleRef.current && !activeBattleRef.current.isVictory && !activeBattleRef.current.isDefeat) {
         const battle = { ...activeBattleRef.current };
         const now = Date.now();
-        
-        // Shield duration check (2 seconds)
-        if (battle.shieldActive && battle.lastShieldTime && now - battle.lastShieldTime > 2000) {
-          battle.shieldActive = false;
-          addLog(t('shieldDeactivated'), 'info');
-        }
+        const elapsed = now - battle.startTime;
+        const totalDuration = 6000; // 6 seconds of cinematic combat
 
-        // Enemy Attack
-        if (now - battle.lastEnemyAttack >= 2500) {
-          let enemyDmg = Math.floor((8 + (battleLevelRef.current * 5)) * (0.8 + Math.random() * 0.4));
+        if (elapsed < totalDuration) {
+          // Cinematic Phase
+          const progress = elapsed / totalDuration;
           
-          // Apply shield reduction (100% - Invulnerable)
-          if (battle.shieldActive) {
-            enemyDmg = 0;
+          // Smoothly drain HP to 0 or 10% based on predeterminedResult
+          if (battle.predeterminedResult === 'victory') {
+            battle.enemyHp = Math.max(0, battle.enemyMaxHp * (1 - progress));
+            battle.playerHp = Math.max(battle.playerMaxHp * 0.1, battle.playerMaxHp * (1 - progress * 0.5));
+          } else {
+            battle.playerHp = Math.max(0, battle.playerMaxHp * (1 - progress));
+            battle.enemyHp = Math.max(battle.enemyMaxHp * 0.1, battle.enemyMaxHp * (1 - progress * 0.5));
           }
 
-          battle.playerHp = Math.max(0, battle.playerHp - enemyDmg);
-          battle.lastEnemyAttack = now;
-          playSfx('hit');
-          
-          if (battle.playerHp <= 0) {
+          // Trigger automatic shots for visual effect
+          if (now - (battle.lastPlayerAttack.laser || 0) > 1000) {
+            battle.lastPlayerAttack = { ...battle.lastPlayerAttack, laser: now };
+            playSfx('laser');
+          }
+          if (now - battle.lastEnemyAttack >= 1500) {
+            battle.lastEnemyAttack = now;
+            playSfx('hit');
+          }
+        } else {
+          // Finalize Result
+          if (battle.predeterminedResult === 'victory') {
+            battle.isVictory = true;
+            battle.enemyHp = 0;
+            resolveBattleVictory(battle);
+          } else {
             battle.isDefeat = true;
+            battle.playerHp = 0;
             resolveBattleDefeat(battle);
           }
+          battle.isCinematicFinished = true;
         }
         
         setActiveBattle(battle);
@@ -7142,12 +7307,10 @@ export const GameDashboard = ({
     if (packs <= 0) return;
 
     const multipliers = getEconomicMultipliers();
-    const compressionBonus = 1 + (miningCompressionLevels[oreId] || 0) * 0.5;
+    const compressionBonus = 1 + (miningCompressionLevels[oreId] || 0) * 0.2;
     let value = Math.floor(ore.baseValue * ore.rarity * ore.packSize * packs * multipliers.profit * compressionBonus);
     
-    if (routeTier === 'Interstellar') {
-      value *= 75; // Adjusted from 2250x to 75x for better balance
-    }
+    // Removed hacky 75x multiplier as base values are now balanced in game-data.ts
     
     // Level 40 reward: 10x mining value
     if (battleLevelRef.current >= 40 && routeTier === 'Interstellar') {
@@ -8350,7 +8513,7 @@ export const GameDashboard = ({
                   />
                   <RobotVisual theme="purple" />
                 </div>
-                <div className="text-[10px] font-orbitron text-purple-400 tracking-[0.4em] uppercase font-bold animate-pulse">Robot Restoration Complete</div>
+                <div className="text-base font-orbitron text-purple-400 tracking-[0.4em] uppercase font-bold animate-pulse">Robot Restoration Complete</div>
               </div>
             )}
 
@@ -8380,7 +8543,7 @@ export const GameDashboard = ({
 
             <button
               onClick={handleNext}
-              className={`px-16 py-5 rounded-2xl font-orbitron font-black text-sm tracking-[0.5em] transition-all hover:scale-105 active:scale-95 border-2 ${
+              className={`px-16 py-5 rounded-2xl font-orbitron font-black text-base tracking-[0.5em] transition-all hover:scale-105 active:scale-95 border-2 ${
                 step.type === 'danger' ? 'bg-red-600 border-red-400 text-black shadow-[0_0_40px_rgba(239,68,68,0.5)]' :
                 step.type === 'success' ? 'bg-emerald-600 border-emerald-400 text-black shadow-[0_0_40px_rgba(16,185,129,0.5)]' :
                 'bg-purple-600 border-purple-400 text-white shadow-[0_0_40px_rgba(168,85,247,0.4)]'
@@ -8462,7 +8625,7 @@ export const GameDashboard = ({
                   setShowFliperamasTutorial(false);
                   playSfx('click');
                 }}
-                className="w-full py-5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-black font-orbitron font-black text-sm tracking-[0.3em] rounded-2xl transition-all shadow-[0_0_30px_rgba(16,185,129,0.4)] uppercase active:scale-[0.98] border-t border-white/20"
+                className="w-full py-5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-black font-orbitron font-black text-base tracking-[0.3em] rounded-2xl transition-all shadow-[0_0_30px_rgba(16,185,129,0.4)] uppercase active:scale-[0.98] border-t border-white/20"
               >
                 {language === 'pt' ? 'VAMOS NESSA' : 'LET\'S GO'}
               </button>
@@ -8502,7 +8665,7 @@ export const GameDashboard = ({
                   </div>
                   <div>
                     <h2 className="text-2xl font-orbitron font-black text-white tracking-widest uppercase">{t('restoration')}</h2>
-                    <p className="text-xs text-emerald-400/60 font-mono uppercase tracking-widest">{t('projectEarthGoals')}</p>
+                    <p className="text-[14px] text-emerald-400/60 font-mono uppercase tracking-widest">{t('projectEarthGoals')}</p>
                   </div>
                 </div>
                 <button 
@@ -8521,10 +8684,10 @@ export const GameDashboard = ({
                   </div>
                   <div className="space-y-2">
                     <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-orbitron text-emerald-400 uppercase tracking-widest">Robot Assistant</span>
+                      <span className="text-base font-orbitron text-emerald-400 uppercase tracking-widest">Robot Assistant</span>
                       <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                     </div>
-                    <p className="text-sm text-white/80 font-mono leading-relaxed italic">
+                    <p className="text-base text-white/80 font-mono leading-relaxed italic">
                       &quot;{isComplete ? t('allResourcesReady') : t('restorationRobotMessage')}&quot;
                     </p>
                   </div>
@@ -8539,9 +8702,9 @@ export const GameDashboard = ({
                         <div className="flex justify-between items-end">
                           <div className="flex items-center gap-2">
                             <res.icon className={`w-4 h-4 ${res.color}`} />
-                            <span className="text-[10px] font-orbitron text-white/60 uppercase tracking-widest">{res.label}</span>
+                            <span className="text-base font-orbitron text-white/60 uppercase tracking-widest">{res.label}</span>
                           </div>
-                          <span className={`text-sm font-orbitron font-bold ${progress >= 100 ? 'text-emerald-400' : 'text-white'}`}>
+                          <span className={`text-base font-orbitron font-bold ${progress >= 100 ? 'text-emerald-400' : 'text-white'}`}>
                             {progress.toFixed(1)}%
                           </span>
                         </div>
@@ -8560,7 +8723,7 @@ export const GameDashboard = ({
                 {/* Global Progress */}
                 <div className="pt-8 border-t border-white/5">
                   <div className="flex justify-between items-end mb-4">
-                    <span className="text-xs font-orbitron text-emerald-400 uppercase tracking-[0.3em]">{t('globalReconstructionProgress')}</span>
+                    <span className="text-[14px] font-orbitron text-emerald-400 uppercase tracking-[0.3em]">{t('globalReconstructionProgress')}</span>
                     <span className="text-3xl font-orbitron font-black text-white">{totalProgress.toFixed(1)}%</span>
                   </div>
                   <div className="h-4 bg-black/60 rounded-full border-2 border-emerald-500/20 overflow-hidden p-1">
@@ -8629,7 +8792,7 @@ export const GameDashboard = ({
                   </div>
                   <div>
                     <h2 className="text-2xl font-orbitron font-black text-white tracking-widest uppercase">{t('robotRepairHeader')}</h2>
-                    <p className="text-white/40 text-xs font-mono uppercase tracking-widest">
+                    <p className="text-white/40 text-[14px] font-mono uppercase tracking-widest">
                       ID: RD-2024-X • {isRobotRepaired ? t('status') + ': OK' : t('status') + ': CRITICAL ERROR'}
                     </p>
                   </div>
@@ -8648,14 +8811,14 @@ export const GameDashboard = ({
                     <GlitchText 
                       key="glitch"
                       text={t('robotGlitchedDialogue')} 
-                      className="text-red-200/80 font-mono text-sm leading-relaxed whitespace-pre-wrap"
+                      className="text-red-200/80 font-mono text-base leading-relaxed whitespace-pre-wrap"
                       delay={40}
                     />
                   ) : (
                     <GlitchText 
                       key="clean"
                       text={t('robotRepairedDialogue')} 
-                      className="text-emerald-200/80 font-mono text-sm leading-relaxed whitespace-pre-wrap"
+                      className="text-emerald-200/80 font-mono text-base leading-relaxed whitespace-pre-wrap"
                       delay={20}
                     />
                   )}
@@ -8663,7 +8826,7 @@ export const GameDashboard = ({
 
                 {!isRobotRepaired && (
                   <div className="space-y-4">
-                    <div className="flex justify-between items-end text-[10px] font-mono uppercase tracking-widest text-white/40">
+                    <div className="flex justify-between items-end text-base font-mono uppercase tracking-widest text-white/40">
                       <span>{t('repairProgress')}</span>
                       <span className="text-red-400 font-orbitron">{robotRepairProgress}%</span>
                     </div>
@@ -8688,7 +8851,7 @@ export const GameDashboard = ({
                         <Wrench className="w-5 h-5" />
                         {t('repairButton')}
                       </button>
-                      <div className="text-[10px] space-y-1 font-mono uppercase tracking-widest text-white/40">
+                      <div className="text-base space-y-1 font-mono uppercase tracking-widest text-white/40">
                         <div className="flex items-center gap-2">
                           <Zap className={`w-3 h-3 ${voidResources.energy >= 500 ? 'text-yellow-400' : 'text-red-400'}`} />
                           500 {t('energy')}
@@ -8767,7 +8930,7 @@ export const GameDashboard = ({
                   </div>
                   <div>
                     <h2 className="text-3xl font-orbitron font-black text-white tracking-widest uppercase">{t('upgradeBattleShip')}</h2>
-                    <p className="text-emerald-400/60 text-xs font-mono uppercase tracking-widest flex items-center gap-2">
+                    <p className="text-emerald-400/60 text-[14px] font-mono uppercase tracking-widest flex items-center gap-2">
                       <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
                       {t('upgradeBattleShipDesc')}
                     </p>
@@ -8784,7 +8947,7 @@ export const GameDashboard = ({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8 relative z-10">
                 <div className="space-y-6">
                   <div className="bg-white/5 border border-white/10 rounded-2xl p-6 space-y-4">
-                    <h3 className="text-sm font-orbitron font-bold text-white tracking-widest uppercase flex items-center gap-2">
+                    <h3 className="text-base font-orbitron font-bold text-white tracking-widest uppercase flex items-center gap-2">
                        <TrendingUp className="w-4 h-4 text-emerald-400" />
                        {t('status')} Lvl {level}
                     </h3>
@@ -8795,35 +8958,35 @@ export const GameDashboard = ({
                         { label: t('level'), value: `+${(level * 10)}`, bonus: t('upgradeLimitBonus') }
                       ].map(s => (
                         <div key={s.label} className="flex justify-between items-center py-2 border-b border-white/5 last:border-0">
-                          <span className="text-[10px] uppercase tracking-widest text-white/40">{s.label}</span>
-                          <span className="text-sm font-orbitron font-bold text-emerald-400">{s.value}</span>
+                          <span className="text-base uppercase tracking-widest text-white/40">{s.label}</span>
+                          <span className="text-base font-orbitron font-bold text-emerald-400">{s.value}</span>
                         </div>
                       ))}
                     </div>
                   </div>
 
-                  <div className="p-4 bg-emerald-500/5 border border-emerald-500/20 rounded-xl italic text-[11px] text-emerald-200/60 leading-relaxed font-mono">
+                  <div className="p-4 bg-emerald-500/5 border border-emerald-500/20 rounded-xl italic text-[14px] text-emerald-200/60 leading-relaxed font-mono">
                     &quot;O Projeto Terra começa com a purificação do Vazio. Sua nave agora é um instrumento de justiça galáctica.&quot;
                   </div>
                 </div>
 
                 <div className="space-y-6 flex flex-col justify-between">
                   <div className="space-y-4">
-                    <div className="text-[10px] font-mono uppercase tracking-widest text-white/40 mb-2">{t('upgradeCost')}</div>
+                    <div className="text-base font-mono uppercase tracking-widest text-white/40 mb-2">{t('upgradeCost')}</div>
                     <div className="grid grid-cols-1 gap-3">
                       <div className={`p-4 rounded-xl border flex items-center justify-between ${voidResources.energy >= energyCost ? 'bg-white/5 border-white/10' : 'bg-red-500/5 border-red-500/20'}`}>
                         <div className="flex items-center gap-3">
                           <Zap className={`w-5 h-5 ${voidResources.energy >= energyCost ? 'text-yellow-400' : 'text-red-400'}`} />
-                          <span className="text-xs font-orbitron font-bold text-white uppercase">{t('energy')}</span>
+                          <span className="text-[14px] font-orbitron font-bold text-white uppercase">{t('energy')}</span>
                         </div>
-                        <span className={`text-sm font-mono font-bold ${voidResources.energy >= energyCost ? 'text-white' : 'text-red-400'}`}>{formatValue(energyCost)}</span>
+                        <span className={`text-base font-mono font-bold ${voidResources.energy >= energyCost ? 'text-white' : 'text-red-400'}`}>{formatValue(energyCost)}</span>
                       </div>
                       <div className={`p-4 rounded-xl border flex items-center justify-between ${voidResources.tech >= techCost ? 'bg-white/5 border-white/10' : 'bg-red-500/5 border-red-500/20'}`}>
                         <div className="flex items-center gap-3">
                           <Cpu className={`w-5 h-5 ${voidResources.tech >= techCost ? 'text-cyan-400' : 'text-red-400'}`} />
-                          <span className="text-xs font-orbitron font-bold text-white uppercase">{t('tech')}</span>
+                          <span className="text-[14px] font-orbitron font-bold text-white uppercase">{t('tech')}</span>
                         </div>
-                        <span className={`text-sm font-mono font-bold ${voidResources.tech >= techCost ? 'text-white' : 'text-red-400'}`}>{formatValue(techCost)}</span>
+                        <span className={`text-base font-mono font-bold ${voidResources.tech >= techCost ? 'text-white' : 'text-red-400'}`}>{formatValue(techCost)}</span>
                       </div>
                     </div>
                   </div>
@@ -8900,7 +9063,7 @@ export const GameDashboard = ({
                   </div>
                   <div>
                     <h2 className="text-base font-orbitron font-black text-white tracking-widest uppercase leading-none">{t('voidWarMap')}</h2>
-                    <p className="text-[8px] text-red-500/60 font-mono uppercase tracking-widest mt-0.5">{t('voidWarAlert')}</p>
+                    <p className="text-[14px] text-red-500/60 font-mono uppercase tracking-widest mt-0.5">{t('voidWarAlert')}</p>
                   </div>
                 </div>
                 <button 
@@ -8952,13 +9115,13 @@ export const GameDashboard = ({
                           <div className="relative">
                             <Crosshair className="w-6 h-6 text-red-500 animate-spin-slow" />
                             <div className="absolute inset-0 flex items-center justify-center">
-                              <span className="text-[9px] font-black text-white">{voidWarProgress.currentBattle + 1}/5</span>
+                              <span className="text-[15px] font-black text-white">{voidWarProgress.currentBattle + 1}/5</span>
                             </div>
                           </div>
                         )}
                         
                         <div className="text-center z-10 w-full px-1">
-                          <h3 className="font-orbitron font-black text-white text-[10px] uppercase tracking-wider leading-none mb-1 truncate">{sector.name}</h3>
+                          <h3 className="font-orbitron font-black text-white text-base uppercase tracking-wider leading-none mb-1 truncate">{sector.name}</h3>
                           <div className="flex flex-col gap-0 mb-1">
                             <p className="text-[6px] font-mono text-cyan-400/80 uppercase tracking-tighter truncate">
                               {language === 'pt' ? 'ZONA' : 'ZONE'}: {sector.zone}
@@ -8967,7 +9130,7 @@ export const GameDashboard = ({
                               BOSS: {sector.boss}
                             </p>
                           </div>
-                          <p className={`text-[8px] font-mono uppercase tracking-widest leading-none ${isCleared ? 'text-emerald-400' : isCurrent ? 'text-red-500' : 'text-white/40'}`}>
+                          <p className={`text-[14px] font-mono uppercase tracking-widest leading-none ${isCleared ? 'text-emerald-400' : isCurrent ? 'text-red-500' : 'text-white/40'}`}>
                             {isCleared ? t('cleared') : sector.locked ? t('lockedSector') : t('battleProgress')}
                           </p>
                         </div>
@@ -9019,12 +9182,12 @@ export const GameDashboard = ({
               </div>
               <div className="space-y-0.5">
                 <h2 className="text-2xl font-orbitron font-black text-white tracking-[0.2em] uppercase">{t('earthProject')}</h2>
-                <p className="text-xs text-emerald-400/60 font-mono uppercase tracking-[0.2em]">{t('biosphereRestoration')}</p>
+                <p className="text-[14px] text-emerald-400/60 font-mono uppercase tracking-[0.2em]">{t('biosphereRestoration')}</p>
               </div>
             </div>
 
             <div className="max-w-2xl mx-auto space-y-3">
-              <div className="flex justify-between items-end text-[9px] font-orbitron text-emerald-400 uppercase tracking-widest">
+              <div className="flex justify-between items-end text-[15px] font-orbitron text-emerald-400 uppercase tracking-widest">
                 <span>{t('globalReconstructionProgress')}</span>
                 <span className="text-lg font-bold">{totalProgress.toFixed(1)}%</span>
               </div>
@@ -9049,7 +9212,7 @@ export const GameDashboard = ({
                 >
                   {t('restoration')}
                 </button>
-                <p className="mt-2 text-emerald-400 font-orbitron text-[10px] uppercase tracking-widest animate-pulse">{t('hopeSymbol')}</p>
+                <p className="mt-2 text-emerald-400 font-orbitron text-base uppercase tracking-widest animate-pulse">{t('hopeSymbol')}</p>
               </motion.div>
             ) : (
               <div className="pt-2">
@@ -9059,7 +9222,7 @@ export const GameDashboard = ({
                 >
                   {t('restoration')}
                 </button>
-                <p className="mt-2 text-white/40 font-mono text-[10px] uppercase tracking-widest">{t('waitingNoduleInit')}</p>
+                <p className="mt-2 text-white/40 font-mono text-base uppercase tracking-widest">{t('waitingNoduleInit')}</p>
               </div>
             )}
           </div>
@@ -9077,8 +9240,8 @@ export const GameDashboard = ({
                       <node.icon className="w-5 h-5" />
                     </div>
                     <div>
-                      <h4 className="text-[10px] font-orbitron font-bold text-white uppercase tracking-wider leading-tight">{node.name}</h4>
-                      <p className="text-[8px] text-white/40 uppercase tracking-widest">{t('captureNodule')}</p>
+                      <h4 className="text-base font-orbitron font-bold text-white uppercase tracking-wider leading-tight">{node.name}</h4>
+                      <p className="text-[14px] text-white/40 uppercase tracking-widest">{t('captureNodule')}</p>
                     </div>
                   </div>
                   <div className="text-right">
@@ -9095,7 +9258,7 @@ export const GameDashboard = ({
                 </div>
 
                 <div className="flex items-center justify-between">
-                  <span className="text-[8px] text-white/40 uppercase tracking-widest font-mono">
+                  <span className="text-[14px] text-white/40 uppercase tracking-widest font-mono">
                     {isNodeComplete ? t('syncComplete') : t('waitingCompactedResources')}
                   </span>
                   {isNodeComplete && <CheckCircle2 className="w-3 h-3 text-emerald-400" />}
@@ -9118,11 +9281,11 @@ export const GameDashboard = ({
         {/* Header with Project Name and Progress */}
         <div className="p-4 border-b border-white/5 flex flex-col gap-3 bg-white/5">
           <div className="flex justify-between items-center">
-            <h2 className="text-[10px] font-orbitron font-bold tracking-[0.2em] text-emerald-400 uppercase flex items-center gap-2">
+            <h2 className="text-base font-orbitron font-bold tracking-[0.2em] text-emerald-400 uppercase flex items-center gap-2">
               <Globe className={`w-3 h-3 ${isComplete ? 'animate-pulse' : ''}`} /> {t('earthProject')}
             </h2>
             <div className="px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20">
-              <span className="text-[8px] font-mono text-emerald-500/80 uppercase tracking-widest font-bold">
+              <span className="text-[14px] font-mono text-emerald-500/80 uppercase tracking-widest font-bold">
                 {language === 'pt' ? 'AO VIVO' : 'LIVE'}
               </span>
             </div>
@@ -9134,30 +9297,30 @@ export const GameDashboard = ({
           {/* Main Info Grid */}
           <div className="grid grid-cols-2 gap-4">
             <div className="p-3 rounded-xl bg-white/5 border border-white/5 flex flex-col gap-1">
-              <span className="text-[8px] font-orbitron text-white/40 uppercase tracking-widest flex items-center gap-1.5">
+              <span className="text-[14px] font-orbitron text-white/40 uppercase tracking-widest flex items-center gap-1.5">
                 <Clock className="w-2.5 h-2.5 text-emerald-400" />
                 {language === 'pt' ? 'Ano Atual' : 'Current Year'}
               </span>
-              <span className="text-sm font-mono font-black text-white tracking-widest">
+              <span className="text-base font-mono font-black text-white tracking-widest">
                 {gameTime.years}
               </span>
             </div>
             <div className="p-3 rounded-xl bg-white/5 border border-white/5 flex flex-col gap-1">
-              <span className="text-[8px] font-orbitron text-white/40 uppercase tracking-widest flex items-center gap-1.5">
+              <span className="text-[14px] font-orbitron text-white/40 uppercase tracking-widest flex items-center gap-1.5">
                 <Users className="w-2.5 h-2.5 text-cyan-400" />
                 {language === 'pt' ? 'População Total' : 'Total Population'}
               </span>
-              <span className="text-sm font-mono font-black text-white tracking-widest">
+              <span className="text-base font-mono font-black text-white tracking-widest">
                 {formatValue(Math.floor(totalHumanPopulation))}
               </span>
             </div>
             <div className="p-3 rounded-xl bg-white/5 border border-white/5 flex flex-col gap-1 col-span-2">
               <div className="flex justify-between items-center mb-1">
-                <span className="text-[8px] font-orbitron text-white/40 uppercase tracking-widest flex items-center gap-1.5">
+                <span className="text-[14px] font-orbitron text-white/40 uppercase tracking-widest flex items-center gap-1.5">
                   <Activity className="w-2.5 h-2.5 text-emerald-400" />
                   {language === 'pt' ? 'Biodiversidade' : 'Biodiversity'}
                 </span>
-                <span className="text-xs font-mono font-black text-emerald-400">{earthBiodiversity.toFixed(1)}%</span>
+                <span className="text-[14px] font-mono font-black text-emerald-400">{earthBiodiversity.toFixed(1)}%</span>
               </div>
               <div className="h-1 bg-black/40 rounded-full overflow-hidden">
                 <motion.div 
@@ -9172,14 +9335,14 @@ export const GameDashboard = ({
 
           {/* Event History */}
           <div className="space-y-3">
-            <div className="flex items-center gap-2 text-[9px] font-orbitron text-white/30 uppercase tracking-[0.2em] px-1">
+            <div className="flex items-center gap-2 text-[15px] font-orbitron text-white/30 uppercase tracking-[0.2em] px-1">
               <HistoryIcon className="w-3 h-3" />
               {language === 'pt' ? 'Histórico de Eventos' : 'Event History'}
             </div>
             
             <div className="space-y-2">
               {last5Events.length === 0 ? (
-                <div className="text-[9px] font-mono text-white/10 italic text-center py-4 border border-dashed border-white/5 rounded-xl">
+                <div className="text-[15px] font-mono text-white/10 italic text-center py-4 border border-dashed border-white/5 rounded-xl">
                   {language === 'pt' ? 'Aguardando simulação...' : 'Waiting for simulation...'}
                 </div>
               ) : (
@@ -9192,14 +9355,14 @@ export const GameDashboard = ({
                     className={`p-3 rounded-xl transition-all group ${event.isFixed ? `${event.specialStyles.bg} ${event.specialStyles.border} border-2 shadow-[0_0_15px_rgba(0,0,0,0.3)]` : 'bg-white/5 border border-white/5 hover:border-emerald-500/20'}`}
                   >
                     <div className="flex justify-between items-start mb-1">
-                      <span className={`text-[10px] font-bold uppercase tracking-tight transition-colors ${event.isFixed ? event.specialStyles.color : 'text-emerald-400/80 group-hover:text-emerald-400'}`}>
+                      <span className={`text-base font-bold uppercase tracking-tight transition-colors ${event.isFixed ? event.specialStyles.color : 'text-emerald-400/80 group-hover:text-emerald-400'}`}>
                         {event.name}
                       </span>
-                      <span className="text-[8px] font-mono text-white/20">
+                      <span className="text-[14px] font-mono text-white/20">
                         {language === 'pt' ? 'ANO' : 'YEAR'} {event.year}
                       </span>
                     </div>
-                    <p className={`text-[9px] leading-relaxed italic ${event.isFixed ? 'text-white/80 font-medium' : 'text-white/40'}`}>
+                    <p className={`text-[15px] leading-relaxed italic ${event.isFixed ? 'text-white/80 font-medium' : 'text-white/40'}`}>
                       {event.description}
                     </p>
                   </motion.div>
@@ -9235,8 +9398,8 @@ export const GameDashboard = ({
             </div>
             <div className="flex-1 space-y-0 text-left">
               <h2 className="text-base font-orbitron font-black text-white tracking-widest uppercase leading-none">{t('colonizationCore')}</h2>
-              <p className="text-[9px] text-cyan-400/60 font-mono uppercase tracking-[0.2em]">{t('finalPreparationEarth')}</p>
-              <p className="text-[8px] text-white/40 max-w-2xl leading-tight">
+              <p className="text-[15px] text-cyan-400/60 font-mono uppercase tracking-[0.2em]">{t('finalPreparationEarth')}</p>
+              <p className="text-[14px] text-white/40 max-w-2xl leading-tight">
                 {t('colonizationCoreDesc')}
               </p>
             </div>
@@ -9257,8 +9420,8 @@ export const GameDashboard = ({
                       <res.icon className="w-3.5 h-3.5" />
                     </div>
                     <div>
-                      <h4 className="text-[10px] font-orbitron font-bold text-white uppercase tracking-wider leading-tight">{res.name}</h4>
-                      <p className="text-[8px] text-white/40 uppercase tracking-widest leading-none">{t('reservoirOf')} {res.raw}</p>
+                      <h4 className="text-base font-orbitron font-bold text-white uppercase tracking-wider leading-tight">{res.name}</h4>
+                      <p className="text-[14px] text-white/40 uppercase tracking-widest leading-none">{t('reservoirOf')} {res.raw}</p>
                     </div>
                   </div>
                 </div>
@@ -9267,7 +9430,7 @@ export const GameDashboard = ({
                   <div className="flex justify-between items-end">
                     <div className="space-y-0">
                       <span className="text-[7px] text-white/40 uppercase tracking-widest">{t('rawResource')}</span>
-                      <div className="text-sm font-orbitron font-bold text-white">{formatValue(rawAmount)}</div>
+                      <div className="text-base font-orbitron font-bold text-white">{formatValue(rawAmount)}</div>
                     </div>
                     <div className="text-right space-y-0">
                       <span className="text-[7px] text-white/40 uppercase tracking-widest">{t('compacted')}</span>
@@ -9287,7 +9450,7 @@ export const GameDashboard = ({
                     <button
                       onClick={() => compactVoidResource(res.id as any)}
                       disabled={!canCompact}
-                      className={`flex-1 py-1.5 rounded-lg font-orbitron font-bold text-[8px] uppercase tracking-widest transition-all active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed ${
+                      className={`flex-1 py-1.5 rounded-lg font-orbitron font-bold text-[14px] uppercase tracking-widest transition-all active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed ${
                         canCompact ? 'bg-white text-black shadow-lg' : 'bg-white/5 text-white/40 border border-white/10'
                       }`}
                     >
@@ -9296,7 +9459,7 @@ export const GameDashboard = ({
                     <button
                       onClick={() => sendCompactedToEarth(res.id as any)}
                       disabled={compactedAmount <= 0}
-                      className={`flex-1 py-1.5 rounded-lg font-orbitron font-bold text-[8px] uppercase tracking-widest transition-all active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed border ${
+                      className={`flex-1 py-1.5 rounded-lg font-orbitron font-bold text-[14px] uppercase tracking-widest transition-all active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed border ${
                         compactedAmount > 0 ? 'bg-cyan-600 border-cyan-400 text-white shadow-[0_0_8px_rgba(6,182,212,0.4)]' : 'bg-white/5 border-white/10 text-white/40'
                       }`}
                     >
@@ -9343,7 +9506,7 @@ export const GameDashboard = ({
                 <div className="flex justify-between items-start">
                   <div className="space-y-0 text-left">
                     <h3 className="text-base font-orbitron font-black text-white tracking-widest uppercase leading-none">{poi.name}</h3>
-                    <p className="text-[9px] text-white/60 font-mono uppercase tracking-widest leading-none max-w-sm line-clamp-1 mt-1">{poi.lore}</p>
+                    <p className="text-[15px] text-white/60 font-mono uppercase tracking-widest leading-none max-w-sm line-clamp-1 mt-1">{poi.lore}</p>
                   </div>
                   <button 
                     onClick={() => setActiveDonationModal(poi.id)}
@@ -9356,15 +9519,15 @@ export const GameDashboard = ({
                 <div className="space-y-2">
                   <div className="flex justify-between items-end">
                     <div className="space-y-0.5">
-                      <span className="text-[8px] text-white/40 uppercase tracking-widest leading-none">{t('locationStatus')}</span>
+                      <span className="text-[14px] text-white/40 uppercase tracking-widest leading-none">{t('locationStatus')}</span>
                       <div className="flex items-center gap-1 mt-0.5">
                         <div className={`w-1.5 h-1.5 rounded-full ${isInspired ? 'bg-emerald-400' : `bg-${color}-400 animate-pulse`}`} />
-                        <span className="text-[11px] font-orbitron font-bold text-white uppercase leading-none">{isInspired ? t('inspired') : t('waitingHelp')}</span>
+                        <span className="text-[14px] font-orbitron font-bold text-white uppercase leading-none">{isInspired ? t('inspired') : t('waitingHelp')}</span>
                       </div>
                     </div>
                     <div className="text-right">
-                      <span className="text-[8px] text-white/40 uppercase tracking-widest leading-none">{t('confidenceInspiration')}</span>
-                      <div className="text-sm font-orbitron font-bold text-white leading-none mt-0.5">{totalProgress.toFixed(1)}%</div>
+                      <span className="text-[14px] text-white/40 uppercase tracking-widest leading-none">{t('confidenceInspiration')}</span>
+                      <div className="text-base font-orbitron font-bold text-white leading-none mt-0.5">{totalProgress.toFixed(1)}%</div>
                     </div>
                   </div>
 
@@ -9384,7 +9547,7 @@ export const GameDashboard = ({
                         </div>
                         <div className="leading-tight">
                           <p className="text-[7px] text-emerald-400/60 uppercase tracking-widest font-bold">{t('activeStatus')}</p>
-                          <p className="text-[10px] font-orbitron font-bold text-white">{t('contributingToEarth')}</p>
+                          <p className="text-base font-orbitron font-bold text-white">{t('contributingToEarth')}</p>
                         </div>
                       </div>
                       <CheckCircle2 className="w-4 h-4 text-emerald-400" />
@@ -9410,7 +9573,7 @@ export const GameDashboard = ({
                             key={res.label}
                             onClick={() => donateQCToPOI(poi.id)}
                             disabled={!canAfford}
-                            className={`flex flex-col items-center justify-center gap-0.5 py-2 px-0.5 border rounded-lg transition-all text-[9px] font-orbitron font-bold uppercase tracking-widest disabled:opacity-30 disabled:cursor-not-allowed group relative overflow-hidden ${
+                            className={`flex flex-col items-center justify-center gap-0.5 py-2 px-0.5 border rounded-lg transition-all text-[15px] font-orbitron font-bold uppercase tracking-widest disabled:opacity-30 disabled:cursor-not-allowed group relative overflow-hidden ${
                               isMax
                                 ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-400'
                                 : 'bg-yellow-500/10 border-yellow-500/40 text-yellow-400 hover:bg-yellow-500/20'
@@ -9442,7 +9605,7 @@ export const GameDashboard = ({
                           key={res.label}
                           onClick={() => donateToPOI(poi.id, res.label)}
                           disabled={!canDonate}
-                          className={`flex flex-col items-center justify-center gap-0.5 py-2 px-0.5 border rounded-lg transition-all text-[9px] font-orbitron font-bold uppercase tracking-widest disabled:opacity-30 disabled:cursor-not-allowed group relative overflow-hidden ${
+                          className={`flex flex-col items-center justify-center gap-0.5 py-2 px-0.5 border rounded-lg transition-all text-[15px] font-orbitron font-bold uppercase tracking-widest disabled:opacity-30 disabled:cursor-not-allowed group relative overflow-hidden ${
                             isResMax
                               ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-400'
                               : isPrimary 
@@ -9499,7 +9662,7 @@ export const GameDashboard = ({
 
           <div className="text-center space-y-2">
             <h3 className="text-2xl font-orbitron font-black text-white uppercase tracking-tighter">{poi.name}</h3>
-            <p className="text-xs text-slate-400 uppercase tracking-widest">{language === 'pt' ? 'Configurações de Doação' : 'Donation Settings'}</p>
+            <p className="text-[14px] text-slate-400 uppercase tracking-widest">{language === 'pt' ? 'Configurações de Doação' : 'Donation Settings'}</p>
           </div>
 
           <div className="space-y-4">
@@ -9517,7 +9680,7 @@ export const GameDashboard = ({
                     : 'bg-white/5 border-white/10 text-slate-400 hover:bg-white/10'
                 }`}
               >
-                <span className="font-orbitron text-sm font-bold uppercase tracking-widest">{option.label}</span>
+                <span className="font-orbitron text-base font-bold uppercase tracking-widest">{option.label}</span>
                 <div className={`w-6 h-6 rounded-md border-2 flex items-center justify-center ${
                   currentMode === option.id ? 'border-purple-400 bg-purple-400' : 'border-slate-700'
                 }`}>
@@ -9574,7 +9737,7 @@ export const GameDashboard = ({
         {/* Header Stats */}
         <div className="p-3 border-b border-white/10 bg-black/40 backdrop-blur-md flex justify-between items-center z-10 shrink-0">
           <div className="space-y-1">
-            <p className="text-[8px] font-orbitron text-white/40 uppercase tracking-widest leading-none">{t('yourShip')}</p>
+            <p className="text-[14px] font-orbitron text-white/40 uppercase tracking-widest leading-none">{t('yourShip')}</p>
             <div className="flex gap-1.5">
               <div className="w-24 h-1.5 bg-black/60 rounded-full border border-white/10 overflow-hidden">
                 <div className="h-full bg-cyan-500 transition-all duration-300" style={{ width: `${(playerStats.shield / playerStats.maxShield) * 100}%` }} />
@@ -9586,13 +9749,13 @@ export const GameDashboard = ({
           </div>
 
           <div className="text-center">
-             <div className={`text-[9px] font-orbitron font-bold ${isGroupBattle ? 'text-yellow-500' : 'text-red-500'} animate-pulse tracking-[0.2em] leading-none`}>
+             <div className={`text-[15px] font-orbitron font-bold ${isGroupBattle ? 'text-yellow-500' : 'text-red-500'} animate-pulse tracking-[0.2em] leading-none`}>
                {isGroupBattle ? t('groupBattle').toUpperCase() : t('realTimeCombat').toUpperCase()}
              </div>
           </div>
 
           <div className="space-y-1 text-right">
-            <p className="text-[8px] font-orbitron text-white/40 uppercase tracking-widest leading-none">
+            <p className="text-[14px] font-orbitron text-white/40 uppercase tracking-widest leading-none">
               {isGroupBattle ? `${t('enemyGroup')} (${enemies.filter(e => e.hp > 0).length})` : `${displayEnemy.type}`}
             </p>
             <div className="flex gap-1.5 justify-end">
@@ -9791,7 +9954,7 @@ export const GameDashboard = ({
           </div>
           <div className="text-center space-y-1">
             <h3 className="text-xl font-orbitron font-black text-white tracking-widest uppercase">{t('scanningVoid')}</h3>
-            <p className="text-[10px] text-red-400/60 font-mono uppercase tracking-[0.2em] animate-pulse">{t('searchingEnemySignatures')}</p>
+            <p className="text-base text-red-400/60 font-mono uppercase tracking-[0.2em] animate-pulse">{t('searchingEnemySignatures')}</p>
           </div>
         </div>
       );
@@ -9804,7 +9967,7 @@ export const GameDashboard = ({
             <h3 className="text-lg font-orbitron font-black text-white tracking-widest uppercase">{t('targetsDetected')}</h3>
             <button 
               onClick={() => setVoidBattleStatus('idle')}
-              className="px-3 py-1.5 bg-white/5 border border-white/10 rounded-lg text-[9px] font-orbitron text-white/60 hover:text-white transition-all uppercase tracking-widest"
+              className="px-3 py-1.5 bg-white/5 border border-white/10 rounded-lg text-[15px] font-orbitron text-white/60 hover:text-white transition-all uppercase tracking-widest"
             >
               {t('cancelSearch')}
             </button>
@@ -9819,20 +9982,20 @@ export const GameDashboard = ({
                     {enemy.type}
                   </div>
                   <div className="text-right">
-                    <p className="text-[8px] text-white/40 uppercase tracking-widest leading-none">{t('qcInPossession')}</p>
-                    <p className="text-xs font-orbitron font-bold text-yellow-400">{formatValue(enemy.qc)}</p>
+                    <p className="text-[14px] text-white/40 uppercase tracking-widest leading-none">{t('qcInPossession')}</p>
+                    <p className="text-[14px] font-orbitron font-bold text-yellow-400">{formatValue(enemy.qc)}</p>
                   </div>
                 </div>
                 
                 <div className="space-y-2">
-                   <div className="flex justify-between text-[9px] font-mono leading-none">
+                   <div className="flex justify-between text-[15px] font-mono leading-none">
                      <span className="text-white/40">ESCUDO</span>
                      <span className="text-cyan-400">{enemy.maxShield}</span>
                    </div>
                    <div className="h-1 bg-black/60 rounded-full overflow-hidden border border-white/5">
                      <div className="h-full bg-cyan-500" style={{ width: '100%' }} />
                    </div>
-                   <div className="flex justify-between text-[9px] font-mono leading-none">
+                   <div className="flex justify-between text-[15px] font-mono leading-none">
                      <span className="text-white/40">CASCO</span>
                      <span className="text-red-400">{enemy.maxHp}</span>
                    </div>
@@ -9843,7 +10006,7 @@ export const GameDashboard = ({
 
                 <button 
                   onClick={() => selectVoidBattle(enemy)}
-                  className="w-full py-2 bg-red-600 text-white font-orbitron font-black text-[10px] rounded-lg hover:bg-red-500 transition-all uppercase tracking-widest shadow-lg group-hover:scale-[1.02] active:scale-95"
+                  className="w-full py-2 bg-red-600 text-white font-orbitron font-black text-base rounded-lg hover:bg-red-500 transition-all uppercase tracking-widest shadow-lg group-hover:scale-[1.02] active:scale-95"
                 >
                   {t('attackTarget')}
                 </button>
@@ -9876,7 +10039,7 @@ export const GameDashboard = ({
            </div>
            <button 
              onClick={() => setVoidBattleStatus('idle')}
-             className="px-12 py-4 bg-white/10 border border-white/20 rounded-xl text-sm font-orbitron font-bold text-white hover:bg-white/20 transition-all uppercase tracking-widest"
+             className="px-12 py-4 bg-white/10 border border-white/20 rounded-xl text-base font-orbitron font-bold text-white hover:bg-white/20 transition-all uppercase tracking-widest"
            >
              {t('backToRadar')}
            </button>
@@ -9914,7 +10077,7 @@ export const GameDashboard = ({
                 )}
                 <Sword className={`w-16 h-16 animate-pulse transition-all duration-700 ${rStyle.sword}`} />
               </div>
-              <div className={`absolute -bottom-2 -right-2 font-orbitron font-black px-4 py-1 rounded-full text-xs shadow-lg transition-all duration-700 ${rStyle.badge}`}>
+              <div className={`absolute -bottom-2 -right-2 font-orbitron font-black px-4 py-1 rounded-full text-[14px] shadow-lg transition-all duration-700 ${rStyle.badge}`}>
                 {t('battleReady')}
               </div>
             </div>
@@ -9947,7 +10110,7 @@ export const GameDashboard = ({
                           whileHover={{ scale: 1.05 }}
                           whileTap={{ scale: 0.95 }}
                           onClick={() => setShowRobotModal(true)}
-                          className={`px-3 py-1 bg-red-500/10 border border-red-500/30 rounded-lg text-[10px] font-orbitron text-red-400 hover:bg-red-500/20 transition-all uppercase tracking-widest flex items-center gap-2 relative ${!isRobotRepaired ? 'animate-pulse' : ''}`}
+                          className={`px-3 py-1 bg-red-500/10 border border-red-500/30 rounded-lg text-base font-orbitron text-red-400 hover:bg-red-500/20 transition-all uppercase tracking-widest flex items-center gap-2 relative ${!isRobotRepaired ? 'animate-pulse' : ''}`}
                         >
                           <Bot className={`w-3 h-3 ${!isRobotRepaired ? 'animate-bounce' : ''}`} />
                           {t('defectiveRobot')}
@@ -9968,7 +10131,7 @@ export const GameDashboard = ({
                           whileHover={{ scale: 1.05 }}
                           whileTap={{ scale: 0.95 }}
                           onClick={() => setShowBattleShipUpgradeModal(true)}
-                          className="px-3 py-1 bg-emerald-500/10 border border-emerald-500/30 rounded-lg text-[10px] font-orbitron text-emerald-400 hover:bg-emerald-500/20 transition-all uppercase tracking-widest flex items-center gap-2 group relative overflow-hidden"
+                          className="px-3 py-1 bg-emerald-500/10 border border-emerald-500/30 rounded-lg text-base font-orbitron text-emerald-400 hover:bg-emerald-500/20 transition-all uppercase tracking-widest flex items-center gap-2 group relative overflow-hidden"
                         >
                           <Zap className="w-3 h-3 group-hover:scale-125 transition-transform" />
                           {t('upgradeBattleShip')}
@@ -9987,24 +10150,24 @@ export const GameDashboard = ({
                     {stats.upgrades.damage >= 5 && stats.upgrades.shield >= 5 && stats.upgrades.crit >= 5 && stats.upgrades.loot >= 5 && stats.rarity !== 'mythic' && (
                       <button
                         onClick={upgradeVoidBattleShipRarity}
-                        className="ml-4 px-3 py-1 bg-white/10 border border-white/20 rounded-lg text-[10px] font-orbitron text-white hover:bg-white/20 transition-all uppercase tracking-widest flex flex-col items-center"
+                        className="ml-4 px-3 py-1 bg-white/10 border border-white/20 rounded-lg text-base font-orbitron text-white hover:bg-white/20 transition-all uppercase tracking-widest flex flex-col items-center"
                       >
-                        <span className="text-[8px] opacity-60">UPGRADE</span>
+                        <span className="text-[14px] opacity-60">UPGRADE</span>
                         {stats.rarity === 'common' ? '5k T/E' : stats.rarity === 'rare' ? '10k T/E' : stats.rarity === 'elite' ? '15k T/E' : '20k T/E'}
                       </button>
                     )}
                   </div>
-                  <p className={`text-xs font-mono uppercase tracking-[0.2em] transition-all duration-700 ${rStyle.subtext}`}>{t('sovereignOfVoid')}</p>
+                  <p className={`text-[14px] font-mono uppercase tracking-[0.2em] transition-all duration-700 ${rStyle.subtext}`}>{t('sovereignOfVoid')}</p>
                 </div>
                 <div className="text-right space-y-2">
                   <div>
-                    <span className={`text-[10px] uppercase tracking-widest ${stats.rarity === 'mythic' ? 'text-white/60 drop-shadow-[0_1px_2px_rgba(0,0,0,1)]' : 'text-white/40'}`}>{t('quantumShield')}</span>
+                    <span className={`text-base uppercase tracking-widest ${stats.rarity === 'mythic' ? 'text-white/60 drop-shadow-[0_1px_2px_rgba(0,0,0,1)]' : 'text-white/40'}`}>{t('quantumShield')}</span>
                     <div className={`text-lg font-orbitron font-bold transition-all duration-700 ${stats.rarity === 'mythic' ? 'text-cyan-300 drop-shadow-[0_0_8px_rgba(6,182,212,0.5)]' : 'text-cyan-400'}`}>
                       {(stats.shield || 0).toFixed(0)} / {(effectiveStats.maxShield || 1000).toFixed(0)}
                     </div>
                   </div>
                   <div>
-                    <span className={`text-[10px] uppercase tracking-widest ${stats.rarity === 'mythic' ? 'text-white/60 drop-shadow-[0_1px_2px_rgba(0,0,0,1)]' : 'text-white/40'}`}>{t('hullIntegrity')}</span>
+                    <span className={`text-base uppercase tracking-widest ${stats.rarity === 'mythic' ? 'text-white/60 drop-shadow-[0_1px_2px_rgba(0,0,0,1)]' : 'text-white/40'}`}>{t('hullIntegrity')}</span>
                     <div className={`text-xl font-orbitron font-bold transition-all duration-700 ${
                       stats.rarity === 'mythic' ? 'text-white drop-shadow-[0_0_10px_rgba(255,255,255,0.5)]' :
                       hpPercent > 50 ? 'text-emerald-400' : hpPercent > 20 ? 'text-yellow-400' : 'text-red-500'
@@ -10042,7 +10205,7 @@ export const GameDashboard = ({
                   <div key={s.label} className={`bg-white/5 border border-white/10 rounded-xl p-3 space-y-1 transition-all duration-700 ${stats.rarity === 'mythic' ? 'bg-black/40 border-slate-400/20' : ''}`}>
                     <div className="flex items-center gap-2">
                       <s.icon className={`w-3 h-3 ${s.color}`} />
-                      <span className={`text-[9px] uppercase tracking-widest ${stats.rarity === 'mythic' ? 'text-white/60 drop-shadow-[0_1px_2px_rgba(0,0,0,1)]' : 'text-white/40'}`}>{s.label}</span>
+                      <span className={`text-[15px] uppercase tracking-widest ${stats.rarity === 'mythic' ? 'text-white/60 drop-shadow-[0_1px_2px_rgba(0,0,0,1)]' : 'text-white/40'}`}>{s.label}</span>
                     </div>
                     <div className={`text-lg font-orbitron font-bold transition-all duration-700 ${rStyle.text}`}>{s.value}</div>
                   </div>
@@ -10068,7 +10231,7 @@ export const GameDashboard = ({
                   className="px-6 py-3 bg-white/10 text-white font-orbitron font-bold rounded-xl hover:bg-white/20 transition-all border border-white/20 active:scale-95 uppercase tracking-[0.2em] disabled:opacity-50 disabled:cursor-not-allowed group relative"
                 >
                   <div className="flex flex-col items-center">
-                    <span className="text-xs">{t('repair')}</span>
+                    <span className="text-[14px]">{t('repair')}</span>
                     <span className="text-[7px] text-white/40 group-hover:text-white/60">
                       {stats.hp < getEffectiveVoidStats(stats).maxHp ? '1.5k Ener | 1.5k Tech' : '1k Ener | 1k Tech'}
                     </span>
@@ -10124,19 +10287,19 @@ export const GameDashboard = ({
                   <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20">
                     <upg.icon className="w-6 h-6 text-red-400" />
                   </div>
-                  <div className="text-[10px] font-mono text-red-500/60 font-bold">LVL {level}/{maxLevel}</div>
+                  <div className="text-base font-mono text-red-500/60 font-bold">LVL {level}/{maxLevel}</div>
                 </div>
                 <div>
-                  <h4 className="text-sm font-orbitron font-bold text-white uppercase tracking-wider">{upg.name}</h4>
-                  <p className="text-[9px] text-white/40 uppercase tracking-widest">{upg.desc}</p>
+                  <h4 className="text-base font-orbitron font-bold text-white uppercase tracking-wider">{upg.name}</h4>
+                  <p className="text-[15px] text-white/40 uppercase tracking-widest">{upg.desc}</p>
                 </div>
                 {!isMax && cost && (
                   <div className="pt-4 border-t border-white/5 space-y-2">
-                    <span className="text-[9px] text-white/40 uppercase tracking-widest block">{t('upgradeCost')}</span>
+                    <span className="text-[15px] text-white/40 uppercase tracking-widest block">{t('upgradeCost')}</span>
                     <div className="grid grid-cols-3 gap-2">
-                      <div className={`text-[9px] font-mono ${(voidResources?.tech || 0) >= cost.tech ? 'text-cyan-400' : 'text-red-400'}`}>{cost.tech} Tech</div>
-                      <div className={`text-[9px] font-mono ${(voidResources?.energy || 0) >= cost.energy ? 'text-yellow-400' : 'text-red-400'}`}>{cost.energy} Ener</div>
-                      <div className={`text-[9px] font-mono ${(voidResources?.minerals || 0) >= cost.minerals ? 'text-slate-400' : 'text-red-400'}`}>{cost.minerals} Min</div>
+                      <div className={`text-[15px] font-mono ${(voidResources?.tech || 0) >= cost.tech ? 'text-cyan-400' : 'text-red-400'}`}>{cost.tech} Tech</div>
+                      <div className={`text-[15px] font-mono ${(voidResources?.energy || 0) >= cost.energy ? 'text-yellow-400' : 'text-red-400'}`}>{cost.energy} Ener</div>
+                      <div className={`text-[15px] font-mono ${(voidResources?.minerals || 0) >= cost.minerals ? 'text-slate-400' : 'text-red-400'}`}>{cost.minerals} Min</div>
                     </div>
                   </div>
                 )}
@@ -10173,7 +10336,7 @@ export const GameDashboard = ({
                   <h3 className="text-2xl font-orbitron font-black text-white tracking-widest uppercase">
                     {voidAircraftTutorialStep === 0 ? t('theBeginning') : t('newPossibilities')}
                   </h3>
-                  <p className="text-sm text-cyan-100/80 font-mono leading-relaxed">
+                  <p className="text-base text-cyan-100/80 font-mono leading-relaxed">
                     {voidAircraftTutorialStep === 0 
                       ? "Aqui é o seu recomeço, devagar, mas importante. Depois de tanta exploração pelo Cosmo afora, restaram poucas opções para seguir em frente, você manteve salvo o projeto: Naves de Buscas. Mas com um pouco de sorte, você foi além, mesmo sem querer... Buscando por restos, sobras, resquícios de minérios... Inúteis... Quase zero de esperança, você se lembrou delas, escondidas, protegidas... Suas naves de buscas, antes inúteis, agora salvação! Com elas você pode... DEVE, buscar recursos onde provavelmente não há, mas ainda há... Esperança!"
                       : "Elas irão procurar minérios diversos, recursos naturais, recursos tecnológicos, recursos biológicos, medicamentos. Você pode melhorar suas naves de buscas com tecnologia, estocagem e uso inteligente de energia."
@@ -10185,14 +10348,14 @@ export const GameDashboard = ({
                   {voidAircraftTutorialStep === 0 ? (
                     <button 
                       onClick={() => setVoidAircraftTutorialStep(1)}
-                      className="px-8 py-3 bg-cyan-500 text-black font-orbitron font-black text-xs rounded-xl hover:bg-cyan-400 transition-all uppercase tracking-widest"
+                      className="px-8 py-3 bg-cyan-500 text-black font-orbitron font-black text-[14px] rounded-xl hover:bg-cyan-400 transition-all uppercase tracking-widest"
                     >
                       {t('next')}
                     </button>
                   ) : (
                     <button 
                       onClick={() => setShowVoidAircraftTutorial(false)}
-                      className="px-8 py-3 bg-emerald-500 text-black font-orbitron font-black text-xs rounded-xl hover:bg-emerald-400 transition-all uppercase tracking-widest"
+                      className="px-8 py-3 bg-emerald-500 text-black font-orbitron font-black text-[14px] rounded-xl hover:bg-emerald-400 transition-all uppercase tracking-widest"
                     >
                       {t('understood')}
                     </button>
@@ -10216,45 +10379,45 @@ export const GameDashboard = ({
                 <div className="flex justify-between items-start">
                   <div className="space-y-1">
                     <h3 className="text-xl font-orbitron font-black text-white tracking-tighter uppercase">{aircraft.name}</h3>
-                    <p className="text-[10px] text-cyan-400/60 font-mono uppercase tracking-widest leading-tight">{aircraft.description}</p>
+                    <p className="text-base text-cyan-400/60 font-mono uppercase tracking-widest leading-tight">{aircraft.description}</p>
                   </div>
-                  <div className={`px-3 py-1 rounded-full text-[9px] font-orbitron font-bold tracking-widest uppercase ${isMission ? 'bg-purple-500/20 text-purple-400 border border-purple-500/40 animate-pulse-glow' : 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/40'}`}>
+                  <div className={`px-3 py-1 rounded-full text-[15px] font-orbitron font-bold tracking-widest uppercase ${isMission ? 'bg-purple-500/20 text-purple-400 border border-purple-500/40 animate-pulse-glow' : 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/40'}`}>
                     {isMission ? t('inMission') : t('available')}
                   </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">
-                    <span className="text-[9px] text-white/40 uppercase tracking-widest">{t('capacity')}</span>
+                    <span className="text-[15px] text-white/40 uppercase tracking-widest">{t('capacity')}</span>
                     <div className="text-lg font-orbitron font-bold text-white">
-                      {Math.floor(aircraft.capacity * (1 + upgrades.storage * 0.2))} <span className="text-[10px] text-cyan-500/60">un</span>
+                      {Math.floor(aircraft.capacity * (1 + upgrades.storage * 0.2))} <span className="text-base text-cyan-500/60">un</span>
                     </div>
                   </div>
                   <div className="space-y-1">
-                    <span className="text-[9px] text-white/40 uppercase tracking-widest">{t('efficiency')}</span>
+                    <span className="text-[15px] text-white/40 uppercase tracking-widest">{t('efficiency')}</span>
                     <div className="text-lg font-orbitron font-bold text-white">
                       {(aircraft.efficiency + upgrades.quality * 10).toFixed(0)}%
                     </div>
                   </div>
                   <div className="space-y-1">
-                    <span className="text-[9px] text-white/40 uppercase tracking-widest">{t('searchTime')}</span>
+                    <span className="text-[15px] text-white/40 uppercase tracking-widest">{t('searchTime')}</span>
                     <div className="text-lg font-orbitron font-bold text-white">
                       {formatTime(currentMissionTime)}
                     </div>
                   </div>
                   <div className="space-y-1">
-                    <span className="text-[9px] text-white/40 uppercase tracking-widest">{t('automatic')}</span>
+                    <span className="text-[15px] text-white/40 uppercase tracking-widest">{t('automatic')}</span>
                     {upgrades.auto === 1 ? (
                       <button
                         onClick={() => toggleVoidAircraftAuto(aircraft.id)}
-                        className={`w-full py-1 rounded-lg text-[10px] font-orbitron font-bold transition-all border ${voidAircraftAutoToggles[aircraft.id] ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40' : 'bg-red-500/20 text-red-400 border-red-500/40'}`}
+                        className={`w-full py-1 rounded-lg text-base font-orbitron font-bold transition-all border ${voidAircraftAutoToggles[aircraft.id] ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40' : 'bg-red-500/20 text-red-400 border-red-500/40'}`}
                       >
                         {voidAircraftAutoToggles[aircraft.id] ? t('active') : t('inactive')}
                       </button>
                     ) : (
                       <button
                         onClick={() => buyVoidAircraftAuto(aircraft.id)}
-                        className="w-full py-1 rounded-lg text-[10px] font-orbitron font-bold transition-all border bg-white/5 text-white/60 border-white/10 hover:bg-white/10"
+                        className="w-full py-1 rounded-lg text-base font-orbitron font-bold transition-all border bg-white/5 text-white/60 border-white/10 hover:bg-white/10"
                       >
                         {{ 'va-1': 50, 'va-2': 75, 'va-3': 100 }[aircraft.id as 'va-1' | 'va-2' | 'va-3']}k QC
                       </button>
@@ -10264,7 +10427,7 @@ export const GameDashboard = ({
 
                 {isMission ? (
                   <div className="space-y-3">
-                    <div className="flex justify-between text-[10px] font-orbitron text-purple-400 uppercase tracking-widest">
+                    <div className="flex justify-between text-base font-orbitron text-purple-400 uppercase tracking-widest">
                       <span>{t('missionProgress')}</span>
                       <span>{formatTime(timeLeft)}</span>
                     </div>
@@ -10279,14 +10442,14 @@ export const GameDashboard = ({
                 ) : (
                   <button
                     onClick={() => startVoidMission(aircraft.id)}
-                    className="w-full py-4 bg-cyan-500 text-black font-orbitron font-black text-sm rounded-xl hover:bg-cyan-400 transition-all shadow-[0_0_20px_rgba(6,182,212,0.4)] active:scale-95 uppercase tracking-[0.2em]"
+                    className="w-full py-4 bg-cyan-500 text-black font-orbitron font-black text-base rounded-xl hover:bg-cyan-400 transition-all shadow-[0_0_20px_rgba(6,182,212,0.4)] active:scale-95 uppercase tracking-[0.2em]"
                   >
                     {t('startSearch')}
                   </button>
                 )}
 
                 <div className="pt-4 border-t border-white/5 space-y-4">
-                  <h4 className="text-[10px] font-orbitron font-bold text-white/60 uppercase tracking-widest">{t('aircraftUpgrades')}</h4>
+                  <h4 className="text-base font-orbitron font-bold text-white/60 uppercase tracking-widest">{t('aircraftUpgrades')}</h4>
                   <div className="grid grid-cols-2 gap-2">
                     {[
                       { id: 'storage', name: t('storage'), icon: Database, max: 5 },
@@ -10306,11 +10469,11 @@ export const GameDashboard = ({
                         >
                           <div className="flex items-center gap-2 mb-1">
                             <upg.icon className={`w-3 h-3 ${isMax ? 'text-emerald-400' : qc >= cost ? 'text-cyan-400' : 'text-slate-500'}`} />
-                            <span className="text-[9px] font-orbitron font-bold text-white/80 uppercase tracking-widest">{upg.name}</span>
+                            <span className="text-[15px] font-orbitron font-bold text-white/80 uppercase tracking-widest">{upg.name}</span>
                           </div>
                           <div className="flex justify-between items-end">
-                            <span className={`text-[10px] font-mono ${isMax ? 'text-emerald-500' : 'text-cyan-500/60'}`}>{isMax ? 'MAX' : `LVL ${level}`}</span>
-                            {!isMax && <span className="text-[10px] font-orbitron font-bold text-white">{formatValue(cost)}</span>}
+                            <span className={`text-base font-mono ${isMax ? 'text-emerald-500' : 'text-cyan-500/60'}`}>{isMax ? 'MAX' : `LVL ${level}`}</span>
+                            {!isMax && <span className="text-base font-orbitron font-bold text-white">{formatValue(cost)}</span>}
                           </div>
                         </button>
                       );
@@ -10371,7 +10534,7 @@ export const GameDashboard = ({
                   </div>
                   <div>
                     <h1 className="text-xl font-orbitron font-black text-white uppercase tracking-tighter">Projeto Terra</h1>
-                    <div className="flex items-center gap-2 text-emerald-400/80 font-mono text-[8px] uppercase tracking-[0.2em]">
+                    <div className="flex items-center gap-2 text-emerald-400/80 font-mono text-[14px] uppercase tracking-[0.2em]">
                       <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
                       {language === 'pt' ? 'Rota 4 - Evolução Ativa' : 'Route 4 - Active Evolution'}
                     </div>
@@ -10382,15 +10545,15 @@ export const GameDashboard = ({
             <div className="flex gap-2">
               <div className="flex flex-col items-center bg-white/5 border border-white/10 p-3 rounded-xl min-w-[100px] relative overflow-hidden group/season">
                  <div className="absolute inset-0 bg-emerald-500/5 group-hover/season:bg-emerald-500/10 transition-colors" />
-                 <div className="text-[8px] font-orbitron text-emerald-500/60 uppercase tracking-[0.3em] mb-1 z-10">{language === 'pt' ? 'ESTAÇÃO' : 'SEASON'}</div>
-                 <div className={`text-sm font-orbitron font-black z-10 ${season.color}`}>
+                 <div className="text-[14px] font-orbitron text-emerald-500/60 uppercase tracking-[0.3em] mb-1 z-10">{language === 'pt' ? 'ESTAÇÃO' : 'SEASON'}</div>
+                 <div className={`text-base font-orbitron font-black z-10 ${season.color}`}>
                    {language === 'pt' ? season.pt : season.en}
                  </div>
               </div>
 
               <div className="flex flex-col items-center bg-white/5 border border-white/10 p-3 rounded-xl min-w-[100px] relative overflow-hidden group/year">
                  <div className="absolute inset-0 bg-emerald-500/5 group-hover/year:bg-emerald-500/10 transition-colors" />
-                 <div className="text-[8px] font-orbitron text-emerald-500/60 uppercase tracking-[0.3em] mb-1 z-10">{language === 'pt' ? 'ANO ATUAL' : 'CURRENT YEAR'}</div>
+                 <div className="text-[14px] font-orbitron text-emerald-500/60 uppercase tracking-[0.3em] mb-1 z-10">{language === 'pt' ? 'ANO ATUAL' : 'CURRENT YEAR'}</div>
                  <div className="text-xl font-orbitron font-black text-white z-10 tabular-nums text-center">
                    {gameTime.years}
                  </div>
@@ -10408,7 +10571,7 @@ export const GameDashboard = ({
                     <div className="p-1.5 rounded-lg bg-blue-500/10 text-blue-400">
                        <Activity size={14} />
                     </div>
-                    <span className="text-[10px] font-orbitron font-bold text-white uppercase tracking-widest">{language === 'pt' ? 'População Total' : 'Total Population'}</span>
+                    <span className="text-base font-orbitron font-bold text-white uppercase tracking-widest">{language === 'pt' ? 'População Total' : 'Total Population'}</span>
                  </div>
                  <div className="text-xl font-orbitron font-black text-white tabular-nums">
                     {formatValue(Math.floor(totalHumanPopulation))}
@@ -10417,10 +10580,10 @@ export const GameDashboard = ({
 
               <div className="pt-2 border-t border-white/5">
                  <div className="space-y-1">
-                    <div className="text-[8px] font-mono text-slate-500 uppercase tracking-widest">{language === 'pt' ? 'Gêneros' : 'Genders'}</div>
+                    <div className="text-[14px] font-mono text-slate-500 uppercase tracking-widest">{language === 'pt' ? 'Gêneros' : 'Genders'}</div>
                     <div className="flex items-center gap-3">
                        <div className="flex-1 space-y-1">
-                          <div className="flex justify-between text-[8px] font-bold">
+                          <div className="flex justify-between text-[14px] font-bold">
                              <span className="text-blue-400">{(earthMaleRatio * 100).toFixed(1)}% {language === 'pt' ? 'H' : 'M'}</span>
                              <span className="text-pink-400">{((1 - earthMaleRatio) * 100).toFixed(1)}% {language === 'pt' ? 'M' : 'W'}</span>
                           </div>
@@ -10447,16 +10610,16 @@ export const GameDashboard = ({
                     <div className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-400">
                        <Heart size={14} />
                     </div>
-                    <span className="text-[10px] font-orbitron font-bold text-white uppercase tracking-widest">{language === 'pt' ? 'Biodiversidade' : 'Biodiversity'}</span>
+                    <span className="text-base font-orbitron font-bold text-white uppercase tracking-widest">{language === 'pt' ? 'Biodiversidade' : 'Biodiversity'}</span>
                  </div>
-                 <div className={`text-[9px] font-orbitron font-bold uppercase tracking-widest ${getBiodiversityColor(earthBiodiversity)}`}>
+                 <div className={`text-[15px] font-orbitron font-bold uppercase tracking-widest ${getBiodiversityColor(earthBiodiversity)}`}>
                     {getBiodiversityQuality(earthBiodiversity)}
                  </div>
               </div>
 
               <div className="space-y-1 pt-2 border-t border-white/5">
                  <div className="flex justify-between items-end">
-                    <span className="text-[8px] font-mono text-slate-500 uppercase">{language === 'pt' ? 'Vida' : 'Life'}</span>
+                    <span className="text-[14px] font-mono text-slate-500 uppercase">{language === 'pt' ? 'Vida' : 'Life'}</span>
                     <span className="text-md font-mono font-bold text-emerald-400 tabular-nums">{earthBiodiversity.toFixed(1)}%</span>
                  </div>
                  <div className="h-1.5 bg-black/40 rounded-full overflow-hidden border border-white/10">
@@ -10480,7 +10643,7 @@ export const GameDashboard = ({
              <div key={idx} className="glass-panel p-4 rounded-xl border border-white/5 space-y-3">
                <div className="flex items-center gap-2 opacity-60">
                  <indicator.icon size={12} className={`text-${indicator.color}-400`} />
-                 <span className="text-[9px] font-orbitron font-bold text-white uppercase tracking-widest">{indicator.label}</span>
+                 <span className="text-[15px] font-orbitron font-bold text-white uppercase tracking-widest">{indicator.label}</span>
                </div>
                <div className="space-y-1">
                  <div className="text-lg font-orbitron font-black text-white tracking-tighter">
@@ -10557,11 +10720,11 @@ export const GameDashboard = ({
     };
     
     return (
-      <div className="space-y-4 lg:space-y-4 flex flex-col h-full overflow-hidden">
-        <div className={`glass-panel ${isInterstellar ? 'neon-border-orange' : 'neon-border-cyan'} p-4 lg:py-6 lg:px-8 rounded-xl flex flex-row justify-between items-center gap-4 shrink-0`}>
+      <div className="space-y-3 lg:space-y-3 flex flex-col h-full overflow-hidden">
+        <div className={`glass-panel ${isInterstellar ? 'neon-border-orange' : 'neon-border-cyan'} p-3 lg:py-4 lg:px-8 rounded-xl flex flex-row justify-between items-center gap-4 shrink-0`}>
           <div className="flex-1">
             <h2 className={`text-lg lg:text-2xl font-orbitron font-bold ${isInterstellar ? 'text-orange-400' : 'text-cyan-400'} uppercase tracking-tight`}>{t('missions')}</h2>
-            <p className="text-[10px] lg:text-[11px] text-slate-500 font-mono uppercase tracking-[0.2em]">
+            <p className="text-base lg:text-[14px] text-slate-500 font-mono uppercase tracking-[0.2em]">
               {readyToClaimCount > 0 ? `${readyToClaimCount} ${t('readyToUnlock' as any)}` : t('gameStatsByRoute')}
             </p>
           </div>
@@ -10570,10 +10733,10 @@ export const GameDashboard = ({
             {/* Mapa de Habilidades Button */}
             <button
               onClick={() => setShowSkillMap(true)}
-              className={`px-4 py-2 lg:py-3 lg:px-6 rounded-lg font-orbitron text-[10px] tracking-widest transition-all uppercase flex flex-col items-center leading-snug bg-amber-500/10 text-amber-400 border border-amber-500/30 hover:bg-amber-500/20 hover:border-amber-500/60 shadow-[0_0_15px_rgba(245,158,11,0.1)]`}
+              className={`px-4 py-2 lg:py-3 lg:px-6 rounded-lg font-orbitron text-base tracking-widest transition-all uppercase flex flex-col items-center justify-center h-[64px] lg:h-[72px] w-[180px] lg:w-[220px] leading-snug bg-amber-500/10 text-amber-400 border border-amber-500/30 hover:bg-amber-500/20 hover:border-amber-500/60 shadow-[0_0_15px_rgba(245,158,11,0.1)]`}
             >
-              <span className="font-black text-[11px] lg:text-[13px]">{language === 'pt' ? 'Mapa de Habilidades' : 'Skill Map'}</span>
-              <span className="opacity-70 font-mono text-[8px] lg:text-[9px]">{language === 'pt' ? 'MELHORIAS' : 'UPGRADES'}</span>
+              <span className="font-black text-[14px] lg:text-base">{language === 'pt' ? 'Mapa de Habilidades' : 'Skill Map'}</span>
+              <span className="opacity-70 font-mono text-[14px] lg:text-[15px]">{language === 'pt' ? 'MELHORIAS' : 'UPGRADES'}</span>
             </button>
 
             {/* Melhorar Button */}
@@ -10593,17 +10756,17 @@ export const GameDashboard = ({
                 }
               }}
               disabled={missionRewardLevel[routeTier] >= 10}
-              className={`px-4 py-2 lg:py-3 lg:px-6 rounded-lg font-orbitron text-[10px] tracking-widest transition-all uppercase flex flex-col items-center leading-snug ${
+              className={`px-4 py-2 lg:py-3 lg:px-6 rounded-lg font-orbitron text-base tracking-widest transition-all uppercase flex flex-col items-center justify-center h-[64px] lg:h-[72px] leading-snug ${
                 missionRewardLevel[routeTier] >= 10 
                   ? 'bg-white/5 text-slate-500 cursor-not-allowed border border-white/10' 
                   : 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/30 hover:bg-indigo-500/20 hover:border-indigo-500/60 shadow-[0_0_15px_rgba(99,102,241,0.1)]'
               }`}
             >
-              <span className="font-black text-[11px] lg:text-[13px]">{language === 'pt' ? 'Melhorar' : 'Upgrade'}</span>
+              <span className="font-black text-[14px] lg:text-base">{language === 'pt' ? 'Melhorar' : 'Upgrade'}</span>
               <div className="flex flex-col items-center">
-                <span className="opacity-70 font-mono text-[8px] lg:text-[9px]">LVL {missionRewardLevel[routeTier]}/10</span>
+                <span className="opacity-70 font-mono text-[14px] lg:text-[15px]">LVL {missionRewardLevel[routeTier]}/10</span>
                 {missionRewardLevel[routeTier] < 10 && (
-                  <span className="text-[8px] text-yellow-500 font-bold mt-0.5">
+                  <span className="text-[14px] text-yellow-500 font-bold mt-0.5">
                     {formatValue(getMissionUpgradeCost(missionRewardLevel[routeTier], routeTier))} QC
                   </span>
                 )}
@@ -10635,7 +10798,7 @@ export const GameDashboard = ({
                   addLog(`${language === 'pt' ? 'Auto-Resgate de Missões desativado!' : 'Auto-Claim Missions deactivated!'}`, 'info');
                 }
               }}
-              className={`px-4 py-2 lg:py-3 lg:px-6 rounded-lg text-[10px] lg:text-[11px] font-bold font-orbitron transition-all flex items-center gap-2 ${
+              className={`px-4 py-2 lg:py-3 lg:px-6 rounded-lg text-base lg:text-[14px] font-bold font-orbitron transition-all flex items-center justify-center h-[64px] lg:h-[72px] w-[180px] lg:w-[220px] gap-2 ${
                 !radarUnlocked[routeTier]
                   ? 'bg-amber-500/10 text-amber-500 border border-amber-500/30 hover:bg-amber-500/20'
                   : autoClaimMissions 
@@ -10648,7 +10811,7 @@ export const GameDashboard = ({
                   <Target className="w-4 h-4" />
                   <div className="flex flex-col items-start leading-none">
                     <span>{language === 'pt' ? 'COMPRAR RADAR' : 'BUY RADAR'}</span>
-                    <span className="text-[8px] text-amber-500/70 font-mono mt-0.5">500k QC</span>
+                    <span className="text-[14px] text-amber-500/70 font-mono mt-0.5">500k QC</span>
                   </div>
                 </>
               ) : autoClaimMissions ? (
@@ -10670,10 +10833,10 @@ export const GameDashboard = ({
         {missions.length === 0 ? (
           <div className="glass-panel border-white/5 p-12 rounded-2xl text-center">
             <Trophy className="w-12 h-12 text-slate-700 mx-auto mb-4 opacity-20" />
-            <p className="text-slate-500 font-mono text-sm uppercase tracking-widest">{t('noMissions')}</p>
+            <p className="text-slate-500 font-mono text-base uppercase tracking-widest">{t('noMissions')}</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-3 flex-1 h-full">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 lg:gap-2 flex-1 overflow-y-auto custom-scrollbar">
             {missions.map((mission) => {
               const rarityInfo = getRarityLabel(mission.rarity);
               return (
@@ -10684,7 +10847,7 @@ export const GameDashboard = ({
                   initial={{ opacity: 0, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.8, y: -20 }}
-                  className={`glass-panel rounded-xl p-4 lg:p-5 flex flex-col justify-between transition-all relative overflow-hidden border-2 h-full ${
+                  className={`glass-panel rounded-xl p-3 lg:p-4 flex flex-col justify-between transition-all relative border-2 h-full ${
                     mission.claimed 
                       ? 'opacity-40 grayscale border-white/5' 
                       : getRarityStyles(mission.rarity, mission.completed)
@@ -10699,26 +10862,26 @@ export const GameDashboard = ({
                       <div className={`p-2 w-fit rounded-lg ${mission.completed ? (isInterstellar ? 'bg-orange-500/20 text-orange-400' : 'bg-cyan-500/20 text-cyan-400') : 'bg-white/5 text-slate-500'}`}>
                         {mission.type === 'delivery' ? <Rocket className="w-4 h-4" /> : mission.type === 'initial' ? <Trophy className="w-4 h-4" /> : <Coins className="w-4 h-4" />}
                       </div>
-                      <div className={`text-[8px] lg:text-[10px] font-black font-orbitron px-1.5 py-0.5 rounded bg-black/40 border border-white/10 ${rarityInfo.color}`}>
+                      <div className={`text-[14px] lg:text-base font-black font-orbitron px-1.5 py-0.5 rounded bg-black/40 border border-white/10 ${rarityInfo.color}`}>
                         {rarityInfo.label} <span className="ml-1 opacity-70">{rarityInfo.mult}</span>
                       </div>
                     </div>
-                    <div className="text-[11px] lg:text-[14px] font-mono text-yellow-500 font-black">
+                    <div className="text-[14px] lg:text-[14px] font-mono text-yellow-500 font-black">
                       {formatValue(mission.reward)} QC
                     </div>
                   </div>
 
-                  <div className="mb-2">
-                    <h3 className={`text-xs lg:text-md font-black font-orbitron truncate ${mission.completed && !mission.claimed ? (isInterstellar ? 'text-orange-400' : 'text-cyan-400') : 'text-slate-200'}`}>
+                  <div className="mb-1">
+                    <h3 className={`text-[14px] lg:text-md font-black font-orbitron truncate ${mission.completed && !mission.claimed ? (isInterstellar ? 'text-orange-400' : 'text-cyan-400') : 'text-slate-200'}`}>
                       {mission.title}
                     </h3>
-                    <p className="text-[9px] lg:text-[11px] text-slate-500 mt-1 line-clamp-2 leading-relaxed">
+                    <p className="text-[15px] lg:text-[14px] text-slate-500 mt-1 line-clamp-2 leading-relaxed">
                       {mission.description}
                     </p>
                   </div>
 
-                  <div className="mt-auto space-y-3">
-                    <div className="flex justify-between items-center text-[9px] font-mono uppercase tracking-widest font-black">
+                  <div className="mt-auto space-y-2">
+                    <div className="flex justify-between items-center text-[15px] font-mono uppercase tracking-widest font-black">
                       <span className="text-slate-500">{t('status')}</span>
                       <span className={mission.completed ? 'text-green-400' : 'text-slate-300'}>
                         {mission.current} / {mission.target}
@@ -10735,7 +10898,7 @@ export const GameDashboard = ({
                     <button
                       onClick={(e) => claimMission(mission.id, e)}
                       disabled={!mission.completed || mission.claimed}
-                      className={`w-full py-3 rounded-xl font-orbitron font-black text-[10px] lg:text-[12px] tracking-[0.2em] transition-all uppercase border-b-4 ${
+                      className={`w-full py-2 rounded-xl font-orbitron font-black text-base lg:text-[15px] tracking-[0.2em] transition-all uppercase border-b-4 ${
                         mission.claimed
                           ? 'bg-white/5 text-slate-600 cursor-not-allowed border-white/10'
                           : mission.completed
@@ -10755,15 +10918,61 @@ export const GameDashboard = ({
     );
   };
 
-  const route2Particles = React.useMemo(() => {
-    return [...Array(100)].map((_, i) => ({
-      speed: Math.random() * 15 + 5,
-      size: Math.random() * 2 + 1,
-      delay: Math.random() * 10,
-      top: `${Math.random() * 100}%`,
-      left: `${Math.random() * 100}%`
+  const route2CanvasRef = React.useRef<HTMLCanvasElement>(null);
+  React.useEffect(() => {
+    if (!isInterstellar) return;
+    const canvas = route2CanvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const resize = () => {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    };
+    resize();
+    window.addEventListener('resize', resize);
+
+    // Pre-compute 60 static particles (much lighter than 100 animated divs)
+    const COLORS = ['rgba(239,68,68,VAL)', 'rgba(249,115,22,VAL)', 'rgba(250,204,21,VAL)'];
+    const particles = Array.from({ length: 60 }, (_, i) => ({
+      x: Math.random() * window.innerWidth,
+      y: Math.random() * window.innerHeight,
+      size: Math.random() * 1.5 + 0.5,
+      speed: Math.random() * 0.4 + 0.1,
+      alpha: Math.random() * 0.6 + 0.2,
+      color: COLORS[i % 3]
     }));
-  }, []);
+
+    let animId: number;
+    const draw = () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      for (const p of particles) {
+        p.x -= p.speed;
+        if (p.x < -2) {
+          p.x = canvas.width + 2;
+          p.y = Math.random() * canvas.height;
+          p.alpha = Math.random() * 0.6 + 0.2;
+        }
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+        ctx.fillStyle = p.color.replace('VAL', String(p.alpha));
+        ctx.fill();
+        // Soft glow: bigger transparent circle
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size * 3, 0, Math.PI * 2);
+        ctx.fillStyle = p.color.replace('VAL', String(p.alpha * 0.15));
+        ctx.fill();
+      }
+      animId = requestAnimationFrame(draw);
+    };
+    draw();
+
+    return () => {
+      cancelAnimationFrame(animId);
+      window.removeEventListener('resize', resize);
+    };
+  }, [isInterstellar]);
 
   return (
     <div className={`min-h-screen ${isInterstellar ? 'bg-[#100505]' : 'bg-[#050510]'} text-slate-200 font-inter selection:bg-cyan-500/30 overflow-hidden relative`}>
@@ -10789,7 +10998,7 @@ export const GameDashboard = ({
             <motion.div
               animate={{ y: [0, -10, 0], opacity: [1, 0] }}
               transition={{ duration: 0.5, repeat: Infinity }}
-              className="text-yellow-400 text-xs font-mono font-bold mt-1"
+              className="text-yellow-400 text-[14px] font-mono font-bold mt-1"
             >
               $$$
             </motion.div>
@@ -10806,37 +11015,19 @@ export const GameDashboard = ({
         <div className={`absolute inset-0 ${isInterstellar ? 'bg-[linear-gradient(to_right,rgba(249,115,22,0.02)_1px,transparent_1px),linear-gradient(to_bottom,rgba(249,115,22,0.02)_1px,transparent_1px)]' : 'bg-[linear-gradient(to_right,rgba(6,182,212,0.02)_1px,transparent_1px),linear-gradient(to_bottom,rgba(6,182,212,0.02)_1px,transparent_1px)]'} bg-[size:40px_40px]`} />
       </div>
 
-      {/* Background Particles for Route 2 */}
+      {/* Background Particles for Route 2 — Canvas-based for high FPS */}
       {isInterstellar && (
-        <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
-          {route2Particles.map((particle, i) => {
-            const xEnd = typeof window !== 'undefined' ? -window.innerWidth : -1000;
-            return (
-              <motion.div
-                key={i}
-                className="absolute rounded-full blur-[0.5px]"
-                style={{
-                  width: particle.size,
-                  height: particle.size,
-                  backgroundColor: i % 3 === 0 ? '#ef4444' : i % 3 === 1 ? '#f97316' : '#facc15',
-                  top: particle.top,
-                  left: particle.left,
-                  boxShadow: `0 0 10px ${i % 3 === 0 ? 'rgba(239, 68, 68, 0.4)' : i % 3 === 1 ? 'rgba(249, 115, 22, 0.4)' : 'rgba(250, 204, 21, 0.4)'}`
-                }}
-                animate={{
-                  x: [0, xEnd],
-                  opacity: [0, 1, 1, 0]
-                }}
-                transition={{
-                  duration: particle.speed,
-                  repeat: Infinity,
-                  ease: "linear",
-                  delay: -particle.delay
-                }}
-              />
-            );
-          })}
-        </div>
+        <>
+          {/* Nebula gradient overlay — pure CSS, zero JS cost */}
+          <div className="fixed inset-0 pointer-events-none z-0" style={{
+            background: 'radial-gradient(ellipse 80% 60% at 20% 50%, rgba(249,115,22,0.04) 0%, transparent 70%), radial-gradient(ellipse 60% 80% at 80% 30%, rgba(239,68,68,0.03) 0%, transparent 70%)'
+          }} />
+          <canvas
+            ref={route2CanvasRef}
+            className="fixed inset-0 pointer-events-none z-0"
+            style={{ opacity: 0.85 }}
+          />
+        </>
       )}
 
       {/* Transition Screen */}
@@ -10938,7 +11129,7 @@ export const GameDashboard = ({
                     initial={{ opacity: 0, x: 50 }}
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0, x: 50 }}
-                    className={`fixed right-4 top-24 z-[100] whitespace-nowrap px-6 py-3 rounded-xl border shadow-2xl font-orbitron text-xs font-bold flex items-center gap-4 backdrop-blur-md ${
+                    className={`fixed right-4 top-24 z-[100] whitespace-nowrap px-6 py-3 rounded-xl border shadow-2xl font-orbitron text-[14px] font-bold flex items-center gap-4 backdrop-blur-md ${
                       battleNotification.type === 'success' 
                         ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-400 shadow-emerald-500/20' 
                         : 'bg-red-500/20 border-red-500/40 text-red-400 shadow-red-500/20'
@@ -10946,7 +11137,7 @@ export const GameDashboard = ({
                   >
                     <div className={`w-3 h-3 rounded-full ${battleNotification.type === 'success' ? 'bg-emerald-400 animate-pulse' : 'bg-red-400'}`} />
                     <div className="flex flex-col">
-                      <span className="text-[10px] opacity-60 uppercase tracking-widest">{battleNotification.type === 'success' ? 'Auto-Combat Victory' : 'Auto-Combat Defeat'}</span>
+                      <span className="text-base opacity-60 uppercase tracking-widest">{battleNotification.type === 'success' ? 'Auto-Combat Victory' : 'Auto-Combat Defeat'}</span>
                       {battleNotification.message}
                     </div>
                   </motion.div>
@@ -10954,7 +11145,7 @@ export const GameDashboard = ({
               </AnimatePresence>
               <div className="flex items-center gap-2 mt-1">
                 <div className={`w-2 h-2 rounded-full ${isInterstellar ? 'bg-orange-500' : 'bg-emerald-500'} animate-pulse`} />
-                <span className={`text-[10px] font-mono ${isInterstellar ? 'text-orange-500/60' : 'text-cyan-500/60'} uppercase tracking-widest`}>
+                <span className={`text-base font-mono ${isInterstellar ? 'text-orange-500/60' : 'text-cyan-500/60'} uppercase tracking-widest`}>
                   {translateData('System Online')} • {playerName}
                 </span>
               </div>
@@ -10978,7 +11169,7 @@ export const GameDashboard = ({
                         className="absolute inset-y-0 left-0 bg-gradient-to-r from-cyan-600 via-cyan-400 to-white shadow-[0_0_20px_rgba(6,182,212,0.8)]"
                       />
                       <div className="absolute inset-0 flex items-center justify-center">
-                        <span className="text-[10px] font-orbitron font-bold text-white drop-shadow-md tracking-widest">
+                        <span className="text-base font-orbitron font-bold text-white drop-shadow-md tracking-widest">
                           {percent}% {t('complete').toUpperCase()}
                         </span>
                       </div>
@@ -11001,7 +11192,7 @@ export const GameDashboard = ({
                 {isVoid && hasWonEliminateEnemiesRoute3 && (
                   <button 
                     onClick={() => setShowRobotModal(true)}
-                    className="px-4 py-1.5 bg-purple-600/20 border border-purple-500 text-purple-400 rounded-full font-orbitron text-[10px] animate-pulse flex items-center gap-2 group hover:bg-purple-600/40 transition-all"
+                    className="px-4 py-1.5 bg-purple-600/20 border border-purple-500 text-purple-400 rounded-full font-orbitron text-base animate-pulse flex items-center gap-2 group hover:bg-purple-600/40 transition-all"
                   >
                     <Bot className="w-3 h-3" />
                     {language === 'pt' ? 'Robô Defeituoso' : 'Defective Robot'}
@@ -11010,14 +11201,14 @@ export const GameDashboard = ({
                 {isSpeedRun && (
                   <div className="flex items-center gap-2 px-3 py-1 bg-slate-900/80 border border-emerald-500/30 rounded-full shadow-[0_0_15px_rgba(16,185,129,0.1)]">
                     <Clock className="w-3 h-3 text-emerald-400 animate-pulse" />
-                    <span className="text-xs font-mono font-bold text-emerald-400 tracking-wider">
+                    <span className="text-[14px] font-mono font-bold text-emerald-400 tracking-wider">
                       {formatTime(speedRunTime)}
                     </span>
                   </div>
                 )}
                 <button 
                   onClick={() => setFormatNumbers(!formatNumbers)}
-                  className={`relative px-4 py-1.5 rounded-full border text-[10px] font-orbitron font-bold transition-all uppercase tracking-widest flex items-center gap-2 overflow-hidden group ${
+                  className={`relative px-4 py-1.5 rounded-full border text-base font-orbitron font-bold transition-all uppercase tracking-widest flex items-center gap-2 overflow-hidden group ${
                     formatNumbers 
                     ? (isInterstellar 
                         ? 'bg-orange-500/20 border-orange-500/50 text-orange-400 shadow-[0_0_15px_rgba(249,115,22,0.4)]' 
@@ -11043,18 +11234,18 @@ export const GameDashboard = ({
                   <div className="flex items-center gap-4 px-4 py-1.5 bg-white/5 rounded-full border border-emerald-500/30 ml-auto mr-4 shadow-inner relative overflow-hidden group">
                     <div className="absolute inset-0 bg-emerald-500/5 group-hover:bg-emerald-500/10 transition-colors pointer-events-none" />
                     <div className="flex flex-col items-center relative z-10">
-                      <span className="text-[8px] uppercase tracking-tighter opacity-50 font-bold leading-none mb-1 text-emerald-400">{language === 'pt' ? 'DIA' : 'DAY'}</span>
-                      <span className="text-sm font-orbitron font-bold text-white leading-none tabular-nums">{gameTime.days}</span>
+                      <span className="text-[14px] uppercase tracking-tighter opacity-50 font-bold leading-none mb-1 text-emerald-400">{language === 'pt' ? 'DIA' : 'DAY'}</span>
+                      <span className="text-base font-orbitron font-bold text-white leading-none tabular-nums">{gameTime.days}</span>
                     </div>
                     <div className="w-[1px] h-4 bg-emerald-500/20 relative z-10" />
                     <div className="flex flex-col items-center relative z-10">
-                      <span className="text-[8px] uppercase tracking-tighter opacity-50 font-bold leading-none mb-1 text-emerald-400">{language === 'pt' ? 'MÊS' : 'MONTH'}</span>
-                      <span className="text-sm font-orbitron font-bold text-white leading-none tabular-nums">{gameTime.months}</span>
+                      <span className="text-[14px] uppercase tracking-tighter opacity-50 font-bold leading-none mb-1 text-emerald-400">{language === 'pt' ? 'MÊS' : 'MONTH'}</span>
+                      <span className="text-base font-orbitron font-bold text-white leading-none tabular-nums">{gameTime.months}</span>
                     </div>
                     <div className="w-[1px] h-4 bg-emerald-500/20 relative z-10" />
                     <div className="flex flex-col items-center relative z-10">
-                      <span className="text-[8px] uppercase tracking-tighter opacity-50 font-bold leading-none mb-1 text-emerald-400">{language === 'pt' ? 'ANO' : 'YEAR'}</span>
-                      <span className="text-sm font-orbitron font-bold text-white leading-none tabular-nums">{gameTime.years}</span>
+                      <span className="text-[14px] uppercase tracking-tighter opacity-50 font-bold leading-none mb-1 text-emerald-400">{language === 'pt' ? 'ANO' : 'YEAR'}</span>
+                      <span className="text-base font-orbitron font-bold text-white leading-none tabular-nums">{gameTime.years}</span>
                     </div>
                   </div>
                 )}
@@ -11062,7 +11253,7 @@ export const GameDashboard = ({
                 <div className="flex items-center gap-2">
                   <Database className={`w-4 h-4 ${themeText}`} />
                   <span className={`text-2xl font-orbitron font-bold ${isInterstellar ? 'neon-text-orange' : 'neon-text-cyan'}`}>
-                    {formatValue(qc)} <span className={`text-xs ${isInterstellar ? 'text-orange-500/60' : 'text-cyan-500/60'}`}>QC</span>
+                    {formatValue(qc)} <span className={`text-[14px] ${isInterstellar ? 'text-orange-500/60' : 'text-cyan-500/60'}`}>QC</span>
                   </span>
                 </div>
               </div>
@@ -11088,31 +11279,31 @@ export const GameDashboard = ({
                   /* Active Deliveries */
                   <div className={`glass-panel ${isInterstellar ? 'neon-border-orange' : 'neon-border-cyan'} rounded-xl flex-1 flex flex-col overflow-hidden`}>
                     <div className="p-4 border-b border-white/5 flex justify-between items-center bg-white/5">
-                      <h2 className={`text-xs font-orbitron font-bold tracking-widest ${themeText} uppercase flex items-center gap-2`}>
+                      <h2 className={`text-[14px] font-orbitron font-bold tracking-widest ${themeText} uppercase flex items-center gap-2`}>
                         <Navigation className="w-4 h-4" /> {t('activeDeliveries')}
                       </h2>
-                      <span className={`text-[10px] font-mono ${isInterstellar ? 'text-orange-500/40' : 'text-cyan-500/40'}`}>
-                        {activeDeliveries.length}/10 HANGARS
+                      <span className={`text-base font-mono ${isInterstellar ? 'text-orange-500/40' : 'text-cyan-500/40'}`}>
+                        {groupedDeliveries.length} LOC / {activeDeliveries.filter(d => !d.id.startsWith('auto-')).length}/25 HANGARS
                       </span>
                     </div>
                   
                     <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
-                    {activeDeliveries.length === 0 && !Object.values(autoTravelActive).some(v => v) ? (
+                    {groupedDeliveries.length === 0 ? (
                       <div className="h-full flex flex-col items-center justify-center text-center opacity-40">
                         <div className="w-12 h-12 rounded-full border border-dashed border-cyan-500/30 flex items-center justify-center mb-4">
                           <Database className="w-6 h-6" />
                         </div>
-                        <p className="text-xs font-orbitron uppercase tracking-widest">{t('noShips')}</p>
+                        <p className="text-[14px] font-orbitron uppercase tracking-widest">{t('noShips')}</p>
                       </div>
                     ) : (
                       <div className="flex flex-col gap-4">
-                        <div className="grid grid-cols-1 xl:grid-cols-2 gap-3 content-start">
+                        <div className="grid grid-cols-1 gap-3 content-start">
                         {/* Coffee Message when fully automated */}
                         {activeDeliveries.length === 0 && Object.values(autoTravelActive).some(v => v) && (
                           <motion.div 
                             initial={{ opacity: 0, y: 10 }}
                             animate={{ opacity: 1, y: 0 }}
-                            className="xl:col-span-2 flex flex-col items-center justify-center text-center p-6 bg-cyan-500/5 rounded-xl border border-cyan-500/10 mb-2"
+                            className="flex flex-col items-center justify-center text-center p-6 bg-cyan-500/5 rounded-xl border border-cyan-500/10 mb-2"
                           >
                             <div className="w-12 h-12 rounded-xl bg-cyan-500/10 flex items-center justify-center mb-4 border border-cyan-500/20 animate-float">
                               <Coffee className="w-6 h-6 text-cyan-400" />
@@ -11123,7 +11314,7 @@ export const GameDashboard = ({
                                 initial={{ opacity: 0, y: 5 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 exit={{ opacity: 0, y: -5 }}
-                                className="text-[10px] font-orbitron text-cyan-300/80 leading-relaxed italic"
+                                className="text-base font-orbitron text-cyan-300/80 leading-relaxed italic"
                               >
                                 {translateData(translations[language].coffeeMessage[coffeePhraseIndex])}
                               </motion.p>
@@ -11131,67 +11322,79 @@ export const GameDashboard = ({
                           </motion.div>
                         )}
 
-                          {activeDeliveries.slice(0, 10).map((delivery) => {
-                            const route = ROUTES.find(r => r.id === delivery.routeId);
+                          {groupedDeliveries.map((group) => {
+                            const route = ROUTES.find(r => r.id === group.routeId);
                             if (!route) return null;
                             
-                            const ship = SHIPS.find(s => s.level === delivery.shipLevel && s.tier === (delivery.tier || route.tier));
+                            const ship = SHIPS.find(s => s.level === group.shipLevel && s.tier === (group.tier as any || route.tier));
                             if (!ship) return null;
 
                             const locationTech = techLevels[route.id] || { engine: 0, ai: 0, value: 0, rare: 0 };
                             const engineUpgrade = UPGRADES.find(u => u.id === 'engine')!;
                             const engineTier = engineUpgrade.tiers.find(t => t.level === locationTech.engine);
                             const isJumping = engineTier?.level === 5;
-                            const isQueued = delivery.status === 'queued';
+                            const isCombat = group.status === 'combat';
 
                             return (
-                              <div key={delivery.id} className={`glass-panel border rounded-lg p-4 space-y-3 transition-all relative overflow-hidden group ${isQueued ? 'neon-border-yellow opacity-70' : isInterstellar ? 'neon-border-orange hover:bg-white/5' : 'neon-border-cyan hover:bg-white/5'}`}>
-                                <div className="flex justify-between items-start relative z-10">
-                                  <div className="min-w-0 flex-1">
-                                    <div className="flex items-center gap-2">
-                                      <div className={`w-6 h-6 rounded bg-white/5 flex items-center justify-center border ${isQueued ? 'border-yellow-500/30' : isInterstellar ? 'border-orange-500/30' : 'border-cyan-500/30'}`}>
-                                        <Navigation className={`w-3 h-3 ${isQueued ? 'text-yellow-400' : isInterstellar ? 'text-orange-400' : 'text-cyan-400'}`} />
-                                      </div>
-                                      <div className="text-[11px] font-orbitron font-bold text-white truncate leading-tight uppercase tracking-wider">{translateData(route.name)}</div>
-                                    </div>
-                                    <div className="flex items-center gap-2 mt-2">
-                                      <span className={`text-[9px] font-mono truncate leading-tight uppercase tracking-tighter ${ship.color}`}>{ship.name}</span>
-                                      <div className="w-1 h-1 rounded-full bg-white/20" />
-                                      <span className="text-[9px] text-yellow-500/80 font-mono">+{route.reward} QC</span>
-                                    </div>
-                                  </div>
-                                  <div className="text-right ml-2">
-                                    <div className={`text-[11px] font-orbitron leading-tight ${isQueued ? 'text-yellow-500/60' : isJumping ? 'text-pink-400 animate-pulse' : isInterstellar ? 'text-orange-400' : 'text-cyan-400'}`}>
-                                      {isQueued ? 'QUEUED' : isJumping ? t('jump') : `${Math.floor(delivery.progress)}%`}
-                                    </div>
-                                    {!isQueued && (
-                                      <div className="text-[8px] font-mono text-white/30 mt-1 uppercase tracking-tighter">
-                                        {isJumping ? 'Warping...' : 'In Transit'}
+                              <div key={group.routeId} className={`glass-panel border rounded-lg p-3 transition-all relative overflow-hidden group ${isCombat ? 'neon-border-red bg-red-500/5' : isInterstellar ? 'neon-border-orange hover:bg-white/5' : 'neon-border-cyan hover:bg-white/5'}`}>
+                                <div className="flex gap-4 relative z-10">
+                                  {/* Left Side: Ship PNG */}
+                                  <div className="relative w-24 h-24 flex-shrink-0 bg-black/40 rounded-lg border border-white/5 overflow-hidden flex items-center justify-center p-2">
+                                    <ShipVisual ship={ship} className="w-full h-full" />
+                                    {group.totalCount > 1 && (
+                                      <div className="absolute bottom-1 right-1 bg-black/80 px-1.5 py-0.5 rounded text-[10px] font-orbitron font-bold text-white border border-white/10">
+                                        x{group.totalCount}
                                       </div>
                                     )}
+                                  </div>
+
+                                  {/* Center: Info */}
+                                  <div className="flex-1 min-w-0 flex flex-col justify-between py-1">
+                                    <div>
+                                      <div className="flex items-center justify-between">
+                                        <div className="text-[14px] font-orbitron font-bold text-white truncate leading-tight uppercase tracking-wider">{translateData(route.name)}</div>
+                                        <div className={`text-[13px] font-orbitron ${isCombat ? 'text-red-400' : isJumping ? 'text-pink-400 animate-pulse' : isInterstellar ? 'text-orange-400' : 'text-cyan-400'}`}>
+                                          {isCombat ? 'COMBAT' : isJumping ? t('jump') : `${Math.floor(group.avgProgress)}%`}
+                                        </div>
+                                      </div>
+                                      <div className="flex items-center gap-2 mt-1">
+                                        <span className={`text-[12px] font-mono truncate ${ship.color}`}>{ship.name}</span>
+                                        {group.autoActive && (
+                                          <div className="flex items-center gap-1 bg-cyan-500/10 px-1.5 rounded border border-cyan-500/20">
+                                            <div className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
+                                            <span className="text-[9px] font-orbitron font-bold text-cyan-400">AUTO</span>
+                                          </div>
+                                        )}
+                                      </div>
+                                    </div>
+
+                                    {/* Aggregated Progress Bar */}
+                                    <div className="space-y-1.5">
+                                      <div className="relative h-1.5 bg-white/5 rounded-full overflow-hidden">
+                                        <motion.div 
+                                          className={`h-full rounded-full ${isCombat ? 'bg-red-500' : isJumping ? 'bg-gradient-to-r from-pink-600 to-pink-400' : isInterstellar ? 'bg-gradient-to-r from-orange-600 to-yellow-400' : 'bg-gradient-to-r from-cyan-600 to-cyan-400'}`}
+                                          initial={{ width: 0 }}
+                                          animate={{ width: `${group.avgProgress}%` }}
+                                          transition={{ type: 'spring', bounce: 0, duration: 0.5 }}
+                                        />
+                                        {isJumping && (
+                                          <motion.div 
+                                            className="absolute inset-0 bg-white/20"
+                                            animate={{ x: ['-100%', '100%'] }}
+                                            transition={{ repeat: Infinity, duration: 1, ease: 'linear' }}
+                                          />
+                                        )}
+                                      </div>
+                                      <div className="flex justify-between items-center text-[10px] font-mono uppercase tracking-tighter opacity-40">
+                                        <span>{isCombat ? 'Action Required' : isJumping ? 'Warping...' : 'In Transit'}</span>
+                                        <span>{route.reward} QC / Trip</span>
+                                      </div>
+                                    </div>
                                   </div>
                                 </div>
                                 
-                                {!isQueued && (
-                                  <div className="relative h-1.5 bg-white/5 rounded-full overflow-hidden z-10">
-                                    <motion.div 
-                                      className={`h-full rounded-full ${isJumping ? 'bg-gradient-to-r from-pink-600 to-pink-400' : isInterstellar ? 'bg-gradient-to-r from-orange-600 to-yellow-400' : 'bg-gradient-to-r from-cyan-600 to-cyan-400'}`}
-                                      initial={{ width: 0 }}
-                                      animate={{ width: `${delivery.progress}%` }}
-                                      transition={{ type: 'spring', bounce: 0, duration: 0.5 }}
-                                    />
-                                    {isJumping && (
-                                      <motion.div 
-                                        className="absolute inset-0 bg-white/20"
-                                        animate={{ x: ['-100%', '100%'] }}
-                                        transition={{ repeat: Infinity, duration: 1, ease: 'linear' }}
-                                      />
-                                    )}
-                                  </div>
-                                )}
-                                
                                 {/* Decorative Background Glow */}
-                                <div className={`absolute inset-0 transition-colors ${isQueued ? 'bg-yellow-500/0' : isInterstellar ? 'bg-orange-500/0 group-hover:bg-orange-500/5' : 'bg-cyan-500/0 group-hover:bg-cyan-500/5'}`} />
+                                <div className={`absolute inset-0 transition-colors ${isCombat ? 'bg-red-500/5' : isInterstellar ? 'bg-orange-500/0 group-hover:bg-orange-500/5' : 'bg-cyan-500/0 group-hover:bg-cyan-500/5'}`} />
                               </div>
                             );
                           })}
@@ -11231,7 +11434,7 @@ export const GameDashboard = ({
                 <button
                   key={tab}
                   onClick={() => setActiveTab(tab as any)}
-                  className={`flex-1 px-2 py-2.5 font-orbitron text-[9px] tracking-widest uppercase transition-all border-b-2 whitespace-nowrap relative ${
+                  className={`flex-1 px-2 py-2.5 font-orbitron text-[15px] tracking-widest uppercase transition-all border-b-2 whitespace-nowrap relative ${
                     activeTab === tab 
                     ? `${themeBorder} ${isVoid ? 'text-purple-100 drop-shadow-[0_0_15px_rgba(192,132,252,1)]' : themeText} ${themeBg} ${isVoid ? 'neon-text-purple' : ''}` 
                     : `border-transparent ${isInterstellar ? 'text-orange-500/40 hover:text-orange-500/80' : isVoid ? 'text-purple-400/60 hover:text-purple-100 hover:drop-shadow-[0_0_12px_rgba(192,132,252,0.8)]' : 'text-cyan-500/40 hover:text-cyan-500/80'}`
@@ -11266,9 +11469,9 @@ export const GameDashboard = ({
                   <div key={res.label} className="glass-panel border border-white/10 rounded-xl p-3 flex items-center justify-between bg-black/40">
                     <div className="flex items-center gap-2">
                       <res.icon className={`w-3 h-3 ${res.color}`} />
-                      <span className="text-[9px] text-white/40 uppercase tracking-widest">{res.label}</span>
+                      <span className="text-[15px] text-white/40 uppercase tracking-widest">{res.label}</span>
                     </div>
-                    <span className="text-sm font-orbitron font-bold text-white">{formatValue(res.value || 0)}</span>
+                    <span className="text-base font-orbitron font-bold text-white">{formatValue(res.value || 0)}</span>
                   </div>
                 ))}
               </motion.div>
@@ -11293,7 +11496,7 @@ export const GameDashboard = ({
                         </div>
                         <button
                           onClick={() => setActiveMiniGameId(null)}
-                          className="px-4 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 rounded font-orbitron text-[10px] tracking-widest transition-all"
+                          className="px-4 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 rounded font-orbitron text-base tracking-widest transition-all"
                         >
                           {language === 'pt' ? 'SAIR' : 'EXIT'}
                         </button>
@@ -11365,7 +11568,7 @@ export const GameDashboard = ({
                       <h3 className="text-3xl font-orbitron font-black text-orange-400 uppercase tracking-[0.3em] drop-shadow-[0_0_10px_rgba(249,115,22,0.5)]">
                         {t('routes2')}
                       </h3>
-                      <p className="text-sm text-orange-200/80 font-mono uppercase tracking-[0.15em] max-w-md leading-relaxed">
+                      <p className="text-base text-orange-200/80 font-mono uppercase tracking-[0.15em] max-w-md leading-relaxed">
                         {t('route2UnlockDesc')}
                       </p>
                     </div>
@@ -11408,7 +11611,7 @@ export const GameDashboard = ({
                       <h3 className="text-3xl font-orbitron font-black text-purple-400 uppercase tracking-[0.3em] drop-shadow-[0_0_10px_rgba(168,85,247,0.5)]">
                         ROTA 3
                       </h3>
-                      <p className="text-sm text-purple-200/80 font-mono uppercase tracking-[0.15em] max-w-md leading-relaxed">
+                      <p className="text-base text-purple-200/80 font-mono uppercase tracking-[0.15em] max-w-md leading-relaxed">
                         {t('route3UnlockDesc')}
                       </p>
                     </div>
@@ -11475,19 +11678,19 @@ export const GameDashboard = ({
                             {!conditionsMet ? (
                               <>
                                 <Shield className="w-8 h-8 text-slate-600 mb-3" />
-                                <div className="text-[11px] font-orbitron text-slate-500 uppercase tracking-widest mb-2 font-bold">{t('locked')}</div>
-                                <div className="text-[10px] text-slate-600 leading-relaxed font-mono uppercase">
+                                <div className="text-[14px] font-orbitron text-slate-500 uppercase tracking-widest mb-2 font-bold">{t('locked')}</div>
+                                <div className="text-base text-slate-600 leading-relaxed font-mono uppercase">
                                   {route.unlockCondition?.route2Unlocked && !isRoute2Unlocked() ? t('route2UnlockDesc') : `${t('requiredShip')}: Lvl ${route.requiredShipLevel}`}
                                 </div>
                               </>
                             ) : (
                               <>
                                 <Zap className={`w-8 h-8 ${isInterstellar ? 'text-orange-500' : 'text-yellow-500'} mb-3 animate-pulse`} />
-                                <div className={`text-[11px] font-orbitron ${themeText} uppercase tracking-[0.2em] mb-4 font-bold`}>{t('readyToUnlock')}</div>
+                                <div className={`text-[14px] font-orbitron ${themeText} uppercase tracking-[0.2em] mb-4 font-bold`}>{t('readyToUnlock')}</div>
                                 <button
                                   onClick={() => buyRoute(route)}
                                   disabled={!canAffordUnlock}
-                                  className={`px-6 py-3 rounded-lg font-orbitron text-[10px] font-bold tracking-[0.2em] transition-all w-full border-b-2 ${
+                                  className={`px-6 py-3 rounded-lg font-orbitron text-base font-bold tracking-[0.2em] transition-all w-full border-b-2 ${
                                     canAffordUnlock 
                                     ? `${isInterstellar ? 'bg-orange-500 text-black hover:bg-orange-400 border-orange-700 shadow-[0_0_25px_rgba(249,115,22,0.4)]' : 'bg-yellow-500 text-black hover:bg-yellow-400 border-yellow-700 shadow-[0_0_25px_rgba(234,179,8,0.4)]'}` 
                                     : 'bg-white/5 text-slate-500 border-white/10 cursor-not-allowed'
@@ -11502,18 +11705,18 @@ export const GameDashboard = ({
 
                         <div className="flex justify-between items-start mb-3">
                           <div className="min-w-0 flex-1">
-                            <h3 className={`font-orbitron text-sm font-black text-white ${isInterstellar ? 'group-hover:neon-text-orange text-orange-200' : 'group-hover:neon-text-cyan text-cyan-100'} transition-colors truncate leading-none uppercase tracking-[0.1em]`}>{t(route.name as any)}</h3>
-                            <p className={`text-[11px] font-mono mt-2 flex items-center gap-2 ${isInterstellar ? 'text-orange-500/80' : 'text-cyan-500/80'} truncate leading-tight uppercase tracking-widest`}>
+                            <h3 className={`font-orbitron text-base font-black text-white ${isInterstellar ? 'group-hover:neon-text-orange text-orange-200' : 'group-hover:neon-text-cyan text-cyan-100'} transition-colors truncate leading-none uppercase tracking-[0.1em]`}>{t(route.name as any)}</h3>
+                            <p className={`text-[14px] font-mono mt-2 flex items-center gap-2 ${isInterstellar ? 'text-orange-500/80' : 'text-cyan-500/80'} truncate leading-tight uppercase tracking-widest`}>
                               <span className="opacity-40">{t(route.origin as any)}</span>
                               <ArrowRight className="w-2.5 h-2.5 opacity-40" />
                               <span>{t(route.destination as any)}</span>
                             </p>
                           </div>
                           <div className="flex flex-col items-end gap-1.5 ml-2">
-                            <div className={`px-2 py-0.5 ${isInterstellar ? 'bg-orange-500/10 text-orange-400 border-orange-500/30' : 'bg-cyan-500/10 text-cyan-400 border-cyan-500/30'} rounded text-[10px] font-black uppercase tracking-widest whitespace-nowrap border shadow-sm`}>
+                            <div className={`px-2 py-0.5 ${isInterstellar ? 'bg-orange-500/10 text-orange-400 border-orange-500/30' : 'bg-cyan-500/10 text-cyan-400 border-cyan-500/30'} rounded text-base font-black uppercase tracking-widest whitespace-nowrap border shadow-sm`}>
                               {route.tier}
                             </div>
-                            <div className={`text-[10px] font-mono uppercase tracking-tighter font-bold ${shipAvailable ? (isInterstellar ? 'text-orange-400/80' : 'text-cyan-400/80') : 'text-pink-400'}`}>
+                            <div className={`text-base font-mono uppercase tracking-tighter font-bold ${shipAvailable ? (isInterstellar ? 'text-orange-400/80' : 'text-cyan-400/80') : 'text-pink-400'}`}>
                               <span className={SHIPS.find(s => s.level === route.requiredShipLevel && s.tier === route.tier)?.color}>
                                 Lvl {route.requiredShipLevel} • {translateData(SHIPS.find(s => s.level === route.requiredShipLevel && s.tier === route.tier)?.name || '')}
                               </span>
@@ -11523,27 +11726,27 @@ export const GameDashboard = ({
 
                         <div className="grid grid-cols-2 gap-x-4 gap-y-2 mb-4 flex-1 py-2 border-y border-white/5">
                           <div className="space-y-1.5">
-                            <div className="text-[10px] uppercase text-slate-500 leading-none tracking-[0.2em] font-orbitron font-bold mb-1 opacity-70">{t('cargo')}</div>
-                              <div className="text-xs font-mono flex items-center gap-2 leading-none text-white font-bold">
+                            <div className="text-base uppercase text-slate-500 leading-none tracking-[0.2em] font-orbitron font-bold mb-1 opacity-70">{t('cargo')}</div>
+                              <div className="text-[14px] font-mono flex items-center gap-2 leading-none text-white font-bold">
                                 <Package className="w-3.5 h-3.5 text-pink-500" />
                                 {t(route.cargoType as any)}
                               </div>
                           </div>
                           <div className="space-y-1.5">
-                            <div className="text-[10px] uppercase text-slate-500 leading-none tracking-[0.2em] font-orbitron font-bold mb-1 opacity-70">{t('reward')}</div>
-                            <div className="text-xs font-mono flex items-center gap-2 text-yellow-400 leading-none font-bold">
+                            <div className="text-base uppercase text-slate-500 leading-none tracking-[0.2em] font-orbitron font-bold mb-1 opacity-70">{t('reward')}</div>
+                            <div className="text-[14px] font-mono flex items-center gap-2 text-yellow-400 leading-none font-bold">
                               <Coins className="w-3.5 h-3.5" />
                               {Math.floor(route.reward * (1 + (valueTier?.value || 0)) * getEconomicMultipliers().profit)}
                               {valueTier && (
-                                <span className="text-[10px] text-emerald-400 ml-1 bg-emerald-500/10 px-1 rounded">
+                                <span className="text-base text-emerald-400 ml-1 bg-emerald-500/10 px-1 rounded">
                                   +{valueTier.value * 100}%
                                 </span>
                               )}
                             </div>
                           </div>
                           <div className="space-y-1.5 col-span-2">
-                            <div className="text-[10px] uppercase text-slate-500 leading-none tracking-[0.2em] font-orbitron font-bold mb-1 opacity-70">{t('range')}</div>
-                            <div className="text-xs font-mono flex items-center gap-2 text-slate-300 leading-none font-bold">
+                            <div className="text-base uppercase text-slate-500 leading-none tracking-[0.2em] font-orbitron font-bold mb-1 opacity-70">{t('range')}</div>
+                            <div className="text-[14px] font-mono flex items-center gap-2 text-slate-300 leading-none font-bold">
                               <CompassIcon className="w-3.5 h-3.5 text-cyan-500" />
                               {formatValue(route.distance)} {route.tier === 'Interstellar' ? 'LY' : 'km'}
                             </div>
@@ -11553,7 +11756,7 @@ export const GameDashboard = ({
                         <div className="mt-auto space-y-2">
                           {isAutoActive && (
                             <div className="space-y-1.5 bg-black/40 p-1.5 rounded-lg border border-white/5">
-                              <div className={`flex justify-between items-center text-[10px] font-orbitron ${themeText} font-bold uppercase tracking-[0.15em]`}>
+                              <div className={`flex justify-between items-center text-base font-orbitron ${themeText} font-bold uppercase tracking-[0.15em]`}>
                                 <div className="flex items-center gap-2">
                                   <div className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
                                   <span>{t('autoTravel')}</span>
@@ -11579,7 +11782,7 @@ export const GameDashboard = ({
                           <button
                             disabled={!isPurchased || !canAffordFuel || !shipAvailable}
                             onClick={() => launchRoute(route)}
-                            className={`w-full py-2.5 rounded-xl font-orbitron text-[11px] font-black tracking-[0.3em] transition-all flex items-center justify-center gap-3 uppercase border-b-4 ${
+                            className={`w-full py-2.5 rounded-xl font-orbitron text-[14px] font-black tracking-[0.3em] transition-all flex items-center justify-center gap-3 uppercase border-b-4 ${
                               isPurchased && canAffordFuel && shipAvailable
                               ? (isInterstellar 
                                   ? 'bg-orange-500 text-black hover:bg-orange-400 border-orange-700 shadow-[0_0_20px_rgba(249,115,22,0.4)] group-hover:scale-[1.02]' 
@@ -11614,12 +11817,12 @@ export const GameDashboard = ({
                           <Flame className="w-5 h-5" />
                         </div>
                         <div>
-                          <h2 className="text-sm font-orbitron font-bold text-white uppercase tracking-wider">{t('cce')}</h2>
-                          <p className="text-[8px] text-slate-500 font-mono uppercase tracking-widest">{t('cceConcept')}</p>
+                          <h2 className="text-base font-orbitron font-bold text-white uppercase tracking-wider">{t('cce')}</h2>
+                          <p className="text-[14px] text-slate-500 font-mono uppercase tracking-widest">{t('cceConcept')}</p>
                         </div>
                       </div>
                       <div className="flex flex-col items-end">
-                        <span className="text-[10px] font-orbitron text-slate-400 uppercase tracking-widest leading-none mb-1">{t('aetherion')}</span>
+                        <span className="text-base font-orbitron text-slate-400 uppercase tracking-widest leading-none mb-1">{t('aetherion')}</span>
                         <div className={`text-xl font-mono font-bold ${isInterstellar ? 'text-orange-400' : 'text-cyan-400'} leading-none`}>
                           {Math.floor((aetherion / 10000) * 100)}%
                         </div>
@@ -11636,12 +11839,12 @@ export const GameDashboard = ({
                           />
                           <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-20" />
                         </div>
-                        <div className="flex justify-end text-[8px] font-mono text-slate-500 uppercase tracking-tighter">
+                        <div className="flex justify-end text-[14px] font-mono text-slate-500 uppercase tracking-tighter">
                           <span>{formatValue(aetherion)} / {formatValue(10000)} Units</span>
                         </div>
                       </div>
                       <div className="hidden md:block">
-                        <p className="text-[8px] text-slate-400 font-mono leading-tight italic border-l border-white/5 pl-4">
+                        <p className="text-[14px] text-slate-400 font-mono leading-tight italic border-l border-white/5 pl-4">
                           &quot;{t('aetherionConcept')}&quot;
                         </p>
                       </div>
@@ -11662,8 +11865,8 @@ export const GameDashboard = ({
                         <div className="space-y-3">
                           <div className="flex justify-between items-start">
                             <div className="min-w-0">
-                              <h3 className={`font-orbitron text-[10px] font-bold ${ship?.color || 'text-white'} truncate leading-tight uppercase tracking-wider`}>{ship?.name || translateData(route.name)}</h3>
-                              <p className={`text-[8px] font-mono ${isInterstellar ? 'text-orange-500/60' : 'text-cyan-500/60'} leading-tight uppercase`}>{translateData(route.name)}</p>
+                              <h3 className={`font-orbitron text-base font-bold ${ship?.color || 'text-white'} truncate leading-tight uppercase tracking-wider`}>{ship?.name || translateData(route.name)}</h3>
+                              <p className={`text-[14px] font-mono ${isInterstellar ? 'text-orange-500/60' : 'text-cyan-500/60'} leading-tight uppercase`}>{translateData(route.name)}</p>
                             </div>
                             <div className={`px-1.5 py-0.5 rounded text-[7px] font-bold uppercase tracking-tighter border ${slots > 0 ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-white/5 text-slate-500 border-white/10'}`}>
                               {slots > 0 ? t('active') : t('locked')}
@@ -11713,7 +11916,7 @@ export const GameDashboard = ({
                               <div className="flex flex-col gap-1">
                                 <button
                                   onClick={() => toggleAutoTravel(route.id)}
-                                  className={`px-3 py-1 rounded text-[8px] font-orbitron font-bold tracking-widest transition-all border uppercase ${
+                                  className={`px-3 py-1 rounded text-[14px] font-orbitron font-bold tracking-widest transition-all border uppercase ${
                                     isDesired 
                                     ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-400' 
                                     : 'bg-white/5 border-white/10 text-slate-500'
@@ -11732,7 +11935,7 @@ export const GameDashboard = ({
                                   {slots * 2} {t('aetherion')} / {t('trip')}
                                 </span>
                                 {isActive && (
-                                  <span className={`text-[8px] font-mono ${isInterstellar ? 'text-orange-400' : 'text-cyan-400'}`}>{Math.floor(progress)}%</span>
+                                  <span className={`text-[14px] font-mono ${isInterstellar ? 'text-orange-400' : 'text-cyan-400'}`}>{Math.floor(progress)}%</span>
                                 )}
                               </div>
                             </div>
@@ -11767,7 +11970,7 @@ export const GameDashboard = ({
                   <div className={`glass-panel ${isInterstellar ? 'neon-border-orange' : 'neon-border-cyan'} p-4 rounded-xl flex justify-between items-center shrink-0`}>
                     <div>
                       <h2 className={`text-lg font-orbitron font-bold ${isInterstellar ? 'text-orange-400' : 'text-cyan-400'} uppercase tracking-tighter`}>{t('mining')}</h2>
-                      <p className="text-[10px] text-slate-500 font-mono uppercase tracking-widest">{t('manageInfrastructure')}</p>
+                      <p className="text-base text-slate-500 font-mono uppercase tracking-widest">{t('manageInfrastructure')}</p>
                     </div>
                     {!isInterstellar && (
                       <div className="flex items-center gap-4">
@@ -11778,7 +11981,7 @@ export const GameDashboard = ({
                         >
                           <ArrowRight className="w-4 h-4 rotate-180" />
                         </button>
-                        <span className={`text-[10px] font-orbitron ${isInterstellar ? 'text-orange-500/60' : 'text-cyan-500/60'} uppercase tracking-widest`}>
+                        <span className={`text-base font-orbitron ${isInterstellar ? 'text-orange-500/60' : 'text-cyan-500/60'} uppercase tracking-widest`}>
                           {miningPageIndex + 1} / {currentOres.length}
                         </span>
                         <button 
@@ -11820,8 +12023,8 @@ export const GameDashboard = ({
                           return (
                             <div key={ore.id} className="glass-panel border border-white/5 rounded-xl flex flex-col items-center justify-center text-center opacity-30 grayscale p-4">
                               <Lock className="w-5 h-5 text-slate-500 mb-2" />
-                              <div className="text-[10px] font-orbitron text-slate-500 uppercase tracking-widest">{ore.name}</div>
-                              <div className="text-[8px] text-slate-600 font-mono mt-1">LVL {ore.requiredShipLevel}+</div>
+                              <div className="text-base font-orbitron text-slate-500 uppercase tracking-widest">{ore.name}</div>
+                              <div className="text-[14px] text-slate-600 font-mono mt-1">LVL {ore.requiredShipLevel}+</div>
                             </div>
                           );
                         }
@@ -11835,18 +12038,18 @@ export const GameDashboard = ({
                           >
                             <div className="flex justify-between items-start mb-2">
                               <div>
-                                <h3 className="font-orbitron text-[10px] font-bold text-white leading-tight uppercase truncate max-w-[100px]">{ore.name}</h3>
+                                <h3 className="font-orbitron text-base font-bold text-white leading-tight uppercase truncate max-w-[100px]">{ore.name}</h3>
                                 <div className="flex items-center gap-2 mt-0.5">
-                                  <div className="flex items-center gap-1 text-[8px] font-mono text-orange-400">
+                                  <div className="flex items-center gap-1 text-[14px] font-mono text-orange-400">
                                     <Cpu className="w-2.5 h-2.5" /> {robots}
                                   </div>
-                                  <div className="flex items-center gap-1 text-[8px] font-mono text-emerald-400">
+                                  <div className="flex items-center gap-1 text-[14px] font-mono text-emerald-400">
                                     <TrendingUp className="w-2.5 h-2.5" /> {totalRate.toFixed(1)}
                                   </div>
                                 </div>
                               </div>
                               <div className="flex flex-col items-end">
-                                <div className="text-[10px] font-bold text-orange-400 font-mono tracking-tighter">{formatValue(packs)} PKS</div>
+                                <div className="text-base font-bold text-orange-400 font-mono tracking-tighter">{formatValue(packs)} PKS</div>
                                 <button 
                                   onClick={(e) => sellOrePack(ore.id, e)}
                                   disabled={packs <= 0}
@@ -11859,9 +12062,9 @@ export const GameDashboard = ({
 
                             {/* Progress Bar */}
                             <div className="h-2 bg-black/40 rounded-full overflow-hidden border border-white/5 p-[1px] mb-3">
-                              <motion.div 
-                                className={`h-full rounded-full bg-gradient-to-r from-orange-600 to-orange-400`}
-                                animate={{ width: `${(amount / ore.packSize) * 100}%` }}
+                              <div 
+                                className="h-full rounded-full bg-gradient-to-r from-orange-600 to-orange-400 transition-[width] duration-300 ease-linear"
+                                style={{ width: `${(amount / ore.packSize) * 100}%` }}
                               />
                             </div>
 
@@ -11878,7 +12081,7 @@ export const GameDashboard = ({
                                   }`}
                                 >
                                   <span className="text-[7px] font-bold uppercase">Robô</span>
-                                  {robots < 5 && <span className="text-[8px] font-mono">{formatValue(robotCost)}</span>}
+                                  {robots < 5 && <span className="text-[14px] font-mono">{formatValue(robotCost)}</span>}
                                 </button>
                                 <button
                                   onClick={() => upgradeMiningRobot(ore.id)}
@@ -11890,7 +12093,7 @@ export const GameDashboard = ({
                                   }`}
                                 >
                                   <span className="text-[7px] font-bold uppercase">Upgrade</span>
-                                  {nextUpgrade && <span className="text-[8px] font-mono">{formatValue(Math.floor(ore.robotBaseCost * nextUpgrade.costMultiplier * getEconomicMultipliers().cost * 0.2))}</span>}
+                                  {nextUpgrade && <span className="text-[14px] font-mono">{formatValue(Math.floor(ore.robotBaseCost * nextUpgrade.costMultiplier * getEconomicMultipliers().cost * 0.2))}</span>}
                                 </button>
                               </div>
 
@@ -11908,7 +12111,7 @@ export const GameDashboard = ({
                                   }`}
                                 >
                                   <span className="text-[7px] font-bold uppercase">Comp. {compressionLevel}/10</span>
-                                  {compressionLevel < 10 && <span className="text-[8px] font-mono">{formatValue(compressionCost)}</span>}
+                                  {compressionLevel < 10 && <span className="text-[14px] font-mono">{formatValue(compressionCost)}</span>}
                                 </button>
                                 <button
                                   onClick={() => buyAutoSell(ore.id)}
@@ -11923,10 +12126,10 @@ export const GameDashboard = ({
                                   {!autoSellUnlockedByOre[ore.id] ? (
                                     <>
                                       <span className="text-[7px] uppercase leading-none">Desbloq. Auto</span>
-                                      <span className="text-[8px] font-mono mt-0.5">{formatValue(ore.autoSellCost * getEconomicMultipliers().cost * 0.8)}</span>
+                                      <span className="text-[14px] font-mono mt-0.5">{formatValue(ore.autoSellCost * getEconomicMultipliers().cost * 0.8)}</span>
                                     </>
                                   ) : (
-                                    <span className="text-[8px] font-bold uppercase tracking-wider">{isAutoSell ? 'AUTO ON' : 'AUTO OFF'}</span>
+                                    <span className="text-[14px] font-bold uppercase tracking-wider">{isAutoSell ? 'AUTO ON' : 'AUTO OFF'}</span>
                                   )}
                                 </button>
                               </div>
@@ -11984,7 +12187,7 @@ export const GameDashboard = ({
                                       <Lock className="w-10 h-10 text-slate-500" />
                                     </div>
                                     <div className="text-xl font-orbitron text-slate-500 uppercase tracking-widest mb-2">{t('locked')}</div>
-                                    <div className="text-sm text-slate-600 uppercase font-mono tracking-widest">Ship Level {ore.requiredShipLevel} Required</div>
+                                    <div className="text-base text-slate-600 uppercase font-mono tracking-widest">Ship Level {ore.requiredShipLevel} Required</div>
                                   </div>
                                 </div>
                               );
@@ -11996,21 +12199,21 @@ export const GameDashboard = ({
                               }`}>
                                 <div className="flex justify-between items-start relative z-10">
                                   <div>
-                                    <div className="text-[10px] font-orbitron text-cyan-500/60 uppercase tracking-widest mb-1">Ore Type {miningPageIndex + 1}</div>
+                                    <div className="text-base font-orbitron text-cyan-500/60 uppercase tracking-widest mb-1">Ore Type {miningPageIndex + 1}</div>
                                     <div className="flex items-center gap-4">
                                       <h3 className="font-orbitron text-lg font-bold text-white tracking-tighter group-hover:text-cyan-400 neon-text-cyan transition-colors">{ore.name}</h3>
                                       
                                       {!isSpeedRun && (
                                         <div className="flex flex-col items-center gap-1">
                                           {(miningCompressionLevels[ore.id] || 0) < 10 && (
-                                            <div className="text-[8px] font-orbitron text-emerald-400 animate-pulse tracking-widest uppercase font-bold">
+                                            <div className="text-[14px] font-orbitron text-emerald-400 animate-pulse tracking-widest uppercase font-bold">
                                               {formatValue(ore.robotBaseCost * Math.pow(1.6681, miningCompressionLevels[ore.id] || 0) * getEconomicMultipliers().cost)} QC
                                             </div>
                                           )}
                                           <button
                                             onClick={() => buyMiningCompression(ore.id)}
                                             disabled={(miningCompressionLevels[ore.id] || 0) >= 10 || qc < Math.floor(ore.robotBaseCost * Math.pow(1.6681, miningCompressionLevels[ore.id] || 0) * getEconomicMultipliers().cost)}
-                                            className={`px-4 py-2 rounded-lg text-[9px] font-orbitron font-bold tracking-[0.15em] transition-all uppercase border relative overflow-hidden group/btn min-w-[140px] ${
+                                            className={`px-4 py-2 rounded-lg text-[15px] font-orbitron font-bold tracking-[0.15em] transition-all uppercase border relative overflow-hidden group/btn min-w-[140px] ${
                                               (miningCompressionLevels[ore.id] || 0) >= 10
                                               ? 'border-white/60 text-white shadow-[0_0_25px_rgba(255,255,255,0.4)] scale-105'
                                               : 'bg-black/40 border-white/20 text-white hover:border-white/40'
@@ -12029,14 +12232,14 @@ export const GameDashboard = ({
                                                   <span className="text-yellow-400">Lvl {miningCompressionLevels[ore.id] || 0}</span>
                                                 </>
                                               ) : (
-                                                <span className="text-white font-black text-[11px] tracking-[0.4em] drop-shadow-[0_0_12px_rgba(255,255,255,1)]">MAX</span>
+                                                <span className="text-white font-black text-[14px] tracking-[0.4em] drop-shadow-[0_0_12px_rgba(255,255,255,1)]">MAX</span>
                                               )}
                                             </span>
                                           </button>
                                         </div>
                                       )}
                                     </div>
-                                    <div className="text-xs font-mono text-cyan-500/60 uppercase flex items-center gap-2 mt-2">
+                                    <div className="text-[14px] font-mono text-cyan-500/60 uppercase flex items-center gap-2 mt-2">
                                       <Cpu className={`w-4 h-4 ${isActive ? 'text-cyan-400 animate-pulse' : 'text-slate-600'}`} />
                                       {t('robots')}: {robots}/5
                                     </div>
@@ -12044,19 +12247,19 @@ export const GameDashboard = ({
                                   <div className="text-right flex flex-col items-end">
                                     <div className="text-2xl font-orbitron text-cyan-400 flex items-center justify-end gap-2">
                                       <TrendingUp className="w-5 h-5" />
-                                      {totalRate.toFixed(2)} <span className="text-xs">{t('units')}/s</span>
+                                      {totalRate.toFixed(2)} <span className="text-[14px]">{t('units')}/s</span>
                                     </div>
-                                    <div className="text-[10px] font-mono text-cyan-500/60 uppercase flex items-center justify-end gap-1 mt-1">
+                                    <div className="text-base font-mono text-cyan-500/60 uppercase flex items-center justify-end gap-1 mt-1">
                                       <Coins className="w-3 h-3" />
                                       {((totalRate / ore.packSize) * ore.baseValue * getEconomicMultipliers().profit * (1 + (miningCompressionLevels[ore.id] || 0) * 0.2)).toFixed(2)} QC/s
                                     </div>
-                                    <div className="text-[10px] font-mono text-slate-500 uppercase mt-1 opacity-50">Lvl {level} {upgrade.name}</div>
+                                    <div className="text-base font-mono text-slate-500 uppercase mt-1 opacity-50">Lvl {level} {upgrade.name}</div>
                                   </div>
                                 </div>
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8 py-6 border-y border-white/5 relative z-10">
                                   <div className="space-y-4">
-                                    <div className="flex justify-between items-center text-xs font-orbitron text-slate-500 uppercase tracking-widest">
+                                    <div className="flex justify-between items-center text-[14px] font-orbitron text-slate-500 uppercase tracking-widest">
                                       <span>{t('oreCollected')}</span>
                                       <span className={amount >= ore.packSize ? 'text-yellow-400 font-bold animate-pulse' : 'text-cyan-400'}>
                                         {formatValue(Math.floor(amount))} / {formatValue(ore.packSize)}
@@ -12070,11 +12273,11 @@ export const GameDashboard = ({
                                       />
                                     </div>
                                     <div className="flex justify-between items-center">
-                                      <div className="text-xs font-mono text-slate-500 uppercase">{t('sellPacks')}: {formatValue(packs)}</div>
+                                      <div className="text-[14px] font-mono text-slate-500 uppercase">{t('sellPacks')}: {formatValue(packs)}</div>
                                       <button
                                         onClick={(e) => sellOrePack(ore.id, e)}
                                         disabled={packs <= 0}
-                                        className={`px-4 py-1.5 rounded-lg text-xs font-orbitron font-bold tracking-widest transition-all uppercase ${
+                                        className={`px-4 py-1.5 rounded-lg text-[14px] font-orbitron font-bold tracking-widest transition-all uppercase ${
                                           packs > 0 
                                           ? 'bg-yellow-500 text-black hover:bg-yellow-400 shadow-[0_0_15px_rgba(234,179,8,0.3)]' 
                                           : 'bg-white/5 text-slate-600 cursor-not-allowed'
@@ -12092,22 +12295,22 @@ export const GameDashboard = ({
                                           <Zap className="w-5 h-5" />
                                         </div>
                                         <div>
-                                          <div className="text-xs font-orbitron text-white uppercase tracking-widest">{t('autoSell')}</div>
-                                          <div className="text-[10px] font-mono text-slate-500 uppercase">{isAutoSell ? t('active') : t('inactive')}</div>
+                                          <div className="text-[14px] font-orbitron text-white uppercase tracking-widest">{t('autoSell')}</div>
+                                          <div className="text-base font-mono text-slate-500 uppercase">{isAutoSell ? t('active') : t('inactive')}</div>
                                         </div>
                                       </div>
                                       {!autoSellUnlockedByOre[ore.id] ? (
                                         <button
                                           onClick={() => buyAutoSell(ore.id)}
                                           disabled={qc < (ore.autoSellCost * getEconomicMultipliers().cost)}
-                                          className={`px-4 py-2 rounded-lg text-[10px] font-orbitron font-bold tracking-widest transition-all uppercase ${qc >= (ore.autoSellCost * getEconomicMultipliers().cost) ? 'bg-pink-600 text-white hover:bg-pink-500 shadow-[0_0_15px_rgba(219,39,119,0.3)]' : 'bg-white/5 text-slate-600 cursor-not-allowed'}`}
+                                          className={`px-4 py-2 rounded-lg text-base font-orbitron font-bold tracking-widest transition-all uppercase ${qc >= (ore.autoSellCost * getEconomicMultipliers().cost) ? 'bg-pink-600 text-white hover:bg-pink-500 shadow-[0_0_15px_rgba(219,39,119,0.3)]' : 'bg-white/5 text-slate-600 cursor-not-allowed'}`}
                                         >
                                           {t('buy')} ({formatValue(ore.autoSellCost * getEconomicMultipliers().cost)})
                                         </button>
                                       ) : (
                                         <button
                                           onClick={() => buyAutoSell(ore.id)}
-                                          className={`px-4 py-2 rounded-lg text-[10px] font-orbitron font-bold tracking-widest transition-all uppercase border ${isAutoSell ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-400' : 'bg-white/5 border-white/10 text-slate-500'}`}
+                                          className={`px-4 py-2 rounded-lg text-base font-orbitron font-bold tracking-widest transition-all uppercase border ${isAutoSell ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-400' : 'bg-white/5 border-white/10 text-slate-500'}`}
                                         >
                                           {isAutoSell ? t('on').toUpperCase() : t('off').toUpperCase()}
                                         </button>
@@ -12119,13 +12322,13 @@ export const GameDashboard = ({
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 relative z-10 mt-auto">
                                   <div className="glass-panel p-4 rounded-xl border border-white/5 space-y-3">
                                     <div className="flex justify-between items-center">
-                                      <span className="text-[10px] font-orbitron text-slate-500 uppercase tracking-widest">{t('buyRobot')}</span>
-                                      <span className="text-xs font-mono text-yellow-500">{formatValue(robotCost)} QC</span>
+                                      <span className="text-base font-orbitron text-slate-500 uppercase tracking-widest">{t('buyRobot')}</span>
+                                      <span className="text-[14px] font-mono text-yellow-500">{formatValue(robotCost)} QC</span>
                                     </div>
                                     <button
                                       onClick={() => buyMiningRobot(ore.id)}
                                       disabled={robots >= 5 || qc < robotCost}
-                                      className={`w-full py-3 rounded-xl font-orbitron text-[10px] font-bold tracking-widest transition-all border uppercase ${robots < 5 && qc >= robotCost ? 'bg-cyan-500 text-black hover:bg-cyan-400 shadow-[0_0_20px_rgba(6,182,212,0.3)]' : 'border-white/10 text-slate-600 cursor-not-allowed'}`}
+                                      className={`w-full py-3 rounded-xl font-orbitron text-base font-bold tracking-widest transition-all border uppercase ${robots < 5 && qc >= robotCost ? 'bg-cyan-500 text-black hover:bg-cyan-400 shadow-[0_0_20px_rgba(6,182,212,0.3)]' : 'border-white/10 text-slate-600 cursor-not-allowed'}`}
                                     >
                                       {robots >= 5 ? t('max').toUpperCase() : t('buyRobot').toUpperCase()}
                                     </button>
@@ -12133,15 +12336,15 @@ export const GameDashboard = ({
 
                                   <div className="glass-panel p-4 rounded-xl border border-white/5 space-y-3">
                                     <div className="flex justify-between items-center">
-                                      <span className="text-[10px] font-orbitron text-slate-500 uppercase tracking-widest">{t('upgradeRobot')}</span>
-                                      <span className="text-xs font-mono text-yellow-500">
+                                      <span className="text-base font-orbitron text-slate-500 uppercase tracking-widest">{t('upgradeRobot')}</span>
+                                      <span className="text-[14px] font-mono text-yellow-500">
                                         {nextUpgrade ? formatValue(Math.floor(ore.robotBaseCost * nextUpgrade.costMultiplier * getEconomicMultipliers().cost)) : '---'} QC
                                       </span>
                                     </div>
                                     <button
                                       onClick={() => upgradeMiningRobot(ore.id)}
                                       disabled={!nextUpgrade || qc < Math.floor(ore.robotBaseCost * nextUpgrade.costMultiplier * getEconomicMultipliers().cost)}
-                                      className={`w-full py-3 rounded-xl font-orbitron text-[10px] font-bold tracking-widest transition-all border uppercase ${nextUpgrade && qc >= Math.floor(ore.robotBaseCost * nextUpgrade.costMultiplier * getEconomicMultipliers().cost) ? 'bg-emerald-500 text-black hover:bg-emerald-400 shadow-[0_0_20px_rgba(16,185,129,0.3)]' : 'border-white/10 text-slate-600 cursor-not-allowed'}`}
+                                      className={`w-full py-3 rounded-xl font-orbitron text-base font-bold tracking-widest transition-all border uppercase ${nextUpgrade && qc >= Math.floor(ore.robotBaseCost * nextUpgrade.costMultiplier * getEconomicMultipliers().cost) ? 'bg-emerald-500 text-black hover:bg-emerald-400 shadow-[0_0_20px_rgba(16,185,129,0.3)]' : 'border-white/10 text-slate-600 cursor-not-allowed'}`}
                                     >
                                       {!nextUpgrade ? t('max').toUpperCase() : t('upgradeRobot').toUpperCase()}
                                     </button>
@@ -12169,7 +12372,7 @@ export const GameDashboard = ({
                         <Rocket className="w-6 h-6" />
                         {t('aircraft')}
                       </h2>
-                      <p className="text-slate-400 text-sm">
+                      <p className="text-slate-400 text-base">
                         {translateData(isInterstellar ? 'Gerencie sua frota de naves interestelares.' : 'Gerencie sua frota de naves solares.')}
                       </p>
                     </div>
@@ -12177,7 +12380,7 @@ export const GameDashboard = ({
                     <div className="flex bg-black/40 p-1 rounded-xl border border-white/10">
                       <button
                         onClick={() => setAircraftSubTab('fleet')}
-                        className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+                        className={`px-4 py-2 rounded-lg text-[14px] font-bold transition-all ${
                           aircraftSubTab === 'fleet' ? 'bg-white/10 text-white' : 'text-white/40 hover:text-white/60'
                         }`}
                       >
@@ -12185,7 +12388,7 @@ export const GameDashboard = ({
                       </button>
                       <button
                         onClick={() => setAircraftSubTab('battle')}
-                        className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+                        className={`px-4 py-2 rounded-lg text-[14px] font-bold transition-all ${
                           aircraftSubTab === 'battle' ? 'bg-purple-500/20 text-purple-400' : 'text-white/40 hover:text-white/60'
                         }`}
                       >
@@ -12203,14 +12406,14 @@ export const GameDashboard = ({
                             <button
                               key={ship.level}
                               onClick={() => setShipPageIndex(ship.level - 1)}
-                              className={`flex-1 min-w-0 py-3 px-2 rounded-xl border transition-all duration-300 font-bold text-[10px] sm:text-sm ${
+                              className={`flex-1 min-w-0 py-3 px-2 rounded-xl border transition-all duration-300 font-bold text-base sm:text-base ${
                                 shipPageIndex === ship.level - 1
                                   ? `${themeBorder} ${themeBg} ${ship.color} ${themeGlow}`
                                   : `border-slate-800 bg-slate-900/50 ${ship.color} opacity-40 hover:opacity-70 hover:border-slate-700`
                               } ${!isUnlocked ? 'opacity-50 grayscale' : ''}`}
                             >
                               <div className="flex flex-col items-center gap-1">
-                                <span className="text-[8px] sm:text-[10px] uppercase tracking-wider opacity-60">Lvl {ship.level}</span>
+                                <span className="text-[14px] sm:text-base uppercase tracking-wider opacity-60">Lvl {ship.level}</span>
                                 <span className="truncate w-full text-center">{translateData(ship.name)}</span>
                                 {!isUnlocked && <Lock className="w-3 h-3 mt-1" />}
                               </div>
@@ -12239,17 +12442,17 @@ export const GameDashboard = ({
                                         {translateData(currentShips[shipPageIndex].name)}
                                       </h3>
                                       <div className="flex items-center gap-4">
-                                        <span className="px-3 py-1 rounded-full bg-slate-800 text-slate-300 text-xs font-bold border border-slate-700">
+                                        <span className="px-3 py-1 rounded-full bg-slate-800 text-slate-300 text-[14px] font-bold border border-slate-700">
                                           Nível {currentShips[shipPageIndex].level}
                                         </span>
-                                        <span className="text-slate-400 text-xs flex items-center gap-1.5">
+                                        <span className="text-slate-400 text-[14px] flex items-center gap-1.5">
                                           <Cpu className="w-3.5 h-3.5" />
                                           {translateData(currentShips[shipPageIndex].technology)}
                                         </span>
                                       </div>
                                     </div>
-                                    <div className={`p-4 rounded-2xl bg-slate-900/80 border ${themeBorder} ${themeGlow}`}>
-                                      <Rocket className={`w-8 h-8 ${currentShips[shipPageIndex].color}`} />
+                                    <div className={`p-4 rounded-2xl bg-slate-900/80 border ${themeBorder} ${themeGlow} flex items-center justify-center overflow-hidden`}>
+                                      <ShipVisual ship={currentShips[shipPageIndex]} className="w-12 h-12" />
                                     </div>
                                   </div>
 
@@ -12261,11 +12464,11 @@ export const GameDashboard = ({
                                 <div className="mt-auto space-y-6 pb-2">
                                   <div className="grid grid-cols-3 gap-4">
                                     <div className="p-4 rounded-xl bg-slate-900/50 border border-slate-800/50 group/stat">
-                                      <div className="text-[10px] text-slate-500 uppercase font-bold mb-1 tracking-widest">{t('speed')}</div>
-                                      <div className={`text-xl font-bold font-orbitron ${themeText}`}>{currentShips[shipPageIndex].maxSpeed} <span className="text-[10px] opacity-60 font-mono">km/s</span></div>
+                                      <div className="text-base text-slate-500 uppercase font-bold mb-1 tracking-widest">{t('speed')}</div>
+                                      <div className={`text-xl font-bold font-orbitron ${themeText}`}>{currentShips[shipPageIndex].maxSpeed} <span className="text-base opacity-60 font-mono">km/s</span></div>
                                     </div>
                                     <div className="p-4 rounded-xl bg-slate-900/50 border border-slate-800/50 group/stat">
-                                      <div className="text-[10px] text-slate-500 uppercase font-bold mb-1 tracking-widest">{t('range')}</div>
+                                      <div className="text-base text-slate-500 uppercase font-bold mb-1 tracking-widest">{t('range')}</div>
                                       <div className={`text-lg lg:text-xl font-bold font-orbitron ${themeText} whitespace-nowrap flex items-baseline gap-1`}>
                                         <span>
                                           {(() => {
@@ -12276,12 +12479,12 @@ export const GameDashboard = ({
                                             return val;
                                           })()}
                                         </span>
-                                        <span className="text-[10px] opacity-60 font-mono uppercase">{isInterstellar ? 'LY' : 'Km'}</span>
+                                        <span className="text-base opacity-60 font-mono uppercase">{isInterstellar ? 'LY' : 'Km'}</span>
                                       </div>
                                     </div>
                                     <div className="p-4 rounded-xl bg-slate-900/50 border border-slate-800/50 group/stat">
-                                      <div className="text-[10px] text-slate-500 uppercase font-bold mb-1 tracking-widest">{t('owned')}</div>
-                                      <div className={`text-xl font-bold font-orbitron ${themeText}`}>{ownedShips[`${routeTier}-${currentShips[shipPageIndex].level}`] || 0} <span className="text-[10px] opacity-60">/ 5</span></div>
+                                      <div className="text-base text-slate-500 uppercase font-bold mb-1 tracking-widest">{t('owned')}</div>
+                                      <div className={`text-xl font-bold font-orbitron ${themeText}`}>{ownedShips[`${routeTier}-${currentShips[shipPageIndex].level}`] || 0} <span className="text-base opacity-60">/ 5</span></div>
                                     </div>
                                   </div>
 
@@ -12320,18 +12523,18 @@ export const GameDashboard = ({
 
                             <div className="flex flex-col gap-4 h-full">
                             <div className="p-4 rounded-xl bg-slate-900/50 border border-slate-800 shrink-0">
-                              <h4 className="text-sm font-bold text-slate-300 mb-4 flex items-center gap-2">
+                              <h4 className="text-base font-bold text-slate-300 mb-4 flex items-center gap-2">
                                 <Info className="w-4 h-4 text-cyan-400" />
                                 {t('status')}
                               </h4>
                               <div className="space-y-3">
                                 <div className="flex justify-between items-center p-2 rounded-lg bg-slate-800/30">
-                                  <span className="text-xs text-slate-400">Capacidade de Frota</span>
-                                  <span className="text-xs font-bold text-slate-200">{formatValue(ownedShips[`${routeTier}-${currentShips[shipPageIndex].level}`] || 0)} / 5</span>
+                                  <span className="text-[14px] text-slate-400">Capacidade de Frota</span>
+                                  <span className="text-[14px] font-bold text-slate-200">{formatValue(ownedShips[`${routeTier}-${currentShips[shipPageIndex].level}`] || 0)} / 5</span>
                                 </div>
                                 <div className="flex justify-between items-center p-2 rounded-lg bg-slate-800/30">
-                                  <span className="text-xs text-slate-400">Tecnologia Requerida</span>
-                                  <span className={`text-xs font-bold ${(unlockedTechLevels[routeTier] || 0) >= currentShips[shipPageIndex].level ? 'text-emerald-400' : 'text-red-400'}`}>
+                                  <span className="text-[14px] text-slate-400">Tecnologia Requerida</span>
+                                  <span className={`text-[14px] font-bold ${(unlockedTechLevels[routeTier] || 0) >= currentShips[shipPageIndex].level ? 'text-emerald-400' : 'text-red-400'}`}>
                                     Lvl {currentShips[shipPageIndex].level}
                                   </span>
                                 </div>
@@ -12341,29 +12544,30 @@ export const GameDashboard = ({
                             {/* Ship visual representation */}
                             <div className={`flex-1 glass-panel rounded-2xl border ${themeBorder} relative overflow-hidden flex items-center justify-center`}>
                               <div className="absolute inset-0 opacity-10 star-grid pointer-events-none" />
-                              <div className={`absolute inset-0 bg-gradient-to-t from-${currentShips[shipPageIndex].color.split('-')[1] || 'cyan'}-500/10 to-transparent`} />
                               
-                              <motion.div
-                                animate={{
-                                  y: [0, -15, 0],
-                                  rotate: [0, 2, 0, -2, 0],
-                                }}
-                                transition={{
-                                  duration: 5,
-                                  repeat: Infinity,
-                                  ease: "easeInOut"
-                                }}
-                                className="relative z-10"
-                              >
-                                <Rocket className={`w-32 h-32 lg:w-48 lg:h-48 ${currentShips[shipPageIndex].color} filter drop-shadow-[0_0_40px_rgba(34,211,238,0.4)] animate-pulse-glow`} />
-                                
-                                <div className="absolute -bottom-8 left-1/2 -translate-x-1/2 w-32 h-4 bg-cyan-500/20 blur-xl rounded-full" />
-                              </motion.div>
+                              {/* Dynamic Background Video - Generated ID from Name */}
+                              {(() => {
+                                const shipId = currentShips[shipPageIndex].name.toLowerCase().replace(/\s+/g, '-');
+                                return (
+                                  <video 
+                                    key={`v-${shipId}`}
+                                    src={`/videos/ships/${shipId}.webm`}
+                                    autoPlay 
+                                    loop 
+                                    muted 
+                                    playsInline
+                                    className="absolute inset-0 w-full h-full object-cover z-0"
+                                    style={{ backgroundColor: 'black' }}
+                                  />
+                                );
+                              })()}
 
-                              <div className="absolute bottom-4 right-4 flex flex-col items-end opacity-40">
-                                <span className="text-[8px] font-mono whitespace-nowrap">REF: {currentShips[shipPageIndex].name.substring(0, 3).toUpperCase()}</span>
-                                <span className="text-[8px] font-mono whitespace-nowrap">X: {4.5 + shipPageIndex * 0.5}.00</span>
-                                <span className="text-[8px] font-mono whitespace-nowrap">Y: {12.2 - shipPageIndex * 0.2}.00</span>
+                              <div className={`absolute inset-0 bg-gradient-to-t from-${currentShips[shipPageIndex].color.split('-')[1] || 'cyan'}-500/10 to-transparent pointer-events-none z-10`} />
+                              
+                              <div className="absolute bottom-4 right-4 flex flex-col items-end opacity-40 z-20">
+                                <span className="text-[14px] font-mono whitespace-nowrap">REF: {currentShips[shipPageIndex].name.substring(0, 3).toUpperCase()}</span>
+                                <span className="text-[14px] font-mono whitespace-nowrap">X: {4.5 + shipPageIndex * 0.5}.00</span>
+                                <span className="text-[14px] font-mono whitespace-nowrap">Y: {12.2 - shipPageIndex * 0.2}.00</span>
                               </div>
                             </div>
                           </div>
@@ -12388,7 +12592,7 @@ export const GameDashboard = ({
                         <Cpu className="w-6 h-6" />
                         {t('technology')}
                       </h2>
-                      <p className="text-slate-400 text-sm">
+                      <p className="text-slate-400 text-base">
                         {translateData(isInterstellar ? 'Pesquise novas tecnologias para expandir sua frota galáctica.' : 'Pesquise novas tecnologias para expandir sua frota solar.')}
                       </p>
                     </div>
@@ -12397,7 +12601,7 @@ export const GameDashboard = ({
                       <div className="flex bg-black/40 p-1 rounded-xl border border-white/10">
                         <button
                           onClick={() => setTechSubTab('research')}
-                          className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+                          className={`px-4 py-2 rounded-lg text-[14px] font-bold transition-all ${
                             techSubTab === 'research' ? 'bg-white/10 text-white' : 'text-white/40 hover:text-white/60'
                           }`}
                         >
@@ -12405,7 +12609,7 @@ export const GameDashboard = ({
                         </button>
                         <button
                           onClick={() => allTechUnlocked && setTechSubTab('extraction')}
-                          className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+                          className={`px-4 py-2 rounded-lg text-[14px] font-bold transition-all ${
                             !allTechUnlocked ? 'opacity-30 cursor-not-allowed' : ''
                           } ${
                             techSubTab === 'extraction' ? 'bg-orange-500/20 text-orange-400' : 'text-white/40 hover:text-white/60'
@@ -12456,26 +12660,24 @@ export const GameDashboard = ({
                             >
                               <div className="flex justify-between items-start mb-3">
                                   <div className="flex-1 pr-2">
-                                    <h3 className={`font-bold leading-tight h-[2.8em] line-clamp-2 text-xs sm:text-sm ${isUnlocked ? 'text-orange-400' : 'text-slate-200'}`}>
+                                    <h3 className={`font-bold leading-tight h-[2.8em] line-clamp-2 text-[14px] sm:text-base ${isUnlocked ? 'text-orange-400' : 'text-slate-200'}`}>
                                       {point.name}
                                     </h3>
                                     {isUnlocked ? (
                                       <div className="mt-1 space-y-1">
-                                        <div className="flex justify-between items-center text-[9px]">
+                                        <div className="flex justify-between items-center text-[15px]">
                                           <span className="text-slate-400">Progresso:</span>
                                           <span className="text-orange-400 font-mono">{(extractionCycleProgress[point.id] || 0).toFixed(0)}%</span>
                                         </div>
                                         <div className="w-full h-1 bg-slate-800 rounded-full overflow-hidden border border-white/5">
-                                          <motion.div 
-                                            className="h-full bg-gradient-to-r from-slate-400 via-white to-slate-400 shadow-[0_0_8px_rgba(255,255,255,0.4)]"
-                                            initial={{ width: 0 }}
-                                            animate={{ width: `${extractionCycleProgress[point.id] || 0}%` }}
-                                            transition={{ duration: 0.1, ease: "linear" }}
+                                          <div 
+                                            className="h-full bg-gradient-to-r from-slate-400 via-white to-slate-400 shadow-[0_0_8px_rgba(255,255,255,0.4)] transition-[width] duration-300 ease-linear"
+                                            style={{ width: `${extractionCycleProgress[point.id] || 0}%` }}
                                           />
                                         </div>
                                       </div>
                                     ) : (
-                                      <p className="text-[10px] text-slate-400 mt-1">
+                                      <p className="text-base text-slate-400 mt-1">
                                         Custo: {formatValue(point.cost)} QC
                                       </p>
                                     )}
@@ -12483,8 +12685,8 @@ export const GameDashboard = ({
                                 <div className="flex items-center gap-2 shrink-0">
                                   {isUnlocked && (
                                     <div className="flex flex-col items-end">
-                                      <span className="text-[9px] text-slate-500 uppercase font-mono">{point.resourceName}</span>
-                                      <span className="text-[10px] font-bold text-orange-400">{formatValue(packs)} / 1.000</span>
+                                      <span className="text-[15px] text-slate-500 uppercase font-mono">{point.resourceName}</span>
+                                      <span className="text-base font-bold text-orange-400">{formatValue(packs)} / 1.000</span>
                                     </div>
                                   )}
                                   {!isUnlocked && !isResearching && (
@@ -12495,7 +12697,7 @@ export const GameDashboard = ({
 
                               <div className="space-y-3 mt-auto">
                                 {isUnlocked ? (
-                                  <div className="space-y-3">
+                                  <div className="space-y-6 flex-1 flex flex-col">
                                     {/* Upgrades Grid */}
                                     <div className="grid grid-cols-2 gap-2">
                                       <button
@@ -12510,9 +12712,9 @@ export const GameDashboard = ({
                                         }`}
                                       >
                                         <Bot className="w-4 h-4" />
-                                        <span className="text-[9px] font-bold uppercase">Robô Lvl {robotLevel}</span>
+                                        <span className="text-[15px] font-bold uppercase">Robô Lvl {robotLevel}</span>
                                         {robotLevel < 5 && (
-                                          <span className="text-[8px] opacity-60 font-mono">{formatValue(1000000000 * Math.pow(2, robotLevel))}</span>
+                                          <span className="text-[14px] opacity-60 font-mono">{formatValue(1000000000 * Math.pow(2, robotLevel))}</span>
                                         )}
                                       </button>
 
@@ -12528,9 +12730,9 @@ export const GameDashboard = ({
                                         }`}
                                       >
                                         <Pickaxe className="w-4 h-4" />
-                                        <span className="text-[9px] font-bold uppercase">Picareta Lvl {prodLevel}</span>
+                                        <span className="text-[15px] font-bold uppercase">Picareta Lvl {prodLevel}</span>
                                         {prodLevel < 6 && (
-                                          <span className="text-[8px] opacity-60 font-mono">{formatValue(EXTRACTION_PRODUCTION_COSTS[prodLevel + 1] * Math.pow(1.1, index))}</span>
+                                          <span className="text-[14px] opacity-60 font-mono">{formatValue(EXTRACTION_PRODUCTION_COSTS[prodLevel + 1] * Math.pow(1.1, index))}</span>
                                         )}
                                       </button>
 
@@ -12546,9 +12748,9 @@ export const GameDashboard = ({
                                         }`}
                                       >
                                         <Zap className="w-4 h-4" />
-                                        <span className="text-[9px] font-bold uppercase">Compactação Lvl {compressionLevel}</span>
+                                        <span className="text-[15px] font-bold uppercase">Compactação Lvl {compressionLevel}</span>
                                         {compressionLevel < 10 && (
-                                          <span className="text-[8px] opacity-60 font-mono">{formatValue(Math.floor(100000000 * Math.pow(1.2, compressionLevel)))}</span>
+                                          <span className="text-[14px] opacity-60 font-mono">{formatValue(Math.floor(100000000 * Math.pow(1.2, compressionLevel)))}</span>
                                         )}
                                       </button>
 
@@ -12562,7 +12764,7 @@ export const GameDashboard = ({
                                           }`}
                                         >
                                           <Cpu className={`w-4 h-4 ${isAutoSellActive ? 'animate-pulse' : ''}`} />
-                                          <span className="text-[8px] font-bold uppercase">{isAutoSellActive ? 'Auto: ON' : 'Auto: OFF'}</span>
+                                          <span className="text-[14px] font-bold uppercase">{isAutoSellActive ? 'Auto: ON' : 'Auto: OFF'}</span>
                                         </button>
                                       ) : (
                                         <button
@@ -12575,7 +12777,7 @@ export const GameDashboard = ({
                                           }`}
                                         >
                                           <Cpu className="w-4 h-4 opacity-40" />
-                                          <span className="text-[8px] font-bold uppercase">Auto Venda</span>
+                                          <span className="text-[14px] font-bold uppercase">Auto Venda</span>
                                           <span className="text-[7px] opacity-60 font-mono">{formatValue(5000000000)}</span>
                                         </button>
                                       )}
@@ -12583,7 +12785,7 @@ export const GameDashboard = ({
                                   </div>
                                 ) : isResearching ? (
                                   <div className="space-y-2">
-                                    <div className="flex justify-between items-center text-[10px] text-orange-400 font-bold uppercase">
+                                    <div className="flex justify-between items-center text-base text-orange-400 font-bold uppercase">
                                       <span>Pesquisando Local...</span>
                                       <span className="font-mono">{progress.toFixed(0)}%</span>
                                     </div>
@@ -12610,7 +12812,7 @@ export const GameDashboard = ({
                                       }
                                     }}
                                     disabled={!canResearch}
-                                    className={`w-full py-2.5 rounded-lg font-bold text-xs transition-all flex items-center justify-center gap-2 ${
+                                    className={`w-full py-2.5 rounded-lg font-bold text-[14px] transition-all flex items-center justify-center gap-2 ${
                                       canResearch
                                         ? 'bg-orange-600 hover:bg-orange-500 text-black shadow-lg shadow-orange-500/20'
                                         : 'bg-slate-800 text-slate-500 cursor-not-allowed opacity-50'
@@ -12639,7 +12841,7 @@ export const GameDashboard = ({
                                 <ChevronLeft className="w-10 h-10 text-orange-400 group-hover:-translate-x-1 transition-transform" />
                               )}
                             </div>
-                            <span className="text-[10px] font-orbitron font-bold text-orange-400 uppercase tracking-widest">
+                            <span className="text-base font-orbitron font-bold text-orange-400 uppercase tracking-widest">
                               {extractionPageIndex === 0 ? 'Ver outros 4 pontos' : 'Voltar para os 5 pontos'}
                             </span>
                             <div className="flex gap-1 mt-1">
@@ -12680,10 +12882,10 @@ export const GameDashboard = ({
                           >
                             <div className="flex justify-between items-start mb-2">
                               <div className="flex-1 overflow-hidden">
-                                <h3 className={`font-orbitron text-xs font-bold ${isUnlocked ? shipColorClass : 'text-slate-200'} uppercase tracking-tight`}>
+                                <h3 className={`font-orbitron text-[14px] font-bold ${isUnlocked ? shipColorClass : 'text-slate-200'} uppercase tracking-tight`}>
                                   {translateData(tech.name)}
                                 </h3>
-                                <p className="text-[10px] text-slate-400 font-medium leading-tight mt-1 line-clamp-2">
+                                <p className="text-base text-slate-400 font-medium leading-tight mt-1 line-clamp-2">
                                   {translateData(tech.description)}
                                 </p>
                               </div>
@@ -12707,7 +12909,7 @@ export const GameDashboard = ({
                             </div>
 
                             <div className="mt-auto space-y-2">
-                              <div className="flex items-center gap-2 text-[9px] font-bold text-slate-400 uppercase tracking-tighter">
+                              <div className="flex items-center gap-2 text-[15px] font-bold text-slate-400 uppercase tracking-tighter">
                                 <Rocket className={`w-3 h-3 ${isUnlocked ? shipColorClass : 'text-slate-600'}`} />
                                 <span>{t('unlocksShip')} {tech.unlocksShipLevel}</span>
                               </div>
@@ -12720,13 +12922,13 @@ export const GameDashboard = ({
                                   >
                                     <Zap className="w-3 h-3 text-slate-900" />
                                   </motion.div>
-                                  <span className="text-[9px] font-black uppercase tracking-widest text-slate-900">
+                                  <span className="text-[15px] font-black uppercase tracking-widest text-slate-900">
                                     {t('unlocked')}
                                   </span>
                                 </div>
                               ) : isResearching ? (
                                 <div className="space-y-1.5">
-                                  <div className="flex justify-between text-[8px] font-bold text-slate-500 uppercase tracking-widest">
+                                  <div className="flex justify-between text-[14px] font-bold text-slate-500 uppercase tracking-widest">
                                     <span>{t('researching')}</span>
                                     <span>{Math.floor(progress)}%</span>
                                   </div>
@@ -12740,7 +12942,7 @@ export const GameDashboard = ({
                                   <div className="flex gap-1.5">
                                     <button
                                       onClick={() => setResearchingTech(null)}
-                                      className="flex-1 py-1 bg-red-900/30 text-red-500 hover:bg-red-900/50 rounded-md font-bold text-[8px] uppercase border border-red-500/30 transition-all"
+                                      className="flex-1 py-1 bg-red-900/30 text-red-500 hover:bg-red-900/50 rounded-md font-bold text-[14px] uppercase border border-red-500/30 transition-all"
                                     >
                                       {t('cancel')}
                                     </button>
@@ -12749,12 +12951,12 @@ export const GameDashboard = ({
                               ) : (
                                 <div className="space-y-1.5">
                                   <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-1 text-[10px] font-bold text-amber-500">
+                                    <div className="flex items-center gap-1 text-base font-bold text-amber-500">
                                       <Coins className="w-3 h-3" />
                                       {cost === 0 ? t('free') : formatValue(cost)}
                                     </div>
                                     {researchTime > 0 && (
-                                      <div className="flex items-center gap-1 text-[8px] font-bold text-slate-500 uppercase">
+                                      <div className="flex items-center gap-1 text-[14px] font-bold text-slate-500 uppercase">
                                         <Clock className="w-2.5 h-2.5" />
                                         {Math.floor(researchTime / 60000)}m
                                       </div>
@@ -12763,7 +12965,7 @@ export const GameDashboard = ({
                                   <button
                                     onClick={() => buyTechnology(tech)}
                                     disabled={!canResearch}
-                                    className={`w-full py-2 rounded-lg text-[10px] font-bold transition-all uppercase tracking-widest ${
+                                    className={`w-full py-2 rounded-lg text-base font-bold transition-all uppercase tracking-widest ${
                                       canResearch
                                         ? `${isInterstellar ? 'bg-orange-600 text-black hover:bg-orange-500' : 'bg-cyan-600 text-black hover:bg-cyan-500'} shadow-lg`
                                         : 'bg-white/5 text-slate-700 cursor-not-allowed border border-white/5'
@@ -12801,12 +13003,12 @@ export const GameDashboard = ({
                                 <Zap className="w-5 h-5" />
                               </div>
                               <div>
-                                <h3 className="font-orbitron text-[10px] font-bold text-white uppercase tracking-wider">{t('rhse')}</h3>
-                                <p className={`text-[8px] font-mono ${isInterstellar ? 'text-orange-500/60' : 'text-cyan-500/60'} uppercase tracking-widest leading-none mt-0.5`}>{t('rhseConcept')}</p>
+                                <h3 className="font-orbitron text-base font-bold text-white uppercase tracking-wider">{t('rhse')}</h3>
+                                <p className={`text-[14px] font-mono ${isInterstellar ? 'text-orange-500/60' : 'text-cyan-500/60'} uppercase tracking-widest leading-none mt-0.5`}>{t('rhseConcept')}</p>
                               </div>
                             </div>
                             <div className="flex items-center gap-2">
-                              {aetherionTubes > 0 && <div className={`text-[8px] font-orbitron font-bold ${isInterstellar ? 'text-orange-400' : 'text-cyan-400'} border ${isInterstellar ? 'border-orange-500/30' : 'border-cyan-500/30'} px-2 py-0.5 rounded animate-pulse`}>{aetherionTubes} TUBES</div>}
+                              {aetherionTubes > 0 && <div className={`text-[14px] font-orbitron font-bold ${isInterstellar ? 'text-orange-400' : 'text-cyan-400'} border ${isInterstellar ? 'border-orange-500/30' : 'border-cyan-500/30'} px-2 py-0.5 rounded animate-pulse`}>{aetherionTubes} TUBES</div>}
                               <ChevronUp className={`w-4 h-4 ${isInterstellar ? 'text-orange-500/40' : 'text-cyan-500/40'}`} />
                             </div>
                           </div>
@@ -12838,11 +13040,11 @@ export const GameDashboard = ({
                               }`}
                             >
                               <div className="flex justify-between items-center w-full">
-                                <span className="text-[10px] font-orbitron font-bold uppercase tracking-wider">{t('extractionTech')}</span>
-                                <span className="text-[10px] font-mono font-bold">{extractionTechLevel >= 10 ? 'MAX' : `LVL ${extractionTechLevel}`}</span>
+                                <span className="text-base font-orbitron font-bold uppercase tracking-wider">{t('extractionTech')}</span>
+                                <span className="text-base font-mono font-bold">{extractionTechLevel >= 10 ? 'MAX' : `LVL ${extractionTechLevel}`}</span>
                               </div>
                               {extractionTechLevel < 10 && (
-                                <div className="mt-auto text-[9px] font-mono font-bold text-right pt-1">
+                                <div className="mt-auto text-[15px] font-mono font-bold text-right pt-1">
                                   {formatValue(10000 * Math.pow(2.5, extractionTechLevel))} QC
                                 </div>
                               )}
@@ -12869,11 +13071,11 @@ export const GameDashboard = ({
                               }`}
                             >
                               <div className="flex justify-between items-center w-full">
-                                <span className="text-[10px] font-orbitron font-bold uppercase tracking-wider">{t('solarMapping')}</span>
-                                <span className="text-[10px] font-mono font-bold">{solarMappingLevel >= 10 ? 'MAX' : `LVL ${solarMappingLevel}`}</span>
+                                <span className="text-base font-orbitron font-bold uppercase tracking-wider">{t('solarMapping')}</span>
+                                <span className="text-base font-mono font-bold">{solarMappingLevel >= 10 ? 'MAX' : `LVL ${solarMappingLevel}`}</span>
                               </div>
                               {solarMappingLevel < 10 && (
-                                <div className="mt-auto text-[9px] font-mono font-bold text-right pt-1">
+                                <div className="mt-auto text-[15px] font-mono font-bold text-right pt-1">
                                   {formatValue(10000 * Math.pow(2.5, solarMappingLevel))} QC
                                 </div>
                               )}
@@ -12900,11 +13102,11 @@ export const GameDashboard = ({
                               }`}
                             >
                               <div className="flex justify-between items-center w-full">
-                                <span className="text-[10px] font-orbitron font-bold uppercase tracking-wider">{t('doubleRoute')}</span>
-                                <span className="text-[10px] font-mono font-bold">{doubleRouteLevel >= 5 ? 'MAX' : `LVL ${doubleRouteLevel}`}</span>
+                                <span className="text-base font-orbitron font-bold uppercase tracking-wider">{t('doubleRoute')}</span>
+                                <span className="text-base font-mono font-bold">{doubleRouteLevel >= 5 ? 'MAX' : `LVL ${doubleRouteLevel}`}</span>
                               </div>
                               {doubleRouteLevel < 5 && (
-                                <div className="mt-auto text-[9px] font-mono font-bold text-right pt-1">
+                                <div className="mt-auto text-[15px] font-mono font-bold text-right pt-1">
                                   {formatValue(DOUBLE_ROUTE_COSTS[doubleRouteLevel])} QC
                                 </div>
                               )}
@@ -12931,11 +13133,11 @@ export const GameDashboard = ({
                               }`}
                             >
                               <div className="flex justify-between items-center w-full">
-                                <span className="text-[10px] font-orbitron font-bold uppercase tracking-wider">{t('doomP')}</span>
-                                <span className="text-[10px] font-mono font-bold">{doomPLevel >= 10 ? 'MAX' : `LVL ${doomPLevel}`}</span>
+                                <span className="text-base font-orbitron font-bold uppercase tracking-wider">{t('doomP')}</span>
+                                <span className="text-base font-mono font-bold">{doomPLevel >= 10 ? 'MAX' : `LVL ${doomPLevel}`}</span>
                               </div>
                               {doomPLevel < 10 && (
-                                <div className="mt-auto text-[9px] font-mono font-bold text-right pt-1">
+                                <div className="mt-auto text-[15px] font-mono font-bold text-right pt-1">
                                   {formatValue(DOOM_P_COSTS[doomPLevel])} QC
                                 </div>
                               )}
@@ -12947,8 +13149,8 @@ export const GameDashboard = ({
                           {/* Mining Waste */}
                           <div className="space-y-1.5 shadow-sm">
                             <div className="flex justify-between items-end px-1">
-                              <span className="text-[9px] font-orbitron text-slate-400 uppercase tracking-widest">♻️ {t('miningWaste')}</span>
-                              <span className="text-[10px] font-mono font-bold text-white">{formatValue(miningWaste)} / {formatValue(7500)}</span>
+                              <span className="text-[15px] font-orbitron text-slate-400 uppercase tracking-widest">♻️ {t('miningWaste')}</span>
+                              <span className="text-base font-mono font-bold text-white">{formatValue(miningWaste)} / {formatValue(7500)}</span>
                             </div>
                             <div className="h-1.5 bg-white/5 rounded-full border border-white/10 overflow-hidden">
                               <motion.div 
@@ -12961,8 +13163,8 @@ export const GameDashboard = ({
                           {/* Solar Energy */}
                           <div className="space-y-1.5 shadow-sm">
                             <div className="flex justify-between items-end px-1">
-                              <span className="text-[9px] font-orbitron text-slate-400 uppercase tracking-widest">☀️ {t('solarEnergy')}</span>
-                              <span className="text-[10px] font-mono font-bold text-white">{solarEnergy} / 7500</span>
+                              <span className="text-[15px] font-orbitron text-slate-400 uppercase tracking-widest">☀️ {t('solarEnergy')}</span>
+                              <span className="text-base font-mono font-bold text-white">{solarEnergy} / 7500</span>
                             </div>
                             <div className="h-1.5 bg-white/5 rounded-full border border-white/10 overflow-hidden">
                               <motion.div 
@@ -12976,7 +13178,7 @@ export const GameDashboard = ({
                         <div className="flex flex-col md:flex-row items-center justify-between gap-4 pt-1 border-t border-white/5 mt-1">
                           <div className="flex items-center gap-4">
                             <div className="flex flex-col">
-                              <span className="text-[9px] font-orbitron text-slate-500 uppercase tracking-widest">{t('aetherionTubes')}</span>
+                              <span className="text-[15px] font-orbitron text-slate-500 uppercase tracking-widest">{t('aetherionTubes')}</span>
                               <div className="flex gap-1 mt-1">
                                 {Array.from({ length: 10 }).map((_, i) => {
                                   const isOverfilled = isInterstellar && aetherionTubes > 10 && i < aetherionTubes - 10;
@@ -13005,7 +13207,7 @@ export const GameDashboard = ({
                           <button
                             onClick={synthesizeAetherion}
                             disabled={aetherionTubes <= 0}
-                            className={`px-5 py-2 rounded-xl font-orbitron font-bold text-[9px] tracking-widest transition-all flex items-center gap-2 uppercase ${
+                            className={`px-5 py-2 rounded-xl font-orbitron font-bold text-[15px] tracking-widest transition-all flex items-center gap-2 uppercase ${
                               aetherionTubes > 0
                               ? (isInterstellar ? 'bg-orange-500 text-black hover:bg-orange-400 shadow-[0_0_15px_rgba(249,115,22,0.4)]' : 'bg-cyan-500 text-black hover:bg-cyan-400 shadow-[0_0_15px_rgba(6,182,212,0.4)]')
                               : 'bg-white/5 text-slate-600 cursor-not-allowed border border-white/5'
@@ -13037,11 +13239,11 @@ export const GameDashboard = ({
                             <div className="flex justify-between items-center w-full">
                               <div>
                                 <h3 className={`font-orbitron text-base md:text-lg font-black ${ship.color} uppercase tracking-tight leading-tight`}>{ship.name}</h3>
-                                <p className={`text-[9px] font-mono ${isInterstellar ? 'text-orange-500/60' : 'text-cyan-500/60'} uppercase tracking-widest leading-none mt-1`}>{t('manageInfrastructure')}</p>
+                                <p className={`text-[15px] font-mono ${isInterstellar ? 'text-orange-500/60' : 'text-cyan-500/60'} uppercase tracking-widest leading-none mt-1`}>{t('manageInfrastructure')}</p>
                               </div>
                               <div className="flex items-center gap-3">
                                 {isMaxed && (
-                                  <div className={`text-xs md:text-sm font-orbitron font-black ${ship.color} border-2 ${ship.color.replace('text-', 'border-').replace('-400', '-500/50')} px-3 py-1 rounded shadow-[0_0_15px_currentColor]`}>
+                                  <div className={`text-[14px] md:text-base font-orbitron font-black ${ship.color} border-2 ${ship.color.replace('text-', 'border-').replace('-400', '-500/50')} px-3 py-1 rounded shadow-[0_0_15px_currentColor]`}>
                                     MAX
                                   </div>
                                 )}
@@ -13054,21 +13256,92 @@ export const GameDashboard = ({
                     </div>
                   </div>
                 ) : (
-                    <div className="space-y-4">
+                    <div className="flex flex-col h-full gap-4">
+                      {/* Back Button - Top Level */}
                       <button 
                         onClick={() => setSelectedUpgradeLocation(null)}
-                        className={`text-[10px] font-orbitron font-bold ${isInterstellar ? 'text-orange-500 hover:text-orange-400' : 'text-cyan-500 hover:text-cyan-400'} flex items-center gap-2 mb-2 uppercase tracking-widest`}
+                        className={`text-lg font-orbitron font-bold ${isInterstellar ? 'text-orange-500 hover:text-orange-400' : 'text-cyan-500 hover:text-cyan-400'} flex items-center gap-2 uppercase tracking-widest shrink-0 w-fit`}
                       >
-                        <ArrowRight className="w-3 h-3 rotate-180" /> {t('back')}
+                        <ArrowRight className="w-4 h-4 rotate-180" /> {t('back')}
                       </button>
-                      
-                      <div className={`glass-panel ${isInterstellar ? 'neon-border-orange' : 'neon-border-cyan'} rounded-lg p-3 mb-4 bg-white/5`}>
-                        <h2 className={`text-xs font-orbitron font-bold ${SHIPS.find(s => s.level === (ROUTES.find(r => r.id === selectedUpgradeLocation)?.requiredShipLevel || 1) && s.tier === (ROUTES.find(r => r.id === selectedUpgradeLocation)?.tier || routeTier))?.color || (isInterstellar ? 'text-orange-400' : 'text-cyan-400')} uppercase tracking-widest flex items-center gap-2`}>
-                          <Settings className="w-4 h-4" /> {SHIPS.find(s => s.level === (ROUTES.find(r => r.id === selectedUpgradeLocation)?.requiredShipLevel || 1) && s.tier === (ROUTES.find(r => r.id === selectedUpgradeLocation)?.tier || routeTier))?.name} {t('upgrades')}
-                        </h2>
-                      </div>
 
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                      <div className="grid grid-cols-4 grid-rows-[auto_1fr_1fr] gap-6 flex-1 min-h-0">
+                        {/* ROW 1: Evolution Progress (Left 50%) + Title (Right 50%) */}
+                        <div className="col-span-2">
+                          <div className={`h-full glass-panel rounded-3xl border-2 ${themeBorder} bg-white/5 p-6 flex flex-col justify-center overflow-hidden relative`}>
+                            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-cyan-500/40 to-transparent" />
+                            <div className="flex justify-between items-center gap-8">
+                              <div className="flex flex-col gap-1">
+                                <h3 className="text-[10px] font-orbitron font-bold text-white/40 uppercase tracking-[0.4em] flex items-center gap-2">
+                                  <Activity className="w-3 h-3" /> Ship Evolution Status
+                                </h3>
+                                <span className="text-slate-500 font-bold uppercase tracking-widest text-[13px]">Upgrades Completion</span>
+                              </div>
+                              {(() => {
+                                const locationTech = techLevels[selectedUpgradeLocation] || { engine: 0, ai: 0, value: 0, rare: 0 };
+                                const totalLevels = Object.values(locationTech).reduce((a, b) => a + (b as number), 0);
+                                // Accurate max possible calculation summing each upgrade's max level
+                                const maxPossible = UPGRADES.reduce((acc, upg) => acc + (upg.tiers.length - 1), 0);
+                                const percent = Math.min(Math.floor((totalLevels / maxPossible) * 100), 100);
+                                return (
+                                  <div className="flex items-center gap-6 flex-1">
+                                    <div className="h-3 flex-1 bg-black/60 rounded-full overflow-hidden p-[2px] border border-white/10">
+                                      <div 
+                                        className={`h-full rounded-full transition-all duration-1000 relative ${isInterstellar ? 'bg-orange-500' : 'bg-pink-600'}`}
+                                        style={{ width: `${percent}%` }}
+                                      >
+                                        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-pulse" />
+                                      </div>
+                                    </div>
+                                    <span className={`text-3xl font-orbitron font-bold ${isInterstellar ? 'text-orange-400' : 'text-cyan-400'} leading-none min-w-[80px] text-right`}>{percent}%</span>
+                                  </div>
+                                );
+                              })()}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="col-span-2">
+                          <div className={`h-full glass-panel ${isInterstellar ? 'neon-border-orange' : 'neon-border-cyan'} rounded-3xl p-6 bg-white/5 border-2 flex items-center justify-center relative overflow-hidden`}>
+                            <h2 className={`text-xl font-orbitron font-bold ${SHIPS.find(s => s.level === (ROUTES.find(r => r.id === selectedUpgradeLocation)?.requiredShipLevel || 1) && s.tier === (ROUTES.find(r => r.id === selectedUpgradeLocation)?.tier || routeTier))?.color || (isInterstellar ? 'text-orange-400' : 'text-cyan-400')} uppercase tracking-widest flex items-center gap-4`}>
+                              <Settings className="w-8 h-8 animate-spin-slow" /> {SHIPS.find(s => s.level === (ROUTES.find(r => r.id === selectedUpgradeLocation)?.requiredShipLevel || 1) && s.tier === (ROUTES.find(r => r.id === selectedUpgradeLocation)?.tier || routeTier))?.name} {t('upgrades')}
+                            </h2>
+                          </div>
+                        </div>
+
+                        {/* ROW 2 & 3: Video (Left Span 2x2) + Upgrades (Right 2x2) */}
+                        <div className="col-span-2 row-span-2">
+                          <div className={`h-full glass-panel rounded-3xl border-2 ${themeBorder} relative overflow-hidden flex items-center justify-center shadow-2xl shadow-black/50`}>
+                            <div className="absolute inset-0 opacity-20 star-grid pointer-events-none" />
+                            
+                            {/* Maintenance/Hangar Video */}
+                            {(() => {
+                              const shipData = SHIPS.find(s => s.level === (ROUTES.find(r => r.id === selectedUpgradeLocation)?.requiredShipLevel || 1) && s.tier === (ROUTES.find(r => r.id === selectedUpgradeLocation)?.tier || routeTier));
+                              const shipId = shipData?.name.toLowerCase().replace(/\s+/g, '-') || 'atlas-courier';
+                              return (
+                                <video 
+                                  key={`h-${shipId}`}
+                                  src={`/videos/hangar/${shipId}.webm`}
+                                  autoPlay 
+                                  loop 
+                                  muted 
+                                  playsInline
+                                  className="absolute inset-0 w-full h-full object-cover z-0"
+                                  style={{ backgroundColor: 'black' }}
+                                />
+                              );
+                            })()}
+
+                            <div className={`absolute inset-0 bg-gradient-to-t from-${SHIPS.find(s => s.level === (ROUTES.find(r => r.id === selectedUpgradeLocation)?.requiredShipLevel || 1) && s.tier === (ROUTES.find(r => r.id === selectedUpgradeLocation)?.tier || routeTier))?.color.split('-')[1] || 'cyan'}-500/20 to-transparent pointer-events-none z-10`} />
+                            
+                            <div className="absolute bottom-6 right-6 flex flex-col items-end opacity-60 z-20 bg-black/40 backdrop-blur-md p-3 rounded-lg border border-white/10">
+                              <span className="text-base font-mono font-bold whitespace-nowrap uppercase tracking-tighter text-white">Status: Maintenance</span>
+                              <span className="text-base font-mono font-bold whitespace-nowrap uppercase tracking-tighter text-white">Hangar: SEC-0{ROUTES.find(r => r.id === selectedUpgradeLocation)?.requiredShipLevel}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* UPGRADE CARDS (4 units) */}
                         {UPGRADES.map(upgrade => {
                           const locationTech = techLevels[selectedUpgradeLocation] || { engine: 0, ai: 0, value: 0, rare: 0 };
                           const level = locationTech[upgrade.id.toLowerCase()] || 0;
@@ -13079,33 +13352,39 @@ export const GameDashboard = ({
                           const multipliers = getEconomicMultipliers();
                           const cost = nextTier ? Math.floor(nextTier.cost * multiplier * multipliers.cost * (isInterstellar ? 1.5 : 1)) : 0;
                           const canAfford = qc >= cost;
+                          
+                          const maxLvl = upgrade.tiers.length - 1;
+                          const progressPercent = (level / maxLvl) * 100;
 
                           return (
-                            <div key={upgrade.id} className={`glass-panel ${isInterstellar ? 'neon-border-orange' : 'neon-border-cyan'} rounded-lg p-3 flex flex-col hover:bg-white/5 transition-colors`}>
-                              <div className="flex justify-between items-start mb-2">
-                                <h3 className="font-orbitron text-[10px] font-bold text-white leading-tight uppercase tracking-wider">{translateData(upgrade.name)}</h3>
-                                <div className={`text-[11px] font-orbitron font-bold ${isInterstellar ? 'text-orange-400 border-orange-500/20 bg-orange-500/5' : 'text-cyan-400 border-cyan-500/20 bg-cyan-500/5'} px-1 rounded`}>{t('level').toUpperCase()} {level}</div>
+                            <div key={upgrade.id} className={`glass-panel ${isInterstellar ? 'neon-border-orange' : 'neon-border-cyan'} rounded-3xl p-5 flex flex-col hover:bg-white/5 transition-all border-2 group h-full min-h-0 relative`}>
+                              <div className="flex justify-between items-start mb-3 shrink-0">
+                                <h3 className="font-orbitron text-lg font-bold text-white leading-tight uppercase tracking-wider group-hover:text-cyan-400 transition-colors">{translateData(upgrade.name)}</h3>
+                                <div className={`text-sm font-orbitron font-bold ${isInterstellar ? 'text-orange-400 border-orange-500/20 bg-orange-500/5' : 'text-cyan-400 border-cyan-500/20 bg-cyan-500/5'} px-3 py-0.5 rounded border`}>{t('level').toUpperCase()} {level}</div>
                               </div>
-                              <div className={`text-xs font-bold ${isInterstellar ? 'text-orange-100' : 'text-cyan-100'} mb-1 leading-tight uppercase tracking-tight`}>{translateData(currentTier.name)}</div>
-                              <p className={`text-[11px] font-mono ${isInterstellar ? 'text-orange-500/60' : 'text-cyan-500/60'} mb-4 flex-1 leading-tight uppercase tracking-tighter`}>{t('bonus')}: {translateData(currentTier.bonus)}</p>
+                              <div className={`text-md font-bold ${isInterstellar ? 'text-orange-100' : 'text-cyan-100'} mb-1 leading-tight uppercase tracking-tight shrink-0`}>{translateData(currentTier.name)}</div>
+                              <p className={`text-[13px] font-mono ${isInterstellar ? 'text-orange-500/60' : 'text-cyan-500/60'} mb-auto flex-1 leading-relaxed uppercase tracking-tighter overflow-hidden`}>{t('bonus')}: {translateData(currentTier.bonus)}</p>
                               
-                              {nextTier ? (
+                              <div className="mt-4 shrink-0">
                                 <button
                                   disabled={!canAfford}
                                   onClick={() => buyUpgrade(selectedUpgradeLocation, upgrade)}
-                                  className={`w-full py-2 rounded-md font-orbitron font-bold text-[10px] tracking-[0.2em] transition-all flex items-center justify-center gap-1.5 uppercase ${
+                                  className={`w-full py-3 rounded-xl font-orbitron font-bold text-lg tracking-[0.2em] transition-all flex items-center justify-center gap-2 uppercase border-b-4 relative overflow-hidden ${
                                     canAfford
-                                    ? (isInterstellar ? 'bg-orange-500 text-black hover:bg-orange-400 shadow-[0_0_15px_rgba(249,115,22,0.3)]' : 'bg-pink-600 text-white hover:bg-pink-500 shadow-[0_0_15px_rgba(219,39,119,0.3)]')
-                                    : 'bg-white/5 text-slate-600 cursor-not-allowed'
+                                    ? (isInterstellar ? 'bg-orange-950 text-orange-400 border-orange-700' : 'bg-pink-950 text-pink-400 border-pink-800')
+                                    : 'bg-white/5 text-slate-600 cursor-not-allowed border-slate-800'
                                   }`}
                                 >
-                                  {t('upgrade').toUpperCase()} <Coins className="w-2.5 h-2.5" /> {formatValue(cost)}
+                                  <div 
+                                    className={`absolute inset-y-0 left-0 opacity-40 transition-all duration-500 ${isInterstellar ? 'bg-orange-500' : 'bg-pink-600'}`} 
+                                    style={{ width: `${progressPercent}%` }}
+                                  />
+                                  <span className="relative z-10 flex items-center gap-2">
+                                    <Coins className="w-5 h-5" />
+                                    {nextTier ? formatValue(cost) : t('max').toUpperCase()}
+                                  </span>
                                 </button>
-                              ) : (
-                                <div className="w-full py-2 rounded-md font-orbitron font-bold text-[10px] tracking-[0.2em] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-center uppercase">
-                                  {t('max').toUpperCase()}
-                                </div>
-                              )}
+                              </div>
                             </div>
                           );
                         })}
@@ -13131,7 +13410,7 @@ export const GameDashboard = ({
                       <h2 className={`text-xl font-orbitron font-bold ${isInterstellar ? 'text-orange-400' : 'text-cyan-400'} uppercase tracking-widest`}>
                         {language === 'pt' ? 'Sair do jogo' : 'Exit Game'}
                       </h2>
-                      <p className="text-xs font-orbitron text-white/60 uppercase tracking-wider leading-relaxed">
+                      <p className="text-[14px] font-orbitron text-white/60 uppercase tracking-wider leading-relaxed">
                         {language === 'pt' 
                           ? 'Isso te levará ao menu inicial e salvará seu progresso automaticamente. Todo o modo automático será desabilitado, descansando e esfriando os motores.' 
                           : 'This will take you to the home menu and save your progress automatically. All automatic modes will be disabled, resting and cooling the engines.'}
@@ -13141,13 +13420,13 @@ export const GameDashboard = ({
                     <div className="flex flex-col gap-4">
                       <button
                         onClick={handleExit}
-                        className={`w-full py-4 ${isInterstellar ? 'bg-orange-500 hover:bg-orange-400 shadow-[0_0_20px_rgba(249,115,22,0.3)]' : 'bg-cyan-500 hover:bg-cyan-400 shadow-[0_0_20px_rgba(6,182,212,0.3)]'} text-black font-orbitron font-bold text-sm tracking-widest rounded-lg transition-all uppercase`}
+                        className={`w-full py-4 ${isInterstellar ? 'bg-orange-500 hover:bg-orange-400 shadow-[0_0_20px_rgba(249,115,22,0.3)]' : 'bg-cyan-500 hover:bg-cyan-400 shadow-[0_0_20px_rgba(6,182,212,0.3)]'} text-black font-orbitron font-bold text-base tracking-widest rounded-lg transition-all uppercase`}
                       >
                         {language === 'pt' ? 'CONFIRMAR E SAIR' : 'CONFIRM AND EXIT'}
                       </button>
                       <button
                         onClick={() => setActiveTab(isEarth ? 'colonies' : isVoid ? 'void_aircraft' : isInterstellar ? 'routes2' : 'routes')}
-                        className="w-full py-2 text-[10px] font-orbitron text-slate-500 hover:text-white transition-colors uppercase tracking-widest"
+                        className="w-full py-2 text-base font-orbitron text-slate-500 hover:text-white transition-colors uppercase tracking-widest"
                       >
                         {language === 'pt' ? 'VOLTAR' : 'BACK'}
                       </button>
@@ -13233,24 +13512,24 @@ export const GameDashboard = ({
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -10 }}
-                  className="space-y-6"
+                  className="space-y-4 flex-1 flex flex-col h-full"
                 >
                   {isEarth ? (
                     <>
                       <div className="glass-panel neon-border-emerald p-4 rounded-xl flex justify-between items-center">
                         <div>
                           <h2 className="text-lg font-orbitron font-bold text-emerald-400 uppercase tracking-tighter">{t('history')}</h2>
-                          <p className="text-[10px] text-slate-500 font-mono uppercase tracking-widest">{t('gameStatsByRoute')}</p>
+                          <p className="text-base text-slate-500 font-mono uppercase tracking-widest">{t('gameStatsByRoute')}</p>
                         </div>
                         <div className="flex gap-2">
                           <button 
                             onClick={exportGameData}
-                            className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-[10px] font-mono uppercase tracking-widest transition-all bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border border-white/5"
+                            className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-base font-mono uppercase tracking-widest transition-all bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border border-white/5"
                           >
                             <Download size={12} />
                             {t('export')}
                           </button>
-                          <label className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-[10px] font-mono uppercase tracking-widest transition-all cursor-pointer bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border border-white/5">
+                          <label className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-base font-mono uppercase tracking-widest transition-all cursor-pointer bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border border-white/5">
                             <Upload size={12} />
                             {t('import')}
                             <input type="file" className="hidden" accept=".dat" onChange={importGameData} />
@@ -13358,13 +13637,13 @@ export const GameDashboard = ({
                       <div className={`glass-panel ${isInterstellar ? 'neon-border-orange' : isVoid ? 'neon-border-purple' : 'neon-border-cyan'} p-4 rounded-xl flex justify-between items-center`}>
                     <div>
                       <h2 className={`text-lg font-orbitron font-bold ${isInterstellar ? 'text-orange-400' : isVoid ? 'text-purple-400' : 'text-cyan-400'} uppercase tracking-tighter`}>{t('history')}</h2>
-                      <p className="text-[10px] text-slate-500 font-mono uppercase tracking-widest">{t('gameStatsByRoute')}</p>
+                      <p className="text-base text-slate-500 font-mono uppercase tracking-widest">{t('gameStatsByRoute')}</p>
                     </div>
                     <div className="flex gap-2">
                       {!isEarth && (
                         <button 
                           onClick={() => setShowRoute2Goals(true)}
-                          className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-[10px] font-orbitron font-bold uppercase tracking-widest transition-all bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/30 shadow-[0_0_15px_rgba(16,185,129,0.1)]`}
+                          className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-base font-orbitron font-bold uppercase tracking-widest transition-all bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/30 shadow-[0_0_15px_rgba(16,185,129,0.1)]`}
                         >
                           <Target size={12} />
                           {isVoid ? (language === 'pt' ? 'Metas Projeto Terra' : 'Project Earth Goals') : isInterstellar ? (language === 'pt' ? 'Metas Rota 3' : 'Route 3 Goals') : (language === 'pt' ? 'Metas Rota 2' : 'Route 2 Goals')}
@@ -13372,12 +13651,12 @@ export const GameDashboard = ({
                       )}
                       <button 
                         onClick={exportGameData}
-                        className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-[10px] font-mono uppercase tracking-widest transition-all ${isInterstellar ? 'bg-orange-500/10 text-orange-400 hover:bg-orange-500/20' : 'bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20'} border border-white/5`}
+                        className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-base font-mono uppercase tracking-widest transition-all ${isInterstellar ? 'bg-orange-500/10 text-orange-400 hover:bg-orange-500/20' : 'bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20'} border border-white/5`}
                       >
                         <Download size={12} />
                         {t('export')}
                       </button>
-                      <label className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-[10px] font-mono uppercase tracking-widest transition-all cursor-pointer ${isInterstellar ? 'bg-orange-500/10 text-orange-400 hover:bg-orange-500/20' : 'bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20'} border border-white/5`}>
+                      <label className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-base font-mono uppercase tracking-widest transition-all cursor-pointer ${isInterstellar ? 'bg-orange-500/10 text-orange-400 hover:bg-orange-500/20' : 'bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20'} border border-white/5`}>
                         <Upload size={12} />
                         {t('import')}
                         <input type="file" className="hidden" accept=".dat" onChange={importGameData} />
@@ -13385,7 +13664,7 @@ export const GameDashboard = ({
                     </div>
                   </div>
 
-                  <div className="relative">
+                  <div className="relative flex-1 flex flex-col">
                     <AnimatePresence mode="wait">
                       {(() => {
                         const tiers = Object.keys(historyStats);
@@ -13404,7 +13683,7 @@ export const GameDashboard = ({
                             initial={{ opacity: 0, x: 20 }}
                             animate={{ opacity: 1, x: 0 }}
                             exit={{ opacity: 0, x: -20 }}
-                            className={`glass-panel ${tierBorder} ${tierBg} p-8 rounded-3xl space-y-8 min-h-[500px] flex flex-col`}
+                            className={`glass-panel ${tierBorder} ${tierBg} p-6 rounded-3xl space-y-6 flex-1 flex flex-col`}
                           >
                             <div className="flex justify-between items-center border-b border-white/5 pb-4">
                               <button 
@@ -13522,42 +13801,42 @@ export const GameDashboard = ({
                                 </div>
                               ) : (
                                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 flex-1">
-                                <div className="space-y-4">
+                                <div className="space-y-6 flex-1 flex flex-col">
                                 <div>
-                                  <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-2">
+                                  <h4 className="text-base font-bold text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-2">
                                     <Activity className="w-4 h-4 text-emerald-400" />
                                     {t('totalDeliveriesBattlesMining')}
                                   </h4>
-                                  <div className="space-y-2 bg-black/20 p-4 rounded-xl border border-white/5">
-                                    <div className="flex justify-between items-center text-[9px]">
-                                      <span className="text-slate-500 uppercase font-mono">{t('randomBattlesFound')}</span>
+                                  <div className="space-y-4 bg-black/20 p-6 rounded-2xl border border-white/5 flex-1">
+                                    <div className="flex justify-between items-center text-[15px]">
+                                      <span className="text-slate-500 uppercase font-mono text-base">{t('randomBattlesFound')}</span>
                                       <span className="font-mono text-white">{formatValue(stats.randomBattlesFound || 0)}</span>
                                     </div>
-                                    <div className="flex justify-between items-center text-[9px]">
-                                      <span className="text-slate-500 uppercase font-mono">{t('radarBattlesFound')}</span>
+                                    <div className="flex justify-between items-center text-[15px]">
+                                      <span className="text-slate-500 uppercase font-mono text-base">{t('radarBattlesFound')}</span>
                                       <span className="font-mono text-white">{formatValue(stats.radarBattlesFound || 0)}</span>
                                     </div>
                                     <div className="h-px bg-white/5 my-1" />
-                                    <div className="flex justify-between items-center text-[9px]">
-                                      <span className="text-slate-500 uppercase font-mono">{t('manualDeliveries')}</span>
+                                    <div className="flex justify-between items-center text-[15px]">
+                                      <span className="text-slate-500 uppercase font-mono text-base">{t('manualDeliveries')}</span>
                                       <span className="font-mono text-white">{formatValue(stats.manualDeliveries)}</span>
                                     </div>
-                                    <div className="flex justify-between items-center text-[9px]">
-                                      <span className="text-slate-500 uppercase font-mono">{t('autoDeliveries')}</span>
+                                    <div className="flex justify-between items-center text-[15px]">
+                                      <span className="text-slate-500 uppercase font-mono text-base">{t('autoDeliveries')}</span>
                                       <span className="font-mono text-white">{formatValue(stats.autoDeliveries)}</span>
                                     </div>
                                     <div className="h-px bg-white/5 my-1" />
-                                    <div className="flex justify-between items-center text-[9px]">
-                                      <span className="text-slate-500 uppercase font-mono">{t('totalMiningPacksSold')}</span>
+                                    <div className="flex justify-between items-center text-[15px]">
+                                      <span className="text-slate-500 uppercase font-mono text-base">{t('totalMiningPacksSold')}</span>
                                       <span className="font-mono text-white">{formatValue((stats.manualMiningPacksSold || 0) + (stats.autoMiningPacksSold || 0))}</span>
                                     </div>
-                                    <div className="flex justify-between items-center text-[9px]">
-                                      <span className="text-slate-500 uppercase font-mono">{t('totalExplorationMiningPacksSold')}</span>
+                                    <div className="flex justify-between items-center text-[15px]">
+                                      <span className="text-slate-500 uppercase font-mono text-base">{t('totalExplorationMiningPacksSold')}</span>
                                       <span className="font-mono text-white">{formatValue((stats.manualExtractionPacksSold || 0) + (stats.autoExtractionPacksSold || 0))}</span>
                                     </div>
                                     <div className="h-px bg-white/5 my-1" />
-                                    <div className="flex justify-between items-center text-[9px]">
-                                      <span className="text-slate-500 uppercase font-mono">{t('missionsCompleted')}</span>
+                                    <div className="flex justify-between items-center text-[15px]">
+                                      <span className="text-slate-500 uppercase font-mono text-base">{t('missionsCompleted')}</span>
                                       <span className="font-mono text-white">{formatValue(stats.missionsCompleted)}</span>
                                     </div>
                                   </div>
@@ -13566,47 +13845,47 @@ export const GameDashboard = ({
 
                               <div className="space-y-3">
                                 <div>
-                                  <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-2">
+                                  <h4 className="text-base font-bold text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-2">
                                     <TrendingUp className="w-3.5 h-3.5 text-cyan-400" />
                                     {t('totalQCAcquired')}
                                   </h4>
-                                  <div className="space-y-1.5 bg-black/20 p-3 rounded-xl border border-white/5">
-                                    <div className="flex justify-between items-center text-[9px]">
+                                  <div className="space-y-3 bg-black/20 p-6 rounded-2xl border border-white/5 flex-1">
+                                    <div className="flex justify-between items-center text-[15px]">
                                       <span className="text-slate-500 uppercase font-mono">{t('fromDeliveries')}</span>
                                       <span className="font-mono text-emerald-400">+{formatValue(stats.qcFromDeliveries)}</span>
                                     </div>
-                                    <div className="flex justify-between items-center text-[9px]">
+                                    <div className="flex justify-between items-center text-[15px]">
                                       <span className="text-slate-500 uppercase font-mono">{t('fromMining')}</span>
                                       <span className="font-mono text-emerald-400">+{formatValue(stats.qcFromMining)}</span>
                                     </div>
-                                    <div className="flex justify-between items-center text-[9px]">
+                                    <div className="flex justify-between items-center text-[15px]">
                                       <span className="text-slate-500 uppercase font-mono">{t('fromExplorationMining')}</span>
                                       <span className="font-mono text-emerald-400">+{formatValue(stats.qcFromExtraction || 0)}</span>
                                     </div>
-                                    <div className="flex justify-between items-center text-[9px]">
+                                    <div className="flex justify-between items-center text-[15px]">
                                       <span className="text-slate-500 uppercase font-mono">{t('fromMissions')}</span>
                                       <span className="font-mono text-emerald-400">+{formatValue((stats.qcFromMissions || 0) + (stats.qcFromTutorial || 0))}</span>
                                     </div>
-                                    <div className="flex justify-between items-center text-[9px]">
+                                    <div className="flex justify-between items-center text-[15px]">
                                       <span className="text-slate-500 uppercase font-mono">{t('fromAllBattles')}</span>
                                       <span className="font-mono text-emerald-400">+{formatValue(stats.qcFromBattles || 0)}</span>
                                     </div>
                                     <div className="h-px bg-white/10 my-1" />
                                     <div className="flex justify-between items-center">
-                                      <span className="text-[10px] font-bold text-white uppercase font-orbitron">{t('totalQCAcquired')}</span>
+                                      <span className="text-base font-bold text-white uppercase font-orbitron">{t('totalQCAcquired')}</span>
                                       <span className={`text-base font-orbitron ${tierColor}`}>{formatValue(stats.qcTotalAcquired)}</span>
                                     </div>
                                   </div>
                                 </div>
 
                                 <div>
-                                  <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-2">
+                                  <h4 className="text-base font-bold text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-2">
                                     <LogOut className="w-3.5 h-3.5 text-pink-400 rotate-90" />
                                     {t('totalQCSpent')}
                                   </h4>
-                                  <div className="bg-pink-500/5 p-3 rounded-xl border border-pink-500/20">
+                                  <div className="bg-pink-500/5 p-6 rounded-2xl border border-pink-500/20">
                                     <div className="flex justify-between items-center">
-                                      <span className="text-[9px] text-slate-500 uppercase font-mono">{t('fromAllSources')}</span>
+                                      <span className="text-[15px] text-slate-500 uppercase font-mono">{t('fromAllSources')}</span>
                                       <span className="text-base font-orbitron text-pink-400">-{formatValue(stats.qcSpent)}</span>
                                     </div>
                                   </div>
@@ -13669,7 +13948,7 @@ export const GameDashboard = ({
                   }`}
                 >
                   <Icon className={`w-5 h-5 ${isActive ? 'animate-pulse-glow' : ''}`} />
-                  <span className="text-[9px] font-orbitron uppercase tracking-tighter">{item.label}</span>
+                  <span className="text-[15px] font-orbitron uppercase tracking-tighter">{item.label}</span>
                   {(item.id === 'missions' && missions.some(m => m.completed && !m.claimed)) || (item.id === 'void_battle' && isVoidWarActive) && (
                     <span className={`absolute top-1 right-1 w-1.5 h-1.5 ${item.id === 'void_battle' ? 'bg-red-500' : 'bg-green-500'} rounded-full animate-ping`} />
                   )}
@@ -13705,7 +13984,7 @@ export const GameDashboard = ({
                 <h2 className="text-2xl font-orbitron font-black text-white tracking-tighter uppercase">
                   {language === 'pt' ? 'Salvando Progresso' : 'Saving Progress'}
                 </h2>
-                <p className="text-xs font-orbitron text-slate-400 uppercase tracking-widest">
+                <p className="text-[14px] font-orbitron text-slate-400 uppercase tracking-widest">
                   {language === 'pt' ? 'Sincronizando dados com a rede neural...' : 'Syncing data with neural network...'}
                 </p>
               </div>
@@ -13718,7 +13997,7 @@ export const GameDashboard = ({
                     className={`h-full ${isInterstellar ? 'bg-gradient-to-r from-orange-600 to-red-600' : 'bg-gradient-to-r from-cyan-600 to-blue-600'}`}
                   />
                 </div>
-                <div className="flex justify-between text-[10px] font-orbitron text-slate-500 uppercase tracking-widest">
+                <div className="flex justify-between text-base font-orbitron text-slate-500 uppercase tracking-widest">
                   <span>{saveProgress}%</span>
                   <span>{saveProgress === 100 ? (language === 'pt' ? 'Concluído' : 'Completed') : (language === 'pt' ? 'Processando...' : 'Processing...')}</span>
                 </div>
@@ -13862,7 +14141,7 @@ export const GameDashboard = ({
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     transition={{ delay: 0.4 }}
-                    className="text-[10px] md:text-xs font-orbitron uppercase tracking-widest text-slate-300"
+                    className="text-base md:text-[14px] font-orbitron uppercase tracking-widest text-slate-300"
                   >
                     {language === 'pt' ? 'Você conquistou o Sistema Solar.' : 'You have conquered the Solar System.'}
                   </motion.p>
@@ -13870,7 +14149,7 @@ export const GameDashboard = ({
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     transition={{ delay: 0.5 }}
-                    className="text-[10px] md:text-xs font-orbitron uppercase tracking-widest text-slate-400"
+                    className="text-base md:text-[14px] font-orbitron uppercase tracking-widest text-slate-400"
                   >
                     {language === 'pt' ? 'Sua jornada interestelar começa agora.' : 'Your interstellar journey begins now.'}
                   </motion.p>
@@ -13878,7 +14157,7 @@ export const GameDashboard = ({
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     transition={{ delay: 0.6 }}
-                    className="text-[10px] md:text-xs font-orbitron uppercase tracking-widest text-emerald-400 mt-2"
+                    className="text-base md:text-[14px] font-orbitron uppercase tracking-widest text-emerald-400 mt-2"
                   >
                     {language === 'pt' 
                       ? 'Parabéns, você ganhou a Pulsar 1, nave de nível 1 para começar sua jornada.' 
@@ -13892,7 +14171,7 @@ export const GameDashboard = ({
                   transition={{ delay: 0.7 }}
                   className="py-2"
                 >
-                  <span className="text-red-500 font-orbitron font-black text-[10px] md:text-xs tracking-[0.2em] uppercase border-y border-red-500/20 py-1 px-4">
+                  <span className="text-red-500 font-orbitron font-black text-base md:text-[14px] tracking-[0.2em] uppercase border-y border-red-500/20 py-1 px-4">
                     {language === 'pt' ? 'O SACRIFÍCIO É NECESSÁRIO' : 'SACRIFICE IS REQUIRED'}
                   </span>
                 </motion.div>
@@ -13901,7 +14180,7 @@ export const GameDashboard = ({
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   transition={{ delay: 0.8 }}
-                  className="text-[9px] md:text-[11px] font-orbitron uppercase tracking-widest text-slate-500 max-w-xs mx-auto leading-relaxed"
+                  className="text-[15px] md:text-[14px] font-orbitron uppercase tracking-widest text-slate-500 max-w-xs mx-auto leading-relaxed"
                 >
                   {language === 'pt' 
                     ? 'Seu império atual será convertido em legado para as colônias locais.' 
@@ -13912,7 +14191,7 @@ export const GameDashboard = ({
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   transition={{ delay: 1.2 }}
-                  className="text-[10px] md:text-xs font-orbitron font-bold uppercase tracking-[0.2em] text-orange-400/80"
+                  className="text-base md:text-[14px] font-orbitron font-bold uppercase tracking-[0.2em] text-orange-400/80"
                 >
                   {language === 'pt' ? 'RUMO AO PRÓXIMO SALTO' : 'TOWARDS THE NEXT LEAP'}
                 </motion.p>
@@ -13932,7 +14211,7 @@ export const GameDashboard = ({
                     setLoreLineIndex(0);
                     setActiveBattle(null);
                   }}
-                  className="w-full py-5 rounded-xl font-orbitron text-sm bg-orange-600 text-black font-black shadow-[0_0_40px_rgba(249,115,22,0.4)] hover:bg-orange-500 transition-all uppercase tracking-[0.4em] relative overflow-hidden group"
+                  className="w-full py-5 rounded-xl font-orbitron text-base bg-orange-600 text-black font-black shadow-[0_0_40px_rgba(249,115,22,0.4)] hover:bg-orange-500 transition-all uppercase tracking-[0.4em] relative overflow-hidden group"
                 >
                   <span className="relative z-10">{language === 'pt' ? 'INICIAR' : 'START'}</span>
                   <motion.div
@@ -13947,7 +14226,7 @@ export const GameDashboard = ({
                   animate={{ opacity: 1 }}
                   transition={{ delay: 1.6 }}
                   onClick={() => setShowRoute2Confirm(false)}
-                  className="w-full py-2 rounded-lg font-orbitron text-[9px] text-white/30 hover:text-white/60 transition-colors uppercase tracking-widest"
+                  className="w-full py-2 rounded-lg font-orbitron text-[15px] text-white/30 hover:text-white/60 transition-colors uppercase tracking-widest"
                 >
                   {t('cancel').toUpperCase()}
                 </motion.button>
@@ -13979,7 +14258,7 @@ export const GameDashboard = ({
               </p>
               
               <div className="bg-black/40 rounded-xl p-6 mb-8 border border-white/5">
-                <div className="text-xs text-slate-500 uppercase tracking-widest mb-1">Final Time</div>
+                <div className="text-[14px] text-slate-500 uppercase tracking-widest mb-1">Final Time</div>
                 <div className="text-4xl font-orbitron font-bold text-emerald-400 tabular-nums">
                   {formatTime(speedRunTime)}
                 </div>
@@ -14059,10 +14338,10 @@ export const GameDashboard = ({
                         {exportOptions[option.id as keyof typeof exportOptions] && <CheckCircle2 size={12} className="text-black" />}
                       </div>
                       <div className="space-y-0.5">
-                        <p className={`text-xs font-orbitron font-bold ${exportOptions[option.id as keyof typeof exportOptions] ? 'text-white' : 'text-slate-400'}`}>
+                        <p className={`text-[14px] font-orbitron font-bold ${exportOptions[option.id as keyof typeof exportOptions] ? 'text-white' : 'text-slate-400'}`}>
                           {option.label}
                         </p>
-                        <p className="text-[9px] text-slate-500 font-mono uppercase tracking-widest">
+                        <p className="text-[15px] text-slate-500 font-mono uppercase tracking-widest">
                           {option.desc}
                         </p>
                       </div>
@@ -14073,13 +14352,13 @@ export const GameDashboard = ({
                 <div className="flex gap-3">
                   <button
                     onClick={() => setShowExportModal(false)}
-                    className="flex-1 py-3 bg-white/5 hover:bg-white/10 text-white font-orbitron text-[10px] uppercase tracking-widest rounded-lg transition-all border border-white/10"
+                    className="flex-1 py-3 bg-white/5 hover:bg-white/10 text-white font-orbitron text-base uppercase tracking-widest rounded-lg transition-all border border-white/10"
                   >
                     {t('cancel')}
                   </button>
                   <button
                     onClick={exportGameData}
-                    className={`flex-1 py-3 ${isInterstellar ? 'bg-orange-500 hover:bg-orange-400' : 'bg-cyan-500 hover:bg-cyan-400'} text-black font-orbitron font-bold text-[10px] uppercase tracking-widest rounded-lg transition-all shadow-lg`}
+                    className={`flex-1 py-3 ${isInterstellar ? 'bg-orange-500 hover:bg-orange-400' : 'bg-cyan-500 hover:bg-cyan-400'} text-black font-orbitron font-bold text-base uppercase tracking-widest rounded-lg transition-all shadow-lg`}
                   >
                     {t('exportButton')}
                   </button>
@@ -14106,9 +14385,9 @@ export const GameDashboard = ({
               })()}
             </div>
             <div>
-              <h4 className="text-[10px] font-orbitron font-black text-cyan-400 uppercase tracking-[0.2em]">Conquista Desbloqueada!</h4>
-              <p className="text-sm font-orbitron font-bold text-white uppercase">{achievementNotification.name}</p>
-              <p className="text-[10px] text-slate-400 font-mono uppercase tracking-wider">{achievementNotification.description}</p>
+              <h4 className="text-base font-orbitron font-black text-cyan-400 uppercase tracking-[0.2em]">Conquista Desbloqueada!</h4>
+              <p className="text-base font-orbitron font-bold text-white uppercase">{achievementNotification.name}</p>
+              <p className="text-base text-slate-400 font-mono uppercase tracking-wider">{achievementNotification.description}</p>
             </div>
             <div className="absolute -top-2 -right-2 w-6 h-6 bg-cyan-500 rounded-full flex items-center justify-center animate-bounce shadow-lg">
               <Trophy className="w-3 h-3 text-black" />
@@ -14139,7 +14418,7 @@ export const GameDashboard = ({
                   <h2 className={`text-xl font-orbitron font-bold text-white tracking-widest uppercase ${isVoid ? 'neon-text-purple' : isInterstellar ? 'neon-text-orange' : 'neon-text-cyan'}`}>
                     {isVoid ? (language === 'pt' ? 'Metas Projeto Terra' : 'Project Earth Goals') : isInterstellar ? (language === 'pt' ? 'Metas para Rota 3' : 'Route 3 Goals') : (language === 'pt' ? 'Metas para Rota 2' : 'Route 2 Goals')}
                   </h2>
-                  <p className="text-[10px] text-slate-500 font-mono uppercase tracking-widest">
+                  <p className="text-base text-slate-500 font-mono uppercase tracking-widest">
                     {isVoid 
                       ? (language === 'pt' ? 'Requisitos para a restauração planetária final' : 'Requirements for final planetary restoration')
                       : isInterstellar 
@@ -14169,8 +14448,8 @@ export const GameDashboard = ({
                     return goals.map((goal) => (
                       <div key={goal.id} className="space-y-2">
                         <div className="flex justify-between items-end">
-                          <span className="text-[10px] font-orbitron font-bold text-white uppercase tracking-wider">{goal.label}</span>
-                          <span className="text-[9px] font-mono text-slate-500">
+                          <span className="text-base font-orbitron font-bold text-white uppercase tracking-wider">{goal.label}</span>
+                          <span className="text-[15px] font-mono text-slate-500">
                             {(goal.progress || 0).toFixed(1)}% / 100%
                           </span>
                         </div>
@@ -14254,8 +14533,8 @@ export const GameDashboard = ({
                   return goals.map((goal) => (
                     <div key={goal.id} className="space-y-2">
                       <div className="flex justify-between items-end">
-                        <span className="text-[10px] font-orbitron font-bold text-white uppercase tracking-wider">{goal.label}</span>
-                        <span className="text-[9px] font-mono text-slate-500">
+                        <span className="text-base font-orbitron font-bold text-white uppercase tracking-wider">{goal.label}</span>
+                        <span className="text-[15px] font-mono text-slate-500">
                           {goal.isCurrency ? formatValue(goal.current) : goal.current} / {goal.isCurrency ? formatValue(goal.target) : goal.target}
                         </span>
                       </div>
@@ -14274,13 +14553,13 @@ export const GameDashboard = ({
               <div className="mt-8 pt-6 border-t border-white/5 flex justify-between items-center relative z-10">
                 <div className="flex items-center gap-2">
                   <div className={`w-2 h-2 rounded-full ${isInterstellar ? 'bg-orange-500' : 'bg-cyan-500'} animate-pulse`} />
-                  <span className="text-[11px] text-slate-500 font-mono uppercase tracking-widest">
+                  <span className="text-[14px] text-slate-500 font-mono uppercase tracking-widest">
                     {language === 'pt' ? 'Sincronização em tempo real' : 'Real-time synchronization'}
                   </span>
                 </div>
                 <button
                   onClick={() => setShowRoute2Goals(false)}
-                  className={`px-8 py-3 rounded-xl font-orbitron font-bold text-xs tracking-[0.2em] transition-all uppercase ${
+                  className={`px-8 py-3 rounded-xl font-orbitron font-bold text-[14px] tracking-[0.2em] transition-all uppercase ${
                     isInterstellar ? 'bg-orange-500 text-black hover:bg-orange-400' : 'bg-cyan-500 text-black hover:bg-cyan-400'
                   }`}
                 >
@@ -14314,7 +14593,7 @@ export const GameDashboard = ({
                   <h2 className={`text-xl font-orbitron font-bold text-white tracking-widest uppercase ${isInterstellar ? 'neon-text-orange' : 'neon-text-cyan'}`}>
                     {language === 'pt' ? 'Mapa de Habilidades' : 'Skill Map'}
                   </h2>
-                  <p className="text-xs text-slate-500 font-mono uppercase tracking-widest">
+                  <p className="text-[14px] text-slate-500 font-mono uppercase tracking-widest">
                     {language === 'pt' ? 'Melhorias permanentes para suas missões' : 'Permanent upgrades for your missions'}
                   </p>
                 </div>
@@ -14326,7 +14605,7 @@ export const GameDashboard = ({
                 </button>
               </div>
 
-              <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar space-y-4 relative z-10">
+              <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar space-y-2 relative z-10">
                 {[
                   { 
                     id: 'lendaria', 
@@ -14395,19 +14674,19 @@ export const GameDashboard = ({
                   const Icon = skill.icon;
 
                   return (
-                    <div key={skill.id} className={`glass-panel border-white/5 p-4 rounded-xl flex items-center gap-4 hover:bg-white/5 transition-all`}>
-                      <div className={`w-12 h-12 rounded-lg bg-white/5 flex items-center justify-center border border-white/10 ${skill.color}`}>
+                    <div key={skill.id} className={`glass-panel border-white/5 p-3 rounded-xl flex items-center gap-4 hover:bg-white/5 transition-all`}>
+                      <div className={`w-10 h-10 rounded-lg bg-white/5 flex items-center justify-center border border-white/10 ${skill.color}`}>
                         <Icon className="w-6 h-6" />
                       </div>
                       
                       <div className="flex-1">
                         <div className="flex justify-between items-start">
-                          <h3 className="text-sm font-orbitron font-bold text-white uppercase tracking-wider">{skill.name}</h3>
-                          <span className="text-[10px] font-mono text-slate-500">LVL {skill.level}/{skill.max}</span>
+                          <h3 className="text-base font-orbitron font-bold text-white uppercase tracking-wider">{skill.name}</h3>
+                          <span className="text-base font-mono text-slate-500">LVL {skill.level}/{skill.max}</span>
                         </div>
-                        <p className="text-[10px] text-slate-400 font-mono uppercase tracking-widest mt-1">{skill.desc}</p>
+                        <p className="text-base text-slate-400 font-mono uppercase tracking-widest mt-0.5">{skill.desc}</p>
                         
-                        <div className="mt-3 flex items-center gap-3">
+                        <div className="mt-2 flex items-center gap-3">
                           <div className="flex-1 h-1.5 bg-white/5 rounded-full overflow-hidden">
                             <div 
                               className={`h-full bg-gradient-to-r ${isInterstellar ? 'from-orange-500 to-orange-300' : 'from-cyan-500 to-cyan-300'}`}
@@ -14416,7 +14695,7 @@ export const GameDashboard = ({
                           </div>
                           
                           {isMax ? (
-                            <div className="px-3 py-1 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded font-orbitron text-[8px] tracking-widest uppercase">
+                            <div className="px-3 py-1 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded font-orbitron text-[14px] tracking-widest uppercase">
                               MAX
                             </div>
                           ) : (
@@ -14432,7 +14711,7 @@ export const GameDashboard = ({
                                   addLog(t('insufficientQC'), 'error');
                                 }
                               }}
-                              className={`px-3 py-1 rounded font-orbitron text-[8px] tracking-widest uppercase transition-all flex items-center gap-1.5 ${
+                              className={`px-3 py-1 rounded font-orbitron text-[14px] tracking-widest uppercase transition-all flex items-center gap-1.5 ${
                                 canAfford 
                                   ? 'bg-yellow-500 text-black hover:bg-yellow-400 font-bold' 
                                   : 'bg-white/5 text-slate-500 cursor-not-allowed'
@@ -14448,10 +14727,10 @@ export const GameDashboard = ({
                 })}
               </div>
 
-              <div className="mt-6 pt-6 border-t border-white/5 flex justify-end relative z-10">
+              <div className="mt-4 pt-4 border-t border-white/5 flex justify-end relative z-10">
                 <button
                   onClick={() => setShowSkillMap(false)}
-                  className={`px-8 py-3 rounded-xl font-orbitron font-bold text-xs tracking-[0.2em] transition-all uppercase ${
+                  className={`px-8 py-3 rounded-xl font-orbitron font-bold text-[14px] tracking-[0.2em] transition-all uppercase ${
                     isInterstellar ? 'bg-orange-500 text-black hover:bg-orange-400' : 'bg-cyan-500 text-black hover:bg-cyan-400'
                   }`}
                 >
@@ -14486,14 +14765,14 @@ export const GameDashboard = ({
                 {t('confirmReset')}
               </h2>
               
-              <p className="text-xs font-orbitron text-slate-400 mb-8 leading-relaxed uppercase tracking-wider">
+              <p className="text-[14px] font-orbitron text-slate-400 mb-8 leading-relaxed uppercase tracking-wider">
                 {t('resetWarning') || 'This will permanently delete all your progress, ships, and upgrades. This action cannot be undone.'}
               </p>
 
               <div className="grid grid-cols-2 gap-4">
                 <button
                   onClick={() => setShowResetConfirm(false)}
-                  className="py-3 rounded-lg font-orbitron text-[10px] border border-white/10 text-white/60 hover:bg-white/5 transition-all uppercase tracking-widest"
+                  className="py-3 rounded-lg font-orbitron text-base border border-white/10 text-white/60 hover:bg-white/5 transition-all uppercase tracking-widest"
                 >
                   {t('cancel').toUpperCase()}
                 </button>
@@ -14503,7 +14782,7 @@ export const GameDashboard = ({
                     await GameStorage.remove('speed_run_save');
                     window.location.reload();
                   }}
-                  className="py-3 rounded-lg font-orbitron text-[10px] bg-rose-600 text-white font-bold shadow-[0_0_20px_rgba(225,29,72,0.3)] hover:bg-rose-500 transition-all uppercase tracking-widest"
+                  className="py-3 rounded-lg font-orbitron text-base bg-rose-600 text-white font-bold shadow-[0_0_20px_rgba(225,29,72,0.3)] hover:bg-rose-500 transition-all uppercase tracking-widest"
                 >
                   {t('reset').toUpperCase()}
                 </button>
@@ -14537,20 +14816,20 @@ export const GameDashboard = ({
                   <div className={`h-0.5 w-12 ${isInterstellar ? 'bg-orange-500/30' : 'bg-cyan-500/30'} mx-auto`} />
                 </div>
                 
-                <p className="text-sm text-slate-300 leading-relaxed font-inter">
+                <p className="text-base text-slate-300 leading-relaxed font-inter">
                   {t(`tutorial${activeTutorial.charAt(0).toUpperCase() + activeTutorial.slice(1)}Desc` as any)}
                 </p>
                 
                 <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-lg px-4 py-2 flex items-center gap-2">
                   <Coins className="w-4 h-4 text-emerald-400" />
-                  <span className="text-xs font-orbitron text-emerald-400 font-bold uppercase tracking-widest">
+                  <span className="text-[14px] font-orbitron text-emerald-400 font-bold uppercase tracking-widest">
                     {activeTutorial === 'routes2' ? t('tutorialRoutes2Bonus') : t('tutorialBonus')}
                   </span>
                 </div>
                 
                 <button
                   onClick={closeTutorial}
-                  className={`w-full py-4 ${isInterstellar ? 'bg-orange-500 hover:bg-orange-400 shadow-[0_0_30px_rgba(249,115,22,0.3)]' : 'bg-cyan-500 hover:bg-cyan-400 shadow-[0_0_30px_rgba(6,182,212,0.3)]'} text-black font-orbitron font-bold text-xs tracking-[0.3em] rounded-xl transition-all active:scale-95 uppercase`}
+                  className={`w-full py-4 ${isInterstellar ? 'bg-orange-500 hover:bg-orange-400 shadow-[0_0_30px_rgba(249,115,22,0.3)]' : 'bg-cyan-500 hover:bg-cyan-400 shadow-[0_0_30px_rgba(6,182,212,0.3)]'} text-black font-orbitron font-bold text-[14px] tracking-[0.3em] rounded-xl transition-all active:scale-95 uppercase`}
                 >
                   {t('close')}
                 </button>
@@ -14612,7 +14891,7 @@ export const GameDashboard = ({
 
                 {/* Content */}
                 <div className="space-y-4">
-                  <div className="text-sm text-blue-100 leading-relaxed font-inter font-medium drop-shadow-md space-y-3">
+                  <div className="text-base text-blue-100 leading-relaxed font-inter font-medium drop-shadow-md space-y-3">
                     {language === 'pt' ? (
                       <>
                         <p className="text-blue-400 font-bold">Doom Protocol!</p>
@@ -14646,7 +14925,7 @@ export const GameDashboard = ({
                 {/* Footer Button */}
                 <button
                   onClick={() => setShowDoomProtocolInfo(false)}
-                  className="w-full py-4 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-orbitron font-black text-xs tracking-[0.4em] rounded-xl transition-all active:scale-95 uppercase shadow-[0_0_30px_rgba(59,130,246,0.4)] border border-white/20"
+                  className="w-full py-4 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-orbitron font-black text-[14px] tracking-[0.4em] rounded-xl transition-all active:scale-95 uppercase shadow-[0_0_30px_rgba(59,130,246,0.4)] border border-white/20"
                 >
                   {language === 'pt' ? 'ENTENDIDO' : 'UNDERSTOOD'}
                 </button>
@@ -14692,7 +14971,7 @@ export const GameDashboard = ({
 
                 <div className="space-y-4">
                   <div className="p-4 rounded-2xl bg-black/40 border border-white/10 space-y-3">
-                    <p className="text-sm text-slate-300 leading-relaxed">
+                    <p className="text-base text-slate-300 leading-relaxed">
                       {language === 'pt' 
                         ? 'O Sistema de Captação Interestelar é uma tecnologia avançada que permite extrair Quantum Credits (QC) diretamente do campo de batalha e de anomalias cósmicas.' 
                         : 'The Interstellar Capture System is an advanced technology that allows extracting Quantum Credits (QC) directly from the battlefield and cosmic anomalies.'}
@@ -14702,15 +14981,15 @@ export const GameDashboard = ({
                       <div className="flex items-center gap-3 p-3 rounded-xl bg-orange-500/10 border border-orange-500/20">
                         <TrendingUp className="w-5 h-5 text-orange-400" />
                         <div>
-                          <p className="text-xs font-bold text-white uppercase">{language === 'pt' ? 'Bônus de Vitória' : 'Victory Bonus'}</p>
-                          <p className="text-[10px] text-slate-400">{language === 'pt' ? 'Aumenta massivamente os ganhos de QC em cada batalha vencida.' : 'Massively increases QC gains in each won battle.'}</p>
+                          <p className="text-[14px] font-bold text-white uppercase">{language === 'pt' ? 'Bônus de Vitória' : 'Victory Bonus'}</p>
+                          <p className="text-base text-slate-400">{language === 'pt' ? 'Aumenta massivamente os ganhos de QC em cada batalha vencida.' : 'Massively increases QC gains in each won battle.'}</p>
                         </div>
                       </div>
                       <div className="flex items-center gap-3 p-3 rounded-xl bg-orange-500/10 border border-orange-500/20">
                         <Zap className="w-5 h-5 text-yellow-400" />
                         <div>
-                          <p className="text-xs font-bold text-white uppercase">{language === 'pt' ? 'Eficiência de Nódulo' : 'Node Efficiency'}</p>
-                          <p className="text-[10px] text-slate-400">{language === 'pt' ? 'Melhora a taxa de conversão de energia interestelar em créditos.' : 'Improves the conversion rate of interstellar energy into credits.'}</p>
+                          <p className="text-[14px] font-bold text-white uppercase">{language === 'pt' ? 'Eficiência de Nódulo' : 'Node Efficiency'}</p>
+                          <p className="text-base text-slate-400">{language === 'pt' ? 'Melhora a taxa de conversão de energia interestelar em créditos.' : 'Improves the conversion rate of interstellar energy into credits.'}</p>
                         </div>
                       </div>
                     </div>
@@ -14718,8 +14997,8 @@ export const GameDashboard = ({
 
                   <div className="p-4 rounded-2xl bg-orange-500/10 border border-orange-500/20">
                     <div className="flex justify-between items-center mb-2">
-                      <span className="text-xs font-bold text-orange-400 uppercase tracking-widest">{language === 'pt' ? 'Status Atual' : 'Current Status'}</span>
-                      <span className="text-xs font-mono text-white">LVL {captureLevel} / 10</span>
+                      <span className="text-[14px] font-bold text-orange-400 uppercase tracking-widest">{language === 'pt' ? 'Status Atual' : 'Current Status'}</span>
+                      <span className="text-[14px] font-mono text-white">LVL {captureLevel} / 10</span>
                     </div>
                     <div className="h-2 bg-black/40 rounded-full overflow-hidden border border-white/10">
                       <motion.div 
@@ -14733,7 +15012,7 @@ export const GameDashboard = ({
 
                 <button
                   onClick={() => setShowCaptureInfo(false)}
-                  className="w-full py-4 bg-orange-500 hover:bg-orange-400 text-black font-black text-sm tracking-[0.2em] rounded-2xl transition-all shadow-[0_0_20px_rgba(249,115,22,0.4)] uppercase"
+                  className="w-full py-4 bg-orange-500 hover:bg-orange-400 text-black font-black text-base tracking-[0.2em] rounded-2xl transition-all shadow-[0_0_20px_rgba(249,115,22,0.4)] uppercase"
                 >
                   {language === 'pt' ? 'ENTENDIDO' : 'UNDERSTOOD'}
                 </button>
@@ -14765,20 +15044,20 @@ export const GameDashboard = ({
               </div>
               
               <div className="space-y-2 relative z-10">
-                <div className={`text-[10px] font-orbitron font-bold ${selectedReward.color === 'emerald' ? 'text-emerald-400' : 'text-purple-400'} tracking-[0.3em] uppercase`}>
+                <div className={`text-base font-orbitron font-bold ${selectedReward.color === 'emerald' ? 'text-emerald-400' : 'text-purple-400'} tracking-[0.3em] uppercase`}>
                   {language === 'pt' ? `NÍVEL ${selectedReward.level} DESBLOQUEADO` : `LEVEL ${selectedReward.level} UNLOCKED`}
                 </div>
                 <h3 className="text-2xl font-black text-white uppercase tracking-tighter">
                   {selectedReward.title}
                 </h3>
                 <div className="h-px w-12 bg-white/10 mx-auto my-4" />
-                <p className="text-slate-300 text-sm leading-relaxed font-medium">
+                <p className="text-slate-300 text-base leading-relaxed font-medium">
                   {selectedReward.description}
                 </p>
 
                 {selectedReward.toggleable && (
                   <div className="pt-4 flex flex-col items-center gap-3">
-                    <div className="text-[10px] text-slate-500 uppercase font-bold tracking-widest">
+                    <div className="text-base text-slate-500 uppercase font-bold tracking-widest">
                       {language === 'pt' ? 'Status da Melhoria' : 'Upgrade Status'}
                     </div>
                     <button
@@ -14805,7 +15084,7 @@ export const GameDashboard = ({
 
               <button
                 onClick={() => setSelectedReward(null)}
-                className={`w-full py-4 rounded-xl font-orbitron font-black text-xs tracking-[0.4em] transition-all active:scale-95 uppercase border ${selectedReward.color === 'emerald' ? 'bg-emerald-600 hover:bg-emerald-500 border-emerald-400 shadow-[0_0_20px_rgba(16,185,129,0.3)]' : 'bg-purple-600 hover:bg-purple-500 border-purple-400 shadow-[0_0_20px_rgba(168,85,247,0.3)]'} text-white`}
+                className={`w-full py-4 rounded-xl font-orbitron font-black text-[14px] tracking-[0.4em] transition-all active:scale-95 uppercase border ${selectedReward.color === 'emerald' ? 'bg-emerald-600 hover:bg-emerald-500 border-emerald-400 shadow-[0_0_20px_rgba(16,185,129,0.3)]' : 'bg-purple-600 hover:bg-purple-500 border-purple-400 shadow-[0_0_20px_rgba(168,85,247,0.3)]'} text-white`}
               >
                 {language === 'pt' ? 'FECHAR' : 'CLOSE'}
               </button>
@@ -14829,7 +15108,7 @@ export const GameDashboard = ({
                 <h3 className="text-2xl font-black text-white uppercase tracking-tighter">
                   {language === 'pt' ? 'Inimigo Detectado!' : 'Enemy Detected!'}
                 </h3>
-                <p className="text-slate-400 text-sm">
+                <p className="text-slate-400 text-base">
                   {language === 'pt' 
                     ? 'Um sinal hostil foi localizado no setor. Prepare-se para o combate.' 
                     : 'A hostile signal has been located in the sector. Prepare for combat.'}
@@ -14838,7 +15117,7 @@ export const GameDashboard = ({
               <div className="grid grid-cols-2 gap-4">
                 <button
                   onClick={() => setFoundBattle(null)}
-                  className="py-3 rounded-xl bg-white/5 border border-white/10 text-slate-400 font-bold hover:bg-white/10 transition-all uppercase text-xs"
+                  className="py-3 rounded-xl bg-white/5 border border-white/10 text-slate-400 font-bold hover:bg-white/10 transition-all uppercase text-[14px]"
                 >
                   {language === 'pt' ? 'Ignorar' : 'Ignore'}
                 </button>
@@ -14847,7 +15126,7 @@ export const GameDashboard = ({
                     setActiveBattle(foundBattle);
                     setFoundBattle(null);
                   }}
-                  className="py-3 rounded-xl bg-cyan-600 text-white font-black hover:bg-cyan-500 transition-all shadow-[0_0_20px_rgba(6,182,212,0.4)] uppercase text-xs"
+                  className="py-3 rounded-xl bg-cyan-600 text-white font-black hover:bg-cyan-500 transition-all shadow-[0_0_20px_rgba(6,182,212,0.4)] uppercase text-[14px]"
                 >
                   {language === 'pt' ? 'Atacar' : 'Attack'}
                 </button>
@@ -14886,7 +15165,7 @@ export const GameDashboard = ({
                 <h2 className="text-3xl font-orbitron font-black text-purple-400 uppercase tracking-[0.3em]">
                   {t('startVoidProtocol')}
                 </h2>
-                <p className="text-sm text-purple-200/60 font-mono uppercase tracking-widest leading-relaxed">
+                <p className="text-base text-purple-200/60 font-mono uppercase tracking-widest leading-relaxed">
                   {language === 'pt' 
                     ? 'Ao avançar para a Era Sem Tempo, você deixará para trás seu império interestelar para enfrentar o desconhecido. Seus recursos serão resetados, mas uma nova tecnologia te aguarda.' 
                     : 'By advancing to the Timeless Era, you will leave behind your interstellar empire to face the unknown. Your resources will be reset, but a new technology awaits you.'}
@@ -14907,7 +15186,7 @@ export const GameDashboard = ({
                 </button>
                 <button
                   onClick={() => setShowRoute3Confirm(false)}
-                  className="w-full py-3 text-xs font-orbitron text-slate-500 hover:text-white transition-colors uppercase tracking-widest"
+                  className="w-full py-3 text-[14px] font-orbitron text-slate-500 hover:text-white transition-colors uppercase tracking-widest"
                 >
                   {language === 'pt' ? 'AINDA NÃO ESTOU PRONTO' : 'I AM NOT READY YET'}
                 </button>
@@ -14964,7 +15243,7 @@ export const GameDashboard = ({
               </div>
 
               <div className="flex justify-between items-center pt-8 border-t border-white/10">
-                <div className="text-[10px] font-orbitron text-purple-500/50 uppercase tracking-[0.3em]">
+                <div className="text-base font-orbitron text-purple-500/50 uppercase tracking-[0.3em]">
                   {loreLineIndex + 1} / {VOID_LORE_LINES.length}
                 </div>
                 
@@ -14974,7 +15253,7 @@ export const GameDashboard = ({
                       setLoreLineIndex(prev => prev + 1);
                       playSfx('click');
                     }}
-                    className="px-8 py-3 bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/30 text-purple-400 font-orbitron text-xs tracking-widest rounded-lg transition-all flex items-center gap-2 group"
+                    className="px-8 py-3 bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/30 text-purple-400 font-orbitron text-[14px] tracking-widest rounded-lg transition-all flex items-center gap-2 group"
                   >
                     {language === 'pt' ? 'PRÓXIMO' : 'NEXT'}
                     <ChevronRight size={16} className="group-hover:translate-x-1 transition-transform" />
@@ -14982,7 +15261,7 @@ export const GameDashboard = ({
                 ) : (
                   <button
                     onClick={startVoidTransition}
-                    className="px-10 py-4 bg-purple-600 hover:bg-purple-500 text-white font-orbitron font-black text-sm tracking-[0.3em] rounded-xl transition-all shadow-[0_0_30px_rgba(168,85,247,0.4)] uppercase animate-pulse-glow"
+                    className="px-10 py-4 bg-purple-600 hover:bg-purple-500 text-white font-orbitron font-black text-base tracking-[0.3em] rounded-xl transition-all shadow-[0_0_30px_rgba(168,85,247,0.4)] uppercase animate-pulse-glow"
                   >
                     {language === 'pt' ? 'INICIAR ROTA 3' : 'START ROUTE 3'}
                   </button>
@@ -15040,7 +15319,7 @@ export const GameDashboard = ({
               </div>
 
               <div className="flex justify-between items-center pt-8 border-t border-white/10">
-                <div className="text-[10px] font-orbitron text-orange-500/50 uppercase tracking-[0.3em]">
+                <div className="text-base font-orbitron text-orange-500/50 uppercase tracking-[0.3em]">
                   {loreLineIndex + 1} / {ROUTE2_LORE_LINES.length}
                 </div>
                 
@@ -15050,7 +15329,7 @@ export const GameDashboard = ({
                       setLoreLineIndex(prev => prev + 1);
                       playSfx('click');
                     }}
-                    className="px-8 py-3 bg-orange-500/10 hover:bg-orange-500/20 border border-orange-500/30 text-orange-400 font-orbitron text-xs tracking-widest rounded-lg transition-all flex items-center gap-2 group"
+                    className="px-8 py-3 bg-orange-500/10 hover:bg-orange-500/20 border border-orange-500/30 text-orange-400 font-orbitron text-[14px] tracking-widest rounded-lg transition-all flex items-center gap-2 group"
                   >
                     {language === 'pt' ? 'PRÓXIMO' : 'NEXT'}
                     <ChevronRight size={16} className="group-hover:translate-x-1 transition-transform" />
@@ -15061,7 +15340,7 @@ export const GameDashboard = ({
                       setShowRoute2Lore(false);
                       startRoute2Transition();
                     }}
-                    className="px-10 py-4 bg-orange-600 hover:bg-orange-500 text-white font-orbitron font-black text-sm tracking-[0.3em] rounded-xl transition-all shadow-[0_0_30px_rgba(249,115,22,0.4)] uppercase animate-pulse-glow"
+                    className="px-10 py-4 bg-orange-600 hover:bg-orange-500 text-white font-orbitron font-black text-base tracking-[0.3em] rounded-xl transition-all shadow-[0_0_30px_rgba(249,115,22,0.4)] uppercase animate-pulse-glow"
                   >
                     {language === 'pt' ? 'INICIAR ROTA 2' : 'START ROUTE 2'}
                   </button>

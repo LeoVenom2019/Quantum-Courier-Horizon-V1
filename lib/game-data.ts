@@ -78,6 +78,8 @@ export interface Ship {
   cost: number;
   tier: 'Solar' | 'Interstellar' | 'Void';
   color: string;
+  image?: string;
+  lottie?: string;
 }
 
 export interface Technology {
@@ -140,15 +142,15 @@ export const ORES: Ore[] = [
   { id: 'nucleo', name: 'Núcleo Quântico', rarity: 1, baseValue: 1000000, requiredShipLevel: 9, packSize: 50, robotBaseCost: 100000000, autoSellCost: 50000000, tier: 'Solar' },
   
   // ROTA 2: Interstellar
-  { id: 'ferro-estelar', name: 'Ferro Estelar', rarity: 1, baseValue: 100000, requiredShipLevel: 1, packSize: 50, robotBaseCost: 5000000, autoSellCost: 100000000, tier: 'Interstellar' },
-  { id: 'cristal-fotonico', name: 'Cristal Fotônico', rarity: 1, baseValue: 250000, requiredShipLevel: 2, packSize: 50, robotBaseCost: 25000000, autoSellCost: 250000000, tier: 'Interstellar' },
-  { id: 'liga-iridio', name: 'Liga de Irídio', rarity: 1, baseValue: 600000, requiredShipLevel: 3, packSize: 50, robotBaseCost: 100000000, autoSellCost: 750000000, tier: 'Interstellar' },
-  { id: 'plasma-solido', name: 'Plasma Sólido', rarity: 1, baseValue: 1500000, requiredShipLevel: 4, packSize: 50, robotBaseCost: 500000000, autoSellCost: 2500000000, tier: 'Interstellar' },
-  { id: 'nucleo-radiante', name: 'Núcleo Radiante', rarity: 1, baseValue: 3500000, requiredShipLevel: 5, packSize: 50, robotBaseCost: 2000000000, autoSellCost: 10000000000, tier: 'Interstellar' },
-  { id: 'fragmento-anomalia', name: 'Fragmento de Anomalia', rarity: 1, baseValue: 8000000, requiredShipLevel: 6, packSize: 50, robotBaseCost: 7500000000, autoSellCost: 35000000000, tier: 'Interstellar' },
-  { id: 'essencia-nebular', name: 'Essência Nebular', rarity: 1, baseValue: 18000000, requiredShipLevel: 7, packSize: 50, robotBaseCost: 25000000000, autoSellCost: 100000000000, tier: 'Interstellar' },
-  { id: 'materia-instavel', name: 'Matéria Instável', rarity: 1, baseValue: 40000000, requiredShipLevel: 8, packSize: 50, robotBaseCost: 100000000000, autoSellCost: 500000000000, tier: 'Interstellar' },
-  { id: 'singularidade-condensada', name: 'Singularidade Condensada', rarity: 1, baseValue: 100000000, requiredShipLevel: 9, packSize: 50, robotBaseCost: 500000000000, autoSellCost: 2000000000000, tier: 'Interstellar' },
+  { id: 'ferro-estelar', name: 'Ferro Estelar', rarity: 1, baseValue: 2000000, requiredShipLevel: 1, packSize: 50, robotBaseCost: 50000000, autoSellCost: 250000000, tier: 'Interstellar' },
+  { id: 'cristal-fotonico', name: 'Cristal Fotônico', rarity: 1, baseValue: 5000000, requiredShipLevel: 2, packSize: 50, robotBaseCost: 150000000, autoSellCost: 750000000, tier: 'Interstellar' },
+  { id: 'liga-iridio', name: 'Liga de Irídio', rarity: 1, baseValue: 15000000, requiredShipLevel: 3, packSize: 50, robotBaseCost: 500000000, autoSellCost: 2500000000, tier: 'Interstellar' },
+  { id: 'plasma-solido', name: 'Plasma Sólido', rarity: 1, baseValue: 50000000, requiredShipLevel: 4, packSize: 50, robotBaseCost: 2000000000, autoSellCost: 10000000000, tier: 'Interstellar' },
+  { id: 'nucleo-radiante', name: 'Núcleo Radiante', rarity: 1, baseValue: 200000000, requiredShipLevel: 5, packSize: 50, robotBaseCost: 10000000000, autoSellCost: 50000000000, tier: 'Interstellar' },
+  { id: 'fragmento-anomalia', name: 'Fragmento de Anomalia', rarity: 1, baseValue: 800000000, requiredShipLevel: 6, packSize: 50, robotBaseCost: 50000000000, autoSellCost: 250000000000, tier: 'Interstellar' },
+  { id: 'essencia-nebular', name: 'Essência Nebular', rarity: 1, baseValue: 3000000000, requiredShipLevel: 7, packSize: 50, robotBaseCost: 250000000000, autoSellCost: 1250000000000, tier: 'Interstellar' },
+  { id: 'materia-instavel', name: 'Matéria Instável', rarity: 1, baseValue: 12000000000, requiredShipLevel: 8, packSize: 50, robotBaseCost: 1500000000000, autoSellCost: 7500000000000, tier: 'Interstellar' },
+  { id: 'singularidade-condensada', name: 'Singularidade Condensada', rarity: 1, baseValue: 50000000000, requiredShipLevel: 9, packSize: 50, robotBaseCost: 10000000000000, autoSellCost: 50000000000000, tier: 'Interstellar' },
 ];
 
 export const ROBOT_UPGRADES: MiningRobotUpgrade[] = [
@@ -457,9 +459,9 @@ export const EXTRACTION_POINTS: ExtractionPoint[] = [
     resourceName: 'Basalto Vulcânico',
     productionPerCycle: 10,
     cycleTime: 5000,
-    cost: 100000000, // 100 Mi
+    cost: 500000000, // 500 Mi
     researchTime: 600000, // 10 minutes
-    valuePerPack: 50000, // 50k (Decreased by 99% again for balance)
+    valuePerPack: 250000000, // 250 Mi
   },
   {
     id: 'ext-2',
@@ -467,9 +469,9 @@ export const EXTRACTION_POINTS: ExtractionPoint[] = [
     resourceName: 'Magnetita',
     productionPerCycle: 10,
     cycleTime: 5000,
-    cost: 150000000, // 150 Mi
+    cost: 2500000000, // 2.5 Bi
     researchTime: 900000, // 15 minutes
-    valuePerPack: 75000, // 75k (Decreased by 99% again for balance)
+    valuePerPack: 1000000000, // 1 Bi
   },
   {
     id: 'ext-3',
@@ -477,9 +479,9 @@ export const EXTRACTION_POINTS: ExtractionPoint[] = [
     resourceName: 'Criolita',
     productionPerCycle: 10,
     cycleTime: 5000,
-    cost: 200000000, // 200 Mi
+    cost: 10000000000, // 10 Bi
     researchTime: 1200000, // 20 minutes
-    valuePerPack: 100000, // 100k (Decreased by 99% again for balance)
+    valuePerPack: 5000000000, // 5 Bi
   },
   {
     id: 'ext-4',
@@ -487,9 +489,9 @@ export const EXTRACTION_POINTS: ExtractionPoint[] = [
     resourceName: 'Titânio',
     productionPerCycle: 10,
     cycleTime: 5000,
-    cost: 250000000, // 250 Mi
+    cost: 50000000000, // 50 Bi
     researchTime: 1500000, // 25 minutes
-    valuePerPack: 125000, // 125k (Decreased by 99% again for balance)
+    valuePerPack: 25000000000, // 25 Bi
   },
   {
     id: 'ext-5',
@@ -497,9 +499,9 @@ export const EXTRACTION_POINTS: ExtractionPoint[] = [
     resourceName: 'Silício',
     productionPerCycle: 10,
     cycleTime: 5000,
-    cost: 300000000, // 300 Mi
+    cost: 200000000000, // 200 Bi
     researchTime: 1800000, // 30 minutes
-    valuePerPack: 150000, // 150k (Decreased by 99% again for balance)
+    valuePerPack: 100000000000, // 100 Bi
   },
   {
     id: 'ext-6',
@@ -649,7 +651,8 @@ export const SHIPS: Ship[] = [
     range: 5000,
     cost: 0,
     tier: 'Solar',
-    color: 'text-cyan-400'
+    color: 'text-cyan-400',
+    image: '/images/ships/atlas-courier.png'
   },
   {
     level: 2,
@@ -661,7 +664,8 @@ export const SHIPS: Ship[] = [
     range: 400000,
     cost: 10000,
     tier: 'Solar',
-    color: 'text-blue-400'
+    color: 'text-blue-400',
+    image: '/images/ships/lunar-runner.png'
   },
   {
     level: 3,
@@ -673,7 +677,8 @@ export const SHIPS: Ship[] = [
     range: 50000000,
     cost: 50000,
     tier: 'Solar',
-    color: 'text-yellow-400'
+    color: 'text-yellow-400',
+    image: '/images/ships/solar-swift.png'
   },
   {
     level: 4,
@@ -685,7 +690,8 @@ export const SHIPS: Ship[] = [
     range: 100000000,
     cost: 200000,
     tier: 'Solar',
-    color: 'text-red-400'
+    color: 'text-red-400',
+    image: '/images/ships/red-horizon.png'
   },
   {
     level: 5,
@@ -697,7 +703,8 @@ export const SHIPS: Ship[] = [
     range: 200000000,
     cost: 1000000,
     tier: 'Solar',
-    color: 'text-orange-400'
+    color: 'text-orange-400',
+    image: '/images/ships/helios-freighter.png'
   },
   {
     level: 6,
@@ -709,7 +716,8 @@ export const SHIPS: Ship[] = [
     range: 700000000,
     cost: 5000000,
     tier: 'Solar',
-    color: 'text-purple-400'
+    color: 'text-purple-400',
+    image: '/images/ships/jovian-hauler.png'
   },
   {
     level: 7,
@@ -721,7 +729,8 @@ export const SHIPS: Ship[] = [
     range: 1500000000,
     cost: 25000000,
     tier: 'Solar',
-    color: 'text-amber-400'
+    color: 'text-amber-400',
+    image: '/images/ships/titan-carrier.png'
   },
   {
     level: 8,
@@ -733,7 +742,8 @@ export const SHIPS: Ship[] = [
     range: 3000000000,
     cost: 100000000,
     tier: 'Solar',
-    color: 'text-indigo-400'
+    color: 'text-indigo-400',
+    image: '/images/ships/void-strider.png'
   },
   {
     level: 9,
@@ -745,7 +755,8 @@ export const SHIPS: Ship[] = [
     range: 5000000000,
     cost: 500000000,
     tier: 'Solar',
-    color: 'text-teal-400'
+    color: 'text-teal-400',
+    image: '/images/ships/neptune-vanguard.png'
   },
 
   // ROTA 2: Interstellar
@@ -759,7 +770,8 @@ export const SHIPS: Ship[] = [
     range: 4.5,
     cost: 0,
     tier: 'Interstellar',
-    color: 'text-pink-400'
+    color: 'text-pink-400',
+    image: '/images/ships/pulsar-i.png'
   },
   {
     level: 2,
@@ -771,19 +783,21 @@ export const SHIPS: Ship[] = [
     range: 5,
     cost: 50000000,
     tier: 'Interstellar',
-    color: 'text-rose-400'
+    color: 'text-rose-600',
+    image: '/images/ships/pulsar-ii.png'
   },
   {
     level: 3,
     name: 'Nebula Runner',
     route: 'Interestelar → Barnard\'s Star',
     maxSpeed: 12000,
-    technology: 'Captação de Energia Residual',
-    description: 'Projetada para cortar o vazio interestelar com eficiência. Utiliza captação de energia residual de nebulosas e poeira cósmica para alimentar seus sistemas auxiliares.',
+    technology: 'Captação de Energia Residual de Nebulosas',
+    description: 'Projetada para cortar o vazio interestelar com eficiência máxima. Utiliza captação de energia residual de nebulosas e poeira cósmica para alimentar seus sistemas auxiliares, reduzindo o consumo de combustível em longas jornadas.',
     range: 6,
     cost: 250000000,
     tier: 'Interstellar',
-    color: 'text-violet-400'
+    color: 'text-violet-300',
+    image: '/images/ships/nebula-runner.png'
   },
   {
     level: 4,
@@ -791,11 +805,12 @@ export const SHIPS: Ship[] = [
     route: 'Interestelar → Wolf 359',
     maxSpeed: 18000,
     technology: 'Propulsão de Antimatéria Estágio I',
-    description: 'O primeiro modelo a utilizar antimatéria como combustível principal. Seus motores de alta performance permitem alcançar sistemas estelares distantes em tempo recorde.',
+    description: 'O primeiro modelo a utilizar antimatéria como combustível principal. Seus motores geram um campo de contenção que previne a aniquilação descontrolada, permitindo alcançar sistemas estelares distantes em tempo recorde.',
     range: 8,
     cost: 1000000000,
     tier: 'Interstellar',
-    color: 'text-emerald-400'
+    color: 'text-green-300',
+    image: '/images/ships/orion-vx.png'
   },
   {
     level: 5,
@@ -803,11 +818,12 @@ export const SHIPS: Ship[] = [
     route: 'Interestelar → Lalande 21185',
     maxSpeed: 25000,
     technology: 'Vela de Fótons de Alta Densidade',
-    description: 'Uma maravilha da engenharia óptica. Utiliza feixes de laser concentrados para impulsionar velas de fótons, atingindo velocidades próximas à da luz.',
+    description: 'Uma maravilha da engenharia óptica. Utiliza feixes de laser concentrados para impulsionar velas de fótons ultra-densas, atingindo velocidades próximas à da luz sem o custo exponencial dos motores convencionais.',
     range: 8.5,
     cost: 5000000000,
     tier: 'Interstellar',
-    color: 'text-yellow-500'
+    color: 'text-yellow-300',
+    image: '/images/ships/quasar-light.png'
   },
   {
     level: 6,
@@ -815,23 +831,25 @@ export const SHIPS: Ship[] = [
     route: 'Interestelar → Sirius',
     maxSpeed: 40000,
     technology: 'Núcleo de Singularidade Controlada',
-    description: 'Utiliza uma micro-singularidade artificial para curvar o espaço-tempo à sua frente, permitindo viagens interestelares massivas com consumo mínimo de energia.',
+    description: 'Utiliza uma micro-singularidade artificial para curvar o espaço-tempo à sua frente. O casco rosado claro é reforçado com ligas de nanotubo de carbono negro, absorvendo a radiação extrema gerada pelo núcleo de singularidade.',
     range: 9,
     cost: 20000000000,
     tier: 'Interstellar',
-    color: 'text-fuchsia-400'
+    color: 'text-pink-200',
+    image: '/images/ships/zenith-core.png'
   },
   {
     level: 7,
     name: 'Nova Striker',
     route: 'Interestelar → Luyten 726-8',
     maxSpeed: 65000,
-    technology: 'Motores de Fusão de Hélio-3',
-    description: 'Uma nave de alta potência projetada para exploração profunda. Seus motores de fusão avançados fornecem empuxo constante para travessias de longo alcance.',
+    technology: 'Motores de Fusão de Hélio-3 Extrema',
+    description: 'Uma nave de combate e exploração forjada nas sombras da Nova mais próxima. Seus motores operam no limite físico do que os materiais conhecidos suportam, com um vermelho-sangue de casco que reflete a intensidade das câmaras de fusão.',
     range: 9.5,
     cost: 100000000000,
     tier: 'Interstellar',
-    color: 'text-red-600'
+    color: 'text-red-500',
+    image: '/images/ships/nova-striker.png'
   },
   {
     level: 8,
@@ -839,11 +857,12 @@ export const SHIPS: Ship[] = [
     route: 'Interestelar → Ross 154',
     maxSpeed: 90000,
     technology: 'Dobra Espacial de Quinta Geração',
-    description: 'O ápice da tecnologia de dobra. Capaz de comprimir o espaço-tempo de forma tão eficiente que as distâncias interestelares parecem meros saltos orbitais.',
+    description: 'O ápice da tecnologia de dobra conhecida. Seu casco azul-celeste brilhante é um efeito colateral da radiação Cherenkov emitida pelo campo de dobra que envolve permanentemente a nave em velocidade de cruzeiro.',
     range: 10,
     cost: 500000000000,
     tier: 'Interstellar',
-    color: 'text-sky-400'
+    color: 'text-sky-300',
+    image: '/images/ships/eclipse-prime.png'
   },
   {
     level: 9,
@@ -851,11 +870,12 @@ export const SHIPS: Ship[] = [
     route: 'Interestelar → Epsilon Eridani',
     maxSpeed: 120000,
     technology: 'Motor de Probabilidade Infinita',
-    description: 'A fronteira final da tecnologia. Utiliza flutuações quânticas para existir em múltiplos pontos do espaço simultaneamente, tornando a distância um conceito obsoleto.',
+    description: 'A fronteira final da tecnologia interestelar. Utiliza flutuações quânticas para existir em múltiplos pontos do espaço simultaneamente. O verde-abacate vibrante do casco é gerado pelos campos de contenção quântica que envolvem a nave em todas as direções.',
     range: 15,
     cost: 2500000000000,
     tier: 'Interstellar',
-    color: 'text-lime-400'
+    color: 'text-lime-400',
+    image: '/images/ships/infinity-drive.png'
   },
   {
     level: 1,
@@ -980,15 +1000,15 @@ export const ROUTES: Route[] = [
   { id: 'netuno', name: 'Fronteira Netuno', origin: 'Terra', destination: 'Netuno', distance: 4300000000, risk: 0.25, reward: 50000000, cargoType: 'Artefatos', tier: 'Solar', autoTravelCost: 10000000, unlockCost: 250000000, requiredShipLevel: 9, unlockCondition: { initial: true } },
 
   // ROTA 2: Interstellar
-  { id: 'alpha-centauri', name: 'Alpha Centauri', origin: 'Sistema Solar', destination: 'Alpha Centauri', distance: 4.37, risk: 0.30, reward: 20000, cargoType: 'Tecnologia', tier: 'Interstellar', autoTravelCost: 100000, requiredShipLevel: 1, unlockCondition: { route2Unlocked: true } },
-  { id: 'proxima-centauri', name: 'Proxima Centauri', origin: 'Sistema Solar', destination: 'Proxima Centauri', distance: 4.24, risk: 0.32, reward: 38000, cargoType: 'Energia', tier: 'Interstellar', autoTravelCost: 250000, unlockCost: 100000, requiredShipLevel: 2, unlockCondition: { route2Unlocked: true } },
-  { id: 'barnards-star', name: 'Barnard\'s Star', origin: 'Sistema Solar', destination: 'Barnard\'s Star', distance: 5.96, risk: 0.35, reward: 88000, cargoType: 'Dados', tier: 'Interstellar', autoTravelCost: 600000, unlockCost: 500000, requiredShipLevel: 3, unlockCondition: { route2Unlocked: true } },
-  { id: 'wolf-359', name: 'Wolf 359', origin: 'Sistema Solar', destination: 'Wolf 359', distance: 7.78, risk: 0.38, reward: 124000, cargoType: 'Tecnologia', tier: 'Interstellar', autoTravelCost: 1000000, unlockCost: 2500000, requiredShipLevel: 4, unlockCondition: { route2Unlocked: true } },
-  { id: 'lalande-21185', name: 'Lalande 21185', origin: 'Sistema Solar', destination: 'Lalande 21185', distance: 8.29, risk: 0.40, reward: 200000, cargoType: 'Biológico', tier: 'Interstellar', autoTravelCost: 1800000, unlockCost: 12500000, requiredShipLevel: 5, unlockCondition: { route2Unlocked: true } },
-  { id: 'sirius', name: 'Sirius', origin: 'Sistema Solar', destination: 'Sirius', distance: 8.60, risk: 0.45, reward: 376000, cargoType: 'Artefatos', tier: 'Interstellar', autoTravelCost: 3500000, unlockCost: 62500000, requiredShipLevel: 6, unlockCondition: { route2Unlocked: true } },
-  { id: 'luyten-726-8', name: 'Luyten 726-8', origin: 'Sistema Solar', destination: 'Luyten 726-8', distance: 8.73, risk: 0.50, reward: 624000, cargoType: 'Energia', tier: 'Interstellar', autoTravelCost: 6000000, unlockCost: 312500000, requiredShipLevel: 7, unlockCondition: { route2Unlocked: true } },
-  { id: 'ross-154', name: 'Ross 154', origin: 'Sistema Solar', destination: 'Ross 154', distance: 9.68, risk: 0.55, reward: 1120000, cargoType: 'Dados', tier: 'Interstellar', autoTravelCost: 12000000, unlockCost: 1562500000, requiredShipLevel: 8, unlockCondition: { route2Unlocked: true } },
-  { id: 'epsilon-eridani', name: 'Epsilon Eridani', origin: 'Sistema Solar', destination: 'Epsilon Eridani', distance: 10.50, risk: 0.60, reward: 2000000, cargoType: 'Tecnologia', tier: 'Interstellar', autoTravelCost: 25000000, unlockCost: 7812500000, requiredShipLevel: 9, unlockCondition: { route2Unlocked: true } },
+  { id: 'alpha-centauri', name: 'Alpha Centauri', origin: 'Sistema Solar', destination: 'Alpha Centauri', distance: 4.37, risk: 0.30, reward: 50000000, cargoType: 'Tecnologia', tier: 'Interstellar', autoTravelCost: 50000000, requiredShipLevel: 1, unlockCondition: { route2Unlocked: true } },
+  { id: 'proxima-centauri', name: 'Proxima Centauri', origin: 'Sistema Solar', destination: 'Proxima Centauri', distance: 4.24, risk: 0.32, reward: 125000000, cargoType: 'Energia', tier: 'Interstellar', autoTravelCost: 150000000, unlockCost: 100000000, requiredShipLevel: 2, unlockCondition: { route2Unlocked: true } },
+  { id: 'barnards-star', name: 'Barnard\'s Star', origin: 'Sistema Solar', destination: 'Barnard\'s Star', distance: 5.96, risk: 0.35, reward: 400000000, cargoType: 'Dados', tier: 'Interstellar', autoTravelCost: 500000000, unlockCost: 500000000, requiredShipLevel: 3, unlockCondition: { route2Unlocked: true } },
+  { id: 'wolf-359', name: 'Wolf 359', origin: 'Sistema Solar', destination: 'Wolf 359', distance: 7.78, risk: 0.38, reward: 1250000000, cargoType: 'Tecnologia', tier: 'Interstellar', autoTravelCost: 1500000000, unlockCost: 2500000000, requiredShipLevel: 4, unlockCondition: { route2Unlocked: true } },
+  { id: 'lalande-21185', name: 'Lalande 21185', origin: 'Sistema Solar', destination: 'Lalande 21185', distance: 8.29, risk: 0.40, reward: 5000000000, cargoType: 'Biológico', tier: 'Interstellar', autoTravelCost: 6000000000, unlockCost: 12500000000, requiredShipLevel: 5, unlockCondition: { route2Unlocked: true } },
+  { id: 'sirius', name: 'Sirius', origin: 'Sistema Solar', destination: 'Sirius', distance: 8.60, risk: 0.45, reward: 20000000000, cargoType: 'Artefatos', tier: 'Interstellar', autoTravelCost: 25000000000, unlockCost: 62500000000, requiredShipLevel: 6, unlockCondition: { route2Unlocked: true } },
+  { id: 'luyten-726-8', name: 'Luyten 726-8', origin: 'Sistema Solar', destination: 'Luyten 726-8', distance: 8.73, risk: 0.50, reward: 80000000000, cargoType: 'Energia', tier: 'Interstellar', autoTravelCost: 100000000000, unlockCost: 312500000000, requiredShipLevel: 7, unlockCondition: { route2Unlocked: true } },
+  { id: 'ross-154', name: 'Ross 154', origin: 'Sistema Solar', destination: 'Ross 154', distance: 9.68, risk: 0.55, reward: 300000000000, cargoType: 'Dados', tier: 'Interstellar', autoTravelCost: 400000000000, unlockCost: 1562500000000, requiredShipLevel: 8, unlockCondition: { route2Unlocked: true } },
+  { id: 'epsilon-eridani', name: 'Epsilon Eridani', origin: 'Sistema Solar', destination: 'Epsilon Eridani', distance: 10.50, risk: 0.60, reward: 1000000000000, cargoType: 'Tecnologia', tier: 'Interstellar', autoTravelCost: 1500000000000, unlockCost: 7812500000000, requiredShipLevel: 9, unlockCondition: { route2Unlocked: true } },
   
   // ROTA 3: Void
   { id: 'void-1', name: 'O Horizonte de Eventos', origin: 'Vazio Profundo', destination: 'Singularidade', distance: 5000, risk: 0.95, reward: 10000000, cargoType: 'Dados', tier: 'Void', autoTravelCost: 5000, requiredShipLevel: 1, unlockCondition: { route3Unlocked: true } },

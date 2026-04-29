@@ -186,11 +186,10 @@ export const IntroNarrative = ({
   const [index, setIndex] = useState(0);
   const [showPlayerId, setShowPlayerId] = useState(false);
   const [isTyping, setIsTyping] = useState(true);
-  const [displayedText, setDisplayedText] = useState("");
+  const [charCount, setCharCount] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [loadingStatus, setLoadingStatus] = useState("");
-  const typingTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const LOADING_STEPS = [
     { progress: 10, en: "Initializing systems...", pt: "Inicializando sistemas..." },
@@ -203,40 +202,37 @@ export const IntroNarrative = ({
   ];
 
   const currentText = STORY_TEXT[index] ? t(language, STORY_TEXT[index].en, STORY_TEXT[index].pt) : "";
+  const displayedText = currentText.slice(0, charCount);
 
   useEffect(() => {
     if (index < STORY_TEXT.length) {
       setIsTyping(true);
-      setDisplayedText("");
-      let charIndex = 0;
-      
-      const typeChar = () => {
-        if (charIndex < currentText.length) {
-          setDisplayedText(prev => prev + currentText[charIndex]);
-          charIndex++;
-          typingTimerRef.current = setTimeout(typeChar, 30);
-        } else {
-          setIsTyping(false);
-          const nextTimer = setTimeout(() => {
-            if (index < STORY_TEXT.length - 1) {
-              setIndex(prev => prev + 1);
-            } else {
-              setShowPlayerId(true);
-            }
-          }, 3000);
-          typingTimerRef.current = nextTimer;
-        }
-      };
-
-      typeChar();
-      return () => {
-        if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
-      };
+      setCharCount(0);
     }
-  }, [index, currentText, language]);
+  }, [index, language]);
+
+  useEffect(() => {
+    if (index < STORY_TEXT.length) {
+      if (charCount < currentText.length) {
+        const timer = setTimeout(() => {
+          setCharCount(prev => prev + 1);
+        }, 30);
+        return () => clearTimeout(timer);
+      } else {
+        setIsTyping(false);
+        const nextTimer = setTimeout(() => {
+          if (index < STORY_TEXT.length - 1) {
+            setIndex(prev => prev + 1);
+          } else {
+            setShowPlayerId(true);
+          }
+        }, 3000);
+        return () => clearTimeout(nextTimer);
+      }
+    }
+  }, [index, charCount, currentText.length]);
 
   const handleSkip = () => {
-    if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
     setShowPlayerId(true);
   };
 
@@ -281,7 +277,7 @@ export const IntroNarrative = ({
             >
               <RobotVisual />
               
-              <div className="min-h-[120px] flex items-center justify-center">
+              <div className="min-h-[120px] flex items-center justify-center px-8 w-full">
                 <p className="text-xl md:text-2xl font-orbitron leading-relaxed text-cyan-100/90 tracking-wide drop-shadow-[0_0_10px_rgba(6,182,212,0.3)]">
                   {displayedText}
                   {isTyping && <motion.span animate={{ opacity: [1, 0, 1] }} transition={{ duration: 0.5, repeat: Infinity }} className="inline-block w-1 h-6 bg-cyan-400 ml-1 align-middle" />}
