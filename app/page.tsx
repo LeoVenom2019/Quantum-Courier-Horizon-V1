@@ -16,54 +16,120 @@ import { ThemeColor, GAME_THEMES } from '@/lib/game-data';
 // Helper for random positions
 const getRandom = (min: number, max: number) => Math.random() * (max - min) + min;
 
-const StarField = ({ theme = 'cyan' }: { theme?: ThemeColor }) => {
-  const [stars, setStars] = useState<{ id: number; x: number; y: number; size: number; duration: number }[]>([]);
-  
-  const colorMap: Record<ThemeColor, string> = {
-    cyan: 'rgba(6,182,212,0.4)',
-    orange: 'rgba(249,115,22,0.4)',
-    neila: 'rgba(16,185,129,0.4)',
-    pink: 'rgba(236,72,153,0.4)',
-    violet: 'rgba(139,92,246,0.4)',
-    amber: 'rgba(245,158,11,0.4)',
-    emerald: 'rgba(16,185,129,0.4)',
-    rose: 'rgba(244,63,94,0.4)',
-    blue: 'rgba(59,130,246,0.4)',
-  };
+interface ConstellationStar {
+  name: string;
+  x: number;
+  y: number;
+  size: number;
+  color: string;
+  glow: string;
+  spike?: boolean;
+}
 
-  const glowColor = colorMap[theme] || colorMap.cyan;
+const CONSTELLATIONS: { [key: string]: ConstellationStar[] } = {
+  ORION: [
+    { name: 'Betelgeuse', x: 42, y: 28, size: 5, color: '#ff8a65', glow: 'rgba(255, 87, 34, 0.6)', spike: true },
+    { name: 'Bellatrix', x: 56, y: 31, size: 3, color: '#d1f0ff', glow: 'rgba(209, 240, 255, 0.4)' },
+    { name: 'Mintaka', x: 48, y: 48, size: 3.5, color: '#ffffff', glow: 'rgba(255, 255, 255, 0.5)' },
+    { name: 'Alnilam', x: 50, y: 50, size: 3.5, color: '#ffffff', glow: 'rgba(255, 255, 255, 0.5)' },
+    { name: 'Alnitak', x: 52, y: 52, size: 3.5, color: '#ffffff', glow: 'rgba(255, 255, 255, 0.5)' },
+    { name: 'Saiph', x: 46, y: 68, size: 3, color: '#d1f0ff', glow: 'rgba(209, 240, 255, 0.4)' },
+    { name: 'Rigel', x: 58, y: 72, size: 5, color: '#ffffff', glow: 'rgba(100, 200, 255, 0.7)', spike: true },
+  ],
+  SOUTHERN_CROSS: [
+    { name: 'Gacrux', x: 85, y: 75, size: 3.5, color: '#ffccbc', glow: 'rgba(255, 204, 188, 0.4)' }, // Top - Red Giant
+    { name: 'Mimosa', x: 80, y: 83, size: 3.5, color: '#d1f0ff', glow: 'rgba(209, 240, 255, 0.4)' }, // Left
+    { name: 'Imai', x: 90, y: 83, size: 3, color: '#ffffff', glow: 'rgba(255, 255, 255, 0.3)' }, // Right
+    { name: 'Acrux', x: 85, y: 91, size: 4.5, color: '#ffffff', glow: 'rgba(255, 255, 255, 0.5)' }, // Bottom
+    { name: 'Ginan', x: 87, y: 85, size: 2, color: '#ffffff', glow: 'rgba(255, 255, 255, 0.2)' }, // Intrometida
+  ]
+};
+
+const Satellite = () => {
+  const [isMounted, setIsMounted] = useState(false);
+  const [props, setProps] = useState({ y: 0, duration: 60, delay: 0, opacity: 0 });
 
   useEffect(() => {
-    const generateStars = () => {
-      return Array.from({ length: 150 }).map((_, i) => ({
-        id: i,
-        x: getRandom(0, 100),
-        y: getRandom(0, 100),
-        size: getRandom(1, 3),
-        duration: getRandom(2, 5),
-      }));
-    };
-    requestAnimationFrame(() => {
-      setStars(generateStars());
+    setProps({
+      y: Math.random() * 100,
+      duration: 60 + Math.random() * 120,
+      delay: Math.random() * 20,
+      opacity: 0.2 + Math.random() * 0.3
     });
+    setIsMounted(true);
   }, []);
 
-  return (
-    <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
-      {/* Bright Star in Top-Left */}
-      <motion.div 
-        className="absolute top-[10%] left-[10%] w-4 h-4 bg-white rounded-full z-10"
-        style={{ boxShadow: `0 0 30px 10px rgba(255,255,255,0.8), 0 0 60px 20px ${glowColor}` }}
-        animate={{ 
-          scale: [1, 1.2, 1],
-          opacity: [0.8, 1, 0.8]
-        }}
-        transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-      >
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-12 h-[1px] bg-white/40 blur-[1px]" />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[1px] h-12 bg-white/40 blur-[1px]" />
-      </motion.div>
+  if (!isMounted) return null;
 
+  return (
+    <motion.div
+      initial={{ left: '-5%', top: `${props.y}%`, opacity: 0 }}
+      animate={{ left: '105%', opacity: [0, props.opacity, props.opacity, 0] }}
+      transition={{ duration: props.duration, repeat: Infinity, delay: props.delay, ease: "linear" }}
+      className="absolute w-1 h-1 bg-slate-400 rounded-full blur-[0.5px] z-0"
+    />
+  );
+};
+
+const StarField = ({ theme = 'cyan' }: { theme?: ThemeColor }) => {
+  const [isMounted, setIsMounted] = useState(false);
+  const [stars] = useState(() => {
+    return Array.from({ length: 80 }).map((_, i) => ({
+      id: i,
+      x: getRandom(0, 100),
+      y: getRandom(0, 100),
+      size: getRandom(0.5, 2),
+      opacity: getRandom(0.1, 0.7),
+      duration: getRandom(3, 7)
+    }));
+  });
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  if (!isMounted) return <div className="absolute inset-0 bg-black" />;
+
+  return (
+    <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden bg-black">
+      {/* Satellites */}
+      <Satellite />
+      <Satellite />
+      <Satellite />
+
+      {/* Constellations */}
+      {[...CONSTELLATIONS.ORION, ...CONSTELLATIONS.SOUTHERN_CROSS].map((star, i) => (
+        <motion.div
+          key={`const-${i}`}
+          className="absolute rounded-full"
+          style={{
+            left: `${star.x}%`,
+            top: `${star.y}%`,
+            width: star.size,
+            height: star.size,
+            backgroundColor: star.color,
+            boxShadow: `0 0 ${star.size * 2}px ${star.glow}`,
+          }}
+          animate={{
+            opacity: [0.7, 1, 0.7],
+            scale: [1, 1.05, 1],
+          }}
+          transition={{
+            duration: 3 + Math.random() * 4,
+            repeat: Infinity,
+            ease: "easeInOut",
+          }}
+        >
+          {star.spike && (
+            <>
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[200%] h-[1px] bg-white/20 blur-[1px]" />
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[1px] h-[200%] bg-white/20 blur-[1px]" />
+            </>
+          )}
+        </motion.div>
+      ))}
+
+      {/* Background Stars */}
       {stars.map((star) => (
         <motion.div
           key={star.id}
@@ -73,11 +139,10 @@ const StarField = ({ theme = 'cyan' }: { theme?: ThemeColor }) => {
             top: `${star.y}%`,
             width: star.size,
             height: star.size,
-            boxShadow: '0 0 10px white',
+            opacity: 0.4
           }}
           animate={{
-            opacity: [0.2, 1, 0.2],
-            scale: [1, 1.2, 1],
+            opacity: [0.1, 0.5, 0.1],
           }}
           transition={{
             duration: star.duration,
@@ -147,8 +212,9 @@ const SpaceShip = ({
   end,
   duration,
   scale,
-  color,
+  shipType,
   onComplete,
+  depth,
   isWarp = false
 }: { 
   id: number;
@@ -156,21 +222,35 @@ const SpaceShip = ({
   end: { x: number; y: number };
   duration: number;
   scale: number;
-  color: 'cyan' | 'orange' | 'pink' | 'emerald' | 'violet' | 'amber';
+  shipType: typeof TRAFFIC_SHIPS[number];
   onComplete: (id: number) => void;
+  depth: { scale: number; opacity: number; blur: number; zIndex: number };
   isWarp?: boolean;
 }) => {
-  const colorMap = {
-    cyan: { border: 'border-cyan-500', shadow: 'shadow-[0_0_15px_rgba(6,182,212,0.5)]', window: 'bg-cyan-300/30 border-cyan-400', engine: 'bg-cyan-500', trail: 'from-cyan-500/50' },
-    orange: { border: 'border-orange-500', shadow: 'shadow-[0_0_15px_rgba(249,115,22,0.5)]', window: 'bg-orange-300/30 border-orange-400', engine: 'bg-orange-500', trail: 'from-orange-500/50' },
-    pink: { border: 'border-pink-500', shadow: 'shadow-[0_0_15px_rgba(236,72,153,0.5)]', window: 'bg-pink-300/30 border-pink-400', engine: 'bg-pink-500', trail: 'from-pink-500/50' },
-    emerald: { border: 'border-emerald-500', shadow: 'shadow-[0_0_15px_rgba(16,185,129,0.5)]', window: 'bg-emerald-300/30 border-emerald-400', engine: 'bg-emerald-500', trail: 'from-emerald-500/50' },
-    violet: { border: 'border-violet-500', shadow: 'shadow-[0_0_15px_rgba(139,92,246,0.5)]', window: 'bg-violet-300/30 border-violet-400', engine: 'bg-violet-500', trail: 'from-violet-500/50' },
-    amber: { border: 'border-amber-500', shadow: 'shadow-[0_0_15px_rgba(245,158,11,0.5)]', window: 'bg-amber-300/30 border-amber-400', engine: 'bg-amber-500', trail: 'from-amber-500/50' },
+  const angle = Math.atan2(end.y - start.y, end.x - start.x) * (180 / Math.PI);
+  
+  // Logic to choose Left/Right asset
+  const isMovingRight = end.x > start.x;
+  const currentPath = `${shipType.basePath}_${isMovingRight ? 'right' : 'left'}.png`;
+  // If moving left, the asset already points 180deg, so we rotate relative to that
+  const displayRotation = isMovingRight ? angle : angle - 180;
+
+  // Combine base scale with depth scale
+  const finalScale = scale * depth.scale;
+
+  const engineGlowMap: Record<string, string> = {
+    cyan: 'shadow-[0_0_20px_#06b6d4,0_0_40px_#06b6d4]',
+    orange: 'shadow-[0_0_20px_#f97316,0_0_40px_#f97316]',
+    violet: 'shadow-[0_0_20px_#8b5cf6,0_0_40px_#8b5cf6]',
+    emerald: 'shadow-[0_0_20px_#10b981,0_0_40px_#10b981]',
   };
 
-  const config = colorMap[color] || colorMap.cyan;
-  const angle = Math.atan2(end.y - start.y, end.x - start.x) * (180 / Math.PI);
+  const trailColorMap: Record<string, string> = {
+    cyan: 'from-cyan-500/40',
+    orange: 'from-orange-500/40',
+    violet: 'from-violet-500/40',
+    emerald: 'from-emerald-500/40',
+  };
 
   return (
     <motion.div
@@ -178,37 +258,87 @@ const SpaceShip = ({
         left: `${start.x}%`, 
         top: `${start.y}%`, 
         opacity: 0,
-        scale: isWarp ? 0 : scale,
-        rotate: angle
+        scale: isWarp ? 0 : finalScale,
+        rotate: displayRotation
       }}
+
       animate={{ 
         left: `${end.x}%`, 
         top: `${end.y}%`,
-        opacity: [0, 0.8, 0.8, 0],
-        scale: isWarp ? [0, scale * 1.5, scale, scale, 0] : scale
+        opacity: [0, depth.opacity, depth.opacity, 0],
+        scale: isWarp ? [0, finalScale * 1.5, finalScale * 0.8, finalScale * 0.8, 0] : finalScale,
+        rotate: displayRotation
       }}
+
       onAnimationComplete={() => onComplete(id)}
       transition={{
         duration: duration,
         ease: isWarp ? "anticipate" : "linear",
       }}
-      className="absolute z-10 pointer-events-none"
+      className="absolute pointer-events-none"
+      style={{ zIndex: depth.zIndex }}
     >
-      <div className="relative">
-        {/* Trail */}
-        <div className={`absolute right-full top-1/2 -translate-y-1/2 w-32 h-1 bg-gradient-to-l ${config.trail} to-transparent blur-sm opacity-50`} />
+      <div className="relative group">
+        {/* Engine Trail */}
+        <motion.div 
+          initial={{ width: 0, opacity: 0 }}
+          animate={{ 
+            width: isWarp ? [100, 400, 100] : [80, 120, 80],
+            opacity: [0.3, 0.6, 0.3]
+          }}
+          transition={{ duration: 0.5, repeat: Infinity }}
+          className={`absolute ${isMovingRight ? 'right-[80%]' : 'left-[80%]'} top-1/2 -translate-y-1/2 h-2 bg-gradient-to-l ${isMovingRight ? trailColorMap[shipType.engineColor] : 'from-transparent'} ${isMovingRight ? 'to-transparent' : trailColorMap[shipType.engineColor]} blur-md`} 
+        />
         
-        <div className={`w-24 h-8 bg-slate-800 border-2 ${config.border} rounded-full relative ${config.shadow}`}>
-          <div className={`absolute top-1 right-4 w-8 h-4 ${config.window} rounded-full border`} />
-          <div className={`absolute -left-4 top-1/2 -translate-y-1/2 w-8 h-4 ${config.engine} blur-md rounded-full animate-pulse`} />
-          <div className="absolute -left-2 top-1/2 -translate-y-1/2 w-4 h-2 bg-white rounded-full" />
+        {/* Engine Glow (Back) */}
+        <div className={`absolute ${isMovingRight ? 'left-2' : 'right-2'} top-1/2 -translate-y-1/2 w-4 h-4 rounded-full blur-sm ${engineGlowMap[shipType.engineColor]} animate-pulse`} />
+
+        {/* Ship Asset */}
+        <div className="relative overflow-visible">
+          <img 
+            src={currentPath} 
+            alt="Space Traffic"
+            className="object-contain"
+            onError={(e) => {
+              // Fallback to _right if _left is not yet available
+              (e.target as HTMLImageElement).src = `${shipType.basePath}_right.png`;
+            }}
+            style={{ 
+              width: shipType.size.w * finalScale, 
+              height: shipType.size.h * finalScale,
+              mixBlendMode: 'screen',
+              transform: isWarp ? 'scaleX(1.5)' : 'none'
+            }}
+          />
+          
+          {/* Subtle Hull Glow */}
+          <div 
+            className="absolute inset-0 rounded-full blur-2xl opacity-20 pointer-events-none" 
+            style={{ backgroundColor: shipType.engineColor === 'cyan' ? '#06b6d4' : shipType.engineColor === 'orange' ? '#f97316' : '#8b5cf6' }}
+          />
         </div>
-        <div className={`absolute -top-4 left-6 w-4 h-12 bg-slate-700 border-l-2 ${config.border} -skew-x-12`} />
-        <div className={`absolute -bottom-4 left-6 w-4 h-12 bg-slate-700 border-l-2 ${config.border} skew-x-12`} />
       </div>
     </motion.div>
   );
 };
+
+const TRAFFIC_SHIPS = [
+  { id: 'interceptor', basePath: '/images/traffic/interceptor', engineColor: 'cyan', speedMult: 1.5, size: { w: 120, h: 60 } },
+  { id: 'freighter', basePath: '/images/traffic/freighter', engineColor: 'orange', speedMult: 0.7, size: { w: 160, h: 80 } },
+  { id: 'scout', basePath: '/images/traffic/scout', engineColor: 'violet', speedMult: 2.2, size: { w: 100, h: 50 } },
+  { id: 'probe', basePath: '/images/traffic/probe', engineColor: 'emerald', speedMult: 1.1, size: { w: 80, h: 80 } },
+  { id: 'ufo', basePath: '/images/traffic/ufo', engineColor: 'cyan', speedMult: 1.8, size: { w: 100, h: 50 } },
+  { id: 'mothership', basePath: '/images/traffic/mothership', engineColor: 'cyan', speedMult: 0.4, size: { w: 250, h: 120 } },
+  { id: 'silver_man', basePath: '/images/traffic/silver_man', engineColor: 'violet', speedMult: 2.5, size: { w: 90, h: 45 } },
+  { id: 'quantum_ghost', basePath: '/images/traffic/quantum_ghost', engineColor: 'emerald', speedMult: 1.3, size: { w: 110, h: 110 } },
+] as const;
+
+const DEPTH_LAYERS = [
+  { scale: 0.15, opacity: 0.3, blur: 0, zIndex: 1 },  // Far
+  { scale: 0.45, opacity: 0.6, blur: 0, zIndex: 5 },  // Mid
+  { scale: 0.85, opacity: 1.0, blur: 0, zIndex: 15 }, // Near
+];
+
 
 const SpaceTraffic = () => {
   const [ships, setShips] = useState<any[]>([]);
@@ -232,24 +362,33 @@ const SpaceTraffic = () => {
       end = { x: 120, y: getRandom(-20, 120) };
     }
     
-    const scale = getRandom(0.2, 1.2);
-    const isWarp = Math.random() > 0.95;
+    const isWarp = Math.random() > 0.94;
+    const shipType = TRAFFIC_SHIPS[Math.floor(Math.random() * TRAFFIC_SHIPS.length)];
+    const depth = DEPTH_LAYERS[Math.floor(Math.random() * DEPTH_LAYERS.length)];
+    
+    // Scale is randomized slightly within the depth layer
+    const scale = getRandom(0.8, 1.2);
+    
+    // Duration logic: heavier ships are slower, scouts are faster
+    const baseDuration = getRandom(25, 55);
+    const duration = (baseDuration / (scale * depth.scale * 2 * shipType.speedMult)) * (isWarp ? 0.15 : 1);
     
     return {
       id,
       start,
       end,
-      duration: (getRandom(15, 35) / (scale * 1.5)) * (isWarp ? 0.2 : 1),
+      duration,
       scale,
-      color: ['cyan', 'orange', 'pink', 'emerald', 'violet', 'amber'][Math.floor(Math.random() * 6)],
+      shipType,
+      depth,
       isWarp,
       key: Math.random()
     };
   }, []);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setShips(Array.from({ length: 8 }).map((_, i) => generateShip(i)));
+    // Initial batch of ships - Increased for more density across layers
+    setShips(Array.from({ length: 15 }).map((_, i) => generateShip(i)));
   }, [generateShip]);
 
   const handleComplete = React.useCallback((id: number) => {
@@ -311,7 +450,7 @@ const MoonVisual = () => {
       animate={{ opacity: 1, scale: 1 }}
       className="relative w-96 h-96 flex items-center justify-center"
     >
-      <div className="absolute w-72 h-72 bg-slate-400/5 rounded-full blur-[80px] pointer-events-none" />
+      {/* No Background Glow */}
       
       <motion.div
         animate={{ 
@@ -344,7 +483,7 @@ const EarthVisual = () => {
       className="relative w-96 h-96 flex items-center justify-center"
     >
       {/* Soft Background Glow - Blends better with the asset */}
-      <div className="absolute w-80 h-80 bg-blue-600/10 rounded-full blur-[100px] pointer-events-none" />
+      {/* No Background Glow */}
       
       {/* Cinematic Earth Asset */}
       <motion.div
@@ -366,8 +505,7 @@ const EarthVisual = () => {
           style={{ mixBlendMode: 'screen' }}
         />
         
-        {/* Subtle Glow Overlay - To hide any remaining edge artifacts */}
-        <div className="absolute inset-0 rounded-full shadow-[inset_0_0_60px_rgba(0,0,0,0.5),0_0_30px_rgba(59,130,246,0.1)] pointer-events-none" />
+        {/* No Glow Overlay */}
       </motion.div>
     </motion.div>
   );
@@ -380,7 +518,7 @@ const SaturnVisual = () => {
       animate={{ opacity: 1, scale: 1 }}
       className="relative w-[500px] h-96 flex items-center justify-center"
     >
-      <div className="absolute w-[400px] h-64 bg-orange-500/5 rounded-full blur-[120px] pointer-events-none" />
+      {/* No Background Glow */}
       
       <motion.div
         animate={{ 
@@ -443,7 +581,7 @@ const BlackHoleVisual = () => {
       animate={{ opacity: 1, scale: 1 }}
       className="relative w-[500px] h-[500px] flex items-center justify-center"
     >
-      <div className="absolute inset-0 bg-white/5 rounded-full blur-[150px] animate-pulse" />
+      {/* No Background Glow */}
       
       <motion.div
         animate={{ 
@@ -473,7 +611,7 @@ const SunVisual = () => (
     animate={{ opacity: 1, scale: 1 }}
     className="relative w-96 h-96 flex items-center justify-center"
   >
-    <div className="absolute inset-0 bg-yellow-500/10 rounded-full blur-[100px] animate-pulse pointer-events-none" />
+    {/* No Background Glow */}
     
     <motion.div
       animate={{ 
@@ -502,7 +640,7 @@ const RobotVisual = () => (
     animate={{ opacity: 1, y: 0 }}
     className="relative w-80 h-80 flex flex-col items-center justify-center"
   >
-    <div className="absolute inset-0 border border-cyan-500/5 rounded-full animate-[spin_20s_linear_infinite] pointer-events-none" />
+    {/* No Background Border Glow */}
     
     <motion.div
       animate={{ 
@@ -532,7 +670,7 @@ const ChessBoardVisual = () => (
     animate={{ opacity: 1, scale: 1 }}
     className="relative w-96 h-96 flex items-center justify-center"
   >
-    <div className="absolute inset-0 bg-amber-500/5 rounded-full blur-[100px] pointer-events-none" />
+    {/* No Background Glow */}
     
     <motion.div
       animate={{ 
@@ -562,7 +700,7 @@ const AlienVisual = () => (
     animate={{ opacity: 1, scale: 1 }}
     className="relative w-96 h-96 flex items-center justify-center"
   >
-    <div className="absolute inset-0 bg-emerald-500/5 rounded-full blur-[100px] pointer-events-none" />
+    {/* No Background Glow */}
     
     <motion.div
       animate={{ 
@@ -1330,39 +1468,32 @@ export default function GameHome() {
           <div className="absolute top-3/4 left-0 w-full h-1 bg-white/40 animate-[glitch-line_1.5s_infinite]" />
         </div>
       )}
-      {/* Background Elements */}
-      <div className={`absolute inset-0 ${theme === 'cyan' ? 'bg-[radial-gradient(circle_at_bottom_right,rgba(88,28,135,0.25)_0%,transparent_60%)]' : theme === 'orange' ? 'bg-[radial-gradient(circle_at_bottom_right,rgba(154,52,18,0.25)_0%,transparent_60%)]' : 'bg-[radial-gradient(circle_at_bottom_right,rgba(6,95,70,0.25)_0%,transparent_60%)]'}`} />
+      {/* Background Elements (Vacuum Focus) */}
       <StarField theme={theme} />
-      <Nebula />
       
-      {/* Background Grid Overlay */}
-      <div className="absolute inset-0 z-0 pointer-events-none opacity-20">
-        <div className={`absolute inset-0 ${theme === 'cyan' ? 'bg-[linear-gradient(rgba(6,182,212,0.1)_1px,transparent_1px),linear-gradient(90deg,rgba(6,182,212,0.1)_1px,transparent_1px)]' : theme === 'orange' ? 'bg-[linear-gradient(rgba(249,115,22,0.1)_1px,transparent_1px),linear-gradient(90deg,rgba(249,115,22,0.1)_1px,transparent_1px)]' : 'bg-[linear-gradient(rgba(16,185,129,0.1)_1px,transparent_1px),linear-gradient(90deg,rgba(16,185,129,0.1)_1px,transparent_1px)]'} bg-[size:60px_60px] [mask-image:radial-gradient(ellipse_at_center,black,transparent_80%)]`} />
-      </div>
-
       {/* Meteors */}
       <Meteor delay={2} theme={theme} />
       <Meteor delay={7} theme={theme} />
       <Meteor delay={12} theme={theme} />
       
       {/* Animated Ships */}
-      <MotherShip />
       <SpaceTraffic />
 
-      {/* Random Visual Event */}
+      {/* Random Visual Event (Stripped of Glows) */}
       <AnimatePresence mode="wait">
         {randomVisual && (
           <motion.div 
-            initial={{ opacity: 0, scale: 0.8 }}
+            initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.8 }}
-            transition={{ duration: 1.5, ease: "easeInOut" }}
-            className="absolute top-1/2 right-[10%] md:right-[20%] -translate-y-1/2 z-10 pointer-events-none hidden md:flex"
+            exit={{ opacity: 0, scale: 0.95 }}
+            transition={{ duration: 1 }}
+            className="absolute top-1/2 right-[10%] md:right-[15%] -translate-y-1/2 z-10 pointer-events-none hidden md:flex"
           >
             {randomVisual}
           </motion.div>
         )}
       </AnimatePresence>
+
 
       {/* Futuristic Frame */}
       <div className={`absolute inset-4 border ${theme === 'cyan' ? 'border-cyan-500/20' : 'border-orange-500/20'} pointer-events-none z-50`}>
@@ -1388,9 +1519,7 @@ export default function GameHome() {
           transition={{ duration: 1, ease: "easeOut" }}
           className="text-left relative"
         >
-          {/* Decorative Circle behind title */}
-          <div className={`absolute top-1/2 left-0 -translate-y-1/2 w-[140%] aspect-square border-2 ${theme === 'cyan' ? 'border-cyan-500/10' : 'border-orange-500/10'} rounded-full animate-[spin_30s_linear_infinite]`} />
-          <div className="absolute top-1/2 left-0 -translate-y-1/2 w-[120%] aspect-square border border-pink-500/10 rounded-full animate-[spin_25s_linear_infinite_reverse]" />
+          {/* Decorative Elements Removed */}
           
           <motion.h1 
             whileHover={{ scale: 1.02 }}
@@ -1413,20 +1542,22 @@ export default function GameHome() {
               </span>
               {tl('QUANTUM COURIER', 'QUANTUM COURIER')}
             </span>
-            <span className={`text-3xl md:text-5xl text-transparent bg-clip-text bg-gradient-to-b from-white ${theme === 'cyan' ? 'via-cyan-200 to-cyan-500 drop-shadow-[0_0_15px_rgba(6,182,212,0.6)]' : 'via-orange-200 to-orange-500 drop-shadow-[0_0_15px_rgba(249,115,22,0.6)]'} relative z-10`}>
-              <span className="absolute inset-0 shimmer-text opacity-70 pointer-events-none">
+            <div className="relative inline-block">
+              <span className={`text-3xl md:text-5xl text-transparent bg-clip-text bg-gradient-to-b from-white ${theme === 'cyan' ? 'via-cyan-200 to-cyan-500 drop-shadow-[0_0_15px_rgba(6,182,212,0.6)]' : 'via-orange-200 to-orange-500 drop-shadow-[0_0_15px_rgba(249,115,22,0.6)]'} relative z-10`}>
+                <span className="absolute inset-0 shimmer-text opacity-70 pointer-events-none">
+                  {tl('HORIZON', 'HORIZON')}
+                </span>
                 {tl('HORIZON', 'HORIZON')}
               </span>
-              {tl('HORIZON', 'HORIZON')}
-            </span>
-            
-            {/* Decorative underline that glows */}
-            <motion.div 
-              initial={{ width: 0 }}
-              animate={{ width: '100%' }}
-              transition={{ delay: 1.5, duration: 1 }}
-              className={`h-0.5 mt-2 z-10 ${theme === 'cyan' ? 'bg-cyan-500 shadow-[0_0_15px_rgba(6,182,212,1)]' : 'bg-orange-500 shadow-[0_0_15px_rgba(249,115,22,1)]'}`}
-            />
+              
+              {/* Decorative underline restricted to HORIZON */}
+              <motion.div 
+                initial={{ width: 0 }}
+                animate={{ width: '100%' }}
+                transition={{ delay: 1.5, duration: 1 }}
+                className={`h-0.5 mt-1 z-10 ${theme === 'cyan' ? 'bg-cyan-500 shadow-[0_0_15px_rgba(6,182,212,1)]' : 'bg-orange-500 shadow-[0_0_15px_rgba(249,115,22,1)]'}`}
+              />
+            </div>
           </motion.h1>
           
         </motion.div>

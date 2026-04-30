@@ -226,6 +226,7 @@ export const SaveManager = {
       },
       earth_reconstruction: {
         earthReconstructionProgress: flatData.earthReconstructionProgress || {},
+        doomPLevel: flatData.doomPLevel || 0,
         earthPopulation: flatData.earthPopulation || 0,
         earthMaleRatio: flatData.earthMaleRatio || 0.5,
         earthBiodiversity: flatData.earthBiodiversity || 0,

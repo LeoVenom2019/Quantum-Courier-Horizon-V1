@@ -6830,10 +6830,6 @@ export const GameDashboard = ({
       extractionAutoSellUnlocked,
       route4Unlocked,
       totalExtractionProfit,
-      aetherion,
-      miningWaste,
-      solarEnergy,
-      aetherionTubes,
       lastScanTime,
       hasSeenRoute2UnlockMessage,
       speedRunTime,
@@ -8391,7 +8387,8 @@ export const GameDashboard = ({
           dodge: { lastUsed: 0, cooldown: 3000 },
           shield: { lastUsed: 0, cooldown: 15000 },
           burst: { lastUsed: 0, cooldown: 8000 }
-        }
+        },
+        keysPressed: new Set<string>()
       });
       return;
     }
@@ -10455,11 +10452,11 @@ export const GameDashboard = ({
              }
           }}
           onUpdateResources={setVoidResources}
-          playSfx={playSfx}
-          t={t}
+          playSfx={playSfx as any}
+          t={t as any}
           language={language}
-          addLog={addLog}
-          formatValue={formatValue}
+          addLog={addLog as any}
+          formatValue={formatValue as any}
           isGroupBattle={activeVoidBattle.isGroupBattle || false}
         />
       );
