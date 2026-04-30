@@ -12873,8 +12873,10 @@ export const GameDashboard = ({
 
               {activeTab === 'aircraft' && (
                 <motion.div
+                  key="aircraft"
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
                   className="flex-1 flex flex-col h-full space-y-6"
                 >
                   <div className="flex items-center justify-between shrink-0">
@@ -13093,8 +13095,10 @@ export const GameDashboard = ({
 
               {activeTab === 'technology' && (
                 <motion.div
+                  key="technology"
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
                   className="flex-1 flex flex-col h-full space-y-4"
                 >
                   <div className="flex items-center justify-between shrink-0">
@@ -13969,29 +13973,20 @@ export const GameDashboard = ({
                   {renderVoidAircraft()}
                 </motion.div>
               )}
-              {activeTab === 'void_battle' && (
-                <motion.div
-                  key="void_battle"
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -20 }}
-                  className="flex-1 flex flex-col h-full"
-                >
-                  {renderVoidBattleShip()}
-                </motion.div>
-              )}
-              {/* Void Map - Smart Standby (Always mounted to prevent video reload flicker) */}
-              <div className={activeTab === 'void_map' ? 'h-full flex flex-col overflow-hidden' : 'hidden'}>
-                <motion.div
-                  key="void_map_persistent"
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: activeTab === 'void_map' ? 1 : 0, x: activeTab === 'void_map' ? 0 : 20 }}
-                  transition={{ duration: 0.3 }}
-                  className="h-full flex flex-col overflow-hidden"
-                >
-                  {renderVoidMap()}
-                </motion.div>
-              </div>
+            </AnimatePresence>
+
+            {/* Void Map - Smart Standby (Always mounted to prevent video reload flicker) */}
+            <div className={activeTab === 'void_map' ? 'h-full flex flex-col overflow-hidden' : 'hidden'}>
+              <motion.div
+                key="void_map_persistent"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: activeTab === 'void_map' ? 1 : 0, x: activeTab === 'void_map' ? 0 : 20 }}
+                transition={{ duration: 0.3 }}
+                className="h-full flex flex-col overflow-hidden"
+              >
+                {renderVoidMap()}
+              </motion.div>
+            </div>
               {activeTab === 'void_war' && (
                 <motion.div
                   key="void_war"
