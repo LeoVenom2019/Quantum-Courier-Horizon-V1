@@ -98,6 +98,8 @@ export interface ModularSaveData {
     battleShipUpgradeLevel: number;
     warCoreLevel: number;
     fleetPower: number;
+    voidAutoShipmentUnlocked: boolean;
+    voidAutoShipmentActive: boolean;
   };
   earth_reconstruction: {
     earthReconstructionProgress: Record<string, number>;
@@ -218,7 +220,9 @@ export const SaveManager = {
         isRobotRepaired: flatData.isRobotRepaired || false,
         battleShipUpgradeLevel: flatData.battleShipUpgradeLevel || 0,
         warCoreLevel: flatData.warCoreLevel || 1,
-        fleetPower: flatData.fleetPower || 0
+        fleetPower: flatData.fleetPower || 0,
+        voidAutoShipmentUnlocked: flatData.voidAutoShipmentUnlocked || false,
+        voidAutoShipmentActive: flatData.voidAutoShipmentActive || false
       },
       earth_reconstruction: {
         earthReconstructionProgress: flatData.earthReconstructionProgress || {},

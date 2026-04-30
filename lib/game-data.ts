@@ -53,12 +53,15 @@ export interface VoidAircraft {
   rareChance: number;
   missionTime: number; // in milliseconds
   description: string;
+  image?: string;
+  video?: string;
 }
 
 export interface VoidPOI {
   id: string;
   name: string;
   lore: string;
+  video?: string;
   need: 'Energia' | 'Alimentos' | 'Tecnologia' | 'Medicamentos';
   resourceRequired: number;
   passiveGeneration: {
@@ -142,15 +145,15 @@ export const ORES: Ore[] = [
   { id: 'nucleo', name: 'Núcleo Quântico', rarity: 1, baseValue: 1000000, requiredShipLevel: 9, packSize: 50, robotBaseCost: 100000000, autoSellCost: 50000000, tier: 'Solar' },
   
   // ROTA 2: Interstellar
-  { id: 'ferro-estelar', name: 'Ferro Estelar', rarity: 1, baseValue: 2000000, requiredShipLevel: 1, packSize: 50, robotBaseCost: 50000000, autoSellCost: 250000000, tier: 'Interstellar' },
-  { id: 'cristal-fotonico', name: 'Cristal Fotônico', rarity: 1, baseValue: 5000000, requiredShipLevel: 2, packSize: 50, robotBaseCost: 150000000, autoSellCost: 750000000, tier: 'Interstellar' },
-  { id: 'liga-iridio', name: 'Liga de Irídio', rarity: 1, baseValue: 15000000, requiredShipLevel: 3, packSize: 50, robotBaseCost: 500000000, autoSellCost: 2500000000, tier: 'Interstellar' },
-  { id: 'plasma-solido', name: 'Plasma Sólido', rarity: 1, baseValue: 50000000, requiredShipLevel: 4, packSize: 50, robotBaseCost: 2000000000, autoSellCost: 10000000000, tier: 'Interstellar' },
-  { id: 'nucleo-radiante', name: 'Núcleo Radiante', rarity: 1, baseValue: 200000000, requiredShipLevel: 5, packSize: 50, robotBaseCost: 10000000000, autoSellCost: 50000000000, tier: 'Interstellar' },
-  { id: 'fragmento-anomalia', name: 'Fragmento de Anomalia', rarity: 1, baseValue: 800000000, requiredShipLevel: 6, packSize: 50, robotBaseCost: 50000000000, autoSellCost: 250000000000, tier: 'Interstellar' },
-  { id: 'essencia-nebular', name: 'Essência Nebular', rarity: 1, baseValue: 3000000000, requiredShipLevel: 7, packSize: 50, robotBaseCost: 250000000000, autoSellCost: 1250000000000, tier: 'Interstellar' },
-  { id: 'materia-instavel', name: 'Matéria Instável', rarity: 1, baseValue: 12000000000, requiredShipLevel: 8, packSize: 50, robotBaseCost: 1500000000000, autoSellCost: 7500000000000, tier: 'Interstellar' },
-  { id: 'singularidade-condensada', name: 'Singularidade Condensada', rarity: 1, baseValue: 50000000000, requiredShipLevel: 9, packSize: 50, robotBaseCost: 10000000000000, autoSellCost: 50000000000000, tier: 'Interstellar' },
+  { id: 'ferro-estelar', name: 'Ferro Estelar', rarity: 1, baseValue: 1000000, requiredShipLevel: 1, packSize: 50, robotBaseCost: 100000000, autoSellCost: 500000000, tier: 'Interstellar' },
+  { id: 'cristal-fotonico', name: 'Cristal Fotônico', rarity: 1, baseValue: 2000000, requiredShipLevel: 2, packSize: 50, robotBaseCost: 300000000, autoSellCost: 1500000000, tier: 'Interstellar' },
+  { id: 'liga-iridio', name: 'Liga de Irídio', rarity: 1, baseValue: 5000000, requiredShipLevel: 3, packSize: 50, robotBaseCost: 1000000000, autoSellCost: 5000000000, tier: 'Interstellar' },
+  { id: 'plasma-solido', name: 'Plasma Sólido', rarity: 1, baseValue: 15000000, requiredShipLevel: 4, packSize: 50, robotBaseCost: 5000000000, autoSellCost: 25000000000, tier: 'Interstellar' },
+  { id: 'nucleo-radiante', name: 'Núcleo Radiante', rarity: 1, baseValue: 50000000, requiredShipLevel: 5, packSize: 50, robotBaseCost: 25000000000, autoSellCost: 125000000000, tier: 'Interstellar' },
+  { id: 'fragmento-anomalia', name: 'Fragmento de Anomalia', rarity: 1, baseValue: 150000000, requiredShipLevel: 6, packSize: 50, robotBaseCost: 100000000000, autoSellCost: 500000000000, tier: 'Interstellar' },
+  { id: 'essencia-nebular', name: 'Essência Nebular', rarity: 1, baseValue: 500000000, requiredShipLevel: 7, packSize: 50, robotBaseCost: 500000000000, autoSellCost: 2500000000000, tier: 'Interstellar' },
+  { id: 'materia-instavel', name: 'Matéria Instável', rarity: 1, baseValue: 1500000000, requiredShipLevel: 8, packSize: 50, robotBaseCost: 2500000000000, autoSellCost: 12500000000000, tier: 'Interstellar' },
+  { id: 'singularidade-condensada', name: 'Singularidade Condensada', rarity: 1, baseValue: 5000000000, requiredShipLevel: 9, packSize: 50, robotBaseCost: 10000000000000, autoSellCost: 50000000000000, tier: 'Interstellar' },
 ];
 
 export const ROBOT_UPGRADES: MiningRobotUpgrade[] = [
@@ -461,7 +464,7 @@ export const EXTRACTION_POINTS: ExtractionPoint[] = [
     cycleTime: 5000,
     cost: 500000000, // 500 Mi
     researchTime: 600000, // 10 minutes
-    valuePerPack: 250000000, // 250 Mi
+    valuePerPack: 25000000, // 25 Mi
   },
   {
     id: 'ext-2',
@@ -471,7 +474,7 @@ export const EXTRACTION_POINTS: ExtractionPoint[] = [
     cycleTime: 5000,
     cost: 2500000000, // 2.5 Bi
     researchTime: 900000, // 15 minutes
-    valuePerPack: 1000000000, // 1 Bi
+    valuePerPack: 100000000, // 100 Mi
   },
   {
     id: 'ext-3',
@@ -481,7 +484,7 @@ export const EXTRACTION_POINTS: ExtractionPoint[] = [
     cycleTime: 5000,
     cost: 10000000000, // 10 Bi
     researchTime: 1200000, // 20 minutes
-    valuePerPack: 5000000000, // 5 Bi
+    valuePerPack: 500000000, // 500 Mi
   },
   {
     id: 'ext-4',
@@ -491,7 +494,7 @@ export const EXTRACTION_POINTS: ExtractionPoint[] = [
     cycleTime: 5000,
     cost: 50000000000, // 50 Bi
     researchTime: 1500000, // 25 minutes
-    valuePerPack: 25000000000, // 25 Bi
+    valuePerPack: 2500000000, // 2.5 Bi
   },
   {
     id: 'ext-5',
@@ -501,7 +504,7 @@ export const EXTRACTION_POINTS: ExtractionPoint[] = [
     cycleTime: 5000,
     cost: 200000000000, // 200 Bi
     researchTime: 1800000, // 30 minutes
-    valuePerPack: 100000000000, // 100 Bi
+    valuePerPack: 10000000000, // 10 Bi
   },
   {
     id: 'ext-6',
@@ -582,7 +585,9 @@ export const VOID_AIRCRAFT: VoidAircraft[] = [
     efficiency: 35,
     rareChance: 0.05,
     missionTime: 150000, // 2.5 min
-    description: 'Uma aeronave leve e ágil, ideal para incursões rápidas em zonas de baixa densidade.'
+    description: 'Uma aeronave leve e ágil, ideal para incursões rápidas em zonas de baixa densidade.',
+    image: '/images/ships/seeker-alpha.png',
+    video: '/videos/ships/seeker-alpha.webm'
   },
   {
     id: 'va-2',
@@ -591,7 +596,9 @@ export const VOID_AIRCRAFT: VoidAircraft[] = [
     efficiency: 45,
     rareChance: 0.10,
     missionTime: 210000, // 3.5 min
-    description: 'Projetada para transporte de carga pesada, com sistemas de filtragem de recursos aprimorados.'
+    description: 'Projetada para transporte de carga pesada, com sistemas de filtragem de recursos aprimorados.',
+    image: '/images/ships/collector-beta.png',
+    video: '/videos/ships/collector-beta.webm'
   },
   {
     id: 'va-3',
@@ -600,7 +607,9 @@ export const VOID_AIRCRAFT: VoidAircraft[] = [
     efficiency: 55,
     rareChance: 0.25,
     missionTime: 270000, // 4.5 min
-    description: 'Equipada com sensores de longo alcance e tecnologia de ocultação para encontrar o que outros ignoram.'
+    description: 'Equipada com sensores de longo alcance e tecnologia de ocultação para encontrar o que outros ignoram.',
+    image: '/images/ships/ghost-gamma.png',
+    video: '/videos/ships/ghost-gamma.webm'
   }
 ];
 
@@ -609,6 +618,7 @@ export const VOID_POIS: VoidPOI[] = [
     id: 'poi-1',
     name: 'Colônia de Eridani',
     lore: 'Uma antiga colônia de mineração que sobreviveu ao colapso, mas agora sofre com a falta de energia.',
+    video: '/videos/pois/void-eridani.webm',
     need: 'Energia',
     resourceRequired: 1000000,
     passiveGeneration: { resource: 'Energia', amount: 100 }
@@ -617,6 +627,7 @@ export const VOID_POIS: VoidPOI[] = [
     id: 'poi-2',
     name: 'Refúgio de Vega',
     lore: 'Sobreviventes isolados em um cinturão de asteroides, buscando desesperadamente por suprimentos básicos.',
+    video: '/videos/pois/void-vega.webm',
     need: 'Alimentos',
     resourceRequired: 2500000,
     passiveGeneration: { resource: 'Alimentos', amount: 50 }
@@ -625,6 +636,7 @@ export const VOID_POIS: VoidPOI[] = [
     id: 'poi-3',
     name: 'Estação Aurora',
     lore: 'Uma base científica oculta que guarda segredos da antiga Terra, mas precisa de tecnologia para reativar seus sistemas.',
+    video: '/videos/pois/void-aurora.webm',
     need: 'Tecnologia',
     resourceRequired: 5000000,
     passiveGeneration: { resource: 'Tecnologia', amount: 20 }
@@ -633,6 +645,7 @@ export const VOID_POIS: VoidPOI[] = [
     id: 'poi-4',
     name: 'Posto Avançado de Sirius',
     lore: 'Uma facção neutra que controla rotas comerciais, disposta a ajudar na reconstrução em troca de medicamentos.',
+    video: '/videos/pois/void-sirius.webm',
     need: 'Medicamentos',
     resourceRequired: 10000000,
     passiveGeneration: { resource: 'Medicamentos', amount: 10 }
@@ -1055,9 +1068,9 @@ export const UPGRADES: Upgrade[] = [
     tiers: [
       { level: 1, name: 'Carga Rara', cost: 10000, bonus: '+50% Lucro', value: 0.5 },
       { level: 2, name: 'Carga Exótica', cost: 100000, bonus: '+100% Lucro', value: 1.0 },
-      { level: 3, name: 'Carga Interplanetária', cost: 1000000, bonus: '+200% Lucro', value: 2.0 },
-      { level: 4, name: 'Carga Intergalática', cost: 10000000, bonus: '+400% Lucro', value: 4.0 },
-      { level: 5, name: 'Carga Alienígena', cost: 100000000, bonus: '+1000% Lucro', value: 10.0 },
+      { level: 3, name: 'Carga Interplanetária', cost: 1000000, bonus: '+150% Lucro', value: 1.5 },
+      { level: 4, name: 'Carga Intergalática', cost: 10000000, bonus: '+300% Lucro', value: 3.0 },
+      { level: 5, name: 'Carga Alienígena', cost: 100000000, bonus: '+500% Lucro', value: 5.0 },
     ]
   },
   {
