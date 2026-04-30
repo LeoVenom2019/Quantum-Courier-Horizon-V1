@@ -13973,20 +13973,17 @@ export const GameDashboard = ({
                   {renderVoidAircraft()}
                 </motion.div>
               )}
-            </AnimatePresence>
-
-            {/* Void Map - Smart Standby (Always mounted to prevent video reload flicker) */}
-            <div className={activeTab === 'void_map' ? 'h-full flex flex-col overflow-hidden' : 'hidden'}>
-              <motion.div
-                key="void_map_persistent"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: activeTab === 'void_map' ? 1 : 0, x: activeTab === 'void_map' ? 0 : 20 }}
-                transition={{ duration: 0.3 }}
-                className="h-full flex flex-col overflow-hidden"
-              >
-                {renderVoidMap()}
-              </motion.div>
-            </div>
+              {activeTab === 'void_battle' && (
+                <motion.div
+                  key="void_battle"
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                  className="flex-1 flex flex-col h-full"
+                >
+                  {renderVoidBattleShip()}
+                </motion.div>
+              )}
               {activeTab === 'void_war' && (
                 <motion.div
                   key="void_war"
@@ -14428,6 +14425,19 @@ export const GameDashboard = ({
               )}
 
             </AnimatePresence>
+
+            {/* Void Map - Smart Standby (Always mounted to prevent video reload flicker) */}
+            <div className={activeTab === 'void_map' ? 'h-full flex flex-col overflow-hidden' : 'hidden'}>
+              <motion.div
+                key="void_map_persistent"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: activeTab === 'void_map' ? 1 : 0, x: activeTab === 'void_map' ? 0 : 20 }}
+                transition={{ duration: 0.3 }}
+                className="h-full flex flex-col overflow-hidden"
+              >
+                {renderVoidMap()}
+              </motion.div>
+            </div>
           </div>
 
           {/* Bottom Navigation for Mobile/Tablet */}
