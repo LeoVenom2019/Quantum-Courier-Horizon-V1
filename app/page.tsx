@@ -1000,6 +1000,26 @@ export default function GameHome() {
 
   // BGM da tela inicial
   const bgmRef = useRef<HTMLAudioElement | null>(null);
+  const [audioUnlocked, setAudioUnlocked] = useState(false);
+
+  // Listener para desbloquear áudio (Autoplay Policy)
+  useEffect(() => {
+    if (audioUnlocked) return;
+
+    const unlock = () => {
+      setAudioUnlocked(true);
+      window.removeEventListener('click', unlock);
+      window.removeEventListener('keydown', unlock);
+    };
+
+    window.addEventListener('click', unlock);
+    window.addEventListener('keydown', unlock);
+
+    return () => {
+      window.removeEventListener('click', unlock);
+      window.removeEventListener('keydown', unlock);
+    };
+  }, [audioUnlocked]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -1013,9 +1033,9 @@ export default function GameHome() {
 
     const bgm = bgmRef.current;
 
-    if (view === 'landing' && musicOn && !jukeboxState.isPlaying) {
+    if (view === 'landing' && musicOn && !jukeboxState.isPlaying && audioUnlocked) {
       // Fade in
-      bgm.play().catch(() => {});
+      bgm.play().catch((err) => console.warn('Audio play blocked:', err));
       let vol = bgm.volume;
       const fadeIn = setInterval(() => {
         vol = Math.min(vol + 0.02, 0.45);
@@ -1036,7 +1056,7 @@ export default function GameHome() {
       }, 80);
       return () => clearInterval(fadeOut);
     }
-  }, [view, musicOn, jukeboxState.isPlaying]);
+  }, [view, musicOn, jukeboxState.isPlaying, audioUnlocked]);
 
   // Cleanup ao desmontar
   useEffect(() => {
