@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Play, Pause, SkipBack, SkipForward, Repeat, Shuffle, Volume2, Music, X, Activity } from 'lucide-react';
 import { Track } from '@/hooks/useJukebox';
@@ -24,32 +24,70 @@ interface JukeboxProps {
 }
 
 const Visualizer = ({ isPlaying }: { isPlaying: boolean }) => {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const barsRef = useRef(Array.from({ length: 12 }, () => ({
+    height: 4,
+    targetHeight: 4,
+    timer: 0
+  })));
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    let animId: number;
+    const draw = () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      
+      const barWidth = 4;
+      const gap = 4;
+      const totalWidth = (barWidth + gap) * 12 - gap;
+      const startX = (canvas.width - totalWidth) / 2;
+
+      barsRef.current.forEach((bar, i) => {
+        if (isPlaying) {
+          if (Date.now() > bar.timer) {
+            bar.targetHeight = Math.random() * 35 + 5;
+            bar.timer = Date.now() + Math.random() * 200 + 100;
+          }
+          // Smooth interpolation
+          bar.height += (bar.targetHeight - bar.height) * 0.15;
+        } else {
+          bar.height += (4 - bar.height) * 0.1;
+        }
+
+        const x = startX + i * (barWidth + gap);
+        const y = canvas.height - bar.height;
+
+        // Draw Glow
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = 'rgba(34, 211, 238, 0.5)';
+        ctx.fillStyle = '#22d3ee';
+        
+        ctx.beginPath();
+        ctx.roundRect(x, y, barWidth, bar.height, 1);
+        ctx.fill();
+        
+        // Reset shadow for next bar
+        ctx.shadowBlur = 0;
+      });
+
+      animId = requestAnimationFrame(draw);
+    };
+
+    draw();
+    return () => cancelAnimationFrame(animId);
+  }, [isPlaying]);
+
   return (
-    <div className="flex items-end justify-center gap-1 h-12 mb-4">
-      {[...Array(12)].map((_, i) => (
-        <motion.div
-          key={i}
-          className="w-1 bg-cyan-400"
-          animate={{
-            height: isPlaying ? [
-              Math.random() * 40 + 10,
-              Math.random() * 40 + 10,
-              Math.random() * 40 + 10
-            ] : 4
-          }}
-          transition={{
-            duration: 0.5,
-            repeat: Infinity,
-            repeatType: "mirror",
-            delay: i * 0.05
-          }}
-          style={{
-            boxShadow: '0 0 10px rgba(34, 211, 238, 0.5)',
-            borderRadius: '1px'
-          }}
-        />
-      ))}
-    </div>
+    <canvas 
+      ref={canvasRef}
+      width={120}
+      height={48}
+      className="w-full h-12 mb-4"
+    />
   );
 };
 

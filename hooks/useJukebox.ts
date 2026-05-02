@@ -156,6 +156,8 @@ export function useJukebox(onPlayStateChange?: (isPlaying: boolean) => void) {
     setVolume,
     setIsLoop,
     setIsShuffle,
+    setPlaylist,
+    setCurrentTrackIndex,
     togglePlay,
     playNext,
     playPrev,

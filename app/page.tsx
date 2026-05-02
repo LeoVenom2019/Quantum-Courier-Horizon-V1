@@ -9,6 +9,7 @@ import { AchievementsModal } from '@/components/AchievementsModal';
 import { ThemeInfoWindow } from '@/components/ThemeInfoWindow';
 import { Jukebox } from '@/components/Jukebox';
 import { useJukebox } from '@/hooks/useJukebox';
+import { useSFX } from '@/hooks/useSFX';
 import { GameStorage } from '@/lib/game-storage';
 import { Language, t } from '@/lib/i18n';
 import { ThemeColor, GAME_THEMES } from '@/lib/game-data';
@@ -985,7 +986,8 @@ export default function GameHome() {
           <BlackHoleVisual key="blackhole" />,
           <SunVisual key="sun" />,
           <RobotVisual key="robot" />,
-          <ChessBoardVisual key="chess" />
+          <ChessBoardVisual key="chess" />,
+          <AlienVisual key="alien" />
         ];
         const randomIndex = Math.floor(Math.random() * visuals.length);
         setRandomVisual(visuals[randomIndex]);
@@ -997,6 +999,9 @@ export default function GameHome() {
 
   // Jukebox Hook
   const jukeboxState = useJukebox();
+  
+  // SFX Hook
+  const { playSfx } = useSFX(sfxOn);
 
   // BGM da tela inicial
   const bgmRef = useRef<HTMLAudioElement | null>(null);
@@ -1410,6 +1415,52 @@ export default function GameHome() {
     setShowOptions(false);
   };
 
+  const handleExportSave = async () => {
+    const data = {
+      time_travel_save: await GameStorage.load('time_travel_save'),
+      game_theme_index: await GameStorage.load('game_theme_index'),
+      game_unlocked_codes: await GameStorage.load('game_unlocked_codes'),
+      game_active_codes: await GameStorage.load('game_active_codes'),
+      speed_run_records: await GameStorage.load('speed_run_records'),
+      export_date: new Date().toISOString(),
+      version: '1.0'
+    };
+
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `qch_save_${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    playSfx('click');
+  };
+
+  const handleImportSave = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const data = JSON.parse(e.target?.result as string);
+        if (data.time_travel_save) await GameStorage.save(data.time_travel_save, 'time_travel_save');
+        if (data.game_theme_index !== undefined) await GameStorage.save(data.game_theme_index, 'game_theme_index');
+        if (data.game_unlocked_codes) await GameStorage.save(data.game_unlocked_codes, 'game_unlocked_codes');
+        if (data.game_active_codes) await GameStorage.save(data.game_active_codes, 'game_active_codes');
+        if (data.speed_run_records) await GameStorage.save(data.speed_run_records, 'speed_run_records');
+        
+        playSfx('click');
+        setTimeout(() => window.location.reload(), 500);
+      } catch (err) {
+        console.error("Failed to import save", err);
+      }
+    };
+    reader.readAsText(file);
+  };
+
   if (view === 'narrative') {
     return (
       <IntroNarrative 
@@ -1471,6 +1522,8 @@ export default function GameHome() {
             }
           }
         }}
+        currentThemeIndex={currentThemeIndex}
+        jukebox={jukeboxState}
       />
     );
   }
@@ -1597,21 +1650,23 @@ export default function GameHome() {
           <MenuButton 
             label={tl('CONTINUE', 'CONTINUAR')} 
             icon={Play} 
-            onClick={handleContinue} 
+            onClick={() => {
+              playSfx('click');
+              handleContinue();
+            }} 
             disabled={!hasSave}
             theme={theme}
           />
-          <MenuButton label={tl('CAMPAIGN', 'CAMPANHA')} icon={Rocket} onClick={() => handleStartGame(false)} theme={theme} />
-          <MenuButton label={tl('SPEED RUN', 'SPEED RUN')} icon={Timer} onClick={() => setShowSpeedRunMenu(true)} theme={theme} />
-          <MenuButton label={tl('OPTIONS', 'OPÇÕES')} icon={Settings} onClick={() => setShowOptions(true)} theme={theme} />
-          <MenuButton label={tl('ACHIEVEMENTS', 'CONQUISTAS')} icon={Trophy} onClick={() => setShowAchievements(true)} theme={theme} />
+          <MenuButton label={tl('CAMPAIGN', 'CAMPANHA')} icon={Rocket} onClick={() => { playSfx('click'); handleStartGame(false); }} theme={theme} />
+          <MenuButton label={tl('SPEED RUN', 'SPEED RUN')} icon={Timer} onClick={() => { playSfx('click'); setShowSpeedRunMenu(true); }} theme={theme} />
+          <MenuButton label={tl('OPTIONS', 'OPÇÕES')} icon={Settings} onClick={() => { playSfx('click'); setShowOptions(true); }} theme={theme} />
+          <MenuButton label={tl('ACHIEVEMENTS', 'CONQUISTAS')} icon={Trophy} onClick={() => { playSfx('click'); setShowAchievements(true); }} theme={theme} />
           
           <div className={`mt-4 flex flex-col gap-1 text-[15px] font-mono ${theme === 'cyan' ? 'text-cyan-500/40' : 'text-orange-500/40'} uppercase tracking-widest`}>
             <div className="flex justify-between">
-              <span>{tl('System: Online', 'Sistema: Online')}</span>
-              <span>{tl('Signal: Stable', 'Sinal: Estável')}</span>
+              <span>{tl('System: Offline', 'Sistema: Offline')}</span>
+              <span>{tl('Signal: Local', 'Sinal: Local')}</span>
             </div>
-            <span>User: {playerName || 'venonleo@gmail.com'}</span>
           </div>
         </motion.div>
       </div>
@@ -1657,13 +1712,13 @@ export default function GameHome() {
                   </h3>
                   <div className="flex gap-2">
                     <button 
-                      onClick={() => setMusicOn(true)}
+                      onClick={() => { playSfx('click'); setMusicOn(true); }}
                       className={`flex-1 py-1.5 rounded font-orbitron text-sm border transition-all ${musicOn ? 'bg-cyan-500 text-black border-cyan-500' : 'bg-transparent text-cyan-500/40 border-cyan-500/20'}`}
                     >
                       {tl('ON', 'LIGADO')}
                     </button>
                     <button 
-                      onClick={() => setMusicOn(false)}
+                      onClick={() => { playSfx('click'); setMusicOn(false); }}
                       className={`flex-1 py-1.5 rounded font-orbitron text-sm border transition-all ${!musicOn ? 'bg-cyan-500 text-black border-cyan-500' : 'bg-transparent text-cyan-500/40 border-cyan-500/20'}`}
                     >
                       {tl('OFF', 'DESLIGADO')}
@@ -1678,13 +1733,13 @@ export default function GameHome() {
                   </h3>
                   <div className="flex gap-2">
                     <button 
-                      onClick={() => setSfxOn(true)}
+                      onClick={() => { playSfx('click'); setSfxOn(true); }}
                       className={`flex-1 py-1.5 rounded font-orbitron text-sm border transition-all ${sfxOn ? 'bg-cyan-500 text-black border-cyan-500' : 'bg-transparent text-cyan-500/40 border-cyan-500/20'}`}
                     >
                       {tl('ON', 'LIGADO')}
                     </button>
                     <button 
-                      onClick={() => setSfxOn(false)}
+                      onClick={() => { playSfx('click'); setSfxOn(false); }}
                       className={`flex-1 py-1.5 rounded font-orbitron text-sm border transition-all ${!sfxOn ? 'bg-cyan-500 text-black border-cyan-500' : 'bg-transparent text-cyan-500/40 border-cyan-500/20'}`}
                     >
                       {tl('OFF', 'DESLIGADO')}
@@ -1699,17 +1754,36 @@ export default function GameHome() {
                   </h3>
                   <div className="grid grid-cols-1 gap-2">
                     <button 
-                      onClick={() => setLanguage('pt')}
+                      onClick={() => { playSfx('click'); setLanguage('pt'); }}
                       className={`w-full py-1.5 rounded font-orbitron text-sm border transition-all ${language === 'pt' ? 'bg-cyan-500 text-black border-cyan-500' : 'bg-transparent text-cyan-500/40 border-cyan-500/20'}`}
                     >
                       {tl('PORTUGUESE', 'PORTUGUÊS')}
                     </button>
                     <button 
-                      onClick={() => setLanguage('en')}
+                      onClick={() => { playSfx('click'); setLanguage('en'); }}
                       className={`w-full py-1.5 rounded font-orbitron text-sm border transition-all ${language === 'en' ? 'bg-cyan-500 text-black border-cyan-500' : 'bg-transparent text-cyan-500/40 border-cyan-500/20'}`}
                     >
                       {tl('ENGLISH', 'INGLÊS')}
                     </button>
+                  </div>
+                </div>
+
+                {/* Data Management */}
+                <div className="space-y-3 pt-3 border-t border-cyan-500/20">
+                  <h3 className="text-[14px] font-orbitron text-cyan-400 uppercase tracking-widest flex items-center gap-2">
+                    <Database className="w-4 h-4" /> {tl('DATA MANAGEMENT', 'DADOS')}
+                  </h3>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button 
+                      onClick={handleExportSave}
+                      className="py-2 rounded font-orbitron text-[12px] border border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/10 transition-all uppercase flex items-center justify-center gap-2"
+                    >
+                      <Navigation className="w-3 h-3 rotate-90" /> {tl('EXPORT', 'EXPORTAR')}
+                    </button>
+                    <label className="py-2 rounded font-orbitron text-[12px] border border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/10 transition-all uppercase flex items-center justify-center gap-2 cursor-pointer text-center">
+                      <Navigation className="w-3 h-3 -rotate-90" /> {tl('IMPORT', 'IMPORTAR')}
+                      <input type="file" accept=".json" onChange={handleImportSave} className="hidden" />
+                    </label>
                   </div>
                 </div>
 
