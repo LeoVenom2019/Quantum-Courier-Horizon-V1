@@ -3,111 +3,42 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Language, t } from '@/lib/i18n';
-import { Rocket, ShieldCheck, ArrowRight, X } from 'lucide-react';
+import { Rocket, ShieldCheck, ArrowRight, X, Sparkles } from 'lucide-react';
 import { SpaceAmbience } from './SpaceAmbience';
+import { BobbyBlueCharacter, BobbyBlueVariant } from './BobbyBlueCharacter';
 
 const STORY_TEXT = [
   {
-    en: "Neural link established. Systems online.",
-    pt: "Link neural estabelecido. Sistemas online."
+    en: "[INCOMING SIGNAL DETECTED... NEURAL SYNC AT 99%]",
+    pt: "[SINAL DE ENTRADA DETECTADO... SINCRONIZAÇÃO NEURAL EM 99%]"
   },
   {
-    en: "Greetings, Commander. I am Unit 7-X, your tactical logistics interface.",
-    pt: "Saudações, Comandante. Eu sou a Unidade 7-X, sua interface tática de logística."
+    en: "Commander... You finally woke up. I am Bobby Blue, your quantum intelligence interface.",
+    pt: "Comandante... Você finalmente acordou. Eu sou Bobby Blue, sua interface de inteligência quântica."
   },
   {
-    en: "The year is 2978. Earth is now a protected ecological reserve, but our future lies among the stars.",
-    pt: "O ano é 2978. A Terra é agora uma reserva ecológica protegida, mas nosso futuro está entre as estrelas."
+    en: "The year is 2978. Earth... Ah, our old Earth. Now it's just a garden of memories protected by laws we cannot break.",
+    pt: "O ano é 2978. A Terra... Ah, a nossa velha Terra. Agora é apenas um jardim de memórias protegido por leis que não podemos quebrar."
   },
   {
-    en: "From the solar forges of Mercury to the frozen spires of Pluto, humanity has built a new civilization.",
-    pt: "Das forjas solares de Mercúrio às torres congeladas de Plutão, a humanidade construiu uma nova civilização."
+    en: "But look out there... From Mercury to the frozen depths of Pluto, humanity has not just survived. We have flourished.",
+    pt: "Mas olhe lá fora... De Mercúrio às profundezas gélidas de Plutão, a humanidade não apenas sobreviveu. Nós florescemos."
   },
   {
-    en: "But a civilization is only as strong as its supply lines. That is where we come in.",
-    pt: "Mas uma civilização é tão forte quanto suas linhas de suprimento. É aí que nós entramos."
+    en: "A stellar empire is not made of weapons, Commander. It's made of flow. Of logistics. Of courage.",
+    pt: "Um império estelar não é feito de armas, Comandante. É feito de fluxo. De logística. De coragem."
   },
   {
-    en: "You have been authorized to establish a new delivery network. It's a high-risk, high-reward venture.",
-    pt: "Você foi autorizado a estabelecer uma nova rede de entregas. É um empreendimento de alto risco e alta recompensa."
+    en: "The quantum rift is open. The Quantum Courier Horizon awaits your orders for the first jump.",
+    pt: "A fenda quântica está aberta. O Quantum Courier Horizon aguarda suas ordens para o primeiro salto."
   },
   {
-    en: "Your first freighter is prepped in the docking bay. The Quantum Courier Horizon is ready for departure.",
-    pt: "Seu primeiro cargueiro está preparado na baia de atracação. O Quantum Courier Horizon está pronto para a partida."
-  },
-  {
-    en: "To finalize the command transfer, please provide your biometric identification.",
-    pt: "Para finalizar a transferência de comando, por favor, forneça sua identificação biométrica."
+    en: "Finalizing authority transfer... Show me who is in command this time.",
+    pt: "Finalizando transferência de autoridade... Mostre-me quem está no comando desta vez."
   }
 ];
 
-const RobotVisual = () => (
-  <motion.div 
-    initial={{ opacity: 0, scale: 0.8 }}
-    animate={{ opacity: 1, scale: 1 }}
-    className="relative w-48 h-48 flex flex-col items-center justify-center mb-8"
-  >
-    {/* Robot Head */}
-    <div className="relative w-24 h-24 bg-slate-800 border-4 border-cyan-500 rounded-2xl shadow-[0_0_30px_rgba(6,182,212,0.4)] flex flex-col items-center justify-center gap-3 overflow-hidden">
-      {/* Scanline effect on face */}
-      <div className="absolute inset-0 bg-[linear-gradient(transparent_0%,rgba(6,182,212,0.05)_50%,transparent_100%)] bg-[length:100%_4px] animate-[scan_2s_linear_infinite]" />
-      
-      <div className="flex gap-4 relative z-10">
-        <motion.div 
-          animate={{ 
-            scale: [1, 1.2, 1],
-            opacity: [1, 0.7, 1],
-            boxShadow: ['0 0 10px rgba(34,211,238,1)', '0 0 20px rgba(34,211,238,1)', '0 0 10px rgba(34,211,238,1)']
-          }}
-          transition={{ duration: 2, repeat: Infinity }}
-          className="w-3 h-3 bg-cyan-400 rounded-full" 
-        />
-        <motion.div 
-          animate={{ 
-            scale: [1, 1.2, 1],
-            opacity: [1, 0.7, 1],
-            boxShadow: ['0 0 10px rgba(34,211,238,1)', '0 0 20px rgba(34,211,238,1)', '0 0 10px rgba(34,211,238,1)']
-          }}
-          transition={{ duration: 2, repeat: Infinity, delay: 0.5 }}
-          className="w-3 h-3 bg-cyan-400 rounded-full" 
-        />
-      </div>
-      
-      {/* Speaking "Mouth" visualization */}
-      <div className="w-12 h-1.5 bg-cyan-900/50 rounded-full overflow-hidden relative border border-cyan-500/20">
-        <motion.div 
-          animate={{ 
-            width: ['20%', '80%', '40%', '90%', '30%'],
-            x: ['-10%', '10%', '-5%', '5%', '0%']
-          }}
-          transition={{ duration: 0.5, repeat: Infinity, ease: "easeInOut" }}
-          className="h-full bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.8)]" 
-        />
-      </div>
-
-      {/* Antenna */}
-      <div className="absolute -top-6 left-1/2 -translate-x-1/2 w-1 h-6 bg-slate-600">
-        <motion.div 
-          animate={{ opacity: [1, 0, 1] }}
-          transition={{ duration: 1, repeat: Infinity }}
-          className="absolute -top-2 left-1/2 -translate-x-1/2 w-2.5 h-2.5 bg-red-500 rounded-full shadow-[0_0_10px_rgba(239,68,68,0.8)]" 
-        />
-      </div>
-    </div>
-    
-    {/* Robot Neck/Base */}
-    <div className="w-32 h-8 bg-slate-900 border-x-4 border-b-4 border-cyan-500 rounded-b-3xl mt-[-4px] relative shadow-[0_10px_20px_rgba(0,0,0,0.5)]">
-      <div className="absolute top-1 left-1/2 -translate-x-1/2 w-20 h-3 bg-slate-950 rounded-full border border-cyan-500/10" />
-    </div>
-
-    {/* Floating effect */}
-    <motion.div 
-      animate={{ y: [0, -10, 0] }}
-      transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-      className="absolute -inset-4 border border-cyan-500/5 rounded-full z-[-1]"
-    />
-  </motion.div>
-);
+// RobotVisual was here, replaced by BobbyBlueCharacter
 
 const StarBackground = () => {
   const [stars] = useState<{ id: number; x: number; y: number; size: number; speed: number; delay: number }[]>(() => 
@@ -271,11 +202,22 @@ export const IntroNarrative = ({
             <motion.div 
               key="narrative"
               initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
+              animate={{ 
+                opacity: 1,
+                x: index === 0 || index === 6 ? [0, -2, 2, -1, 1, 0] : 0 
+              }}
+              transition={{ 
+                duration: 0.5,
+                x: { duration: 0.3, repeat: 1 }
+              }}
               exit={{ opacity: 0 }}
               className="flex flex-col items-center text-center"
             >
-              <RobotVisual />
+              <BobbyBlueCharacter 
+                variant={index === 0 ? 'glitch' : 'intro'} 
+                isSpeaking={isTyping} 
+                className="mb-8"
+              />
               
               <div className="min-h-[120px] flex items-center justify-center px-8 w-full">
                 <p className="text-xl md:text-2xl font-orbitron leading-relaxed text-cyan-100/90 tracking-wide drop-shadow-[0_0_10px_rgba(6,182,212,0.3)]">

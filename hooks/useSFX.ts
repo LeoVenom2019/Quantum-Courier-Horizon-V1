@@ -25,6 +25,23 @@ export type SFXType =
   | 'kill_enemys_botton'
   | 'bobby_blue_theme_victory'
   | 'heal_ship'
+  | 'start_research'
+  | 'tutorial_open'
+  | 'cash_register'
+  | 'buying_iten'
+  | 'police_sirene_1'
+  | 'police_siren_2'
+  | 'police_sirene_3'
+  | 'start_engine_1'
+  | 'start_engine_2'
+  | 'open_window'
+  | 'close_window'
+  | 'ask_window'
+  | 'bip_scanner'
+  | 'eterion_fuell'
+  | 'buy_new_robot'
+  | 'bobby_mining'
+  | 'mining_stones'
   | 'alert_alert';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -44,6 +61,23 @@ const SFX_PATHS: Partial<Record<string, string>> = {
   kill_enemys_botton: '/audio/sfx/kill_enemys_botton.ogg',
   bobby_blue_theme_victory: '/audio/sfx/bobby_blue/bobby_blue_theme_victory.ogg',
   heal_ship: '/audio/sfx/heal_ship.ogg',
+  start_research: '/audio/sfx/start.botton.ogg',
+  tutorial_open: '/audio/sfx/tutorial_open.ogg',
+  cash_register: '/audio/sfx/cash_register.ogg',
+  buying_iten: '/audio/sfx/buying_iten.ogg',
+  police_sirene_1: '/audio/sfx/police_sirene_1.ogg',
+  police_siren_2: '/audio/sfx/police_siren_2.ogg',
+  police_sirene_3: '/audio/sfx/police_sirene_3.ogg',
+  start_engine_1: '/audio/sfx/start_engine_1.ogg',
+  start_engine_2: '/audio/sfx/start_engine_2.ogg',
+  open_window: '/audio/sfx/open_window.ogg',
+  close_window: '/audio/sfx/close_window.ogg',
+  ask_window: '/audio/sfx/ask_window.ogg',
+  bip_scanner: '/audio/sfx/bip_scanner.ogg',
+  eterion_fuell: '/audio/sfx/eterion_fuell.ogg',
+  buy_new_robot: '/audio/sfx/buy_new_robot.ogg',
+  bobby_mining: '/audio/sfx/bobby_mining.ogg',
+  mining_stones: '/audio/sfx/mining_stones.ogg',
   alert_alert: '/audio/sfx/alert_alert.ogg',
 };
 

@@ -558,7 +558,7 @@ export interface Achievement {
 }
 
 export const ACHIEVEMENTS: Achievement[] = [
-  { id: 'first_delivery', name: 'Primeira Entrega', description: 'Complete sua primeira entrega com sucesso.', type: 'accumulative', target: 1, icon: 'CheckCircle2' },
+  { id: 'first_delivery', name: 'Primeira Entrega', description: 'Complete sua primeira entrega com sucesso.', type: 'milestone', target: 1, icon: 'CheckCircle2' },
   { id: 'qc_millionaire', name: 'Magnata Espacial', description: 'Acumule um total de 1.000.000 de QC.', type: 'milestone', target: 1000000, icon: 'Coins' },
   { id: 'battle_warrior', name: 'Guerreiro das Estrelas', description: 'Vença 10 batalhas contra piratas.', type: 'accumulative', target: 10, icon: 'Sword' },
   { id: 'robot_owner', name: 'Minerador Experiente', description: 'Compre 5 robôs mineradores.', type: 'accumulative', target: 5, icon: 'Bot' },
@@ -575,6 +575,8 @@ export const ACHIEVEMENTS: Achievement[] = [
   { id: 'all_ships_r1_r2', name: 'Colecionador de Frotas', description: 'Compre todas as naves da Rota 1 e Rota 2 (18 naves).', type: 'milestone', target: 18, icon: 'Rocket' },
   { id: 'total_missions_1k', name: 'Herói das Galáxias', description: 'Faça 1000 Missões da aba "Missões" em ambas as Rotas.', type: 'accumulative', target: 1000, icon: 'Trophy' },
   { id: 'battle_level_55', name: 'Lenda de Combate', description: 'Alcance o Nível de Batalha 55.', type: 'milestone', target: 55, icon: 'Sword' },
+  { id: 'mining_tycoon', name: 'Magnata da Mineração', description: 'Venda 10.000 pacotes de minério.', type: 'accumulative', target: 10000, icon: 'Pickaxe' },
+  { id: 'perfect_pilot', name: 'Piloto Perfeito', description: 'Alcance o bônus "PERFEITO" em 100 entregas.', type: 'accumulative', target: 100, icon: 'Zap' },
 ];
 
 export const VOID_AIRCRAFT: VoidAircraft[] = [

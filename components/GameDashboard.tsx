@@ -1764,6 +1764,8 @@ interface RouteStats {
   manualExtractionPacksSold: number;
   autoExtractionPacksSold: number;
   qcFromBattles: number;
+  battlesWon: number;
+  perfectDeliveries: number;
   years?: number;
   population?: number;
   biodiversity?: number;
@@ -2023,7 +2025,7 @@ const ROUTE2_LORE_LINES = [
   "A tecnologia de dobra quântica foi estabilizada. O vácuo entre as estrelas não é mais uma barreira.",
   "Mas cuidado, Comandante. O espaço interestelar é vasto e silencioso.",
   "Novas facções, piratas galácticos e anomalias espaciais testarão sua frota.",
-  "Eu, Unidade 7-X, continuarei monitorando seus sistemas neurais.",
+  "Eu, Bobby Blue, continuarei monitorando seus sistemas neurais.",
   "Prepare-se para o salto. O universo é o seu novo mercado.",
   "---",
   "A Rota 2 trará novos desafios, naves mais potentes e minérios exóticos. O lucro é maior, mas o risco também. Boa sorte."
@@ -3004,7 +3006,7 @@ export const GameDashboard = memo(({
       randomBattlesFound: 0, radarBattlesFound: 0,
       manualMiningPacksSold: 0, autoMiningPacksSold: 0,
       manualExtractionPacksSold: 0, autoExtractionPacksSold: 0,
-      qcFromBattles: 0
+      qcFromBattles: 0, battlesWon: 0, perfectDeliveries: 0
     },
     Interstellar: { 
       deliveries: 0, manualDeliveries: 0, autoDeliveries: 0, 
@@ -3013,7 +3015,7 @@ export const GameDashboard = memo(({
       randomBattlesFound: 0, radarBattlesFound: 0,
       manualMiningPacksSold: 0, autoMiningPacksSold: 0,
       manualExtractionPacksSold: 0, autoExtractionPacksSold: 0,
-      qcFromBattles: 0
+      qcFromBattles: 0, battlesWon: 0, perfectDeliveries: 0
     },
     Void: { 
       deliveries: 0, manualDeliveries: 0, autoDeliveries: 0, 
@@ -3022,7 +3024,7 @@ export const GameDashboard = memo(({
       randomBattlesFound: 0, radarBattlesFound: 0,
       manualMiningPacksSold: 0, autoMiningPacksSold: 0,
       manualExtractionPacksSold: 0, autoExtractionPacksSold: 0,
-      qcFromBattles: 0
+      qcFromBattles: 0, battlesWon: 0, perfectDeliveries: 0
     },
     Earth: { 
       deliveries: 0, manualDeliveries: 0, autoDeliveries: 0, 
@@ -3031,7 +3033,7 @@ export const GameDashboard = memo(({
       randomBattlesFound: 0, radarBattlesFound: 0,
       manualMiningPacksSold: 0, autoMiningPacksSold: 0,
       manualExtractionPacksSold: 0, autoExtractionPacksSold: 0,
-      qcFromBattles: 0,
+      qcFromBattles: 0, battlesWon: 0, perfectDeliveries: 0,
       years: 0, population: 0, biodiversity: 0, events: 0,
       health: 0, happiness: 0, security: 0, qualityOfLife: 0
     }
@@ -3796,15 +3798,122 @@ export const GameDashboard = memo(({
     if (qc >= cost) {
       setQc(prev => prev - cost);
       setter(level + 1);
-      playSfx('tech_success');
+      playSfx('level_up');
       addLog(`${t('upgraded')} ${name} ${t('toLevel')} ${level + 1}`, 'success');
       updateHistoryStats('spent', cost);
+      performSave();
     }
   };
 
   const addLog = useCallback((message: string, type: 'info' | 'success' | 'warning' | 'error' = 'info') => {
     setGameLogs(prev => [{ id: Math.random().toString(36).substr(2, 9), message, type }, ...prev].slice(0, 5));
   }, []);
+
+  // Centralized Save Function
+  const performSave = useCallback(async () => {
+    if (isSpeedRun || !isLoaded) return;
+    
+    const saveData = {
+      qc: qcRef.current,
+      unlockedRouteIds: unlockedRouteIdsRef.current,
+      ownedShips: ownedShipsRef.current,
+      techLevels: techLevelsRef.current,
+      autoTravelSlots: autoTravelSlotsRef.current,
+      playerName,
+      miningRobots: miningRobotsRef.current,
+      miningRobotLevels: miningRobotLevelsRef.current,
+      oresCollected: oresCollectedRef.current,
+      autoSellByOre: autoSellByOreRef.current,
+      autoSellUnlockedByOre: autoSellUnlockedByOreRef.current,
+      unlockedTechLevels: unlockedTechLevelsRef.current,
+      autoTravelActive: autoTravelActiveRef.current,
+      autoTravelDesired: autoTravelDesiredRef.current,
+      seenTutorials,
+      aetherion: aetherionRef.current,
+      aetherionTubes: aetherionTubesRef.current,
+      miningWaste: miningWasteRef.current,
+      solarEnergy: solarEnergyRef.current,
+      routeTier: routeTierRef.current,
+      totalDeliveries: totalDeliveriesRef.current,
+      deliveriesByLocation: deliveriesByLocationRef.current,
+      historyStats: historyStatsRef.current,
+      activeCodes,
+      missions,
+      missionMythicBonus,
+      missionAlienBonus,
+      missionLegendaryBonus,
+      missionRewardLevel,
+      skillLendariaLevel,
+      skillMiticaLevel,
+      skillAlienLevel,
+      skillTempoDinheiroLevel,
+      skillRobosOlimpicosLevel,
+      autoClaimMissions,
+      radarUnlocked,
+      completedInitialMissions,
+      miningCompressionLevels,
+      shipXP: shipXPRef.current,
+      shipLevel: shipLevelRef.current,
+      extractionTechLevel: extractionTechLevelRef.current,
+      solarMappingLevel: solarMappingLevelRef.current,
+      doubleRouteLevel: doubleRouteLevelRef.current,
+      doomPLevel: doomPLevelRef.current,
+      captureLevel: captureLevelRef.current,
+      battleLevel: battleLevelRef.current,
+      radarLevel: radarLevelRef.current,
+      isRetributionActive: isRetributionActiveRef.current,
+      isFatigueActive: isFatigueActiveRef.current,
+      unlockedExtractionPoints: unlockedExtractionPointsRef.current,
+      extractionPacks: extractionPacksRef.current,
+      extractionRobotLevels: extractionRobotLevelsRef.current,
+      extractionProductionLevels: extractionProductionLevelsRef.current,
+      extractionCompressionLevels: extractionCompressionLevelsRef.current,
+      extractionAutoSell: extractionAutoSellRef.current,
+      extractionAutoSellUnlocked: extractionAutoSellUnlockedRef.current,
+      totalExtractionProfit: totalExtractionProfitRef.current,
+      lastScanTime,
+      warCoreLevel: warCoreLevelRef.current,
+      fleetPower: fleetPowerRef.current,
+      earthReconstructionProgress: earthReconstructionProgressRef.current,
+      isVoidWarActive: isVoidWarActive,
+      voidWarProgress: voidWarProgress,
+      voidResources: voidResourcesRef.current,
+      voidCompactedResources: voidCompactedResources,
+      voidDonationModes: voidDonationModes,
+      voidAircraftMissions: voidAircraftMissionsRef.current,
+      voidAircraftUpgrades: voidAircraftUpgradesRef.current,
+      voidAircraftAutoToggles: voidAircraftAutoTogglesRef.current,
+      voidBattleShipStats: voidBattleShipStatsRef.current,
+      voidPOIsInspiration: voidPOIsInspirationRef.current,
+      voidPOIQCDonations: voidPOIQCDonationsRef.current,
+      route4Unlocked: route4Unlocked,
+      unlockedAchievements,
+      achievementProgress,
+      hasWonEliminateEnemiesRoute3: hasWonEliminateEnemiesRoute3Ref.current,
+      robotRepairProgress: robotRepairProgressRef.current,
+      isRobotRepaired: isRobotRepairedRef.current,
+      battleShipUpgradeLevel: battleShipUpgradeLevelRef.current,
+      gameTimeSeconds: gameTimeSecondsRef.current,
+      earthPopulation: earthPopulationRef.current,
+      earthMaleRatio: earthMaleRatioRef.current,
+      earthBiodiversity: earthBiodiversityRef.current,
+      earthEvents: earthEventsRef.current
+    };
+
+    const modularSave = SaveManager.createSave(saveData);
+    await GameStorage.save(modularSave, 'time_travel_save');
+  }, [isSpeedRun, isLoaded, playerName, seenTutorials, activeCodes, missions, missionMythicBonus, missionAlienBonus, missionLegendaryBonus, missionRewardLevel, skillLendariaLevel, skillMiticaLevel, skillAlienLevel, skillTempoDinheiroLevel, skillRobosOlimpicosLevel, autoClaimMissions, radarUnlocked, completedInitialMissions, miningCompressionLevels, lastScanTime, isVoidWarActive, voidWarProgress, voidCompactedResources, voidDonationModes, route4Unlocked, unlockedAchievements, achievementProgress, earthEvents]);
+
+  // Auto-save logic
+  useEffect(() => {
+    if (isSpeedRun || !isLoaded) return;
+    
+    const saveInterval = setInterval(() => {
+      performSave();
+    }, 10000); // Auto-save every 10 seconds
+    
+    return () => clearInterval(saveInterval);
+  }, [isSpeedRun, isLoaded, performSave]);
 
   const t = useCallback((key: string) => {
     try {
@@ -4082,6 +4191,7 @@ export const GameDashboard = memo(({
     updateHistoryStats('spent', boostCost);
     setUnlockedExtractionPoints(prev => prev.includes(researchingExtractionPoint.id) ? prev : [...prev, researchingExtractionPoint.id]);
     setResearchingExtractionPoint(null);
+    playSfx('ask_window');
     playSfx('success');
     addLog(`${point.name} ${t('unlockedSuccessfully' as any)}`, 'success');
   };
@@ -4117,6 +4227,7 @@ export const GameDashboard = memo(({
       setExtractionPacks(nextPacks);
       setQc(prev => prev + totalValue);
       setTotalExtractionProfit(prev => prev + totalValue);
+      playSfx('cash_register');
       
       setHistoryStats(prev => ({
         ...prev,
@@ -4151,7 +4262,7 @@ export const GameDashboard = memo(({
       ...prev,
       [id]: currentLevel + 1
     }));
-    playSfx('success');
+    playSfx('bobby_mining');
     addLog(`Robô de ${EXTRACTION_POINTS.find(p => p.id === id)?.name} melhorado para o nível ${currentLevel + 1}`, 'success');
   };
 
@@ -4173,7 +4284,7 @@ export const GameDashboard = memo(({
       ...prev,
       [id]: currentLevel + 1
     }));
-    playSfx('success');
+    playSfx('mining_stones');
     addLog(`Picareta de ${EXTRACTION_POINTS.find(p => p.id === id)?.name} melhorada para o nível ${currentLevel + 1}`, 'success');
   };
 
@@ -4197,8 +4308,11 @@ export const GameDashboard = memo(({
 
   const toggleExtractionAutoSell = (id: string) => {
     if (!extractionAutoSellUnlocked[id]) return;
-    setExtractionAutoSell(prev => ({ ...prev, [id]: !prev[id] }));
-    playSfx('toggle');
+    setExtractionAutoSell(prev => {
+      const newState = !prev[id];
+      playSfx(newState ? 'open_window' : 'close_window');
+      return { ...prev, [id]: newState };
+    });
   };
 
   const upgradeExtractionCompression = (id: string) => {
@@ -4218,7 +4332,7 @@ export const GameDashboard = memo(({
       ...prev,
       [id]: currentLevel + 1
     }));
-    playSfx('success');
+    playSfx('level_up');
     addLog(`Compactação de ${EXTRACTION_POINTS.find(p => p.id === id)?.name} melhorada para o nível ${currentLevel + 1}`, 'success');
   };
 
@@ -4296,7 +4410,7 @@ export const GameDashboard = memo(({
     setQc(prev => prev - cost);
     setBattleLevel(nextLevel);
     addLog(`${t('battleLevelIncreased')} ${nextLevel}!`, 'success');
-    playSfx('level_up');
+    playSfx('buying_iten');
   }, [battleLevel, qc, language, addLog, playSfx, routeTier]);
 
   const upgradeRadar = useCallback(() => {
@@ -4314,13 +4428,14 @@ export const GameDashboard = memo(({
     setQc(prev => prev - cost);
     setRadarLevel(nextLevel);
     addLog(`${t('radarUpgraded')} ${nextLevel}!`, 'success');
-    playSfx('level_up');
+    playSfx('buying_iten');
   }, [radarLevel, qc, language, addLog, playSfx]);
 
   const findBattle = useCallback(() => {
     if (battleLevel < 1) return;
     if (foundBattle) return;
     if (isScanning) return;
+    playSfx('bip_scanner');
 
     const now = Date.now();
     const baseCooldown = 60000; // 1 minute
@@ -4641,7 +4756,7 @@ export const GameDashboard = memo(({
                     if (canUpgradePrivatePolice) {
                       setQc(prev => prev - privatePoliceCost);
                       setPrivatePoliceLevel(prev => prev + 1);
-                      playSfx('success');
+                      playSfx('police_sirene_1');
                       addLog(t('privatePoliceUpgraded'), 'success');
                     }
                   }}
@@ -4664,8 +4779,9 @@ export const GameDashboard = memo(({
                 </div>
                 <button
                   onClick={() => {
-                    setAutoSkipRandomBattles(!autoSkipRandomBattles);
-                    playSfx('toggle');
+                    const newState = !autoSkipRandomBattles;
+                    setAutoSkipRandomBattles(newState);
+                    playSfx(newState ? 'ask_window' : 'close_window');
                   }}
                   className={`w-9 h-4.5 rounded-full transition-all relative ${autoSkipRandomBattles ? 'bg-orange-500' : 'bg-slate-800'}`}
                 >
@@ -4750,7 +4866,7 @@ export const GameDashboard = memo(({
                     onClick={() => {
                       if (battleLevel >= reward.level) {
                         setSelectedReward(reward);
-                        playSfx('click');
+                        playSfx('ask_window');
                       }
                     }}
                     className={`flex flex-col items-center gap-2 p-3 rounded-xl border transition-all ${
@@ -4849,7 +4965,10 @@ export const GameDashboard = memo(({
                         <div className="mt-auto flex items-center justify-between p-3 rounded-xl bg-orange-500/10 border border-orange-500/20">
                           <div className="flex items-center gap-3">
                             <motion.button
-                              onClick={() => setShowCaptureInfo(true)}
+                              onClick={() => {
+                                setShowCaptureInfo(true);
+                                playSfx('open_window');
+                              }}
                               animate={{ 
                                 boxShadow: ["0 0 0px rgba(249, 115, 22, 0)", "0 0 10px rgba(249, 115, 22, 0.4)", "0 0 0px rgba(249, 115, 22, 0)"]
                               }}
@@ -4868,7 +4987,7 @@ export const GameDashboard = memo(({
                               if (canUpgradeCapture) {
                                 setQc(prev => prev - captureCost);
                                 setCaptureLevel(prev => prev + 1);
-                                playSfx('success');
+                                playSfx('level_up');
                                 addLog(t('captureUpgraded'), 'success');
                               }
                             }}
@@ -4985,9 +5104,13 @@ export const GameDashboard = memo(({
     const xpReward = (routeTier === 'Solar' ? shipLevelRef.current >= 10 : shipLevelRef.current >= 20) ? 0 : Math.floor((100 + (shipLevelRef.current * 50)) * bonusMultiplier);
     
     let baseAetherion = 40;
-    if (battle.enemyType === 'Elite') baseAetherion = 80;
+    if (routeTier !== 'Void') {
+      baseAetherion = Math.floor(Math.random() * (125 - 75 + 1)) + 75;
+    }
+
+    if (battle.enemyType === 'Elite') baseAetherion *= 2;
     if (battle.enemyType === 'Boss') {
-      baseAetherion = 160;
+      baseAetherion *= 4;
       // Level 45 reward: +50% resources from Bosses
       if (battleLevelRef.current >= 45 && routeTier === 'Interstellar') {
         baseAetherion *= 1.5;
@@ -4996,29 +5119,34 @@ export const GameDashboard = memo(({
     }
     
     let aetherionReward = Math.floor(baseAetherion * bonusMultiplier * shipAetherionBonus);
+    
+    // Assign rewards directly to the battle object so callers see them
+    battle.reward = qcReward;
+    battle.xpReward = xpReward;
+    battle.aetherionReward = aetherionReward;
 
-    // Level 55 reward: No Etérion, only QC for Radar battles (Kombat Wortal)
-    if (battleLevelRef.current >= 55 && routeTier === 'Interstellar' && battle.deliveryId === 'manual-battle') {
-      aetherionReward = 0;
-    }
-
-    setQc(prev => prev + qcReward);
-    setAetherion(prev => Math.min(10000, prev + aetherionReward));
+    setQc(prev => {
+      const next = prev + qcReward;
+      qcRef.current = next;
+      return next;
+    });
+    setAetherion(prev => {
+      const next = Math.min(10000, prev + aetherionReward);
+      aetherionRef.current = next;
+      return next;
+    });
     addXP(xpReward);
     updateHistoryStats('acquired', qcReward, 'battle');
-    updateAchievementProgress('battle_warrior', 1);
-    updateAchievementProgress('pirate_slayer', 1);
+    setHistoryStats(prev => ({
+      ...prev,
+      [routeTier]: {
+        ...prev[routeTier],
+        battlesWon: (prev[routeTier].battlesWon || 0) + 1
+      }
+    }));
 
     const xpText = xpReward > 0 ? `, +${formatValue(xpReward)} XP` : '';
     const bonusText = bonusMultiplier > 1 ? ` (+${Math.round((bonusMultiplier - 1) * 100)}% BONUS)` : '';
-
-    setActiveBattle(prev => prev ? { 
-      ...prev, 
-      isVictory: true, 
-      reward: qcReward, 
-      xpReward: xpReward, 
-      aetherionReward: aetherionReward 
-    } : null);
 
     addLog(language === 'pt' 
       ? `VITÓRIA: Inimigo destruído! +${formatValue(qcReward)} QC${xpText}, +${formatValue(aetherionReward)} Aetherion${bonusText}` 
@@ -5027,7 +5155,7 @@ export const GameDashboard = memo(({
     );
 
     return { qcReward, xpReward, aetherionReward };
-  }, [language, formatValue, addXP, updateHistoryStats, addLog, getEconomicMultipliers, isInterstellar, routeTier, updateAchievementProgress, t]);
+  }, [language, formatValue, addXP, updateHistoryStats, addLog, getEconomicMultipliers, isInterstellar, routeTier, updateAchievementProgress, t, performSave]);
 
   const resolveBattleDefeat = useCallback((battle: Battle) => {
     addLog(t('defeatShipDestroyed'), 'error');
@@ -5049,7 +5177,7 @@ export const GameDashboard = memo(({
     
     if (battle.predeterminedResult === 'victory') {
       resolveBattleVictory(battle);
-      setActiveBattle(prev => prev ? { ...prev, isVictory: true, isDefeat: false, playerHp: prev.playerMaxHp, enemyHp: 0, isCinematicFinished: true } : null);
+      setActiveBattle({ ...battle, isVictory: true, isDefeat: false, playerHp: battle.playerMaxHp, enemyHp: 0, isCinematicFinished: true });
     } else {
       resolveBattleDefeat(battle);
       setActiveBattle(prev => prev ? { ...prev, isVictory: false, isDefeat: true, playerHp: 0, enemyHp: prev.enemyMaxHp, isCinematicFinished: true } : null);
@@ -5484,14 +5612,14 @@ export const GameDashboard = memo(({
                             <span className="text-emerald-400 font-orbitron font-bold">+{formatValue(activeBattle.reward)} QC</span>
                           </div>
                           {(activeBattle.xpReward ?? 0) > 0 && (
-                            <div className="flex items-center gap-2 bg-cyan-500/10 border border-cyan-500/30 px-4 py-2 rounded-xl">
-                              <Zap className="w-4 h-4 text-cyan-400" />
-                              <span className="text-cyan-400 font-orbitron font-bold">+{activeBattle.xpReward} XP</span>
+                            <div className="flex items-center gap-2 bg-purple-500/10 border border-purple-500/30 px-4 py-2 rounded-xl">
+                              <Trophy className="w-4 h-4 text-purple-400" />
+                              <span className="text-purple-400 font-orbitron font-bold">+{activeBattle.xpReward} XP</span>
                             </div>
                           )}
                           {(activeBattle.aetherionReward ?? 0) > 0 && (
                             <div className="flex items-center gap-2 bg-orange-500/10 border border-orange-500/30 px-4 py-2 rounded-xl">
-                              <Trophy className="w-4 h-4 text-orange-400" />
+                              <Zap className="w-4 h-4 text-orange-400" />
                               <span className="text-orange-400 font-orbitron font-bold">+{activeBattle.aetherionReward} ET</span>
                             </div>
                           )}
@@ -5658,12 +5786,19 @@ export const GameDashboard = memo(({
             const reward = Math.floor(baseRewardValue * multiplier * (0.8 + Math.random() * 0.4));
             
             // Rebalanced XP rewards based on rarity
-            const rewardXP = rarity === 'common' ? 100 : (rarity === 'rare' ? 500 : (rarity === 'legendary' ? 2000 : 5000));
+            const rewardXP = rarity === 'mythic' ? (Math.floor(Math.random() * (40 - 20 + 1)) + 20) : 0;
+
+
 
             // Increased targets to ensure missions don't complete too fast
             const baseTarget = isSpeedRunRef.current ? (10 + Math.floor(Math.random() * 10)) : (currentTier === 'Interstellar' ? 100 : 40);
             const reduction = isSpeedRunRef.current ? 0 : skillTempoDinheiroLevelRef.current[routeTier];
             const target = Math.max(10, baseTarget - reduction);
+            
+            let rewardAetherion = 0;
+            if (rarity === 'mythic') {
+              rewardAetherion = Math.floor(Math.random() * (40 - 20 + 1)) + 20;
+            }
 
             currentMissions.push({
               id: `delivery_${ship.level}_${Date.now()}_${currentMissions.length}`,
@@ -5671,6 +5806,7 @@ export const GameDashboard = memo(({
               description: languageRef.current === 'pt' ? `Faça ${target} entregas com a ${ship.name}.` : `Make ${target} deliveries with the ${ship.name}.`,
               reward,
               rewardXP,
+              rewardAetherion: rewardAetherion > 0 ? rewardAetherion : undefined,
               type: 'delivery',
               target,
               current: 0,
@@ -5695,12 +5831,19 @@ export const GameDashboard = memo(({
             const reward = Math.floor(baseRewardValue * multiplier * (0.8 + Math.random() * 0.4));
             
             // Rebalanced XP rewards based on rarity
-            const rewardXP = rarity === 'common' ? 100 : (rarity === 'rare' ? 500 : (rarity === 'legendary' ? 2000 : 5000));
+            const rewardXP = rarity === 'mythic' ? (Math.floor(Math.random() * (40 - 20 + 1)) + 20) : 0;
+
+
 
             // Increased targets to ensure missions don't complete too fast
             const baseTarget = isSpeedRunRef.current ? (10 + Math.floor(Math.random() * 5)) : (currentTier === 'Interstellar' ? 60 : 20);
             const reduction = isSpeedRunRef.current ? 0 : skillRobosOlimpicosLevelRef.current[routeTier];
             const target = Math.max(10, baseTarget - reduction);
+            
+            let rewardAetherion = 0;
+            if (rarity === 'mythic') {
+              rewardAetherion = Math.floor(Math.random() * (40 - 20 + 1)) + 20;
+            }
 
             currentMissions.push({
               id: `sell_${ore.id}_${Date.now()}_${currentMissions.length}`,
@@ -5708,6 +5851,7 @@ export const GameDashboard = memo(({
               description: languageRef.current === 'pt' ? `Venda ${target} PACKS de ${ore.name}.` : `Sell ${target} packs of ${ore.name}.`,
               reward,
               rewardXP,
+              rewardAetherion: rewardAetherion > 0 ? rewardAetherion : undefined,
               type: 'sell',
               target,
               current: 0,
@@ -5807,7 +5951,18 @@ export const GameDashboard = memo(({
       });
     }
 
-    setQc(c => c + mission.reward);
+    setQc(c => {
+      const next = c + mission.reward;
+      qcRef.current = next;
+      return next;
+    });
+    if (mission.rewardAetherion) {
+      setAetherion(prev => {
+        const next = Math.min(10000, prev + mission.rewardAetherion!);
+        aetherionRef.current = next;
+        return next;
+      });
+    }
     if (mission.rewardXP) addXP(mission.rewardXP);
     updateHistoryStats('acquired', mission.reward, 'mission');
     setHistoryStats(prev => {
@@ -5831,13 +5986,14 @@ export const GameDashboard = memo(({
       return filtered;
     });
     
-    if (activeTab === 'missions' || isAuto) {
-      playSfx('cash');
+    if (!isAuto) {
+      playSfx('cash_register');
     }
     
     const xpText = mission.rewardXP ? `, +${mission.rewardXP} XP` : '';
-    addLog(`${t('missionReward')}: +${formatValue(mission.reward)} QC${xpText}`, 'success');
-  }, [missions, playSfx, addLog, t, generateMissions, activeTab, updateHistoryStats, isInterstellar]);
+    const aetherionText = mission.rewardAetherion ? `, +${mission.rewardAetherion} Aetherion` : '';
+    addLog(`${t('missionReward')}: +${formatValue(mission.reward)} QC${xpText}${aetherionText}`, 'success');
+  }, [missions, playSfx, addLog, t, generateMissions, activeTab, updateHistoryStats, isInterstellar, performSave]);
 
   useEffect(() => {
     if (!isLoaded || !autoClaimMissions) return;
@@ -5864,6 +6020,9 @@ export const GameDashboard = memo(({
   const [showSpeedRunWinModal, setShowSpeedRunWinModal] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [showRoute2Confirm, setShowRoute2Confirm] = useState(false);
+  const [showRoute2Info, setShowRoute2Info] = useState(false);
+  const [showRoute3Info, setShowRoute3Info] = useState(false);
+
 
   // Speed Run Timer
   useEffect(() => {
@@ -6275,7 +6434,13 @@ export const GameDashboard = memo(({
   useEffect(() => { activeDeliveriesRef.current = activeDeliveries; }, [activeDeliveries]);
   useEffect(() => { techLevelsRef.current = techLevels; }, [techLevels]);
   useEffect(() => { qcRef.current = qc; }, [qc]);
+  useEffect(() => { aetherionRef.current = aetherion; }, [aetherion]);
+  useEffect(() => { aetherionTubesRef.current = aetherionTubes; }, [aetherionTubes]);
+  useEffect(() => { miningWasteRef.current = miningWaste; }, [miningWaste]);
+  useEffect(() => { solarEnergyRef.current = solarEnergy; }, [solarEnergy]);
+  useEffect(() => { historyStatsRef.current = historyStats; }, [historyStats]);
   useEffect(() => { autoTravelActiveRef.current = autoTravelActive; }, [autoTravelActive]);
+  useEffect(() => { autoTravelDesiredRef.current = autoTravelDesired; }, [autoTravelDesired]);
   useEffect(() => { autoTravelProgressRef.current = autoTravelProgress; }, [autoTravelProgress]);
   useEffect(() => { autoTravelSlotsRef.current = autoTravelSlots; }, [autoTravelSlots]);
   useEffect(() => { totalDeliveriesRef.current = totalDeliveries; }, [totalDeliveries]);
@@ -6405,52 +6570,73 @@ export const GameDashboard = memo(({
     return true;
   }, [isSpeedRun, routeTier, unlockedTechLevels, ownedShips, techLevels, miningRobots, miningRobotLevels, autoTravelSlots, autoTravelActive, historyStats, miningCompressionLevels, totalDeliveries]);
 
-  const checkMilestoneAchievements = useCallback(() => {
-    // QC Millionaire
-    const totalQC = (historyStats['Solar']?.qcTotalAcquired || 0) + (historyStats['Interstellar']?.qcTotalAcquired || 0) + (historyStats['Void']?.qcTotalAcquired || 0);
+  const syncAchievements = useCallback(() => {
+    // 1. First Delivery
+    if (totalDeliveries >= 1) updateAchievementProgress('first_delivery', 1, true);
+
+    // 2. QC Millionaire & Trillionaire
+    const totalQC = Object.values(historyStats).reduce((acc, curr) => acc + (curr.qcTotalAcquired || 0), 0);
     if (totalQC >= 1000000) updateAchievementProgress('qc_millionaire', totalQC, true);
     if (totalQC >= 1000000000000) updateAchievementProgress('qc_trillionaire', totalQC, true);
 
-    // Route Unlocks
+    // 3. Battle Warrior & Pirate Slayer
+    const totalBattlesWon = Object.values(historyStats).reduce((acc, curr) => acc + (curr.battlesWon || 0), 0);
+    updateAchievementProgress('battle_warrior', totalBattlesWon, true);
+    updateAchievementProgress('pirate_slayer', totalBattlesWon, true);
+
+    // 4. Robot Owner (Total robots)
+    const totalRobots = Object.values(miningRobots).reduce((a, b) => a + b, 0);
+    updateAchievementProgress('robot_owner', totalRobots, true);
+
+    // 5. Route Unlocks
     if (isRoute2Unlocked()) updateAchievementProgress('route_2_unlocked', 1, true);
     if (isRoute3Unlocked()) updateAchievementProgress('void_unlocked', 1, true);
 
-    // Tech Master
+    // 6. Tech Master (Sum of technology levels)
     const totalTechs = Object.values(unlockedTechLevels).reduce((a, b) => a + b, 0);
     updateAchievementProgress('tech_master', totalTechs, true);
 
-    // Ship Collector
-    const totalShips = Object.values(ownedShips).reduce((a, b) => a + b, 0);
+    // 7. Ship Collector (Unique ships)
+    const totalShips = Object.keys(ownedShips).length;
     updateAchievementProgress('ship_collector', totalShips, true);
 
-    // Max Upgrade
+    // 8. Max Upgrade
     const hasMaxUpgrade = Object.values(techLevels).some(loc => Object.values(loc).some(lvl => lvl >= 5));
     if (hasMaxUpgrade) updateAchievementProgress('max_upgrade', 5, true);
 
-    // Earth Restorer
+    // 9. Earth Restorer
     const earthProgress = Object.values(earthReconstructionProgress).reduce((a, b) => a + b, 0) / 5;
     if (earthProgress >= 50) updateAchievementProgress('earth_restorer', earthProgress, true);
     if (earthProgress >= 100) updateAchievementProgress('earth_restorer_100', earthProgress, true);
 
-    // Total Deliveries
-    const totalDels = (historyStats['Solar']?.deliveries || 0) + (historyStats['Interstellar']?.deliveries || 0) + (historyStats['Void']?.deliveries || 0);
-    if (totalDels >= 10000) updateAchievementProgress('total_deliveries_10k', totalDels, true);
+    // 10. Total Deliveries
+    if (totalDeliveries >= 10000) updateAchievementProgress('total_deliveries_10k', totalDeliveries, true);
 
-    // All Ships R1 & R2
+    // 11. All Ships R1 & R2
     const shipsR1R2 = Object.keys(ownedShips).filter(key => key.startsWith('Solar-') || key.startsWith('Interstellar-')).length;
     if (shipsR1R2 >= 18) updateAchievementProgress('all_ships_r1_r2', shipsR1R2, true);
 
-    // Total Missions
-    const totalMissions = (historyStats['Solar']?.missionsCompleted || 0) + (historyStats['Interstellar']?.missionsCompleted || 0) + (historyStats['Void']?.missionsCompleted || 0);
+    // 12. Total Missions
+    const totalMissions = Object.values(historyStats).reduce((acc, curr) => acc + (curr.missionsCompleted || 0), 0);
     if (totalMissions >= 1000) updateAchievementProgress('total_missions_1k', totalMissions, true);
 
-    // Battle Level
+    // 13. Battle Level
     if (battleLevel >= 55) updateAchievementProgress('battle_level_55', battleLevel, true);
-  }, [historyStats, isRoute2Unlocked, isRoute3Unlocked, unlockedTechLevels, ownedShips, techLevels, earthReconstructionProgress, battleLevel, updateAchievementProgress]);
+
+    // 14. Mining Tycoon
+    const totalPacksSold = Object.values(historyStats).reduce((acc, curr) => 
+      acc + (curr.manualMiningPacksSold || 0) + (curr.autoMiningPacksSold || 0), 0);
+    updateAchievementProgress('mining_tycoon', totalPacksSold, true);
+
+    // 15. Perfect Pilot
+    const totalPerfects = Object.values(historyStats).reduce((acc, curr) => acc + (curr.perfectDeliveries || 0), 0);
+    updateAchievementProgress('perfect_pilot', totalPerfects, true);
+
+  }, [historyStats, totalDeliveries, isRoute2Unlocked, isRoute3Unlocked, unlockedTechLevels, ownedShips, techLevels, earthReconstructionProgress, battleLevel, miningRobots, updateAchievementProgress]);
 
   useEffect(() => {
-    checkMilestoneAchievements();
-  }, [checkMilestoneAchievements]);
+    syncAchievements();
+  }, [syncAchievements]);
 
   const startVoidTransition = () => {
     if (isSpeedRun) return; 
@@ -6630,12 +6816,14 @@ export const GameDashboard = memo(({
     }
     
     setResearchingTech(null);
+    playSfx('ask_window');
     if (researchingTech.tier === 'Solar' || researchingTech.tier === 'Interstellar') {
       playSfx('tech_success');
     } else {
       playSfx('success');
     }
     addLog(language === 'pt' ? `Pesquisa concluída com boost! (-${formatValue(boostCost)} QC)` : `Research completed with boost! (-${formatValue(boostCost)} QC)`, 'success');
+    performSave();
   };
 
   // Effect to show Route 2 unlock message
@@ -6664,97 +6852,11 @@ export const GameDashboard = memo(({
     if (isSpeedRun || !isLoaded) return;
     
     const saveInterval = setInterval(() => {
-      const saveData = {
-        qc: qcRef.current,
-        unlockedRouteIds: unlockedRouteIdsRef.current,
-        ownedShips: ownedShipsRef.current,
-        techLevels: techLevelsRef.current,
-        autoTravelSlots: autoTravelSlotsRef.current,
-        playerName,
-        miningRobots: miningRobotsRef.current,
-        miningRobotLevels: miningRobotLevelsRef.current,
-        oresCollected: oresCollectedRef.current,
-        autoSellByOre: autoSellByOreRef.current,
-        autoSellUnlockedByOre: autoSellUnlockedByOreRef.current,
-        unlockedTechLevels: unlockedTechLevelsRef.current,
-        autoTravelActive: autoTravelActiveRef.current,
-        autoTravelDesired: autoTravelDesiredRef.current,
-        seenTutorials,
-        routeTier: routeTierRef.current,
-        totalDeliveries: totalDeliveriesRef.current,
-        deliveriesByLocation: deliveriesByLocationRef.current,
-        historyStats,
-        activeCodes,
-        missions,
-        missionMythicBonus,
-        missionAlienBonus,
-        missionLegendaryBonus,
-        missionRewardLevel,
-        skillLendariaLevel,
-        skillMiticaLevel,
-        skillAlienLevel,
-        skillTempoDinheiroLevel,
-        skillRobosOlimpicosLevel,
-        autoClaimMissions,
-        radarUnlocked,
-        completedInitialMissions,
-        miningCompressionLevels,
-        shipXP: shipXPRef.current,
-        shipLevel: shipLevelRef.current,
-        extractionTechLevel: extractionTechLevelRef.current,
-        solarMappingLevel: solarMappingLevelRef.current,
-        doubleRouteLevel: doubleRouteLevelRef.current,
-        doomPLevel: doomPLevelRef.current,
-        captureLevel: captureLevelRef.current,
-        battleLevel: battleLevelRef.current,
-        radarLevel: radarLevelRef.current,
-        isRetributionActive: isRetributionActiveRef.current,
-        isFatigueActive: isFatigueActiveRef.current,
-        unlockedExtractionPoints: unlockedExtractionPointsRef.current,
-        extractionPacks: extractionPacksRef.current,
-        extractionRobotLevels: extractionRobotLevelsRef.current,
-        extractionProductionLevels: extractionProductionLevelsRef.current,
-        extractionCompressionLevels: extractionCompressionLevelsRef.current,
-        extractionAutoSell: extractionAutoSellRef.current,
-        extractionAutoSellUnlocked: extractionAutoSellUnlockedRef.current,
-        totalExtractionProfit: totalExtractionProfitRef.current,
-        lastScanTime,
-        warCoreLevel: warCoreLevelRef.current,
-        fleetPower: fleetPowerRef.current,
-        earthReconstructionProgress: earthReconstructionProgressRef.current,
-        isVoidWarActive: isVoidWarActive,
-        voidWarProgress: voidWarProgress,
-        voidResources: voidResourcesRef.current,
-        voidCompactedResources: voidCompactedResources,
-        voidDonationModes: voidDonationModes,
-        voidAircraftMissions: voidAircraftMissionsRef.current,
-        voidAircraftUpgrades: voidAircraftUpgradesRef.current,
-        voidAircraftAutoToggles: voidAircraftAutoTogglesRef.current,
-        voidBattleShipStats: voidBattleShipStatsRef.current,
-        voidPOIsInspiration: voidPOIsInspirationRef.current,
-        voidPOIQCDonations: voidPOIQCDonationsRef.current,
-        route4Unlocked: route4Unlocked,
-        unlockedAchievements,
-        achievementProgress,
-        hasWonEliminateEnemiesRoute3: hasWonEliminateEnemiesRoute3Ref.current,
-        robotRepairProgress: robotRepairProgressRef.current,
-        isRobotRepaired: isRobotRepairedRef.current,
-        battleShipUpgradeLevel: battleShipUpgradeLevelRef.current,
-        gameTimeSeconds: gameTimeSecondsRef.current,
-        earthPopulation: earthPopulationRef.current,
-        earthMaleRatio: earthMaleRatioRef.current,
-        earthBiodiversity: earthBiodiversityRef.current,
-        earthEvents: earthEventsRef.current
-      };
-      const saveToStorage = async () => {
-        const modularSave = SaveManager.createSave(saveData);
-        await GameStorage.save(modularSave, 'time_travel_save');
-      };
-      saveToStorage();
-    }, 30000); // Auto-save every 30 seconds
+      performSave();
+    }, 10000); // Auto-save every 10 seconds
     
     return () => clearInterval(saveInterval);
-  }, [isSpeedRun, isLoaded, playerName, seenTutorials, historyStats, activeCodes, missions, missionMythicBonus, missionAlienBonus, missionLegendaryBonus, autoClaimMissions, radarUnlocked, completedInitialMissions, miningCompressionLevels, missionRewardLevel, skillLendariaLevel, skillMiticaLevel, skillAlienLevel, skillTempoDinheiroLevel, skillRobosOlimpicosLevel, radarLevel, lastScanTime, extractionTechLevel, solarMappingLevel, captureLevel, unlockedAchievements, achievementProgress]);
+  }, [isSpeedRun, isLoaded, performSave]);
 
   // Load save logic
   useEffect(() => {
@@ -7004,7 +7106,11 @@ export const GameDashboard = memo(({
   }, [language, coffeePhraseIndex]);
 
   const launchRoute = useCallback((route: Route) => {
-    playSfx('click');
+    if (route.tier === 'Interstellar') {
+      playSfx('start_engine_2');
+    } else {
+      playSfx('start_engine_1');
+    }
     const locationTech = techLevelsRef.current[route.id] || { engine: 0, ai: 0, value: 0, rare: 0 };
     const valueUpgrade = UPGRADES.find(u => u.id === 'value')!;
     const valueTier = valueUpgrade.tiers.find(t => t.level === locationTech.value);
@@ -7050,6 +7156,7 @@ export const GameDashboard = memo(({
 
     setQc(c => c - fuelCost);
     updateHistoryStats('spent', fuelCost);
+    performSave();
     completeInitialMission('init_4');
     setActiveDeliveries(prev => [
       ...prev,
@@ -7104,7 +7211,11 @@ export const GameDashboard = memo(({
     if (level === 1) {
       completeInitialMission('init_2');
     }
-    playSfx('buy');
+    if (routeTier === 'Interstellar') {
+      playSfx('start_engine_2');
+    } else {
+      playSfx('start_engine_1');
+    }
     addLog(isFirstShipOfLevel ? `Free Lvl ${level} ship acquired!` : `New Lvl ${level} ship purchased!`, 'success');
   }, [playSfx, addLog, getEconomicMultipliers, routeTier, updateHistoryStats, completeInitialMission]);
 
@@ -7139,7 +7250,7 @@ export const GameDashboard = memo(({
       if (tech.id === 'solar-1') {
         completeInitialMission('init_1');
       }
-      playSfx('success');
+      playSfx('start_research');
       addLog(isSpeedRun ? `${tech.name} unlocked instantly!` : `Technology ${tech.name} unlocked!`, 'success');
       // Give free ship of that level
       if (isSpeedRun) {
@@ -7159,7 +7270,7 @@ export const GameDashboard = memo(({
       if (tech.id === 'solar-1') {
         completeInitialMission('init_1');
       }
-      playSfx('buy');
+      playSfx('start_research');
       addLog(`Researching ${tech.name}...`, 'info');
     }
   };
@@ -7310,9 +7421,17 @@ export const GameDashboard = memo(({
     
     const aetherionToAdd = tubesToUse * 500;
     
-    setAetherion(prev => Math.min(10000, prev + aetherionToAdd));
-    setAetherionTubes(prev => prev - tubesToUse);
-    playSfx('success');
+    setAetherion(prev => {
+      const next = Math.min(10000, prev + aetherionToAdd);
+      aetherionRef.current = next;
+      return next;
+    });
+    setAetherionTubes(prev => {
+      const next = prev - tubesToUse;
+      aetherionTubesRef.current = next;
+      return next;
+    });
+    playSfx('eterion_fuell');
     addLog(`${t('synthesisComplete')}${aetherionToAdd} Eterion!`, 'success');
   }, [setAetherion, setAetherionTubes, playSfx, addLog, language, t]);
 
@@ -7539,7 +7658,7 @@ export const GameDashboard = memo(({
                     type: 'success'
                   });
                 }
-                playSfx('success');
+                playSfx('police_sirene_3');
               } else {
                 resolveBattleDefeat(battle);
                 if (isRetributionActiveRef.current) {
@@ -7550,7 +7669,7 @@ export const GameDashboard = memo(({
                     type: 'error'
                   });
                 }
-                playSfx('error');
+                playSfx('police_sirene_3');
               }
               
               // Reset ship status if it was a manual delivery
@@ -7825,12 +7944,20 @@ export const GameDashboard = memo(({
               totalRewardBatch += Math.floor(reward);
               locationUpdates[route.destination] = (locationUpdates[route.destination] || 0) + 1;
               totalCompletedCount++;
+              if (isPerfect) {
+                setHistoryStats(prev => ({
+                  ...prev,
+                  [routeTier]: {
+                    ...prev[routeTier],
+                    perfectDeliveries: (prev[routeTier].perfectDeliveries || 0) + 1
+                  }
+                }));
+              }
             }
           });
 
           setQc(c => c + totalRewardBatch);
           updateHistoryStats('acquired', totalRewardBatch, 'delivery');
-          updateAchievementProgress('first_delivery', totalCompletedCount);
           
           const manualCount = completions.filter(c => c.isManual).reduce((acc, curr) => acc + curr.count, 0);
           const autoCount = completions.filter(c => !c.isManual).reduce((acc, curr) => acc + curr.count, 0);
@@ -8026,6 +8153,7 @@ export const GameDashboard = memo(({
       if (['mining', 'aircraft', 'upgrades', 'auto', 'routes2', 'technology', 'missions', 'history'].includes(activeTab)) {
         if (!seenTutorials[activeTab]) {
           setActiveTutorial(activeTab);
+          playSfx('tutorial_open');
         }
       }
     }, 100);
@@ -8039,6 +8167,7 @@ export const GameDashboard = memo(({
       const timer = setTimeout(() => {
         setShowFliperamasTutorial(true);
         setSeenTutorials(prev => ({ ...prev, fliperamas: true }));
+        playSfx('tutorial_open');
       }, 0);
       return () => clearTimeout(timer);
     }
@@ -8092,7 +8221,10 @@ export const GameDashboard = memo(({
       setQc(c => c - (route.unlockCost || 0));
       updateHistoryStats('spent', route.unlockCost || 0);
       setUnlockedRouteIds(prev => [...prev, route.id]);
-      playSfx('buy');
+      if (route.tier === 'Solar') playSfx('start_engine_1');
+      else if (route.tier === 'Interstellar') playSfx('start_engine_2');
+      else playSfx('buy');
+
       addLog(`Route ${route.name} unlocked!`, 'success');
     } else {
       addLog(`Not enough QC to unlock ${route.name}`, 'error');
@@ -8162,9 +8294,8 @@ export const GameDashboard = memo(({
     setQc(c => c - cost);
     updateHistoryStats('spent', cost);
     setMiningRobots(prev => ({ ...prev, [oreId]: currentRobots + 1 }));
-    updateAchievementProgress('robot_owner', 1);
     completeInitialMission('init_6');
-    playSfx('buy');
+    playSfx('buy_new_robot');
     addLog(`${t('buyRobot')}: ${ore.name}`, 'success');
   };
 
@@ -8206,7 +8337,7 @@ export const GameDashboard = memo(({
       setQc(prev => prev - cost);
       updateHistoryStats('spent', cost);
       setMiningCompressionLevels(prev => ({ ...prev, [oreId]: currentLevel + 1 }));
-      playSfx('level_up');
+      playSfx('buying_iten');
       addLog(`${t('refinedCompression')} ${ore.name} Lvl ${currentLevel + 1}`, 'success');
     } else {
       playSfx('error');
@@ -8242,9 +8373,9 @@ export const GameDashboard = memo(({
         y: rect.top
       };
       setFloatingRewards(prev => [...prev, newFloatingReward]);
-      playSfx('success');
+      playSfx('cash_register');
     } else {
-      playSfx('buy');
+      // In automatic mode, we don't play the cash register sound
     }
 
     setQc(c => c + value);
@@ -8313,7 +8444,7 @@ export const GameDashboard = memo(({
     
     setAutoTravelDesired(prev => ({ ...prev, [routeId]: isActivating }));
     setAutoTravelActive(prev => ({ ...prev, [routeId]: isActivating }));
-    playSfx('click');
+    playSfx(isActivating ? 'open_window' : 'close_window');
   };
 
   const buyAutoTravelSlot = (routeId: string) => {
@@ -8345,7 +8476,7 @@ export const GameDashboard = memo(({
         [routeId]: (prev[routeId] || 0) + 1
       }));
       completeInitialMission('init_5');
-      playSfx('buy');
+      playSfx('buying_iten');
       addLog(`${t('autoTravelSlotPurchased')} ${routeId}`, 'success');
     } else {
       addLog(t('insufficientQCForAutoTravelSlot'), 'error');
@@ -11264,7 +11395,10 @@ export const GameDashboard = memo(({
           <div className="flex items-center gap-3">
             {/* Mapa de Habilidades Button */}
             <button
-              onClick={() => setShowSkillMap(true)}
+              onClick={() => {
+                setShowSkillMap(true);
+                playSfx('open_window');
+              }}
               className={`px-4 py-2 lg:py-3 lg:px-6 rounded-lg font-orbitron text-base tracking-widest transition-all uppercase flex flex-col items-center justify-center h-[64px] lg:h-[72px] w-[180px] lg:w-[220px] leading-snug bg-amber-500/10 text-amber-400 border border-amber-500/30 hover:bg-amber-500/20 hover:border-amber-500/60 shadow-[0_0_15px_rgba(245,158,11,0.1)]`}
             >
               <span className="font-black text-[14px] lg:text-base">{language === 'pt' ? 'Mapa de Habilidades' : 'Skill Map'}</span>
@@ -11323,7 +11457,7 @@ export const GameDashboard = memo(({
                 }
                 
                 setAutoClaimMissions(prev => !prev);
-                playSfx('click');
+                playSfx(autoClaimMissions ? 'close_window' : 'ask_window');
                 if (!autoClaimMissions) {
                   addLog(`${language === 'pt' ? 'Auto-Resgate de Missões ativado!' : 'Auto-Claim Missions activated!'}`, 'success');
                 } else {
@@ -11402,9 +11536,15 @@ export const GameDashboard = memo(({
                       <div className="text-[14px] lg:text-[14px] font-mono text-yellow-500 font-black flex items-center gap-1.5">
                         <Coins className="w-3.5 h-3.5" /> {formatValue(mission.reward)}
                       </div>
-                      {mission.rewardXP && mission.rewardXP > 0 && (
+                      {mission.rarity === 'mythic' && mission.rewardXP && mission.rewardXP > 0 && (
+
                         <div className="text-[14px] lg:text-[14px] font-mono text-purple-400 font-bold flex items-center gap-1.5">
                           <Trophy className="w-3.5 h-3.5" /> {mission.rewardXP}
+                        </div>
+                      )}
+                      {mission.rewardAetherion && mission.rewardAetherion > 0 && (
+                        <div className="text-[14px] lg:text-[14px] font-mono text-cyan-400 font-bold flex items-center gap-1.5">
+                          <Zap className="w-3.5 h-3.5" /> {mission.rewardAetherion}
                         </div>
                       )}
                     </div>
@@ -11659,37 +11799,86 @@ export const GameDashboard = memo(({
             <div className={`w-12 h-12 rounded-lg ${isInterstellar ? 'bg-orange-500/10 border-orange-500/30' : 'bg-cyan-500/10 border-cyan-500/30'} flex items-center justify-center border animate-pulse-glow`}>
               <Rocket className={`w-6 h-6 ${themeText}`} />
             </div>
-            <div>
-              <h1 className={`text-xl font-orbitron font-bold tracking-tighter ${isInterstellar ? 'neon-text-orange' : 'neon-text-cyan'} leading-none`}>
-                {translateData('QUANTUM COURIER HORIZON')}
-              </h1>
-              <AnimatePresence>
-                {battleNotification && (
-                  <motion.div
-                    initial={{ opacity: 0, x: 50 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: 50 }}
-                    className={`fixed right-4 top-24 z-[100] whitespace-nowrap px-6 py-3 rounded-xl border shadow-2xl font-orbitron text-[14px] font-bold flex items-center gap-4 backdrop-blur-md ${
-                      battleNotification.type === 'success' 
-                        ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-400 shadow-emerald-500/20' 
-                        : 'bg-red-500/20 border-red-500/40 text-red-400 shadow-red-500/20'
-                    }`}
+            <div className="flex items-center gap-6">
+              <div>
+                <h1 className={`text-xl font-orbitron font-bold tracking-tighter ${isInterstellar ? 'neon-text-orange' : 'neon-text-cyan'} leading-none`}>
+                  {translateData('QUANTUM COURIER HORIZON')}
+                </h1>
+                
+                <div className="flex items-center gap-2 mt-1">
+                  <div className={`w-2 h-2 rounded-full ${isInterstellar ? 'bg-orange-500' : 'bg-emerald-500'} animate-pulse`} />
+                  <span className={`text-base font-mono ${isInterstellar ? 'text-orange-500/60' : 'text-cyan-500/60'} uppercase tracking-widest`}>
+                    {translateData('System Online')} • {playerName}
+                  </span>
+                </div>
+              </div>
+
+              {/* Transition Buttons Area */}
+              <div className="flex items-center">
+                {/* Route 2 Alert Button */}
+                {routeTier === 'Solar' && isRoute2Unlocked() && !isSpeedRun && (
+                  <motion.button
+                    initial={{ scale: 0, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    whileHover={{ scale: 1.1 }}
+                    whileTap={{ scale: 0.9 }}
+                    onClick={() => setShowRoute2Info(true)}
+                    className="relative group flex items-center justify-center"
                   >
-                    <div className={`w-3 h-3 rounded-full ${battleNotification.type === 'success' ? 'bg-emerald-400 animate-pulse' : 'bg-red-400'}`} />
-                    <div className="flex flex-col">
-                      <span className="text-base opacity-60 uppercase tracking-widest">{battleNotification.type === 'success' ? 'Auto-Combat Victory' : 'Auto-Combat Defeat'}</span>
-                      {battleNotification.message}
+                    <div className="absolute -inset-2 bg-orange-500/20 blur-xl rounded-full animate-pulse group-hover:bg-orange-500/40 transition-all" />
+                    <div className="relative w-10 h-10 rounded-lg bg-orange-500/10 border border-orange-500/50 flex items-center justify-center text-orange-400 shadow-[0_0_15px_rgba(249,115,22,0.3)] overflow-hidden">
+                      <Rocket className="w-5 h-5 animate-bounce" />
+                      <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/10 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700" />
                     </div>
-                  </motion.div>
+                    {/* Small dot notification */}
+                    <div className="absolute -top-1 -right-1 w-3 h-3 bg-orange-500 rounded-full border-2 border-black animate-ping" />
+                    <div className="absolute -top-1 -right-1 w-3 h-3 bg-orange-500 rounded-full border-2 border-black" />
+                  </motion.button>
                 )}
-              </AnimatePresence>
-              <div className="flex items-center gap-2 mt-1">
-                <div className={`w-2 h-2 rounded-full ${isInterstellar ? 'bg-orange-500' : 'bg-emerald-500'} animate-pulse`} />
-                <span className={`text-base font-mono ${isInterstellar ? 'text-orange-500/60' : 'text-cyan-500/60'} uppercase tracking-widest`}>
-                  {translateData('System Online')} • {playerName}
-                </span>
+
+                {/* Route 3 Alert Button */}
+                {routeTier === 'Interstellar' && isRoute3Unlocked() && !isSpeedRun && (
+                  <motion.button
+                    initial={{ scale: 0, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    whileHover={{ scale: 1.1 }}
+                    whileTap={{ scale: 0.9 }}
+                    onClick={() => setShowRoute3Info(true)}
+                    className="relative group flex items-center justify-center"
+                  >
+                    <div className="absolute -inset-2 bg-purple-500/20 blur-xl rounded-full animate-pulse group-hover:bg-purple-500/40 transition-all" />
+                    <div className="relative w-10 h-10 rounded-lg bg-purple-500/10 border border-purple-500/50 flex items-center justify-center text-purple-400 shadow-[0_0_15px_rgba(168,85,247,0.3)] overflow-hidden">
+                      <Rocket className="w-5 h-5 animate-bounce" />
+                      <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/10 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700" />
+                    </div>
+                    {/* Small dot notification */}
+                    <div className="absolute -top-1 -right-1 w-3 h-3 bg-purple-500 rounded-full border-2 border-black animate-ping" />
+                    <div className="absolute -top-1 -right-1 w-3 h-3 bg-purple-500 rounded-full border-2 border-black" />
+                  </motion.button>
+                )}
               </div>
             </div>
+
+            <AnimatePresence>
+              {battleNotification && (
+                <motion.div
+                  initial={{ opacity: 0, x: 50 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: 50 }}
+                  className={`fixed right-4 top-24 z-[100] whitespace-nowrap px-6 py-3 rounded-xl border shadow-2xl font-orbitron text-[14px] font-bold flex items-center gap-4 backdrop-blur-md ${
+                    battleNotification.type === 'success' 
+                      ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-400 shadow-emerald-500/20' 
+                      : 'bg-red-500/20 border-red-500/40 text-red-400 shadow-red-500/20'
+                  }`}
+                >
+                  <div className={`w-3 h-3 rounded-full ${battleNotification.type === 'success' ? 'bg-emerald-400 animate-pulse' : 'bg-red-400'}`} />
+                  <div className="flex flex-col">
+                    <span className="text-base opacity-60 uppercase tracking-widest">{battleNotification.type === 'success' ? 'Auto-Combat Victory' : 'Auto-Combat Defeat'}</span>
+                    {battleNotification.message}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
 
           {isSpeedRun && (
@@ -11950,7 +12139,8 @@ export const GameDashboard = memo(({
               
               return baseTabs.map(tab => {
                 if (tab === 'routes' && isInterstellar) return null;
-                if (tab === 'routes2' && !isInterstellar && (typeof isRoute2Unlocked === 'function' ? !isRoute2Unlocked() : true)) return null;
+                if (tab === 'routes2' && !isInterstellar) return null;
+
                 if (tab === 'routes2' && isSpeedRun) return null;
                 if (tab === 'missions' && isSpeedRun) return null;
                 if (tab === 'history' && isSpeedRun) return null;
@@ -12082,91 +12272,8 @@ export const GameDashboard = memo(({
                 >
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 lg:grid-rows-3 gap-4 lg:gap-3 flex-1 h-full overflow-hidden">
                   {/* Route 2 Unlock Banner */}
-              {routeTier === 'Solar' && isRoute2Unlocked() && !isSpeedRun && (
-                <motion.div 
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  className="col-span-full relative overflow-hidden glass-panel border-2 border-orange-500/50 p-8 rounded-2xl bg-gradient-to-br from-orange-500/20 via-black/40 to-orange-900/20 flex flex-col lg:flex-row items-center justify-between gap-8 shadow-[0_0_50px_rgba(249,115,22,0.3)] group"
-                >
-                  {/* Decorative Background Elements */}
-                  <div className="absolute top-0 left-0 w-full h-full pointer-events-none">
-                    <div className="absolute -top-24 -left-24 w-64 h-64 bg-orange-500/10 rounded-full blur-3xl group-hover:bg-orange-500/20 transition-all duration-1000" />
-                    <div className="absolute -bottom-24 -right-24 w-64 h-64 bg-orange-500/10 rounded-full blur-3xl group-hover:bg-orange-500/20 transition-all duration-1000" />
-                  </div>
 
-                  <div className="flex flex-col md:flex-row items-center gap-6 relative z-10 text-center md:text-left">
-                    <div className="relative">
-                      <div className="w-20 h-20 rounded-full bg-orange-500/20 flex items-center justify-center border-2 border-orange-500 shadow-[0_0_20px_rgba(249,115,22,0.5)] animate-pulse-glow">
-                        <Globe className="w-10 h-10 text-orange-400" />
-                      </div>
-                      <div className="absolute -top-1 -right-1 w-6 h-6 bg-orange-500 rounded-full flex items-center justify-center animate-bounce shadow-lg">
-                        <ArrowRight className="w-4 h-4 text-black" />
-                      </div>
-                    </div>
-                    <div className="space-y-1">
-                      <h3 className="text-3xl font-orbitron font-black text-orange-400 uppercase tracking-[0.3em] drop-shadow-[0_0_10px_rgba(249,115,22,0.5)]">
-                        {t('routes2')}
-                      </h3>
-                      <p className="text-base text-orange-200/80 font-mono uppercase tracking-[0.15em] max-w-md leading-relaxed">
-                        {t('route2UnlockDesc')}
-                      </p>
-                    </div>
-                  </div>
 
-                  <div className="relative z-10 w-full lg:w-auto">
-                    <button
-                      onClick={() => setShowRoute2Confirm(true)}
-                      className="w-full lg:w-auto px-12 py-5 bg-orange-500 text-black font-orbitron font-black text-xl rounded-xl hover:bg-orange-400 transition-all shadow-[0_0_30px_rgba(249,115,22,0.5)] hover:scale-105 active:scale-95 uppercase tracking-[0.25em] border-b-4 border-orange-700 active:border-b-0 active:translate-y-1 flex items-center justify-center gap-3"
-                    >
-                      <Rocket className="w-6 h-6" />
-                      {t('startInterstellarProtocol')}
-                    </button>
-                  </div>
-                </motion.div>
-              )}
-
-              {/* Route 3 Unlock Banner */}
-              {routeTier === 'Interstellar' && isRoute3Unlocked() && !isSpeedRun && (
-                <motion.div 
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  className="col-span-full relative overflow-hidden glass-panel border-2 border-purple-500/50 p-8 rounded-2xl bg-gradient-to-br from-purple-500/20 via-black/40 to-purple-900/20 flex flex-col lg:flex-row items-center justify-between gap-8 shadow-[0_0_50px_rgba(168,85,247,0.3)] group"
-                >
-                  <div className="absolute top-0 left-0 w-full h-full pointer-events-none">
-                    <div className="absolute -top-24 -left-24 w-64 h-64 bg-purple-500/10 rounded-full blur-3xl group-hover:bg-purple-500/20 transition-all duration-1000" />
-                    <div className="absolute -bottom-24 -right-24 w-64 h-64 bg-purple-500/10 rounded-full blur-3xl group-hover:bg-purple-500/20 transition-all duration-1000" />
-                  </div>
-
-                  <div className="flex flex-col md:flex-row items-center gap-6 relative z-10 text-center md:text-left">
-                    <div className="relative">
-                      <div className="w-20 h-20 rounded-full bg-purple-500/20 flex items-center justify-center border-2 border-purple-500 shadow-[0_0_20px_rgba(168,85,247,0.5)] animate-pulse-glow">
-                        <Zap className="w-10 h-10 text-purple-400" />
-                      </div>
-                      <div className="absolute -top-1 -right-1 w-6 h-6 bg-purple-500 rounded-full flex items-center justify-center animate-bounce shadow-lg">
-                        <ArrowRight className="w-4 h-4 text-black" />
-                      </div>
-                    </div>
-                    <div className="space-y-1">
-                      <h3 className="text-3xl font-orbitron font-black text-purple-400 uppercase tracking-[0.3em] drop-shadow-[0_0_10px_rgba(168,85,247,0.5)]">
-                        ROTA 3
-                      </h3>
-                      <p className="text-base text-purple-200/80 font-mono uppercase tracking-[0.15em] max-w-md leading-relaxed">
-                        {t('route3UnlockDesc')}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="relative z-10 w-full lg:w-auto">
-                    <button
-                      onClick={() => setShowRoute3Confirm(true)}
-                      className="w-full lg:w-auto px-12 py-5 bg-purple-600 text-white font-orbitron font-black text-xl rounded-xl hover:bg-purple-500 transition-all shadow-[0_0_30px_rgba(168,85,247,0.5)] hover:scale-105 active:scale-95 uppercase tracking-[0.25em] border-b-4 border-purple-800 active:border-b-0 active:translate-y-1 flex items-center justify-center gap-3"
-                    >
-                      <Rocket className="w-6 h-6" />
-                      {t('startVoidProtocol')}
-                    </button>
-                  </div>
-                </motion.div>
-              )}
 
               {currentRoutes.filter(route => {
                     const isShipUnlocked = route.requiredShipLevel === 1 || (ownedShips[`${routeTier}-${route.requiredShipLevel}`] || 0) > 0;
@@ -12947,18 +13054,23 @@ export const GameDashboard = memo(({
                             <button
                               key={ship.level}
                               onClick={() => setShipPageIndex(ship.level - 1)}
-                              className={`flex-1 min-w-0 py-3 px-2 rounded-xl border transition-all duration-300 font-bold text-base sm:text-base ${
+                              className={`flex-1 min-w-[120px] py-4 px-2 rounded-xl border transition-all duration-300 font-bold ${
                                 shipPageIndex === ship.level - 1
-                                  ? `${themeBorder} ${themeBg} ${ship.color} ${themeGlow}`
-                                  : `border-slate-800 bg-slate-900/50 ${ship.color} opacity-40 hover:opacity-70 hover:border-slate-700`
-                              } ${!isUnlocked ? 'opacity-50 grayscale' : ''}`}
+                                  ? `${themeBorder} bg-white/10 shadow-[0_0_20px_rgba(255,255,255,0.05)]`
+                                  : `border-white/10 bg-white/5 hover:bg-white/10 hover:border-white/20`
+                              } ${!isUnlocked ? 'opacity-30 grayscale cursor-not-allowed' : ''}`}
                             >
-                              <div className="flex flex-col items-center gap-1">
-                                <span className="text-[14px] sm:text-base uppercase tracking-wider opacity-60">Lvl {ship.level}</span>
-                                <span className="truncate w-full text-center">{translateData(ship.name)}</span>
-                                {!isUnlocked && <Lock className="w-3 h-3 mt-1" />}
+                              <div className="flex flex-col items-center gap-1.5">
+                                <span className={`text-[11px] uppercase tracking-[0.2em] ${shipPageIndex === ship.level - 1 ? 'text-white' : 'text-slate-500'}`}>
+                                  Lvl {ship.level}
+                                </span>
+                                <span className={`truncate w-full text-center text-[15px] font-orbitron uppercase tracking-wider ${isUnlocked ? ship.color : 'text-slate-400'}`}>
+                                  {translateData(ship.name)}
+                                </span>
+                                {!isUnlocked && <Lock className="w-3.5 h-3.5 text-slate-600 mt-0.5" />}
                               </div>
                             </button>
+
                           );
                         })}
                       </div>
@@ -13360,7 +13472,7 @@ export const GameDashboard = memo(({
                                           startTime: Date.now(),
                                           endTime: Date.now() + point.researchTime
                                         });
-                                        playSfx('buy');
+                                        playSfx('start_research');
                                       }
                                     }}
                                     disabled={!canResearch}
@@ -13671,7 +13783,7 @@ export const GameDashboard = memo(({
                                 if (qc >= cost && doomPLevel < 10) {
                                   setQc(prev => prev - cost);
                                   setDoomPLevel(prev => prev + 1);
-                                  playSfx('level_up');
+                                  playSfx('police_sirene_1');
                                   addLog(`${t('doomP')} UPGRADED: Level ${doomPLevel + 1}`, 'success');
                                 }
                               }}
@@ -13782,7 +13894,10 @@ export const GameDashboard = memo(({
                         return (
                           <button
                             key={route.id}
-                            onClick={() => setSelectedUpgradeLocation(route.id)}
+                            onClick={() => {
+                              setSelectedUpgradeLocation(route.id);
+                              playSfx('open_window');
+                            }}
                             className={`glass-panel ${getShipNeonBorder(ship.color)} rounded-xl p-4 hover:bg-white/5 transition-all text-left group relative h-full flex flex-col justify-center ${isMaxed ? 'opacity-90' : 'opacity-100'}`}
                           >
                             {isMaxed && (
@@ -13811,7 +13926,10 @@ export const GameDashboard = memo(({
                     <div className="flex flex-col h-full gap-4">
                       {/* Back Button - Top Level */}
                       <button 
-                        onClick={() => setSelectedUpgradeLocation(null)}
+                        onClick={() => {
+                          setSelectedUpgradeLocation(null);
+                          playSfx('close_window');
+                        }}
                         className={`text-lg font-orbitron font-bold ${isInterstellar ? 'text-orange-500 hover:text-orange-400' : 'text-cyan-500 hover:text-cyan-400'} flex items-center gap-2 uppercase tracking-widest shrink-0 w-fit`}
                       >
                         <ArrowRight className="w-4 h-4 rotate-180" /> {t('back')}
@@ -14191,7 +14309,10 @@ export const GameDashboard = memo(({
                     <div className="flex gap-2">
                       {!isEarth && (
                         <button 
-                          onClick={() => setShowRoute2Goals(true)}
+                          onClick={() => {
+                            setShowRoute2Goals(true);
+                            playSfx('open_window');
+                          }}
                           className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-base font-orbitron font-bold uppercase tracking-widest transition-all bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/30 shadow-[0_0_15px_rgba(16,185,129,0.1)]`}
                         >
                           <Target size={12} />
@@ -14484,7 +14605,8 @@ export const GameDashboard = memo(({
                 ]
               : [
                   { id: 'routes', icon: Map, label: t('routes1' as any), hide: isInterstellar },
-                  { id: 'routes2', icon: Globe, label: t('routes2' as any), hide: (!isInterstellar && !isRoute2Unlocked()) || isSpeedRun },
+                  { id: 'routes2', icon: Globe, label: t('routes2' as any), hide: !isInterstellar || isSpeedRun },
+
                   { id: 'missions', icon: Trophy, label: t('missions' as any), hide: isSpeedRun },
                   { id: 'aircraft', icon: Rocket, label: t('aircraft' as any) },
                   { id: 'technology', icon: Cpu, label: t('technology' as any) },
@@ -14588,7 +14710,151 @@ export const GameDashboard = memo(({
         }
       `}</style>
 
+      {/* Route 2 Info Modal */}
+      <AnimatePresence>
+        {showRoute2Info && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md"
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 20 }}
+              className="relative w-full max-w-4xl overflow-hidden glass-panel border-2 border-orange-500/50 p-10 rounded-3xl bg-gradient-to-br from-orange-500/20 via-black/90 to-orange-900/40 shadow-[0_0_100px_rgba(249,115,22,0.2)]"
+            >
+              <button 
+                onClick={() => setShowRoute2Info(false)}
+                className="absolute top-6 right-6 w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-white/40 hover:text-white hover:bg-white/10 transition-all z-20"
+              >
+                <X className="w-6 h-6" />
+              </button>
+
+              {/* Decorative Elements */}
+              <div className="absolute -top-24 -left-24 w-64 h-64 bg-orange-500/10 rounded-full blur-3xl pointer-events-none" />
+              <div className="absolute -bottom-24 -right-24 w-64 h-64 bg-orange-500/10 rounded-full blur-3xl pointer-events-none" />
+
+              <div className="relative z-10 flex flex-col items-center text-center gap-10">
+                <div className="relative">
+                  <div className="w-24 h-24 rounded-full bg-orange-500/20 flex items-center justify-center border-2 border-orange-500 shadow-[0_0_30px_rgba(249,115,22,0.5)] animate-pulse-glow">
+                    <Globe className="w-12 h-12 text-orange-400" />
+                  </div>
+                  <div className="absolute -top-1 -right-1 w-8 h-8 bg-orange-500 rounded-full flex items-center justify-center animate-bounce shadow-lg">
+                    <ArrowRight className="w-5 h-5 text-black" />
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <h3 className="text-4xl font-orbitron font-black text-orange-400 uppercase tracking-[0.4em] drop-shadow-[0_0_15px_rgba(249,115,22,0.6)]">
+                    {t('routes2')}
+                  </h3>
+                  <div className="h-1 w-32 bg-orange-500/50 mx-auto rounded-full" />
+                  <p className="text-xl text-orange-100 font-mono uppercase tracking-[0.2em] max-w-2xl leading-relaxed">
+                    {t('route2UnlockDesc')}
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full max-w-2xl">
+                  <div className="bg-white/5 border border-white/10 p-4 rounded-xl text-left">
+                    <div className="text-orange-400 font-orbitron text-xs tracking-widest uppercase mb-1">Status</div>
+                    <div className="text-white font-mono">{t('unlocked').toUpperCase()}</div>
+                  </div>
+                  <div className="bg-white/5 border border-white/10 p-4 rounded-xl text-left">
+                    <div className="text-orange-400 font-orbitron text-xs tracking-widest uppercase mb-1">Fase</div>
+                    <div className="text-white font-mono">PROTOCOLO INTERESTELAR</div>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => {
+                    setShowRoute2Info(false);
+                    setShowRoute2Confirm(true);
+                  }}
+                  className="group relative px-16 py-6 bg-orange-500 text-black font-orbitron font-black text-2xl rounded-2xl hover:bg-orange-400 transition-all shadow-[0_0_40px_rgba(249,115,22,0.6)] hover:scale-105 active:scale-95 uppercase tracking-[0.3em] border-b-4 border-orange-700 active:border-b-0 active:translate-y-1 flex items-center justify-center gap-4"
+                >
+                  <Rocket className="w-8 h-8" />
+                  {t('startInterstellarProtocol')}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+        {showRoute3Info && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md"
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 20 }}
+              className="relative w-full max-w-4xl overflow-hidden glass-panel border-2 border-purple-500/50 p-10 rounded-3xl bg-gradient-to-br from-purple-500/20 via-black/90 to-purple-900/40 shadow-[0_0_100px_rgba(168,85,247,0.2)]"
+            >
+              <button 
+                onClick={() => setShowRoute3Info(false)}
+                className="absolute top-6 right-6 w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-white/40 hover:text-white hover:bg-white/10 transition-all z-20"
+              >
+                <X className="w-6 h-6" />
+              </button>
+
+              {/* Decorative Elements */}
+              <div className="absolute -top-24 -left-24 w-64 h-64 bg-purple-500/10 rounded-full blur-3xl pointer-events-none" />
+              <div className="absolute -bottom-24 -right-24 w-64 h-64 bg-purple-500/10 rounded-full blur-3xl pointer-events-none" />
+
+              <div className="relative z-10 flex flex-col items-center text-center gap-10">
+                <div className="relative">
+                  <div className="w-24 h-24 rounded-full bg-purple-500/20 flex items-center justify-center border-2 border-purple-500 shadow-[0_0_30px_rgba(168,85,247,0.5)] animate-pulse-glow">
+                    <Zap className="w-12 h-12 text-purple-400" />
+                  </div>
+                  <div className="absolute -top-1 -right-1 w-8 h-8 bg-purple-500 rounded-full flex items-center justify-center animate-bounce shadow-lg">
+                    <ArrowRight className="w-5 h-5 text-black" />
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <h3 className="text-4xl font-orbitron font-black text-purple-400 uppercase tracking-[0.4em] drop-shadow-[0_0_15px_rgba(168,85,247,0.6)]">
+                    ROTA 3
+                  </h3>
+                  <div className="h-1 w-32 bg-purple-500/50 mx-auto rounded-full" />
+                  <p className="text-xl text-purple-100 font-mono uppercase tracking-[0.2em] max-w-2xl leading-relaxed">
+                    {t('route3UnlockDesc')}
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full max-w-2xl">
+                  <div className="bg-white/5 border border-white/10 p-4 rounded-xl text-left">
+                    <div className="text-purple-400 font-orbitron text-xs tracking-widest uppercase mb-1">Status</div>
+                    <div className="text-white font-mono">{t('unlocked').toUpperCase()}</div>
+                  </div>
+                  <div className="bg-white/5 border border-white/10 p-4 rounded-xl text-left">
+                    <div className="text-purple-400 font-orbitron text-xs tracking-widest uppercase mb-1">Fase</div>
+                    <div className="text-white font-mono">PROTOCOLO VAZIO</div>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => {
+                    setShowRoute3Info(false);
+                    setShowRoute3Confirm(true);
+                  }}
+                  className="group relative px-16 py-6 bg-purple-600 text-white font-orbitron font-black text-2xl rounded-2xl hover:bg-purple-500 transition-all shadow-[0_0_40px_rgba(168,85,247,0.6)] hover:scale-105 active:scale-95 uppercase tracking-[0.3em] border-b-4 border-purple-800 active:border-b-0 active:translate-y-1 flex items-center justify-center gap-4"
+                >
+                  <Rocket className="w-8 h-8" />
+                  {t('startVoidProtocol')}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+
       {/* Epic Route 2 Confirmation Screen */}
+
       <AnimatePresence>
         {showRoute2Confirm && (
           <motion.div
@@ -14992,7 +15258,10 @@ export const GameDashboard = memo(({
                   </p>
                 </div>
                 <button 
-                  onClick={() => setShowRoute2Goals(false)}
+                  onClick={() => {
+                    setShowRoute2Goals(false);
+                    playSfx('close_window');
+                  }}
                   className="p-2 hover:bg-white/10 rounded-full transition-colors"
                 >
                   <LogOut className="w-5 h-5 text-slate-400" />
@@ -15033,7 +15302,10 @@ export const GameDashboard = memo(({
                   </span>
                 </div>
                 <button
-                  onClick={() => setShowRoute2Goals(false)}
+                  onClick={() => {
+                    setShowRoute2Goals(false);
+                    playSfx('close_window');
+                  }}
                   className={`px-8 py-3 rounded-xl font-orbitron font-bold text-[14px] tracking-[0.2em] transition-all uppercase ${
                     isInterstellar ? 'bg-orange-500 text-black hover:bg-orange-400' : 'bg-cyan-500 text-black hover:bg-cyan-400'
                   }`}
@@ -15050,7 +15322,10 @@ export const GameDashboard = memo(({
       {/* Skill Map Modal */}
       <SkillMap 
         show={showSkillMap}
-        onClose={() => setShowSkillMap(false)}
+        onClose={() => {
+          setShowSkillMap(false);
+          playSfx('close_window');
+        }}
         isInterstellar={isInterstellar}
         language={language}
         qc={qc}
@@ -15345,7 +15620,10 @@ export const GameDashboard = memo(({
                     </div>
                   </div>
                   <button 
-                    onClick={() => setShowCaptureInfo(false)}
+                    onClick={() => {
+                      setShowCaptureInfo(false);
+                      playSfx('close_window');
+                    }}
                     className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center hover:bg-white/20 transition-colors border border-white/10"
                   >
                     <X className="w-4 h-4 text-white" />
@@ -15394,7 +15672,10 @@ export const GameDashboard = memo(({
                 </div>
 
                 <button
-                  onClick={() => setShowCaptureInfo(false)}
+                  onClick={() => {
+                    setShowCaptureInfo(false);
+                    playSfx('close_window');
+                  }}
                   className="w-full py-4 bg-orange-500 hover:bg-orange-400 text-black font-black text-base tracking-[0.2em] rounded-2xl transition-all shadow-[0_0_20px_rgba(249,115,22,0.4)] uppercase"
                 >
                   {language === 'pt' ? 'ENTENDIDO' : 'UNDERSTOOD'}
@@ -15412,7 +15693,10 @@ export const GameDashboard = memo(({
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.9 }}
             className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
-            onClick={() => setSelectedReward(null)}
+            onClick={() => {
+              setSelectedReward(null);
+              playSfx('close_window');
+            }}
           >
             <motion.div 
               className={`glass-panel p-8 rounded-3xl border ${selectedReward.color === 'emerald' ? 'border-emerald-500/40 shadow-[0_0_30px_rgba(16,185,129,0.2)]' : 'border-purple-500/40 shadow-[0_0_30px_rgba(168,85,247,0.2)]'} max-w-md w-full text-center space-y-6 relative overflow-hidden`}
@@ -15466,7 +15750,10 @@ export const GameDashboard = memo(({
               </div>
 
               <button
-                onClick={() => setSelectedReward(null)}
+                onClick={() => {
+                  setSelectedReward(null);
+                  playSfx('close_window');
+                }}
                 className={`w-full py-4 rounded-xl font-orbitron font-black text-[14px] tracking-[0.4em] transition-all active:scale-95 uppercase border ${selectedReward.color === 'emerald' ? 'bg-emerald-600 hover:bg-emerald-500 border-emerald-400 shadow-[0_0_20px_rgba(16,185,129,0.3)]' : 'bg-purple-600 hover:bg-purple-500 border-purple-400 shadow-[0_0_20px_rgba(168,85,247,0.3)]'} text-white`}
               >
                 {language === 'pt' ? 'FECHAR' : 'CLOSE'}
