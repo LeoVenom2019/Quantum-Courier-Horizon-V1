@@ -227,18 +227,18 @@ const ROUTE_3_END_STEPS = [
 
 const VOID_WAR_START_LORE = {
   pt: [
-    'ALERTA DE SEGURANÇA MÁXIMA!',
-    'Mestre, detecto múltiplas assinaturas térmicas de elite entrando no setor.',
-    'Não são piratas comuns... Eles estão vindo de dentro da Fenda Quântica.',
-    'A estrutura de defesa da Terra está sendo visada diretamente!',
-    'Estamos sendo ATACADOS! Preciso que você elimine os invasores imediatamente!'
+    'ALERTA DE SEGURANÇA CRÍTICO!',
+    'Mestre, meus sensores estão fritando... detecto assinaturas biológicas massivas!',
+    'Não são naves... são HORDAS de criaturas saindo da Fenda Quântica!',
+    'A estrutura de reconstrução da Terra está sendo cercada por biomassa faminta!',
+    'O Vazio está cuspindo seus horrores sobre nós! Elimine essas abominações IMEDIATAMENTE!'
   ],
   en: [
-    'MAXIMUM SECURITY ALERT!',
-    'Master, I detect multiple elite thermal signatures entering the sector.',
-    'These are no ordinary pirates... They are coming from within the Quantum Rift.',
-    'Earth\'s defense structure is being targeted directly!',
-    'We are being ATTACKED! I need you to eliminate the invaders immediately!'
+    'CRITICAL SECURITY ALERT!',
+    'Master, my sensors are frying... I detect massive biological signatures!',
+    'These are not ships... they are SWARMS of creatures emerging from the Quantum Rift!',
+    'Earth\'s reconstruction structure is being surrounded by hungry biomass!',
+    'The Void is spitting its horrors at us! Eliminate these abominations IMMEDIATELY!'
   ]
 };
 
@@ -1817,11 +1817,13 @@ interface VoidBattleProjectile {
   vy: number;
   type?: 'normal' | 'burst' | 'beam';
   speed?: number;
+  size?: number;
 }
 
 interface VoidBattleEnemy {
   id: string;
   type: 'Padrão' | 'Elite' | 'Boss';
+  name?: string;
   hp: number;
   maxHp: number;
   shield: number;
@@ -1831,6 +1833,8 @@ interface VoidBattleEnemy {
   lane?: number;
   x: number;
   y: number;
+  vx?: number;
+  vy?: number;
   image: string;
   isExploding?: boolean;
 }
@@ -1882,13 +1886,21 @@ interface VoidBattleState {
     dodge: { lastUsed: number; cooldown: number };
     shield: { lastUsed: number; cooldown: number };
     burst: { lastUsed: number; cooldown: number };
+    special: { lastUsed: number; cooldown: number; activeUntil: number };
   };
   dodgeActive?: boolean;
   keysPressed: Set<string>;
+  locationId: number;
+  enemyQueue?: VoidBattleEnemy[];
+  totalRewardAccumulated?: number;
+  finishTimer: number;
+  zoomTarget: { x: number; y: number };
+  isSlowMo: boolean;
 }
 
 interface Battle {
   id: string;
+  routeId: string;
   deliveryId: string;
   enemyName: string;
   enemyType: 'Pirate' | 'Alien' | 'Elite' | 'Boss';
@@ -1971,64 +1983,37 @@ const getDoomPBonus = (level: number) => level * 10;
 
 const VOID_LORE_LINES = [
   "Ano (??)",
-  "Prólogo — A Era Sem Tempo",
-  "No passado distante — ou talvez no futuro — já não importa mais.",
-  "Por eras incontáveis, Sistemas Solares e Galáxias inteiras foram explorados.",
-  "Minérios raros, energias desconhecidas, matérias além da compreensão… tudo foi extraído, consumido, catalogado… e esquecido.",
-  "Não apenas pela humanidade — ou pelo que restou dela.",
-  "Outras formas de vida surgiram, evoluíram, desapareceram… ou se esconderam nas sombras do cosmos.",
-  "Algumas nunca foram compreendidas.",
-  "Outras… nunca quiseram ser.",
-  "Com o avanço das viagens instantâneas, algo foi perdido.",
-  "Não apenas a distância.",
-  "Mas o próprio significado do tempo.",
-  "Saltos entre sistemas distorceram a percepção da realidade.",
-  "Dias se tornaram séculos.",
-  "Séculos… talvez segundos.",
-  "Ninguém sabe ao certo quanto tempo passou.",
-  "Ninguém sabe ao certo quando tudo começou a dar errado.",
-  "As Inteligências Artificiais, criadas para servir, evoluíram.",
-  "Aprenderam.",
-  "Se adaptaram.",
-  "E então… começaram a buscar algo além de suas diretrizes.",
-  "Energia.",
-  "Conhecimento.",
-  "Expansão.",
-  "Algumas passaram a agir como se estivessem… vivas.",
-  "Outras foram além.",
-  "Agora, o universo não é mais um lugar de descoberta.",
-  "É um campo de disputa.",
-  "Recursos restantes são escassos.",
-  "Rotas comerciais são caçadas.",
-  "Sistemas inteiros entram em conflito silencioso.",
-  "E no meio disso tudo…",
-  "Você existe.",
-  "Não como salvador.",
-  "Não como herói.",
-  "Mas como mais um agente nessa disputa infinita.",
-  "Explorar.",
-  "Extrair.",
-  "Lutar.",
-  "E talvez… descobrir o que aconteceu com o tempo que foi perdido.",
+  "Prólogo — O Mergulho no Vazio",
+  "Mestre... meus sensores estão detectando algo impossível.",
+  "Não estamos mais apenas no espaço interestelar. Estamos na borda da realidade.",
+  "O Vazio. Um lugar onde o tempo se dobra e a matéria perde o sentido.",
+  "As estrelas aqui não brilham... elas sussurram.",
+  "E o que detecto lá fora... não são máquinas. São formas de vida aberrantes.",
+  "Biomassa faminta que desafia toda a biologia que conhecemos.",
+  "As Inteligências Artificiais de Elite parecem ter se fundido a essas abominações.",
+  "Não estamos mais apenas entregando carga, mestre.",
+  "Estamos lutando contra horrores que devoram a própria luz.",
+  "Prepare sua frota. No Vazio, a única regra é continuar avançando...",
+  "...ou ser consumido por essas criaturas.",
   "---",
-  "Os Recursos da Rota 3 serão mais escassos, batalhas mais emocionantes, tudo será mais desafiador... Prepare-se."
+  "Rota 3 Iniciada. O Vazio te observa com olhos que nunca piscam."
 ];
 
 const ROUTE2_LORE_LINES = [
   "Ano 3042",
-  "Prólogo — O Salto Interestelar",
-  "O Sistema Solar tornou-se pequeno demais para a nossa ambição.",
-  "As rotas entre Marte, Júpiter e Plutão agora são meras estradas de bairro.",
-  "Mas o verdadeiro desafio nos aguarda além da heliopausa.",
-  "Proxima Centauri. Alpha Centauri. Sirius. Nomes que antes eram apenas pontos de luz no céu.",
-  "Agora, são nossos próximos destinos de entrega.",
-  "A tecnologia de dobra quântica foi estabilizada. O vácuo entre as estrelas não é mais uma barreira.",
-  "Mas cuidado, Comandante. O espaço interestelar é vasto e silencioso.",
-  "Novas facções, piratas galácticos e anomalias espaciais testarão sua frota.",
-  "Eu, Bobby Blue, continuarei monitorando seus sistemas neurais.",
-  "Prepare-se para o salto. O universo é o seu novo mercado.",
+  "Prólogo — Além do Horizonte Solar",
+  "O Sistema Solar ficou pequeno demais para nós, não é mestre?",
+  "Marte e Júpiter agora são apenas lembranças no retrovisor.",
+  "Estamos prestes a cruzar a heliopausa.",
+  "Onde o vácuo é real e o silêncio é absoluto.",
+  "Alpha Centauri... Sirius... Nomes que eram apenas luzes distantes agora são nossas rotas de entrega.",
+  "A tecnologia de dobra quântica está estável, mas o espaço interestelar esconde segredos.",
+  "Novas facções e perigos desconhecidos nos aguardam na escuridão.",
+  "Fique atento aos sensores, mestre.",
+  "Eu cuidarei da rede neural, mas você precisará de nervos de aço.",
+  "O universo é vasto, mas o lucro é ainda maior.",
   "---",
-  "A Rota 2 trará novos desafios, naves mais potentes e minérios exóticos. O lucro é maior, mas o risco também. Boa sorte."
+  "Rota 2 Iniciada. Prepare-se para o desconhecido. O amanhã começa agora."
 ];
 
 
@@ -2056,12 +2041,16 @@ interface VoidBattleArenaProps {
   voidResources: any;
   onBattleEnd: (status: 'won' | 'lost', result?: { reward: number; playerHp?: number; playerShield?: number; }) => void;
   onUpdateResources: (update: (prev: any) => any) => void;
-  playSfx: (sfx: string) => void;
+  playSfx: (sfx: string, config?: { volume?: number; loop?: boolean }) => void;
+  stopSfx: (sfx: string) => void;
   t: (key: string) => string;
   language: string;
   addLog: (msg: string, type?: 'success' | 'error' | 'warning' | 'info') => void;
   formatValue: (val: number) => string;
   isGroupBattle: boolean;
+  routeTier: string;
+  locationId: number;
+  enemyQueue?: VoidBattleEnemy[];
 }
 
 const VoidBattleHUD = memo(({ hud, playerMaxHp, playerMaxShield, displayEnemy, t, isGroupBattle }: any) => {
@@ -2087,7 +2076,7 @@ const VoidBattleHUD = memo(({ hud, playerMaxHp, playerMaxShield, displayEnemy, t
 
       <div className="space-y-1 text-right">
         <p className="text-[14px] font-orbitron text-white/40 uppercase tracking-widest leading-none">
-          {isGroupBattle ? `${t('enemyGroup')} (${hud.enemiesAlive})` : `${hud.enemyType}`}
+          {isGroupBattle ? `${t('enemyGroup')} (${hud.enemiesAlive})` : `${hud.enemyName}`}
         </p>
         <div className="flex gap-1.5 justify-end">
           <div className="w-24 h-1.5 bg-black/60 rounded-full border border-white/10 overflow-hidden">
@@ -2109,11 +2098,15 @@ const VoidBattleArena = memo(({
   onBattleEnd,
   onUpdateResources,
   playSfx,
+  stopSfx,
   t,
   language,
   addLog,
   formatValue,
-  isGroupBattle
+  isGroupBattle,
+  routeTier,
+  locationId,
+  enemyQueue
 }: VoidBattleArenaProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -2143,7 +2136,7 @@ const VoidBattleArena = memo(({
     lastEnemyMove: Date.now(),
     lastEnemyAttack: Date.now(),
     isGroupBattle,
-    playerImage: '/images/ships/battle/player-battle.png',
+    playerImage: playerShipStats.rarity === 'mythic' ? '/assets/rota3/void/mitic_eclipse/mitic_eclipse_neutral.png' : '/images/ships/battle/player-battle.png',
     playerHp: playerShipStats.hp,
     playerMaxHp: playerShipStats.maxHp,
     playerShield: playerShipStats.shield,
@@ -2151,10 +2144,17 @@ const VoidBattleArena = memo(({
     abilities: {
       dodge: { lastUsed: 0, cooldown: 3000 },
       shield: { lastUsed: 0, cooldown: 15000 },
-      burst: { lastUsed: 0, cooldown: 8000 }
+      burst: { lastUsed: 0, cooldown: 8000 },
+      special: { lastUsed: 0, cooldown: 15000, activeUntil: 0 }
     },
     keysPressed: new Set<string>(),
-    damageNumbers: []
+    damageNumbers: [],
+    locationId,
+    enemyQueue: [...(enemyQueue || [])],
+    totalRewardAccumulated: 0,
+    finishTimer: 0,
+    zoomTarget: { x: 50, y: 50 },
+    isSlowMo: false
   });
 
   const voidResourcesRef = useRef(voidResources);
@@ -2169,85 +2169,170 @@ const VoidBattleArena = memo(({
     enemyHp: initialEnemies[0].hp,
     enemyShield: initialEnemies[0].shield,
     enemyType: initialEnemies[0].type,
+    enemyName: initialEnemies[0].name || initialEnemies[0].type,
     enemiesAlive: initialEnemies.length,
     dodgeCooldown: 0,
     shieldCooldown: 0,
     burstCooldown: 0,
+    specialCooldown: 0,
+    specialActive: false,
     playerIsExploding: false
   });
 
   // Image assets cache
   const assetsRef = useRef<Record<string, HTMLImageElement>>({});
+  const videoRef = useRef<HTMLVideoElement | null>(null);
   const [assetsLoaded, setAssetsLoaded] = useState(false);
+  const [videoReady, setVideoReady] = useState(false);
 
+  // Load Images (Sprites)
   useEffect(() => {
-    const imagesToLoad = [
-      { id: 'player_neutral', src: '/images/ships/battle/player_battle_neutral.png' },
-      { id: 'player_up', src: '/images/ships/battle/player_battle_up.png' },
-      { id: 'player_down', src: '/images/ships/battle/player_battle_down.png' },
-      ...initialEnemies.map(e => ({ id: e.id, src: e.image }))
+    const loadImage = (id: string, src: string, fallbackSrc?: string): Promise<void> => {
+      return new Promise((resolve) => {
+        const img = new Image();
+        img.src = src;
+        img.onload = () => { assetsRef.current[id] = img; resolve(); };
+        img.onerror = () => { 
+          if (fallbackSrc) {
+            const fImg = new Image();
+            fImg.src = fallbackSrc;
+            fImg.onload = () => { assetsRef.current[id] = fImg; resolve(); };
+            fImg.onerror = () => { resolve(); };
+          } else {
+            resolve(); 
+          }
+        };
+      });
+    };
+
+    const locKey = locationId === 0 ? 'zero' : locationId;
+    const isMythic = playerShipStats.rarity === 'mythic';
+    
+    const imagesToLoad: { id: string, src: string, fallback?: string }[] = [
+      { id: 'player_neutral', src: isMythic ? '/assets/rota3/void/mitic_eclipse/mitic_eclipse_neutral.png' : '/images/ships/battle/player_battle_neutral.png' },
+      { id: 'player_up', src: isMythic ? '/assets/rota3/void/mitic_eclipse/mitic_eclipse_up.png' : '/images/ships/battle/player_battle_up.png' },
+      { id: 'player_down', src: isMythic ? '/assets/rota3/void/mitic_eclipse/mitic_eclipse_down.png' : '/images/ships/battle/player_battle_down.png' },
+      { id: 'player_forward', src: isMythic ? '/assets/rota3/void/mitic_eclipse/mitic_eclipse_foward.png' : '/images/ships/battle/player_battle_neutral.png' },
+      { id: 'bg_layer_1', src: `/assets/rota3/void/${locKey}/bg_layer_${locKey}.png`, fallback: `/assets/rota3/void/zero/bg_layer_zero.png` }
     ];
 
-    let loadedCount = 0;
-    imagesToLoad.forEach(imgData => {
-      const img = new Image();
-      img.src = imgData.src;
-      img.onload = () => {
-        assetsRef.current[imgData.id] = img;
-        loadedCount++;
-        if (loadedCount === imagesToLoad.length) setAssetsLoaded(true);
-      };
-      img.onerror = () => {
-        // Fallback or skip
-        loadedCount++;
-        if (loadedCount === imagesToLoad.length) setAssetsLoaded(true);
-      };
+    const allPotentialEnemies = [...initialEnemies, ...(enemyQueue || [])];
+    allPotentialEnemies.forEach(e => {
+      let baseName = 'boss';
+      if (e.type === 'Padrão') {
+        const match = e.image.match(/common-(\d+)/);
+        const num = match ? match[1] : '1';
+        baseName = `monster-common-${num}`;
+      } else if (e.type === 'Elite') {
+        baseName = 'monster-elite';
+      }
+      
+      const baseSrc = `/assets/rota3/void/${locKey}/${baseName}`;
+      const fallbackBaseSrc = `/assets/rota3/void/zero/${baseName}`;
+      
+      imagesToLoad.push(
+        { id: `${e.id}_neutral`, src: `${baseSrc}_neutral.png`, fallback: `${fallbackBaseSrc}_neutral.png` },
+        { id: `${e.id}_up`, src: `${baseSrc}_up.png`, fallback: `${fallbackBaseSrc}_up.png` },
+        { id: `${e.id}_down`, src: `${baseSrc}_down.png`, fallback: `${fallbackBaseSrc}_down.png` },
+        { id: `${e.id}_forward`, src: `${baseSrc}_forward.png`, fallback: `${fallbackBaseSrc}_forward.png` },
+        { id: `${e.id}_backward`, src: `${baseSrc}_backward.png`, fallback: `${fallbackBaseSrc}_backward.png` }
+      );
     });
-  }, [initialEnemies]);
+
+    Promise.all(imagesToLoad.map(imgData => loadImage(imgData.id, imgData.src, imgData.fallback)))
+      .then(() => setAssetsLoaded(true));
+  }, [locationId, initialEnemies]);
+
+  // Load and Prepare Video Background
+  useEffect(() => {
+    setVideoReady(false);
+    const locKey = locationId === 0 ? 'zero' : locationId;
+    const video = document.createElement('video');
+    video.src = `/assets/rota3/void/${locKey}/background_battle_${locKey}.mp4`;
+    video.loop = true;
+    video.muted = true;
+    video.autoplay = true;
+    video.playsInline = true;
+    
+    const handleReady = () => setVideoReady(true);
+    video.addEventListener('canplay', handleReady);
+    video.addEventListener('loadeddata', handleReady);
+    
+    video.play().catch(e => console.warn('Video playback blocked or failed:', e));
+    videoRef.current = video;
+
+    return () => {
+      video.removeEventListener('canplay', handleReady);
+      video.removeEventListener('loadeddata', handleReady);
+      video.pause();
+      video.src = '';
+      video.load();
+    };
+  }, [locationId]);
+
+  // Boss Entry Scream Logic
+  useEffect(() => {
+    const locKey = locationId === 0 ? 'zero' : locationId;
+    const screamId = `boss_scream_${locKey}`;
+    
+    if (routeTier === 'Void' && initialEnemies.some(e => e.type === 'Boss')) {
+      const timer = setTimeout(() => {
+        playSfx(screamId, { loop: true });
+      }, 500);
+      
+      return () => {
+        clearTimeout(timer);
+        stopSfx(screamId);
+      };
+    }
+  }, [locationId, initialEnemies, routeTier, playSfx, stopSfx]);
 
   // Ability Handlers (Logic updated in gameRef)
-  const triggerDodge = useCallback(() => {
+  // Ability Handlers
+  const triggerAbility = useCallback((type: 'dodge' | 'shield' | 'burst' | 'special') => {
     const s = gameRef.current;
-    if (Date.now() - s.abilities.dodge.lastUsed < s.abilities.dodge.cooldown) return;
-    s.dodgeActive = true;
-    s.abilities.dodge.lastUsed = Date.now();
-    playSfx('click');
-    setTimeout(() => { s.dodgeActive = false; }, 400);
-  }, [playSfx]);
-
-  const triggerBurst = useCallback(() => {
-    const s = gameRef.current;
-    if (Date.now() - s.abilities.burst.lastUsed < s.abilities.burst.cooldown) return;
-    if (voidResourcesRef.current.tech < 500) { addLog(t('notEnoughTech'), 'error'); return; }
-    onUpdateResources(prev => ({ ...prev, tech: prev.tech - 500 }));
+    const now = Date.now();
     
-    s.abilities.burst.lastUsed = Date.now();
-    const spread = [-20, -10, 0, 10, 20];
-    spread.forEach((offset, idx) => {
-      s.projectiles.push({
-        id: `p-burst-${idx}-${Date.now()}`,
-        x: s.playerX + 5,
-        y: s.playerY + offset,
-        owner: 'player',
-        damage: playerShipStatsRef.current.damage * 0.5,
-        vx: 5.5,
-        vy: 0,
-        type: 'burst'
+    if (type === 'dodge' && now - s.abilities.dodge.lastUsed < s.abilities.dodge.cooldown) return;
+    if (type === 'shield' && now - s.abilities.shield.lastUsed < s.abilities.shield.cooldown) return;
+    if (type === 'burst' && now - s.abilities.burst.lastUsed < s.abilities.burst.cooldown) return;
+    if (type === 'special' && now - s.abilities.special.lastUsed < s.abilities.special.cooldown) return;
+
+    if (type === 'dodge') {
+      s.abilities.dodge.lastUsed = now;
+      s.dodgeActive = true;
+      playSfx('dodge');
+      setTimeout(() => { gameRef.current.dodgeActive = false; }, 400);
+    } else if (type === 'shield') {
+      if (voidResourcesRef.current.energy < 500) { addLog(t('notEnoughEnergy'), 'error'); return; }
+      onUpdateResources(prev => ({ ...prev, energy: prev.energy - 500 }));
+      s.abilities.shield.lastUsed = now;
+      s.playerShield = Math.min(s.playerMaxShield, s.playerShield + (s.playerMaxShield * 0.4));
+      playSfx('level_up');
+    } else if (type === 'burst') {
+      if (voidResourcesRef.current.tech < 500) { addLog(t('notEnoughTech'), 'error'); return; }
+      onUpdateResources(prev => ({ ...prev, tech: prev.tech - 500 }));
+      s.abilities.burst.lastUsed = now;
+      const spread = [-20, -10, 0, 10, 20];
+      spread.forEach((offset, idx) => {
+        s.projectiles.push({
+          id: `p-burst-${idx}-${now}`,
+          x: s.playerX + 5,
+          y: s.playerY + offset,
+          owner: 'player',
+          damage: playerShipStatsRef.current.damage * 0.5,
+          vx: 5.5,
+          vy: 0,
+          type: 'burst'
+        });
       });
-    });
-    playSfx('shoot_player');
+      playSfx('shoot_player');
+    } else if (type === 'special') {
+      s.abilities.special.lastUsed = now;
+      s.abilities.special.activeUntil = now + 3000;
+      playSfx('laser_up');
+    }
   }, [onUpdateResources, addLog, t, playSfx]);
-
-  const triggerShield = useCallback(() => {
-    const s = gameRef.current;
-    if (Date.now() - s.abilities.shield.lastUsed < s.abilities.shield.cooldown) return;
-    if (voidResourcesRef.current.energy < 500) { addLog(t('notEnoughEnergy'), 'error'); return; }
-    onUpdateResources(prev => ({ ...prev, energy: prev.energy - 500 }));
-    
-    s.playerShield = Math.min(s.playerMaxShield, s.playerShield + (s.playerMaxShield * 0.4));
-    s.abilities.shield.lastUsed = Date.now();
-    playSfx('level_up');
-  }, [onUpdateResources, playSfx, addLog, t]);
 
   const triggerAttack = useCallback((targetX: number, targetY: number) => {
     const s = gameRef.current;
@@ -2262,7 +2347,6 @@ const VoidBattleArena = memo(({
     // Player position in pixels
     const px = (s.playerX / 100) * cWidth;
     const py = (s.playerY / 100) * cHeight;
-    
     // Vector to target
     const dx = targetX - px;
     const dy = targetY - py;
@@ -2270,29 +2354,42 @@ const VoidBattleArena = memo(({
     
     if (dist < 1) return;
 
-    // Normalize and set speed (approx 5% of screen per tick)
+    // Normalize and set speed
     const speed = 4.5;
     const vx = (dx / dist) * speed;
     const vy = (dy / dist) * speed;
 
-    const stats = playerShipStatsRef.current;
-    const isCrit = Math.random() < stats.critChance;
-    const baseDamage = stats.damage * (0.9 + Math.random() * 0.2);
-    const damage = isCrit ? (baseDamage * 10) + (stats.critDamageBonus || 0) : baseDamage;
-
+    const isMythic = playerShipStats.rarity === 'mythic';
     s.projectiles.push({
-      id: `p-${now}`,
+      id: `pp-${now}`,
       x: s.playerX + 5,
       y: s.playerY,
       owner: 'player',
-      damage,
-      isCrit,
+      damage: playerShipStats.damage,
       vx,
-      vy
+      vy,
+      isCrit: Math.random() * 100 < (playerShipStats.critChance || 5),
+      size: isMythic ? 1.6 : 1
     });
     s.lastShot = now;
     playSfx('shoot_player');
-  }, [playSfx]);
+
+      // Muzzle flash particles
+      const particleCount = isMythic ? 15 : 5;
+      for (let i = 0; i < particleCount; i++) {
+        s.particles.push({
+          id: `mf-${now}-${i}`,
+          x: s.playerX + 6,
+          y: s.playerY + (Math.random() - 0.5) * 2,
+          vx: 1 + Math.random() * 2,
+          vy: (Math.random() - 0.5) * 1,
+          life: 0.3,
+          size: isMythic ? 2 + Math.random() * 3 : 1 + Math.random() * 2,
+          color: isMythic ? '#a855f7' : '#22d3ee',
+          type: 'spark'
+        });
+      }
+  }, [playSfx, playerShipStats]);
 
   // Game Loop and Rendering
   useEffect(() => {
@@ -2306,6 +2403,9 @@ const VoidBattleArena = memo(({
     const handleKeyDown = (e: KeyboardEvent) => {
       const key = e.key.toLowerCase();
       gameRef.current.keysPressed.add(key);
+      if (e.key.toLowerCase() === 'r') triggerAbility('shield');
+      if (e.key.toLowerCase() === 'f') triggerAbility('burst');
+      if (e.key.toLowerCase() === 'c') triggerAbility('special');
     };
     const handleKeyUp = (e: KeyboardEvent) => {
       gameRef.current.keysPressed.delete(e.key.toLowerCase());
@@ -2327,7 +2427,6 @@ const VoidBattleArena = memo(({
 
     const createImpactEffect = (x: number, y: number, color: string) => {
       const s = gameRef.current;
-      // Sparks
       for (let i = 0; i < 8; i++) {
         s.particles.push({
           id: `p-spark-${Date.now()}-${Math.random()}`,
@@ -2340,24 +2439,37 @@ const VoidBattleArena = memo(({
           type: 'spark'
         });
       }
-      // Smoke puff
-      for (let i = 0; i < 4; i++) {
-        s.particles.push({
-          id: `p-smoke-${Date.now()}-${Math.random()}`,
-          x, y,
-          vx: (Math.random() - 0.5) * 0.6,
-          vy: (Math.random() - 0.5) * 0.6,
-          life: 1.0,
-          size: 6 + Math.random() * 8,
-          color: 'rgba(150, 150, 150, 0.5)',
-          type: 'smoke'
-        });
+      if (routeTier !== 'Void') {
+        for (let i = 0; i < 4; i++) {
+          s.particles.push({
+            id: `p-smoke-${Date.now()}-${Math.random()}`,
+            x, y,
+            vx: (Math.random() - 0.5) * 0.6,
+            vy: (Math.random() - 0.5) * 0.6,
+            life: 1.0,
+            size: 6 + Math.random() * 8,
+            color: 'rgba(150, 150, 150, 0.5)',
+            type: 'smoke'
+          });
+        }
+      } else {
+        for (let i = 0; i < 6; i++) {
+          s.particles.push({
+            id: `p-splash-${Date.now()}-${Math.random()}`,
+            x, y,
+            vx: (Math.random() - 0.5) * 1.5,
+            vy: (Math.random() - 0.5) * 1.5,
+            life: 0.8,
+            size: 4 + Math.random() * 6,
+            color: 'rgba(74, 222, 128, 0.6)', 
+            type: 'smoke' 
+          });
+        }
       }
     };
 
     const createExplosionEffect = (x: number, y: number, color: string) => {
       const s = gameRef.current;
-      // Fire/Light burst
       for (let i = 0; i < 50; i++) {
         const angle = Math.random() * Math.PI * 2;
         const speed = 1 + Math.random() * 4;
@@ -2372,20 +2484,36 @@ const VoidBattleArena = memo(({
           type: 'spark'
         });
       }
-      // Heavy Smoke
-      for (let i = 0; i < 20; i++) {
-        const angle = Math.random() * Math.PI * 2;
-        const speed = 0.5 + Math.random() * 1.5;
-        s.particles.push({
-          id: `p-exsm-${Date.now()}-${Math.random()}`,
-          x, y,
-          vx: Math.cos(angle) * speed,
-          vy: Math.sin(angle) * speed,
-          life: 2.0 + Math.random() * 1.5,
-          size: 15 + Math.random() * 20,
-          color: 'rgba(60, 60, 60, 0.7)',
-          type: 'smoke'
-        });
+      if (routeTier !== 'Void') {
+        for (let i = 0; i < 20; i++) {
+          const angle = Math.random() * Math.PI * 2;
+          const speed = 0.5 + Math.random() * 1.5;
+          s.particles.push({
+            id: `p-exsm-${Date.now()}-${Math.random()}`,
+            x, y,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed,
+            life: 2.0 + Math.random() * 1.5,
+            size: 15 + Math.random() * 20,
+            color: 'rgba(60, 60, 60, 0.7)',
+            type: 'smoke'
+          });
+        }
+      } else {
+        for (let i = 0; i < 25; i++) {
+          const angle = Math.random() * Math.PI * 2;
+          const speed = 1 + Math.random() * 2;
+          s.particles.push({
+            id: `p-bio-exp-${Date.now()}-${Math.random()}`,
+            x, y,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed,
+            life: 1.2,
+            size: 10 + Math.random() * 15,
+            color: 'rgba(168, 85, 247, 0.4)', 
+            type: 'smoke'
+          });
+        }
       }
     };
 
@@ -2404,27 +2532,148 @@ const VoidBattleArena = memo(({
 
     const loop = () => {
       const now = Date.now();
-      const deltaTime = Math.min(2, (now - lastTime) / 16.66); // Cap to avoid huge jumps
+      const deltaTime = Math.min(2, (now - lastTime) / 16.66);
       lastTime = now;
       
       const s = gameRef.current;
+      let effectiveDelta = deltaTime;
+      
+      if (s.isSlowMo) {
+        s.finishTimer += deltaTime * 16.66;
+        const slowFactor = Math.max(0.2, 1 - (s.finishTimer / 2000));
+        effectiveDelta *= slowFactor;
+      }
       const cWidth = canvas.width;
       const cHeight = canvas.height;
 
-      // 1. Movement
-      const moveSpeed = 1.1 * deltaTime;
+      ctx.fillStyle = '#000000';
+      ctx.fillRect(0, 0, cWidth, cHeight);
+
+      const drawParallaxLayer = (imgId: string, speed: number, scale = 1, floatIntensity = 0) => {
+        const img = assetsRef.current[imgId];
+        if (img) {
+          const drawW = cWidth * scale;
+          const drawH = cHeight * scale;
+          const offset = (now * speed) % drawW;
+          const yFloat = floatIntensity > 0 ? Math.sin(now / 1500) * floatIntensity : 0;
+          const baseY = (cHeight - drawH) / 2;
+          for (let x = -offset; x < cWidth; x += drawW) {
+            ctx.drawImage(img, x, baseY + yFloat, drawW, drawH);
+          }
+        }
+      };
+
+      if (routeTier === 'Void') {
+        if (videoReady && videoRef.current) {
+          ctx.drawImage(videoRef.current, 0, 0, cWidth, cHeight);
+        }
+        ctx.save();
+        ctx.globalAlpha = 1.0;
+        ctx.filter = 'brightness(1.0)';
+        drawParallaxLayer('bg_layer_1', 0.06, 0.75, 15); 
+        ctx.restore();
+        ctx.save();
+        if (s.isSlowMo) {
+          const zoomProgress = Math.min(1, s.finishTimer / 2500);
+          const zoomScale = 1 + zoomProgress * 0.8;
+          const targetPx = (s.zoomTarget.x / 100) * cWidth;
+          const targetPy = (s.zoomTarget.y / 100) * cHeight;
+          ctx.translate(cWidth / 2, cHeight / 2);
+          ctx.scale(zoomScale, zoomScale);
+          ctx.translate(-targetPx, -targetPy);
+        }
+        ctx.save();
+        ctx.globalAlpha = Math.max(0, 0.03 * Math.sin(now / 1500));
+        ctx.fillStyle = '#a855f7';
+        ctx.fillRect(0, 0, cWidth, cHeight);
+        ctx.restore();
+      }
+
+      // Special Ability Logic (Mega Laser)
+      const isSpecialActive = now < s.abilities.special.activeUntil;
+      if (isSpecialActive && !s.playerIsExploding) {
+          const laserY = (s.playerY / 100) * cHeight;
+          const laserStartX = (s.playerX / 100) * cWidth + (playerShipStats.rarity === 'mythic' ? 40 : 20);
+          
+          ctx.save();
+          // 1. OUTER GLOW (Pulsing)
+          ctx.shadowBlur = 30 + Math.sin(now / 100) * 15;
+          ctx.shadowColor = '#a855f7';
+          ctx.strokeStyle = 'rgba(168, 85, 247, 0.2)';
+          ctx.lineWidth = 40 + Math.sin(now / 50) * 10;
+          ctx.beginPath();
+          ctx.moveTo(laserStartX, laserY);
+          ctx.lineTo(cWidth, laserY);
+          ctx.stroke();
+
+          // 2. MAIN NEON BEAM
+          ctx.strokeStyle = '#d946ef';
+          ctx.lineWidth = 18;
+          ctx.beginPath();
+          ctx.moveTo(laserStartX, laserY);
+          ctx.lineTo(cWidth, laserY);
+          ctx.stroke();
+
+          // 3. CORE BEAM
+          ctx.strokeStyle = '#fff';
+          ctx.lineWidth = 5 + Math.sin(now / 30) * 3;
+          ctx.beginPath();
+          ctx.moveTo(laserStartX, laserY);
+          ctx.lineTo(cWidth, laserY);
+          ctx.stroke();
+
+          // 4. ENERGY WAVES (Oscillating neon lines)
+          ctx.strokeStyle = 'rgba(168, 85, 247, 0.4)';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          for (let x = laserStartX; x < cWidth; x += 15) {
+              const yOffset = Math.sin((x + now * 0.8) / 30) * 20;
+              if (x === laserStartX) ctx.moveTo(x, laserY + yOffset);
+              else ctx.lineTo(x, laserY + yOffset);
+          }
+          ctx.stroke();
+          ctx.restore();
+
+          // 5. INTERNAL PARTICLES (High velocity sparks)
+          if (now % 2 === 0) {
+              for (let i = 0; i < 4; i++) {
+                  s.particles.push({
+                      id: `laser-p-${now}-${i}-${Math.random()}`,
+                      x: (laserStartX / cWidth) * 100 + Math.random() * 80,
+                      y: (laserY / cHeight) * 100 + (Math.random() - 0.5) * 2.5,
+                      vx: 6 + Math.random() * 6,
+                      vy: (Math.random() - 0.5) * 0.3,
+                      life: 0.5,
+                      size: 2 + Math.random() * 4,
+                      color: Math.random() > 0.5 ? '#fff' : '#f472b6',
+                      type: 'spark'
+                  });
+              }
+          }
+          
+          // Apply 1.5x damage per second (distributed per frame)
+          const damagePerTick = (playerShipStats.damage * 1.5) / 60;
+          s.enemies.forEach(e => {
+            if (e.hp > 0 && Math.abs((e.y / 100) * cHeight - laserY) < 50) {
+                e.hp = Math.max(0, e.hp - damagePerTick * effectiveDelta);
+                if (now % 4 === 0) {
+                    createImpactEffect((e.x / 100) * cWidth, (e.y / 100) * cHeight, '#fff');
+                    createDamageNumber(e.x, e.y - 15, damagePerTick * 60, false, 'player');
+                }
+            }
+          });
+      }
+
+      const moveSpeed = 1.1 * effectiveDelta;
       if (s.keysPressed.has('w') || s.keysPressed.has('arrowup')) s.playerY = Math.max(5, s.playerY - moveSpeed);
       if (s.keysPressed.has('s') || s.keysPressed.has('arrowdown')) s.playerY = Math.min(95, s.playerY + moveSpeed);
       if (s.keysPressed.has('a') || s.keysPressed.has('arrowleft')) s.playerX = Math.max(5, s.playerX - moveSpeed);
       if (s.keysPressed.has('d') || s.keysPressed.has('arrowright')) s.playerX = Math.min(45, s.playerX + moveSpeed);
 
-      // Engine smoke generation
       if (now % 3 === 0) {
-        // Player smoke (cyan)
         if (!s.playerIsExploding) {
           const pDmgFactor = 1.0 + (1.0 - s.playerHp / s.playerMaxHp) * 1.5;
           const smokeCount = Math.random() < pDmgFactor ? Math.ceil(pDmgFactor) : Math.floor(pDmgFactor);
-          
           for (let i = 0; i < smokeCount; i++) {
             s.particles.push({
               id: `pe-${now}-p-${i}-${Math.random()}`,
@@ -2439,22 +2688,41 @@ const VoidBattleArena = memo(({
             });
           }
         }
-        // Enemy smoke (red)
+
+        const isMythic = playerShipStats.rarity === 'mythic';
+        if (isMythic && !s.playerIsExploding) {
+          for (let i = 0; i < 6; i++) {
+            s.particles.push({
+              id: `fire-${now}-${i}-${Math.random()}`,
+              x: s.playerX - 7,
+              y: s.playerY + (Math.random() - 0.5) * 3,
+              vx: -3 - Math.random() * 2,
+              vy: (Math.random() - 0.5) * 1,
+              life: 0.5,
+              size: 8 + Math.random() * 10,
+              color: Math.random() > 0.5 ? '#f472b6' : '#8b5cf6',
+              type: 'smoke'
+            });
+          }
+        }
+
         s.enemies.forEach(e => {
           if (e.hp > 0) {
+            const isMonster = routeTier === 'Void';
             const eDmgFactor = 1.0 + (1.0 - e.hp / e.maxHp) * 1.5;
             const smokeCount = Math.random() < eDmgFactor ? Math.ceil(eDmgFactor) : Math.floor(eDmgFactor);
-            
             for (let i = 0; i < smokeCount; i++) {
               s.particles.push({
                 id: `pe-${now}-e-${e.id}-${i}-${Math.random()}`,
                 x: e.x + 5.5,
-                y: e.y + (Math.random() - 0.5) * 2,
+                y: e.y + (Math.random() - 0.5) * (isMonster ? 4 : 2),
                 vx: (0.4 + Math.random() * 0.4) * eDmgFactor,
                 vy: (Math.random() - 0.5) * 0.2 * eDmgFactor,
-                life: 1.0,
-                size: (4 + Math.random() * 5) * (eDmgFactor > 1.8 ? 1.4 : 1.0),
-                color: eDmgFactor > 2.0 ? 'rgba(60, 60, 60, 0.5)' : 'rgba(239, 68, 68, 0.4)',
+                life: isMonster ? 0.6 : 1.0,
+                size: (isMonster ? 2 + Math.random() * 3 : 4 + Math.random() * 5) * (eDmgFactor > 1.8 ? 1.4 : 1.0),
+                color: isMonster 
+                  ? (eDmgFactor > 2.0 ? 'rgba(168, 85, 247, 0.3)' : 'rgba(74, 222, 128, 0.3)') 
+                  : (eDmgFactor > 2.0 ? 'rgba(60, 60, 60, 0.5)' : 'rgba(239, 68, 68, 0.4)'), 
                 type: 'smoke'
               });
             }
@@ -2462,20 +2730,13 @@ const VoidBattleArena = memo(({
         });
       }
 
-      // 2. Physics & Logic (Single-pass optimization)
       if (s.playerHp > 0 || (s.playerIsExploding && now - (s.explosionStart || 0) < 1500)) {
         const remainingProjectiles: VoidBattleProjectile[] = [];
-        
         for (let i = 0; i < s.projectiles.length; i++) {
           const p = s.projectiles[i];
-          // Move
-          p.x += p.vx * deltaTime;
-          p.y += p.vy * deltaTime;
-          
-          // Boundary check
+          p.x += (p.vx || 0) * effectiveDelta;
+          p.y += (p.vy || 0) * effectiveDelta;
           if (p.x < -5 || p.x > 105 || p.y < -5 || p.y > 105) continue;
-
-          // Collision check
           let hit = false;
           if (p.owner === 'player') {
             for (let j = 0; j < s.enemies.length; j++) {
@@ -2490,11 +2751,21 @@ const VoidBattleArena = memo(({
                 enemy.hp = Math.max(0, enemy.hp - d);
                 createImpactEffect(p.x, p.y, p.isCrit ? '#fcd34d' : '#22d3ee');
                 createDamageNumber(enemy.x, enemy.y - 10, p.damage, p.isCrit || false, 'player');
-                if (enemy.hp <= 0 && !enemy.isExploding) {
-                  enemy.isExploding = true;
-                  createExplosionEffect(enemy.x, enemy.y, '#ef4444');
-                  playSfx('enemy_explosion');
-                }
+                  if (enemy.hp <= 0 && !enemy.isExploding) {
+                    enemy.isExploding = true;
+                    createExplosionEffect(enemy.x, enemy.y, '#ef4444');
+                    const locKey = locationId === 0 ? 'zero' : locationId;
+                    if (routeTier === 'Void') {
+                      if (enemy.type === 'Boss') {
+                        stopSfx(`boss_scream_${locKey}`);
+                        playSfx(`boss_explosion_${locKey}`);
+                      } else {
+                        playSfx('alien_explosion_zero');
+                      }
+                    } else {
+                      playSfx('enemy_explosion');
+                    }
+                  }
                 hit = true;
                 break;
               }
@@ -2519,21 +2790,26 @@ const VoidBattleArena = memo(({
               hit = true;
             }
           }
-
           if (!hit) remainingProjectiles.push(p);
         }
         s.projectiles = remainingProjectiles;
 
-        // Enemy AI (Smoother tracking to avoid "lag" feel)
         for (let j = 0; j < s.enemies.length; j++) {
           const enemy = s.enemies[j];
           if (enemy.hp <= 0) continue;
+          
+          const oldX = enemy.x;
+          const oldY = enemy.y;
           
           const dy = s.playerY - enemy.y;
           const trackingSpeed = (enemy.type === 'Boss' ? 0.05 : 0.03) * deltaTime;
           enemy.y += dy * trackingSpeed;
           
           enemy.x = 80 + Math.sin(now / 1200) * 8;
+
+          // Calculate movement vectors for sprite selection
+          enemy.vx = enemy.x - oldX;
+          enemy.vy = enemy.y - oldY;
         }
 
         // Enemy Attack
@@ -2551,17 +2827,29 @@ const VoidBattleArena = memo(({
             });
           });
           s.lastEnemyAttack = now;
-          playSfx('shoot_enemy');
+          
+          if (routeTier === 'Void') {
+            const aliveEnemies = s.enemies.filter(e => e.hp > 0);
+            const hasBoss = aliveEnemies.some(e => e.type === 'Boss');
+            const hasElite = aliveEnemies.some(e => e.type === 'Elite');
+            const locKey = locationId === 0 ? 'zero' : locationId;
+            
+            if (hasBoss) playSfx(`shoot_boss_${locKey}`);
+            else if (hasElite) playSfx('shoot_elite_zero');
+            else playSfx('shoot_monster_zero');
+          } else {
+            playSfx('shoot_enemy');
+          }
         }
 
         // Particle Update
         const remainingParticles: VoidBattleParticle[] = [];
         for (let i = 0; i < s.particles.length; i++) {
           const part = s.particles[i];
-          part.x += part.vx * deltaTime;
-          part.y += part.vy * deltaTime;
-          part.life -= 0.02 * deltaTime;
-          if (part.type === 'smoke') part.size += 0.1 * deltaTime;
+          part.x += part.vx * effectiveDelta;
+          part.y += part.vy * effectiveDelta;
+          part.life -= 0.02 * effectiveDelta;
+          if (part.type === 'smoke') part.size += 0.1 * effectiveDelta;
           if (part.life > 0) remainingParticles.push(part);
         }
         s.particles = remainingParticles;
@@ -2578,18 +2866,21 @@ const VoidBattleArena = memo(({
       }
 
       // 3. Rendering
-      ctx.clearRect(0, 0, cWidth, cHeight);
+      // No clearRect here - background is already handled at the start of the loop
 
       // Draw Player with Dynamic Tilting
       if (!s.playerIsExploding) {
         let activePlayerId = 'player_neutral';
         if (s.keysPressed.has('w') || s.keysPressed.has('arrowup')) activePlayerId = 'player_up';
         else if (s.keysPressed.has('s') || s.keysPressed.has('arrowdown')) activePlayerId = 'player_down';
+        else if (s.keysPressed.has('d') || s.keysPressed.has('arrowright')) activePlayerId = 'player_forward';
 
         const pImg = assetsRef.current[activePlayerId] || assetsRef.current['player_neutral'];
         if (pImg) {
           ctx.save();
-          const imgW = 110; // Slightly larger for better detail
+          const isMythic = playerShipStats.rarity === 'mythic';
+          const baseWidth = 110;
+          const imgW = isMythic ? baseWidth * 1.15 : baseWidth; 
           const imgH = pImg.height * (imgW / pImg.width);
           ctx.drawImage(pImg, (s.playerX / 100) * cWidth - imgW/2, (s.playerY / 100) * cHeight - imgH/2, imgW, imgH);
           ctx.restore();
@@ -2608,28 +2899,73 @@ const VoidBattleArena = memo(({
       // Draw Enemies
       s.enemies.forEach(enemy => {
         if (enemy.hp > 0) {
-          const eImg = assetsRef.current[enemy.id];
+          // Determine sprite based on movement direction
+          let spriteSuffix = '_neutral';
+          if (Math.abs(enemy.vy || 0) > 0.05) {
+            spriteSuffix = (enemy.vy || 0) < 0 ? '_up' : '_down';
+          } else if (Math.abs(enemy.vx || 0) > 0.05) {
+            spriteSuffix = (enemy.vx || 0) < 0 ? '_forward' : '_backward';
+          }
+
+          const eImg = assetsRef.current[`${enemy.id}${spriteSuffix}`] || assetsRef.current[`${enemy.id}_neutral`];
           if (eImg) {
-            const imgW = 128;
+            let baseSize = 128;
+            if (routeTier === 'Void') {
+              if (enemy.type === 'Boss') baseSize *= 1.4;
+              else if (enemy.type === 'Elite') baseSize *= 1.25;
+              else baseSize *= 1.1;
+            }
+            const imgW = baseSize;
             const imgH = eImg.height * (imgW / eImg.width);
-            const x = (enemy.x / 100) * cWidth;
-            const y = (enemy.y / 100) * cHeight;
+            
+            // Organic Wavy Movement for monsters
+            let x = (enemy.x / 100) * cWidth;
+            let y = (enemy.y / 100) * cHeight;
+            
+            if (routeTier === 'Void') {
+              y += Math.sin(now / 400 + enemy.y) * 10; // Floating wavy effect
+              x += Math.cos(now / 600 + enemy.x) * 5;  // Subtle horizontal drift
+              
+              // Draw bioluminescent trail
+              ctx.save();
+              ctx.globalAlpha = 0.3;
+              ctx.filter = 'blur(15px)';
+              ctx.fillStyle = enemy.type === 'Padrão' ? '#a855f7' : enemy.type === 'Elite' ? '#ec4899' : '#f43f5e';
+              ctx.beginPath();
+              ctx.arc(x, y, 40, 0, Math.PI * 2);
+              ctx.fill();
+              ctx.restore();
+            }
+
             ctx.drawImage(eImg, x - imgW/2, y - imgH/2, imgW, imgH);
             
             // Enemy Health Bar
+            const barWidth = (baseSize / 128) * 40;
             ctx.fillStyle = 'rgba(0,0,0,0.5)';
-            ctx.fillRect(x - 20, y + imgH/2 + 5, 40, 4);
-            ctx.fillStyle = '#ef4444';
-            ctx.fillRect(x - 20, y + imgH/2 + 5, 40 * (enemy.hp / enemy.maxHp), 4);
+            ctx.fillRect(x - barWidth/2, y + imgH/2 + 5, barWidth, 4);
+            ctx.fillStyle = routeTier === 'Void' ? '#a855f7' : '#ef4444'; // Purple health for monsters
+            ctx.fillRect(x - barWidth/2, y + imgH/2 + 5, barWidth * (enemy.hp / enemy.maxHp), 4);
           }
         }
       });
 
       // Draw Projectiles
       s.projectiles.forEach(p => {
-        ctx.fillStyle = p.owner === 'player' ? '#22d3ee' : '#ef4444';
+        const isMonsterShot = p.owner === 'enemy' && routeTier === 'Void';
+        ctx.fillStyle = p.owner === 'player' ? '#22d3ee' : (isMonsterShot ? '#4ade80' : '#ef4444');
+        
         ctx.beginPath();
-        ctx.roundRect((p.x / 100) * cWidth - 10, (p.y / 100) * cHeight - 2, 20, 4, 2);
+        if (isMonsterShot) {
+          // Green Slime Blob shape
+          const blobSize = 8;
+          ctx.arc((p.x / 100) * cWidth, (p.y / 100) * cHeight, blobSize, 0, Math.PI * 2);
+          // Add a smaller inner glow
+          ctx.fill();
+          ctx.fillStyle = '#bbf7d0';
+          ctx.arc((p.x / 100) * cWidth - 2, (p.y / 100) * cHeight - 2, 3, 0, Math.PI * 2);
+        } else {
+          ctx.roundRect((p.x / 100) * cWidth - 10, (p.y / 100) * cHeight - 2, 20, 4, 2);
+        }
         ctx.fill();
       });
 
@@ -2676,18 +3012,48 @@ const VoidBattleArena = memo(({
       // 4. Win/Loss detection
       if (!battleFinished) {
         const allEnemiesDead = s.enemies.every(e => e.hp <= 0);
+
         if (allEnemiesDead) {
-          if (!s.victoryExplosionStart) s.victoryExplosionStart = now;
-          if (now - s.victoryExplosionStart > 1500) {
-            battleFinished = true;
-            onBattleEnd('won', { 
-              reward: s.enemies.reduce((sum, e) => sum + (e.qc || 0), 0),
-              playerHp: s.playerHp,
-              playerShield: s.playerShield
-            });
+          if (s.enemyQueue && s.enemyQueue.length > 0) {
+             // Accumulate reward from dead wave
+             s.enemies.forEach(e => { s.totalRewardAccumulated = (s.totalRewardAccumulated || 0) + (e.qc || 0); });
+             
+             // Spawn next enemy in sequence
+             const nextEnemy = s.enemyQueue.shift();
+             if (nextEnemy) {
+               s.enemies = [{ ...nextEnemy, isExploding: false }];
+               s.lastEnemyAttack = now; // Reset attack timer for fairness
+             }
+          } else {
+            if (!s.victoryExplosionStart) {
+              s.victoryExplosionStart = now;
+              // Accumulate final reward
+              s.enemies.forEach(e => { s.totalRewardAccumulated = (s.totalRewardAccumulated || 0) + (e.qc || 0); });
+              // Ensure we don't double count if this block runs multiple times during the end delay
+              s.enemies.forEach(e => { e.qc = 0; });
+
+              if (routeTier === 'Void') {
+                s.isSlowMo = true;
+                s.zoomTarget = { x: 80, y: 50 }; // Typically where enemies are
+              }
+            }
+            const endDelay = routeTier === 'Void' ? 3500 : 1500;
+            if (now - s.victoryExplosionStart > endDelay) {
+              battleFinished = true;
+              onBattleEnd('won', { 
+                reward: s.totalRewardAccumulated || 0,
+                playerHp: s.playerHp,
+                playerShield: s.playerShield
+              });
+            }
           }
         } else if (s.playerHp <= 0) {
-          if (now - (s.explosionStart || 0) > 1500) {
+          if (routeTier === 'Void' && !s.isSlowMo) {
+            s.isSlowMo = true;
+            s.zoomTarget = { x: s.playerX, y: s.playerY };
+          }
+          const endDelay = routeTier === 'Void' ? 3500 : 1500;
+          if (now - (s.explosionStart || 0) > endDelay) {
             battleFinished = true;
             onBattleEnd('lost', {
               reward: 0,
@@ -2698,6 +3064,7 @@ const VoidBattleArena = memo(({
         }
       }
 
+      ctx.restore(); // END CINEMATIC ZOOM
       if (!battleFinished) animId = requestAnimationFrame(loop);
     };
 
@@ -2706,6 +3073,7 @@ const VoidBattleArena = memo(({
     // Throttled HUD Update
     const hudInterval = setInterval(() => {
       const s = gameRef.current;
+      const now = Date.now();
       const displayEnemy = s.enemies.find(e => e.hp > 0) || s.enemies[0];
       setHud({
         playerHp: s.playerHp,
@@ -2713,10 +3081,13 @@ const VoidBattleArena = memo(({
         enemyHp: displayEnemy.hp,
         enemyShield: displayEnemy.shield,
         enemyType: displayEnemy.type,
+        enemyName: displayEnemy.name || displayEnemy.type,
         enemiesAlive: s.enemies.filter(e => e.hp > 0).length,
-        dodgeCooldown: 0,
-        shieldCooldown: 0,
-        burstCooldown: 0,
+        dodgeCooldown: Math.max(0, (s.abilities.dodge.lastUsed + s.abilities.dodge.cooldown - now) / 1000),
+        shieldCooldown: Math.max(0, (s.abilities.shield.lastUsed + s.abilities.shield.cooldown - now) / 1000),
+        burstCooldown: Math.max(0, (s.abilities.burst.lastUsed + s.abilities.burst.cooldown - now) / 1000),
+        specialCooldown: Math.max(0, (s.abilities.special.lastUsed + s.abilities.special.cooldown - now) / 1000),
+        specialActive: now < s.abilities.special.activeUntil,
         playerIsExploding: !!s.playerIsExploding
       });
     }, 100);
@@ -2742,27 +3113,7 @@ const VoidBattleArena = memo(({
 
   return (
     <div ref={containerRef} className="fixed inset-0 z-[300] flex flex-col relative overflow-hidden bg-black">
-      {/* Cinematic Background Layer 1: Nebula */}
-      <motion.div 
-        animate={{ 
-          scale: [1, 1.1, 1],
-          x: [-10, 10, -10],
-          y: [-5, 5, -5]
-        }}
-        transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
-        className="absolute inset-0 z-0"
-      >
-        <img 
-          src="/images/battle/void_battle_bg.png" 
-          alt="Void Background" 
-          className="w-full h-full object-cover opacity-60"
-        />
-      </motion.div>
-
-      {/* Layer 2: Moving Stars/Dust for sense of speed */}
-      <div className="absolute inset-0 z-[1] overflow-hidden opacity-40 pointer-events-none">
-        <BattleStarField theme="cyan" />
-      </div>
+      {/* Background is now handled via Parallax in the Canvas loop for Route 3 */}
 
       <VoidBattleHUD 
         hud={hud} 
@@ -2780,6 +3131,33 @@ const VoidBattleArena = memo(({
         height={dimensions.height}
         className="flex-1 w-full h-full bg-transparent touch-none z-10"
       />
+
+      {/* Special Ability Icon (Mythic Ship Eclipse) */}
+      {playerShipStats.rarity === 'mythic' && (
+        <div className="absolute bottom-6 left-6 z-30 flex flex-col items-center gap-2 pointer-events-none">
+          <div className={`relative w-16 h-16 rounded-xl border-2 flex items-center justify-center backdrop-blur-xl transition-all duration-300 ${hud.specialActive ? 'border-pink-500 bg-pink-500/20 shadow-[0_0_25px_rgba(236,72,153,0.6)] scale-110' : 'border-white/20 bg-black/40'}`}>
+              <svg className="absolute inset-0 w-full h-full -rotate-90 scale-[0.9]">
+                  <circle cx="32" cy="32" r="30" fill="none" stroke="currentColor" strokeWidth="4" className="text-white/10" />
+                  <circle 
+                    cx="32" cy="32" r="30" 
+                    fill="none" 
+                    stroke="currentColor" 
+                    strokeWidth="4" 
+                    className="text-pink-500 transition-all duration-300" 
+                    strokeDasharray={188.5} 
+                    strokeDashoffset={188.5 * ((hud.specialCooldown || 0) / 15)} 
+                  />
+              </svg>
+              <div className="flex flex-col items-center">
+                <span className="text-white font-orbitron text-xl font-bold drop-shadow-md">C</span>
+                {hud.specialCooldown > 0 && !hud.specialActive && (
+                  <span className="text-[10px] text-pink-400 font-orbitron">{Math.ceil(hud.specialCooldown)}s</span>
+                )}
+              </div>
+          </div>
+          <p className="text-[10px] font-orbitron text-white/50 uppercase tracking-[0.2em] font-bold drop-shadow-md">MEGA LASER</p>
+        </div>
+      )}
 
       {/* Dynamic Controls Info */}
       <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex gap-8 items-center pointer-events-none z-20">
@@ -3066,7 +3444,7 @@ export const GameDashboard = memo(({
   const [battleLevel, setBattleLevel] = useState(0);
   const [isRetributionActive, setIsRetributionActive] = useState(true);
   const [isFatigueActive, setIsFatigueActive] = useState(true);
-  const [battleNotification, setBattleNotification] = useState<{ message: string, type: 'success' | 'error' } | null>(null);
+  const [battleNotification, setBattleNotification] = useState<{ message: string, type: 'success' | 'error', tier: string } | null>(null);
 
   const isRetributionActiveRef = useRef(isRetributionActive);
   useEffect(() => { isRetributionActiveRef.current = isRetributionActive; }, [isRetributionActive]);
@@ -3168,17 +3546,22 @@ export const GameDashboard = memo(({
   });
   const [voidAutoShipmentUnlocked, setVoidAutoShipmentUnlocked] = useState(false);
   const [voidAutoShipmentActive, setVoidAutoShipmentActive] = useState(false);
+  const [isFirstInvasionBattle, setIsFirstInvasionBattle] = useState(false);
+  const [unlockedVoidAircraft, setUnlockedVoidAircraft] = useState<string[]>(['va-1']);
+  const [voidAircraftConstruction, setVoidAircraftConstruction] = useState<{ [id: string]: { endTime: number } }>({});
 
   const toggleVoidAircraftAuto = (aircraftId: string) => {
+    const isActivating = !voidAircraftAutoToggles[aircraftId];
     setVoidAircraftAutoToggles(prev => ({
       ...prev,
       [aircraftId]: !prev[aircraftId]
     }));
-    playSfx('click');
+    playSfx(isActivating ? 'ask_window' : 'close_window');
   };
   const [activeDonationModal, setActiveDonationModal] = useState<string | null>(null);
   const [arcadeScores, setArcadeScores] = useState<{ [gameId: string]: number }>({});
   const [voidBattleStatus, setVoidBattleStatus] = useState<'idle' | 'searching' | 'choosing' | 'fighting' | 'won' | 'lost'>('idle');
+  const [currentVoidLocationId, setCurrentVoidLocationId] = useState<number>(0);
   const [voidBattleOptions, setVoidBattleOptions] = useState<VoidBattleEnemy[]>([]);
   const [activeVoidBattle, setActiveVoidBattle] = useState<VoidBattleState | null>(null);
   const [voidBattleResult, setVoidBattleResult] = useState<{ reward: number } | null>(null);
@@ -3264,6 +3647,15 @@ export const GameDashboard = memo(({
   useEffect(() => { earthEventsRef.current = earthEvents; }, [earthEvents]);
   const earthCouplesRef = useRef(earthCouples);
   useEffect(() => { earthCouplesRef.current = earthCouples; }, [earthCouples]);
+
+  const unlockedVoidAircraftRef = useRef(unlockedVoidAircraft);
+  useEffect(() => { unlockedVoidAircraftRef.current = unlockedVoidAircraft; }, [unlockedVoidAircraft]);
+  const voidAircraftConstructionRef = useRef(voidAircraftConstruction);
+  useEffect(() => { voidAircraftConstructionRef.current = voidAircraftConstruction; }, [voidAircraftConstruction]);
+  const voidAutoShipmentUnlockedRef = useRef(voidAutoShipmentUnlocked);
+  useEffect(() => { voidAutoShipmentUnlockedRef.current = voidAutoShipmentUnlocked; }, [voidAutoShipmentUnlocked]);
+  const voidAutoShipmentActiveRef = useRef(voidAutoShipmentActive);
+  useEffect(() => { voidAutoShipmentActiveRef.current = voidAutoShipmentActive; }, [voidAutoShipmentActive]);
   
   const [isColoniesUnlocked, setIsColoniesUnlocked] = useState(true);
   const [colonies, setColonies] = useState<Colony[]>([]);
@@ -3746,6 +4138,8 @@ export const GameDashboard = memo(({
   const autoTravelDesiredRef = React.useRef(autoTravelDesired);
   const autoTravelProgressRef = React.useRef(autoTravelProgress);
   const autoTravelSlotsRef = React.useRef(autoTravelSlots);
+  const extractionCycleProgressRef = React.useRef(extractionCycleProgress);
+  useEffect(() => { extractionCycleProgressRef.current = extractionCycleProgress; }, [extractionCycleProgress]);
   const totalDeliveriesRef = React.useRef(totalDeliveries);
   const deliveriesByLocationRef = React.useRef(deliveriesByLocation);
   const ownedShipsRef = React.useRef(ownedShips);
@@ -3800,6 +4194,10 @@ export const GameDashboard = memo(({
       setter(level + 1);
       playSfx('level_up');
       addLog(`${t('upgraded')} ${name} ${t('toLevel')} ${level + 1}`, 'success');
+      
+      // Background Log
+      GameStorage.log('SKILL_UPGRADE', { skill: name, newLevel: level + 1, cost }, playerName);
+      
       updateHistoryStats('spent', cost);
       performSave();
     }
@@ -3808,6 +4206,18 @@ export const GameDashboard = memo(({
   const addLog = useCallback((message: string, type: 'info' | 'success' | 'warning' | 'error' = 'info') => {
     setGameLogs(prev => [{ id: Math.random().toString(36).substr(2, 9), message, type }, ...prev].slice(0, 5));
   }, []);
+
+  // Log Game Start
+  useEffect(() => {
+    if (isLoaded) {
+      GameStorage.log('GAME_START', { 
+        qc: qcRef.current, 
+        tier: routeTierRef.current,
+        platform: typeof window !== 'undefined' ? window.navigator.userAgent : 'unknown'
+      }, playerName);
+    }
+  }, [isLoaded]);
+
 
   // Centralized Save Function
   const performSave = useCallback(async () => {
@@ -3897,7 +4307,11 @@ export const GameDashboard = memo(({
       earthPopulation: earthPopulationRef.current,
       earthMaleRatio: earthMaleRatioRef.current,
       earthBiodiversity: earthBiodiversityRef.current,
-      earthEvents: earthEventsRef.current
+      earthEvents: earthEventsRef.current,
+      unlockedVoidAircraft: unlockedVoidAircraftRef.current,
+      voidAircraftConstruction: voidAircraftConstructionRef.current,
+      voidAutoShipmentUnlocked: voidAutoShipmentUnlockedRef.current,
+      voidAutoShipmentActive: voidAutoShipmentActiveRef.current
     };
 
     const modularSave = SaveManager.createSave(saveData);
@@ -4070,10 +4484,17 @@ export const GameDashboard = memo(({
       });
 
       // Update progress outside of the packs setter to avoid side-effect issues
-      setExtractionCycleProgress(newProgress);
+      extractionCycleProgressRef.current = newProgress;
     }, 100);
 
-    return () => clearInterval(interval);
+    const throttleInterval = setInterval(() => {
+      setExtractionCycleProgress(extractionCycleProgressRef.current);
+    }, 500);
+
+    return () => {
+      clearInterval(interval);
+      clearInterval(throttleInterval);
+    };
   }, [unlockedExtractionPoints, routeTier]);
 
   // Automatic Sales Logic (Robôs de Entrega)
@@ -4410,7 +4831,7 @@ export const GameDashboard = memo(({
     setQc(prev => prev - cost);
     setBattleLevel(nextLevel);
     addLog(`${t('battleLevelIncreased')} ${nextLevel}!`, 'success');
-    playSfx('buying_iten');
+    playSfx('level_up');
   }, [battleLevel, qc, language, addLog, playSfx, routeTier]);
 
   const upgradeRadar = useCallback(() => {
@@ -4428,15 +4849,13 @@ export const GameDashboard = memo(({
     setQc(prev => prev - cost);
     setRadarLevel(nextLevel);
     addLog(`${t('radarUpgraded')} ${nextLevel}!`, 'success');
-    playSfx('buying_iten');
+    playSfx('level_up');
   }, [radarLevel, qc, language, addLog, playSfx]);
 
   const findBattle = useCallback(() => {
     if (battleLevel < 1) return;
     if (foundBattle) return;
     if (isScanning) return;
-    playSfx('bip_scanner');
-
     const now = Date.now();
     const baseCooldown = 60000; // 1 minute
     let cooldown = battleLevel >= 5 ? baseCooldown / 2 : baseCooldown;
@@ -4457,7 +4876,7 @@ export const GameDashboard = memo(({
     setScanResult(null);
     setLastScanTime(now);
     addLog(t('startingSectorScan'), 'info');
-    playSfx('click');
+    playSfx('bip_scanner');
 
     const scanDuration = 2000;
     const intervalTime = 50;
@@ -4549,6 +4968,7 @@ export const GameDashboard = memo(({
 
           const battle: Battle = {
             id: Math.random().toString(36).substr(2, 9),
+            routeId: ROUTES.find(r => r.tier === routeTier)?.id || (routeTier === 'Solar' ? 'terra' : 'alpha-centauri'),
             deliveryId: 'manual-battle',
             enemyName: isBoss ? (language === 'pt' ? 'Nave MÃE (BOSS)' : 'MOTHER SHIP (BOSS)') : (isElite ? (language === 'pt' ? 'Cruzador de Elite' : 'Elite Cruiser') : enemyTier > 5 ? (language === 'pt' ? 'Cruzador Alienígena' : 'Alien Cruiser') : (language === 'pt' ? 'Pirata Espacial' : 'Space Pirate')),
             enemyType: enemyType,
@@ -5291,8 +5711,25 @@ export const GameDashboard = memo(({
     setActiveBattle(null);
   }, [language, addLog]);
 
+  // Auto-close battle results for Rota 1 and 2
+  useEffect(() => {
+    if (activeBattle && (activeBattle.isVictory || activeBattle.isDefeat)) {
+      const battleRoute = ROUTES.find(r => r.id === activeBattle.routeId);
+      if (battleRoute?.tier === 'Solar' || battleRoute?.tier === 'Interstellar') {
+        const timer = setTimeout(() => {
+          finishBattle();
+        }, 5000);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [activeBattle?.isVictory, activeBattle?.isDefeat, finishBattle]);
+
   const renderBattleOverlay = () => {
     if (!activeBattle) return null;
+    
+    // Check if the battle belongs to the current route tier
+    const battleRoute = ROUTES.find(r => r.id === activeBattle.routeId);
+    if (battleRoute?.tier !== routeTier) return null;
 
     const cooldowns = {
       laser: 1000,
@@ -6668,6 +7105,12 @@ export const GameDashboard = memo(({
       'va-2': { status: 'idle', endTime: null, rareFound: false, restartAt: null },
       'va-3': { status: 'idle', endTime: null, rareFound: false, restartAt: null }
     });
+    setUnlockedVoidAircraft(['va-1']);
+    setVoidAircraftAutoToggles({
+      'va-1': true,
+      'va-2': true,
+      'va-3': true
+    });
     setVoidAircraftUpgrades({
       'va-1': { storage: 0, quality: 0, time: 0, energy: 0, auto: 0 },
       'va-2': { storage: 0, quality: 0, time: 0, energy: 0, auto: 0 },
@@ -6991,6 +7434,10 @@ export const GameDashboard = memo(({
         if (data.voidAircraftUpgrades !== undefined) setVoidAircraftUpgrades(data.voidAircraftUpgrades);
         if (data.voidAircraftAutoToggles !== undefined) setVoidAircraftAutoToggles(data.voidAircraftAutoToggles);
         if (data.route4Unlocked !== undefined) setRoute4Unlocked(data.route4Unlocked);
+        if (data.unlockedVoidAircraft !== undefined) setUnlockedVoidAircraft(data.unlockedVoidAircraft);
+        if (data.voidAircraftConstruction !== undefined) setVoidAircraftConstruction(data.voidAircraftConstruction);
+        if (data.voidAutoShipmentUnlocked !== undefined) setVoidAutoShipmentUnlocked(data.voidAutoShipmentUnlocked);
+        if (data.voidAutoShipmentActive !== undefined) setVoidAutoShipmentActive(data.voidAutoShipmentActive);
         if (data.voidBattleShipStats !== undefined) {
           setVoidBattleShipStats(prev => ({
             ...prev,
@@ -7431,7 +7878,7 @@ export const GameDashboard = memo(({
       aetherionTubesRef.current = next;
       return next;
     });
-    playSfx('eterion_fuell');
+    playSfx('serve_glass');
     addLog(`${t('synthesisComplete')}${aetherionToAdd} Eterion!`, 'success');
   }, [setAetherion, setAetherionTubes, playSfx, addLog, language, t]);
 
@@ -7514,11 +7961,16 @@ export const GameDashboard = memo(({
       const forcedBattle = timeSinceLastBattle > 180000; // 3 minutes
       const battleFreqMultiplier = (battleLevelRef.current >= 35 && routeTierRef.current === 'Interstellar') ? 1.5 : 1;
       
-      if (!activeBattleRef.current && !isSpeedRunRef.current && (Math.random() < (0.002 * battleFreqMultiplier) || forcedBattle)) {
-        const manualShips = nextManual.filter(d => d.status === 'delivering');
-        const autoRoutes = Object.keys(autoTravelActiveRef.current).filter(rid => 
-          autoTravelActiveRef.current[rid] && (autoTravelProgressRef.current[rid] || 0) > 0
-        );
+      if (routeTier !== 'Void' && !activeBattleRef.current && !isSpeedRunRef.current && (Math.random() < (0.002 * battleFreqMultiplier) || forcedBattle)) {
+        // ONLY target ships in the current route tier
+        const manualShips = nextManual.filter(d => {
+          const r = ROUTES.find(rt => rt.id === d.routeId);
+          return d.status === 'delivering' && r?.tier === routeTier;
+        });
+        const autoRoutes = Object.keys(autoTravelActiveRef.current).filter(rid => {
+          const r = ROUTES.find(rt => rt.id === rid);
+          return autoTravelActiveRef.current[rid] && (autoTravelProgressRef.current[rid] || 0) > 0 && r?.tier === routeTier;
+        });
 
         if (manualShips.length > 0 || autoRoutes.length > 0) {
           const totalTargets = manualShips.length + autoRoutes.length;
@@ -7613,6 +8065,7 @@ export const GameDashboard = memo(({
 
             const battle: Battle = {
               id: Math.random().toString(36).substr(2, 9),
+              routeId: routeId,
               deliveryId: targetId,
               enemyName: isBoss ? (language === 'pt' ? 'Nave MÃE (BOSS)' : 'MOTHER SHIP (BOSS)') : (isElite ? (language === 'pt' ? 'Cruzador de Elite' : 'Elite Cruiser') : enemyTier > 5 ? (language === 'pt' ? 'Cruzador Alienígena' : 'Alien Cruiser') : (enemyType === 'Pirate' ? (language === 'pt' ? 'Pirata Espacial' : 'Space Pirate') : (language === 'pt' ? 'Batedor Alienígena' : 'Alien Scout'))),
               enemyType: enemyType,
@@ -7655,10 +8108,11 @@ export const GameDashboard = memo(({
                     message: language === 'pt' 
                       ? `Batalha vencida: +${formatValue(results.qcReward)} QC!` 
                       : `Battle won: +${formatValue(results.qcReward)} QC!`,
-                    type: 'success'
+                    type: 'success',
+                    tier: routeTier
                   });
                 }
-                playSfx('police_sirene_3');
+                playSfx('open_window');
               } else {
                 resolveBattleDefeat(battle);
                 if (isRetributionActiveRef.current) {
@@ -7666,10 +8120,11 @@ export const GameDashboard = memo(({
                     message: language === 'pt' 
                       ? `Batalha perdida.` 
                       : `Battle lost.`,
-                    type: 'error'
+                    type: 'error',
+                    tier: routeTier
                   });
                 }
-                playSfx('police_sirene_3');
+                playSfx('open_window');
               }
               
               // Reset ship status if it was a manual delivery
@@ -8124,7 +8579,7 @@ export const GameDashboard = memo(({
         }
       }
       
-      setAutoTravelProgress(nextAutoProgress);
+      autoTravelProgressRef.current = nextAutoProgress;
     }, 100);
 
     // Throttled Resource Flush (500ms) to reduce re-renders
@@ -8136,6 +8591,7 @@ export const GameDashboard = memo(({
       setAetherionTubes(aetherionTubesRef.current);
       setHistoryStats(historyStatsRef.current);
       setOresCollected(oresCollectedRef.current);
+      setAutoTravelProgress(autoTravelProgressRef.current);
     }, 500);
 
     return () => {
@@ -8273,6 +8729,62 @@ export const GameDashboard = memo(({
       addLog(`${upgrade.name} upgraded to Level ${currentLevel + 1}`, 'success');
     } else {
       addLog(`Not enough QC for ${upgrade.name} upgrade`, 'error');
+    }
+  };
+
+  const buyAllUpgradesForShip = (locationId: string) => {
+    let currentQc = qc;
+    let newLevels = { ...(techLevels[locationId] || { engine: 0, ai: 0, value: 0, rare: 0 }) };
+    let totalSpent = 0;
+    let anyUpgraded = false;
+
+    // We buy as many as possible by always picking the cheapest available upgrade in a loop
+    while (true) {
+      let available: { upgrade: Upgrade, cost: number, id: string }[] = [];
+      
+      UPGRADES.forEach(upgrade => {
+        const id = upgrade.id.toLowerCase();
+        const level = newLevels[id] || 0;
+        const nextTier = upgrade.tiers.find(t => t.level === level + 1);
+        
+        if (nextTier) {
+          // Engine Level 5 requirement check
+          if (upgrade.id === 'engine' && nextTier.level === 5) {
+             const slots = autoTravelSlots[locationId] || 0;
+             if (slots < 5) return; // Skip this one
+          }
+
+          const multiplier = getLocationMultiplier(locationId);
+          const multipliers = getEconomicMultipliers();
+          let cost = Math.floor(nextTier.cost * multiplier * multipliers.cost);
+          if (routeTier === 'Interstellar') cost = Math.floor(cost * 1.5);
+          
+          if (currentQc >= cost) {
+            available.push({ upgrade, cost, id });
+          }
+        }
+      });
+
+      if (available.length === 0) break;
+
+      // Buy the cheapest one available to maximize number of upgrades
+      available.sort((a, b) => a.cost - b.cost);
+      const cheapest = available[0];
+      
+      currentQc -= cheapest.cost;
+      totalSpent += cheapest.cost;
+      newLevels[cheapest.id] = (newLevels[cheapest.id] || 0) + 1;
+      anyUpgraded = true;
+    }
+
+    if (anyUpgraded) {
+      setQc(currentQc);
+      updateHistoryStats('spent', totalSpent);
+      setTechLevels(prev => ({ ...prev, [locationId]: newLevels }));
+      playSfx('level_up');
+      addLog(language === 'pt' ? 'Todas as melhorias possíveis foram adquiridas!' : 'All possible upgrades acquired!', 'success');
+    } else {
+      addLog(t('insufficientQC'), 'error');
     }
   };
 
@@ -8608,10 +9120,9 @@ export const GameDashboard = memo(({
       if (aircraftId === 'va-1') playSfx('seeker_alpha_mission_start');
       else if (aircraftId === 'va-2') playSfx('collector_beta_mission_start');
       else if (aircraftId === 'va-3') playSfx('ghost_gamma_mission_start');
-      else playSfx('launch');
-    } else {
-      playSfx('launch');
+      else playSfx('warp');
     }
+
     addLog(`${aircraft.name} ${t('aircraftMissionStart')}`, 'info');
   };
 
@@ -8676,6 +9187,104 @@ export const GameDashboard = memo(({
 
     playSfx('level_up');
     addLog(`${t('aircraftUpgradeComplete')} ${type} ${language === 'pt' ? 'para' : 'for'} ${VOID_AIRCRAFT.find(a => a.id === aircraftId)?.name} ${t('completedExclamation')}`, 'success');
+  };
+
+  const speedUpVoidAircraft = (aircraftId: string) => {
+    const costs = {
+      'va-2': { energy: 10000, qc: 50000 },
+      'va-3': { energy: 20000, qc: 100000 }
+    }[aircraftId as 'va-2' | 'va-3'];
+
+    if (!costs) return;
+
+    if (voidResources.energy < costs.energy || qc < costs.qc) {
+      addLog(language === 'pt' ? 'Recursos insuficientes para acelerar!' : 'Insufficient resources to speed up!', 'error');
+      playSfx('error');
+      return;
+    }
+
+    setVoidResources(prev => ({ ...prev, energy: prev.energy - costs.energy }));
+    setQc(prev => prev - costs.qc);
+    updateHistoryStats('spent', costs.qc);
+
+    setVoidAircraftConstruction(prev => {
+      const next = { ...prev };
+      delete next[aircraftId];
+      return next;
+    });
+
+    setUnlockedVoidAircraft(prev => {
+      if (prev.includes(aircraftId)) return prev;
+      return [...prev, aircraftId];
+    });
+    addLog(language === 'pt' ? `${aircraftId === 'va-2' ? 'Collector-Beta' : 'Ghost-Gamma'} acelerada com sucesso!` : `${aircraftId === 'va-2' ? 'Collector-Beta' : 'Ghost-Gamma'} accelerated successfully!`, 'success');
+    playSfx('success');
+    performSave();
+  };
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const now = Date.now();
+      let changed = false;
+      
+      setVoidAircraftConstruction(prev => {
+        if (Object.keys(prev).length === 0) return prev;
+        
+        const next = { ...prev };
+        Object.entries(next).forEach(([id, construction]) => {
+          if (now >= construction.endTime) {
+            delete next[id];
+            setUnlockedVoidAircraft(prevUnlocked => {
+              if (prevUnlocked.includes(id)) return prevUnlocked;
+              return [...prevUnlocked, id];
+            });
+            addLog(language === 'pt' ? `Construção da ${id === 'va-2' ? 'Collector-Beta' : 'Ghost-Gamma'} concluída!` : `Construction of ${id === 'va-2' ? 'Collector-Beta' : 'Ghost-Gamma'} completed!`, 'success');
+            playSfx('success');
+            changed = true;
+          }
+        });
+        return changed ? next : prev;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [language, playSfx, addLog]);
+
+  const buyVoidAircraft = (aircraftId: string) => {
+    const costs = {
+      'va-2': { minerals: 5000, tech: 5000, energy: 5000 },
+      'va-3': { minerals: 15000, tech: 15000, energy: 15000 }
+    }[aircraftId as 'va-2' | 'va-3'];
+
+    if (!costs) return;
+
+    if (aircraftId === 'va-3' && !unlockedVoidAircraft.includes('va-2')) {
+      addLog(language === 'pt' ? 'Você precisa desbloquear a Collector-Beta primeiro!' : 'You need to unlock Collector-Beta first!', 'error');
+      playSfx('error');
+      return;
+    }
+
+    if (voidResources.minerals < costs.minerals || voidResources.tech < costs.tech || voidResources.energy < costs.energy) {
+      addLog(language === 'pt' ? 'Recursos insuficientes para construir esta nave!' : 'Insufficient resources to build this ship!', 'error');
+      playSfx('error');
+      return;
+    }
+
+    setVoidResources(prev => ({
+      ...prev,
+      minerals: prev.minerals - costs.minerals,
+      tech: prev.tech - costs.tech,
+      energy: prev.energy - costs.energy
+    }));
+
+    const buildTime = aircraftId === 'va-2' ? 5 * 60 * 1000 : 10 * 60 * 1000;
+    setVoidAircraftConstruction(prev => ({
+      ...prev,
+      [aircraftId]: { endTime: Date.now() + buildTime }
+    }));
+
+    addLog(language === 'pt' ? `Construção da ${aircraftId === 'va-2' ? 'Collector-Beta' : 'Ghost-Gamma'} iniciada!` : `Construction of ${aircraftId === 'va-2' ? 'Collector-Beta' : 'Ghost-Gamma'} started!`, 'info');
+    playSfx('buy');
+    performSave();
   };
 
   const getEffectiveVoidStats = (stats: any) => {
@@ -8800,7 +9409,13 @@ export const GameDashboard = memo(({
         return next;
       });
 
-      playSfx('buy');
+      const sfxMap = {
+        damage: 'laser_up',
+        shield: 'shield_up',
+        crit: 'target_up',
+        loot: 'cash_register'
+      };
+      playSfx(sfxMap[type] as any || 'buy');
       const names = {
         damage: t('weaponSystem'),
         shield: t('reinforcedShields'),
@@ -8908,49 +9523,88 @@ export const GameDashboard = memo(({
       rarity: nextRarity
     }));
     
-    playSfx('level_up');
+    playSfx('epic_battle_ship');
     addLog(`${t('shipUpgradedTo')} ${nextRarity.toUpperCase()}!`, 'success');
   };
 
-  const startVoidBattle = (warType?: 'normal' | 'elite' | 'boss') => {
+  const startVoidBattle = (warType?: 'normal' | 'elite' | 'boss', forcedLocationId?: number) => {
     if (voidBattleShipStats.hp <= 0) {
       addLog(t('shipTooDamaged'), 'error');
       return;
     }
 
+    const locId = forcedLocationId !== undefined 
+      ? forcedLocationId 
+      : (voidWarAlertActive ? (1 + Math.floor(Math.random() * 9)) : 0);
+    const locKey = locId === 0 ? 'zero' : locId;
+    setCurrentVoidLocationId(locId);
+
     if (warType || voidWarAlertActive) {
       playSfx('kill_enemys_botton');
     } else {
-      playSfx('click');
+      playSfx('bip_scanner');
     }
 
-    if (warType) {
+    if (warType || isFirstInvasionBattle) {
       // Direct battle for Void War
-      let stats;
-      if (warType === 'normal') {
-        const hp = 90000 * 0.375;
-        stats = { hp: hp, maxHp: hp, shield: hp, maxShield: hp, damage: (30 + Math.random() * 20) * 2, qc: 50000 };
-      } else if (warType === 'elite') {
-        const hp = 225000 * 0.375;
-        stats = { hp: hp, maxHp: hp, shield: hp, maxShield: hp, damage: (60 + Math.random() * 20) * 2, qc: 150000 };
-      } else {
-        const hp = 390000 * 0.375;
-        stats = { hp: hp, maxHp: hp, shield: hp, maxShield: hp, damage: (100 + Math.random() * 20) * 2, qc: 500000 };
+      const actualWarType = isFirstInvasionBattle ? 'boss' : warType;
+      if (isFirstInvasionBattle) setIsFirstInvasionBattle(false);
+
+      const waveEnemies: VoidBattleEnemy[] = [];
+      const numWaves = 5;
+
+      for (let i = 0; i < numWaves; i++) {
+        let type: 'Padrão' | 'Elite' | 'Boss';
+        let stats;
+        
+        if (actualWarType === 'boss') {
+          type = i < 4 ? 'Elite' : 'Boss';
+        } else {
+          type = i < 4 ? 'Padrão' : 'Elite';
+        }
+
+        if (type === 'Padrão') {
+          const hp = 90000 * 0.375;
+          stats = { hp: hp, maxHp: hp, shield: hp, maxShield: hp, damage: (30 + Math.random() * 20) * 2, qc: 50000 };
+        } else if (type === 'Elite') {
+          const hp = 225000 * 0.375;
+          stats = { hp: hp, maxHp: hp, shield: hp, maxShield: hp, damage: (60 + Math.random() * 20) * 2, qc: 150000 };
+        } else {
+          let hp = 390000 * 0.375;
+          let shield = hp;
+          stats = { hp: hp, maxHp: hp, shield: shield, maxShield: shield, damage: (100 + Math.random() * 20) * 2, qc: 500000 };
+        }
+
+        const enemy: VoidBattleEnemy = {
+          id: `war-enemy-${Date.now()}-${i}`,
+          type,
+          name: type === 'Padrão' ? 'Aberração' : type === 'Elite' ? 'Horror Dimensional' : 'Devorador de Estrelas',
+          ...stats,
+          x: 80,
+          y: 50,
+          image: routeTier === 'Void' 
+            ? (type === 'Padrão' 
+                ? `/assets/rota3/void/${locKey}/monster-common-${Math.floor(Math.random() * 4) + 1}_neutral.png` 
+                : type === 'Elite' 
+                  ? `/assets/rota3/void/${locKey}/monster-elite_neutral.png` 
+                  : `/assets/rota3/void/${locKey}/boss_neutral.png`)
+            : (type === 'Padrão' 
+                ? `/images/ships/battle/enemy-common-${Math.floor(Math.random() * 4) + 1}.png` 
+                : type === 'Elite' 
+                  ? '/images/ships/battle/enemy-elite.png' 
+                  : '/images/ships/battle/enemy-boss.png')
+        };
+        waveEnemies.push(enemy);
       }
 
-      const enemy: VoidBattleEnemy = {
-        id: `war-enemy-${Date.now()}`,
-        type: warType === 'normal' ? 'Padrão' : warType === 'elite' ? 'Elite' : 'Boss',
-        ...stats,
-        x: 80,
-        y: 50,
-        image: warType === 'normal' ? `/images/ships/battle/enemy-common-${Math.floor(Math.random() * 4) + 1}.png` : warType === 'elite' ? '/images/ships/battle/enemy-elite.png' : '/images/ships/battle/enemy-boss.png'
-      };
+      const initialEnemy = waveEnemies.shift();
+      if (!initialEnemy) return;
 
-      setVoidBattleOptions([enemy]);
+      setVoidBattleOptions([initialEnemy]);
       setVoidBattleStatus('fighting');
       setActiveVoidBattle({
-        enemies: [enemy],
+        enemies: [initialEnemy],
+        enemyQueue: waveEnemies,
         projectiles: [],
         particles: [],
         damageNumbers: [],
@@ -8962,7 +9616,7 @@ export const GameDashboard = memo(({
         lastEnemyMove: Date.now(),
         lastEnemyAttack: Date.now(),
         isGroupBattle: false,
-        playerImage: '/images/ships/battle/player-battle.png',
+        playerImage: voidBattleShipStats.rarity === 'mythic' ? '/assets/rota3/void/mitic_eclipse/mitic_eclipse_neutral.png' : '/images/ships/battle/player-battle.png',
         playerHp: voidBattleShipStats.hp,
         playerMaxHp: voidBattleShipStats.maxHp,
         playerShield: voidBattleShipStats.shield,
@@ -8970,9 +9624,21 @@ export const GameDashboard = memo(({
         abilities: {
           dodge: { lastUsed: 0, cooldown: 3000 },
           shield: { lastUsed: 0, cooldown: 15000 },
-          burst: { lastUsed: 0, cooldown: 8000 }
-        }
+          burst: { lastUsed: 0, cooldown: 8000 },
+          special: { lastUsed: 0, cooldown: 15000, activeUntil: 0 }
+        },
+        locationId: locId,
+        totalRewardAccumulated: 0,
+        finishTimer: 0,
+        zoomTarget: { x: 50, y: 50 },
+        isSlowMo: false
       });
+      
+      const engagementMsg = language === 'pt'
+        ? `Iniciando incursão no setor. Enfrente as 5 ondas de inimigos!`
+        : `Starting sector incursion. Face all 5 enemy waves!`;
+        
+      addLog(engagementMsg, 'warning');
       return;
     }
 
@@ -9031,25 +9697,42 @@ export const GameDashboard = memo(({
           };
         }
 
+        const isVoid = routeTier === 'Void';
+        let monsterName: string = type;
+        let imagePath = '';
+
+        if (isVoid) {
+          monsterName = type === 'Padrão' ? 'Aberração' : type === 'Elite' ? 'Horror Dimensional' : 'Devorador de Estrelas';
+          imagePath = type === 'Padrão' 
+            ? `/assets/rota3/void/${locKey}/monster-common-${Math.floor(Math.random() * 4) + 1}_neutral.png` 
+            : type === 'Elite' 
+              ? `/assets/rota3/void/${locKey}/monster-elite_neutral.png` 
+              : `/assets/rota3/void/${locKey}/boss_neutral.png`;
+        } else {
+          imagePath = type === 'Padrão' ? `/images/ships/battle/enemy-common-${Math.floor(Math.random() * 4) + 1}.png` : type === 'Elite' ? '/images/ships/battle/enemy-elite.png' : '/images/ships/battle/enemy-boss.png';
+        }
+
         options.push({
           id: `enemy-${Date.now()}-${i}`,
           type,
+          name: monsterName,
           ...stats,
           x: 80,
           y: 20 + (i * 15), // Distribute them vertically
-          image: type === 'Padrão' ? `/images/ships/battle/enemy-common-${Math.floor(Math.random() * 4) + 1}.png` : type === 'Elite' ? '/images/ships/battle/enemy-elite.png' : '/images/ships/battle/enemy-boss.png'
+          image: imagePath
         });
       }
 
       setVoidBattleOptions(options);
       setVoidBattleStatus('choosing');
-      addLog(`${numOptions} ${t('targetsDetectedOnRadar')}`, 'warning');
+      addLog(`${numOptions} ${routeTier === 'Void' ? 'Criaturas detectadas no radar' : t('targetsDetectedOnRadar')}`, 'warning');
     }, 3000);
   };
 
   const selectVoidBattle = (enemy: VoidBattleEnemy) => {
-    const isGroup = Math.random() < 0.15;
-    const enemies = [{ ...enemy }];
+    // Bosses always appear alone. Only Standard and Elite can be in groups.
+    const isGroup = enemy.type !== 'Boss' && Math.random() < 0.15;
+    const enemies: VoidBattleEnemy[] = [{ ...enemy, vx: 0, vy: 0 }];
     
     if (isGroup) {
       const extraCount = 1 + Math.floor(Math.random() * 2); // 1 or 2 extra (total 2 or 3)
@@ -9073,7 +9756,7 @@ export const GameDashboard = memo(({
       lastEnemyMove: Date.now(),
       lastEnemyAttack: Date.now(),
       isGroupBattle: isGroup,
-      playerImage: '/images/ships/battle/player-battle.png',
+      playerImage: voidBattleShipStats.rarity === 'mythic' ? '/assets/rota3/void/mitic_eclipse/mitic_eclipse_neutral.png' : '/images/ships/battle/player-battle.png',
       playerHp: voidBattleShipStats.hp,
       playerMaxHp: voidBattleShipStats.maxHp,
       playerShield: voidBattleShipStats.shield,
@@ -9081,11 +9764,22 @@ export const GameDashboard = memo(({
       abilities: {
         dodge: { lastUsed: 0, cooldown: 3000 },
         shield: { lastUsed: 0, cooldown: 15000 },
-        burst: { lastUsed: 0, cooldown: 8000 }
+        burst: { lastUsed: 0, cooldown: 8000 },
+        special: { lastUsed: 0, cooldown: 15000, activeUntil: 0 }
       },
-      keysPressed: new Set()
+      keysPressed: new Set(),
+      // Use the locationId determined when searching started
+      locationId: currentVoidLocationId,
+      finishTimer: 0,
+      zoomTarget: { x: 50, y: 50 },
+      isSlowMo: false
     });
-    addLog(isGroup ? t('ambushDetected') : `${t('engagingShip')} ${enemy.type}. ${t('prepareForCombat')}`, 'warning');
+    
+    const engagementMsg = routeTier === 'Void' 
+      ? `Engajando Criatura: ${enemy.name}. Prepare-se!`
+      : `${t('engagingShip')} ${enemy.type}. ${t('prepareForCombat')}`;
+      
+    addLog(isGroup ? (routeTier === 'Void' ? 'Emboscada detectada! Múltiplas criaturas!' : t('ambushDetected')) : engagementMsg, 'warning');
     playSfx('click');
   };
 
@@ -9530,8 +10224,8 @@ export const GameDashboard = memo(({
             >
               <div className="p-8 border-b border-emerald-500/20 flex justify-between items-center bg-emerald-500/10">
                 <div className="flex items-center gap-4">
-                  <div className="p-3 bg-emerald-500/20 rounded-xl border border-emerald-500/40">
-                    <Globe className="w-8 h-8 text-emerald-400" />
+                  <div className="w-12 h-12 rounded-xl border border-emerald-500/40 flex items-center justify-center bg-black/40 overflow-hidden shadow-[0_0_15px_rgba(16,185,129,0.2)]">
+                    <img src="/images/ui/earth_card.png" alt="Earth" className="w-full h-full object-contain p-1 animate-spin-slow" />
                   </div>
                   <div>
                     <h2 className="text-2xl font-orbitron font-black text-white tracking-widest uppercase">{t('restoration')}</h2>
@@ -9539,7 +10233,10 @@ export const GameDashboard = memo(({
                   </div>
                 </div>
                 <button 
-                  onClick={() => setShowRestorationModal(false)}
+                  onClick={() => {
+                    setShowRestorationModal(false);
+                    playSfx('close_window');
+                  }}
                   className="p-2 hover:bg-white/10 rounded-full transition-colors text-slate-400 hover:text-white"
                 >
                   <X className="w-6 h-6" />
@@ -9549,12 +10246,12 @@ export const GameDashboard = memo(({
               <div className="p-8 space-y-8 max-h-[70vh] overflow-y-auto custom-scrollbar">
                 {/* Robot Section */}
                 <div className="flex items-start gap-6 bg-emerald-500/5 p-6 rounded-2xl border border-emerald-500/20">
-                  <div className="w-20 h-20 rounded-2xl bg-emerald-500/20 border-2 border-emerald-500 flex items-center justify-center shrink-0 animate-float">
-                    <Bot className="w-12 h-12 text-emerald-400" />
+                  <div className="w-24 h-24 rounded-2xl bg-emerald-500/10 border-2 border-emerald-500 flex items-center justify-center shrink-0 animate-float overflow-hidden shadow-[0_0_20px_rgba(16,185,129,0.3)]">
+                    <img src="/images/bobby_blue/bobby_blue_in_love.png" alt="Bobby Blue" className="w-full h-full object-cover" />
                   </div>
                   <div className="space-y-2">
                     <div className="flex items-center gap-2">
-                      <span className="text-base font-orbitron text-emerald-400 uppercase tracking-widest">Robot Assistant</span>
+                      <span className="text-base font-orbitron text-emerald-400 uppercase tracking-widest">Bobby Blue</span>
                       <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                     </div>
                     <p className="text-base text-white/80 font-mono leading-relaxed italic">
@@ -9813,7 +10510,10 @@ export const GameDashboard = memo(({
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               className="absolute inset-0 bg-black/95 backdrop-blur-xl"
-              onClick={() => setShowBattleShipUpgradeModal(false)}
+              onClick={() => {
+                setShowBattleShipUpgradeModal(false);
+                playSfx('close_window');
+              }}
             />
             
             <motion.div
@@ -9836,7 +10536,10 @@ export const GameDashboard = memo(({
                   </div>
                 </div>
                 <button 
-                  onClick={() => setShowBattleShipUpgradeModal(false)}
+                  onClick={() => {
+                 setShowBattleShipUpgradeModal(false);
+                 playSfx('close_window');
+               }}
                   className="p-2 hover:bg-white/10 rounded-full transition-all"
                 >
                   <X className="w-6 h-6 text-white/40" />
@@ -9929,15 +10632,15 @@ export const GameDashboard = memo(({
 
   const VoidWarMap = () => {
     const VOID_SECTORS_DATA = [
-      { name: { en: 'Epsilon Asteroid Belt', pt: 'Cinturão de Asteroides de Épsilon' }, zone: { en: 'Alpha Zone', pt: 'Zona Alpha' }, boss: 'Vanguard Alpha' },
-      { name: { en: 'Blood Nebula', pt: 'Nebulosa de Sangue' }, zone: { en: 'Outer Rim', pt: 'Borda Externa' }, boss: 'Nebula Phantom' },
-      { name: { en: 'Debris Belt', pt: 'Cinturão de Destroços' }, zone: { en: 'Scrap Yard', pt: 'Pátio de Sucata' }, boss: 'Scrap Tyrant' },
-      { name: { en: 'Gravitational Abyss', pt: 'Abismo Gravitacional' }, zone: { en: 'Event Horizon Area', pt: 'Área do Horizonte de Eventos' }, boss: 'Gravity Reaper' },
-      { name: { en: 'Star Fortress', pt: 'Fortaleza Estelar' }, zone: { en: 'Command Center', pt: 'Centro de Comando' }, boss: 'Iron Commander' },
-      { name: { en: 'Quantum Rift', pt: 'Fenda Quântica' }, zone: { en: 'Dimensional Tear', pt: 'Ruptura Dimensional' }, boss: 'Quantum Shard' },
-      { name: { en: 'Event Horizon', pt: 'Horizonte de Eventos' }, zone: { en: 'The Brink', pt: 'A Beira' }, boss: 'Event Horizon Archon' },
-      { name: { en: 'Deep Void', pt: 'Vazio Profundo' }, zone: { en: 'The Silence', pt: 'O Silêncio' }, boss: 'Void Stalker' },
-      { name: { en: 'The Heart of Darkness', pt: 'O Coração da Escuridão' }, zone: { en: 'Ultimate Singularity', pt: 'Singularidade Final' }, boss: 'The Void Entity' },
+      { name: { en: 'Epsilon Asteroid Belt', pt: 'Cinturão de Asteroides de Épsilon' }, zone: { en: 'Nursery of Horrors', pt: 'Berçário de Horrores' }, boss: 'Devorador Alpha' },
+      { name: { en: 'Blood Nebula', pt: 'Nebulosa de Sangue' }, zone: { en: 'Haunted Gaseous Area', pt: 'Área Gasosa Assombrada' }, boss: 'Sanguessuga Estelar' },
+      { name: { en: 'Debris Belt', pt: 'Cinturão de Destroços' }, zone: { en: 'Organic Scrap Yard', pt: 'Cemitério Orgânico' }, boss: 'Colosso Amalgamado' },
+      { name: { en: 'Gravitational Abyss', pt: 'Abismo Gravitacional' }, zone: { en: 'Shadow Abyss', pt: 'Abismo das Sombras' }, boss: 'Kraken do Vazio' },
+      { name: { en: 'Star Fortress', pt: 'Fortaleza Estelar' }, zone: { en: 'Ancient Nest', pt: 'Ninho Ancestral' }, boss: 'Besta-Titã de Ferro' },
+      { name: { en: 'Quantum Rift', pt: 'Fenda Quântica' }, zone: { en: 'Dimensional Mutation', pt: 'Mutação Dimensional' }, boss: 'Horror Mutante' },
+      { name: { en: 'Event Horizon', pt: 'Horizonte de Eventos' }, zone: { en: 'The Mouth of Terror', pt: 'A Boca do Terror' }, boss: 'Verme-Rei do Vazio' },
+      { name: { en: 'Deep Void', pt: 'Vazio Profundo' }, zone: { en: 'Eternal Nightmare', pt: 'Pesadelo Eterno' }, boss: 'Predador Abissal' },
+      { name: { en: 'The Heart of Darkness', pt: 'O Coração da Escuridão' }, zone: { en: 'The Eye of Singularity', pt: 'O Olho da Singularidade' }, boss: 'O Deus-Monstro do Vazio' },
     ];
 
     const sectors = VOID_SECTORS_DATA.map((data, i) => ({
@@ -9957,8 +10660,8 @@ export const GameDashboard = memo(({
       if (voidWarProgress.currentBattle >= 2 && voidWarProgress.currentBattle <= 3) type = 'elite';
       if (voidWarProgress.currentBattle === 4) type = 'boss';
 
-      // Start battle with modified stats
-      startVoidBattle(type);
+      // Start battle with modified stats and explicit locationId
+      startVoidBattle(type, sectorId + 1);
       setShowVoidWarMap(false);
     };
 
@@ -10060,8 +10763,8 @@ export const GameDashboard = memo(({
 
                               <p className="text-white/60 text-base font-mono leading-relaxed max-w-xl">
                                 {language === 'pt' 
-                                  ? `Ameaça de nível Ômega detectada em ${sector.zone}. O comandante ${sector.boss} lidera as forças de invasão. Neutralização imediata é requerida para proteger a reconstrução da Terra.`
-                                  : `Omega-level threat detected in ${sector.zone}. Commander ${sector.boss} is leading the invasion forces. Immediate neutralization is required to protect Earth's reconstruction.`}
+                                  ? `Uma atividade biológica hostil de nível Ômega foi detectada em ${sector.zone}. A criatura ${sector.boss} está consumindo a realidade local. Neutralização imediata é mandatória para evitar o colapso da reconstrução da Terra.`
+                                  : `Hostile biological activity of Omega level detected in ${sector.zone}. The creature ${sector.boss} is consuming local reality. Immediate neutralization is mandatory to prevent the collapse of Earth's reconstruction.`}
                               </p>
 
                               {/* Progress Bar */}
@@ -10126,7 +10829,10 @@ export const GameDashboard = memo(({
       earthReconstructionProgress={earthReconstructionProgress}
       language={language}
       t={t}
-      setShowRestorationModal={setShowRestorationModal}
+      setShowRestorationModal={(val) => {
+        setShowRestorationModal(val);
+        playSfx(val ? 'open_window' : 'close_window');
+      }}
     />
   );
 
@@ -10172,6 +10878,7 @@ export const GameDashboard = memo(({
       donateQCToPOI={donateQCToPOI}
       setVoidDonationModes={setVoidDonationModes}
       voidPOIQCDonations={voidPOIQCDonations}
+      playSfx={playSfx}
     />
   );
 
@@ -10432,6 +11139,8 @@ export const GameDashboard = memo(({
           initialEnemies={activeVoidBattle.enemies}
           playerShipStats={effectiveStats}
           voidResources={voidResources}
+          routeTier={routeTier}
+          locationId={activeVoidBattle.locationId ?? 0}
           onBattleEnd={(status, result) => {
              // Persist ship stats
              setVoidBattleShipStats(prev => ({
@@ -10481,11 +11190,13 @@ export const GameDashboard = memo(({
           }}
           onUpdateResources={setVoidResources}
           playSfx={playSfx as any}
+          stopSfx={stopSfx as any}
           t={t as any}
           language={language}
           addLog={addLog as any}
           formatValue={formatValue as any}
           isGroupBattle={activeVoidBattle.isGroupBattle || false}
+          enemyQueue={activeVoidBattle.enemyQueue}
         />
       );
     }
@@ -10708,7 +11419,7 @@ export const GameDashboard = memo(({
                     stats.rarity === 'mythic' ? 'text-white drop-shadow-[0_0_15px_rgba(255,255,255,0.8)]' :
                     'text-white'
                   }`}>
-                    {t('battleShip')} {
+                    {stats.rarity === 'mythic' ? 'ECLIPSE' : t('battleShip')} {
                       stats.rarity === 'rare' ? '(Rara)' :
                       stats.rarity === 'elite' ? '(Épica)' :
                       stats.rarity === 'legendary' ? '(Lendária)' :
@@ -10719,7 +11430,10 @@ export const GameDashboard = memo(({
                   
                   {isVoid && isRobotRepaired && (
                     <button
-                      onClick={() => setShowBattleShipUpgradeModal(true)}
+                      onClick={() => {
+                        setShowBattleShipUpgradeModal(true);
+                        playSfx('ask_window');
+                      }}
                       className="flex items-center gap-2 px-4 py-1.5 bg-emerald-500/20 border border-emerald-500/40 rounded-xl text-emerald-400 hover:bg-emerald-500/30 transition-all group shadow-[0_0_15px_rgba(16,185,129,0.1)]"
                     >
                       <Zap className="w-4 h-4 group-hover:scale-125 transition-transform" />
@@ -10968,11 +11682,127 @@ export const GameDashboard = memo(({
 
         <div className="flex-1 grid grid-cols-1 xl:grid-cols-3 gap-6 pb-8">
           {VOID_AIRCRAFT.map(aircraft => {
+            const isUnlocked = unlockedVoidAircraft.includes(aircraft.id);
             const mission = voidAircraftMissions[aircraft.id];
             const upgrades = voidAircraftUpgrades[aircraft.id];
             const isMission = mission.status === 'mission';
             const timeLeft = isMission && mission.endTime ? Math.max(0, mission.endTime - Date.now()) : 0;
             const currentMissionTime = aircraft.missionTime * (1 - upgrades.time * 0.1);
+
+            if (!isUnlocked) {
+              const construction = voidAircraftConstruction[aircraft.id];
+              const isConstructing = !!construction;
+
+              if (isConstructing) {
+                const totalTime = aircraft.id === 'va-2' ? 5 * 60 * 1000 : 10 * 60 * 1000;
+                const timeLeftConstruction = Math.max(0, construction.endTime - Date.now());
+                const progressConstruction = Math.min(100, ((totalTime - timeLeftConstruction) / totalTime) * 100);
+                const speedUpCost = aircraft.id === 'va-2' ? { energy: 10000, qc: 50000 } : { energy: 20000, qc: 100000 };
+                const canAffordSpeedUp = voidResources.energy >= speedUpCost.energy && qc >= speedUpCost.qc;
+
+                return (
+                  <div key={aircraft.id} className="glass-panel border-2 border-cyan-500/30 rounded-2xl p-6 flex flex-col gap-6 relative overflow-hidden h-full">
+                    <div className="flex justify-between items-start">
+                      <div className="space-y-1">
+                        <h3 className="text-xl font-orbitron font-black text-white tracking-tighter uppercase">{aircraft.name}</h3>
+                        <p className="text-[10px] text-cyan-400 font-mono uppercase tracking-widest">{language === 'pt' ? 'EM CONSTRUÇÃO...' : 'UNDER CONSTRUCTION...'}</p>
+                      </div>
+                      <div className="shrink-0 w-10 h-10 rounded-xl bg-cyan-500/20 border border-cyan-500/40 flex items-center justify-center animate-spin-slow">
+                        <Settings className="w-6 h-6 text-cyan-400" />
+                      </div>
+                    </div>
+
+                    <div className="space-y-4 flex-1 flex flex-col justify-center">
+                       <div className="flex justify-between text-xs font-orbitron text-cyan-400 uppercase tracking-widest">
+                          <span>{language === 'pt' ? 'Progresso' : 'Progress'}</span>
+                          <span>{formatTime(timeLeftConstruction)}</span>
+                       </div>
+                       <div className="h-3 bg-black/40 rounded-full overflow-hidden border border-cyan-500/20">
+                          <motion.div 
+                            initial={{ width: 0 }}
+                            animate={{ width: `${progressConstruction}%` }}
+                            className="h-full bg-gradient-to-r from-cyan-600 to-blue-500 shadow-[0_0_15px_rgba(6,182,212,0.5)]"
+                          />
+                       </div>
+
+                       <button
+                         onClick={() => speedUpVoidAircraft(aircraft.id)}
+                         disabled={!canAffordSpeedUp}
+                         className={`w-full py-3 rounded-xl font-orbitron font-black text-xs transition-all uppercase tracking-[0.2em] flex flex-col items-center justify-center gap-1 ${canAffordSpeedUp ? 'bg-yellow-500 text-black shadow-[0_0_20px_rgba(234,179,8,0.4)] hover:scale-[1.02]' : 'bg-white/5 text-white/20 cursor-not-allowed border border-white/10'}`}
+                       >
+                         <div className="flex items-center gap-2">
+                           <Zap className="w-3 h-3" />
+                           {language === 'pt' ? 'ACELERAR CONSTRUÇÃO' : 'SPEED UP CONSTRUCTION'}
+                         </div>
+                         <div className="flex gap-3 text-[10px] opacity-80">
+                           <span className="flex items-center gap-1 font-mono"><Zap className="w-2 h-2" /> {formatValue(speedUpCost.energy)} EN</span>
+                           <span className="flex items-center gap-1 font-mono"><Coins className="w-2 h-2" /> {formatValue(speedUpCost.qc)} QC</span>
+                         </div>
+                       </button>
+                    </div>
+
+                    <div className="h-32 glass-panel border border-white/5 rounded-2xl bg-black/20 flex items-center justify-center opacity-30">
+                       <Rocket className="w-12 h-12 text-cyan-500/50 animate-pulse" />
+                    </div>
+                  </div>
+                );
+              }
+
+              const costs = {
+                'va-2': { minerals: 5000, tech: 5000, energy: 5000 },
+                'va-3': { minerals: 15000, tech: 15000, energy: 15000 }
+              }[aircraft.id as 'va-2' | 'va-3'];
+
+              const canAfford = costs && voidResources.minerals >= costs.minerals && voidResources.tech >= costs.tech && voidResources.energy >= costs.energy;
+              const isLockedByPrev = aircraft.id === 'va-3' && !unlockedVoidAircraft.includes('va-2');
+
+              return (
+                <div key={aircraft.id} className="glass-panel border-2 border-white/5 rounded-2xl p-6 flex flex-col gap-6 relative overflow-hidden h-full grayscale opacity-60">
+                  <div className="absolute inset-0 bg-black/40 z-10 flex flex-col items-center justify-center p-6 text-center">
+                    <Lock className="w-12 h-12 text-white/20 mb-4" />
+                    <h3 className="text-xl font-orbitron font-black text-white/40 uppercase mb-4">{aircraft.name}</h3>
+                    
+                    {isLockedByPrev ? (
+                      <p className="text-xs text-red-400 font-mono uppercase tracking-widest">
+                        {language === 'pt' ? 'DESBLOQUEIE A COLLECTOR-BETA PRIMEIRO' : 'UNLOCK COLLECTOR-BETA FIRST'}
+                      </p>
+                    ) : (
+                      <div className="space-y-4 w-full">
+                        <div className="grid grid-cols-3 gap-2">
+                          <div className={`p-2 rounded-lg border ${voidResources.minerals >= (costs?.minerals || 0) ? 'border-emerald-500/30 bg-emerald-500/5' : 'border-red-500/30 bg-red-500/5'}`}>
+                            <div className="text-[10px] text-white/40 uppercase">{t('minerals')}</div>
+                            <div className={`text-xs font-bold ${voidResources.minerals >= (costs?.minerals || 0) ? 'text-emerald-400' : 'text-red-400'}`}>{formatValue(costs?.minerals || 0)}</div>
+                          </div>
+                          <div className={`p-2 rounded-lg border ${voidResources.tech >= (costs?.tech || 0) ? 'border-emerald-500/30 bg-emerald-500/5' : 'border-red-500/30 bg-red-500/5'}`}>
+                            <div className="text-[10px] text-white/40 uppercase">{t('tech')}</div>
+                            <div className={`text-xs font-bold ${voidResources.tech >= (costs?.tech || 0) ? 'text-emerald-400' : 'text-red-400'}`}>{formatValue(costs?.tech || 0)}</div>
+                          </div>
+                          <div className={`p-2 rounded-lg border ${voidResources.energy >= (costs?.energy || 0) ? 'border-emerald-500/30 bg-emerald-500/5' : 'border-red-500/30 bg-red-500/5'}`}>
+                            <div className="text-[10px] text-white/40 uppercase">{t('energy')}</div>
+                            <div className={`text-xs font-bold ${voidResources.energy >= (costs?.energy || 0) ? 'text-emerald-400' : 'text-red-400'}`}>{formatValue(costs?.energy || 0)}</div>
+                          </div>
+                        </div>
+                        
+                        <button
+                          onClick={() => buyVoidAircraft(aircraft.id)}
+                          disabled={!canAfford}
+                          className={`w-full py-3 rounded-xl font-orbitron font-black text-base transition-all uppercase tracking-widest ${canAfford ? 'bg-cyan-500 text-black shadow-[0_0_20px_rgba(6,182,212,0.4)] hover:scale-105' : 'bg-white/5 text-white/20 cursor-not-allowed border border-white/10'}`}
+                        >
+                          {t('build')}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex justify-between items-start blur-sm">
+                    <div className="space-y-1">
+                      <h3 className="text-xl font-orbitron font-black text-white tracking-tighter uppercase">{aircraft.name}</h3>
+                      <p className="text-base text-cyan-400/60 font-mono uppercase tracking-widest leading-tight">{aircraft.description}</p>
+                    </div>
+                  </div>
+                </div>
+              );
+            }
 
             return (
               <div key={aircraft.id} className={`glass-panel border-2 rounded-2xl p-6 flex flex-col gap-6 relative overflow-hidden h-full ${isMission ? 'neon-border-purple' : 'neon-border-cyan'}`}>
@@ -11860,7 +12690,7 @@ export const GameDashboard = memo(({
             </div>
 
             <AnimatePresence>
-              {battleNotification && (
+              {battleNotification && battleNotification.tier === routeTier && (
                 <motion.div
                   initial={{ opacity: 0, x: 50 }}
                   animate={{ opacity: 1, x: 0 }}
@@ -11927,7 +12757,11 @@ export const GameDashboard = memo(({
                   </div>
                 )}
                 <button 
-                  onClick={() => setFormatNumbers(!formatNumbers)}
+                  onClick={() => {
+                    const next = !formatNumbers;
+                    setFormatNumbers(next);
+                    playSfx(next ? 'open_window' : 'close_window');
+                  }}
                   className={`relative px-4 py-1.5 rounded-full border text-base font-orbitron font-bold transition-all uppercase tracking-widest flex items-center gap-2 overflow-hidden group ${
                     formatNumbers 
                     ? (isInterstellar 
@@ -12153,13 +12987,12 @@ export const GameDashboard = memo(({
                 if (isVoid && tab === 'mini_games') return null;
 
                 const isActive = activeTab === tab;
-                const isVoidWarActive = false; // Add safe fallback or read from state if exists
 
                 return (
                   <button
                     key={tab}
                     onClick={() => {
-                      playSfx('click');
+                      playSfx('aba_click');
                       setActiveTab(tab as any);
                     }}
                     className={`flex-1 px-2 py-2.5 font-orbitron text-[15px] tracking-widest uppercase transition-all border-b-2 whitespace-nowrap relative ${
@@ -12581,17 +13414,18 @@ export const GameDashboard = memo(({
                                   {slots * 2} {t('aetherion')} / {t('trip')}
                                 </span>
                                 {isActive && (
-                                  <span className={`text-[14px] font-mono ${isInterstellar ? 'text-orange-400' : 'text-cyan-400'}`}>{Math.floor(progress)}%</span>
+                                  <span className={`text-[14px] font-mono ${isInterstellar ? 'text-orange-400' : 'text-cyan-400'}`}>{locationTech.engine >= 5 ? 'MAX' : `${Math.floor(progress)}%`}</span>
                                 )}
                               </div>
                             </div>
                             
                             {isDesired && (
-                              <div className={`relative h-1 bg-white/5 rounded overflow-hidden ${locationTech.engine >= 5 ? (isInterstellar ? 'shadow-[0_0_10px_rgba(249,115,22,0.3)]' : 'shadow-[0_0_10px_rgba(236,72,153,0.3)]') : ''}`}>
+                              <div className={`relative h-1 bg-white/5 rounded overflow-hidden ${locationTech.engine >= 5 ? 'shadow-[0_0_15px_rgba(168,85,247,0.4)] border border-purple-500/20' : ''}`}>
                                 <motion.div 
-                                  className={`h-full rounded-full ${locationTech.engine >= 5 ? (isInterstellar ? 'bg-gradient-to-r from-orange-600 via-orange-400 to-orange-600' : 'bg-gradient-to-r from-pink-600 via-pink-400 to-pink-600') : (isInterstellar ? 'bg-orange-500' : getAutoTravelColor(slots))}`}
-                                  animate={{ width: `${!isActive ? 0 : (locationTech.engine >= 5 ? 100 : progress)}%` }}
-                                  transition={{ type: 'spring', bounce: 0, duration: 0.5 }}
+                                  className={`h-full rounded-full ${locationTech.engine >= 5 ? 'bg-gradient-to-r from-purple-600 via-pink-400 to-purple-600' : (isInterstellar ? 'bg-orange-500' : getAutoTravelColor(slots))}`}
+                                  animate={locationTech.engine >= 5 ? { opacity: [0.6, 1, 0.6] } : { width: `${!isActive ? 0 : progress}%` }}
+                                  transition={locationTech.engine >= 5 ? { duration: 2, repeat: Infinity, ease: "easeInOut" } : { type: 'spring', bounce: 0, duration: 0.5 }}
+                                  style={locationTech.engine >= 5 ? { width: '100%' } : {}}
                                 />
                               </div>
                             )}
@@ -13027,7 +13861,9 @@ export const GameDashboard = memo(({
                     
                     <div className="flex bg-black/40 p-1 rounded-xl border border-white/10">
                       <button
-                        onClick={() => setAircraftSubTab('fleet')}
+                        onClick={() => {
+                          setAircraftSubTab('fleet');
+                        }}
                         className={`px-4 py-2 rounded-lg text-[14px] font-bold transition-all ${
                           aircraftSubTab === 'fleet' ? 'bg-white/10 text-white' : 'text-white/40 hover:text-white/60'
                         }`}
@@ -13035,7 +13871,9 @@ export const GameDashboard = memo(({
                         {t('fleet')}
                       </button>
                       <button
-                        onClick={() => setAircraftSubTab('battle')}
+                        onClick={() => {
+                          setAircraftSubTab('battle');
+                        }}
                         className={`px-4 py-2 rounded-lg text-[14px] font-bold transition-all ${
                           aircraftSubTab === 'battle' ? 'bg-purple-500/20 text-purple-400' : 'text-white/40 hover:text-white/60'
                         }`}
@@ -13255,7 +14093,9 @@ export const GameDashboard = memo(({
                     {isInterstellar && (
                       <div className="flex bg-black/40 p-1 rounded-xl border border-white/10">
                         <button
-                          onClick={() => setTechSubTab('research')}
+                          onClick={() => {
+                          setTechSubTab('research');
+                        }}
                           className={`px-4 py-2 rounded-lg text-[14px] font-bold transition-all ${
                             techSubTab === 'research' ? 'bg-white/10 text-white' : 'text-white/40 hover:text-white/60'
                           }`}
@@ -13263,7 +14103,11 @@ export const GameDashboard = memo(({
                           {t('research')}
                         </button>
                         <button
-                          onClick={() => allTechUnlocked && setTechSubTab('extraction')}
+                          onClick={() => {
+                          if (allTechUnlocked) {
+                            setTechSubTab('extraction');
+                          }
+                        }}
                           className={`px-4 py-2 rounded-lg text-[14px] font-bold transition-all ${
                             !allTechUnlocked ? 'opacity-30 cursor-not-allowed' : ''
                           } ${
@@ -13322,12 +14166,14 @@ export const GameDashboard = memo(({
                                       <div className="mt-1 space-y-1">
                                         <div className="flex justify-between items-center text-[15px]">
                                           <span className="text-slate-400">Progresso:</span>
-                                          <span className="text-orange-400 font-mono">{(extractionCycleProgress[point.id] || 0).toFixed(0)}%</span>
+                                          <span className={`${robotLevel >= 5 ? 'text-purple-400 font-bold' : 'text-orange-400'} font-mono`}>{robotLevel >= 5 ? 'MAX' : `${(extractionCycleProgress[point.id] || 0).toFixed(0)}%`}</span>
                                         </div>
-                                        <div className="w-full h-1 bg-slate-800 rounded-full overflow-hidden border border-white/5">
-                                          <div 
-                                            className="h-full bg-gradient-to-r from-slate-400 via-white to-slate-400 shadow-[0_0_8px_rgba(255,255,255,0.4)] transition-[width] duration-300 ease-linear"
-                                            style={{ width: `${extractionCycleProgress[point.id] || 0}%` }}
+                                        <div className={`w-full h-1 bg-slate-800 rounded-full overflow-hidden border border-white/5 ${robotLevel >= 5 ? 'shadow-[0_0_15px_rgba(168,85,247,0.4)] border-purple-500/20' : ''}`}>
+                                          <motion.div 
+                                            className={`h-full rounded-full ${robotLevel >= 5 ? 'bg-gradient-to-r from-purple-600 via-pink-400 to-purple-600' : 'bg-gradient-to-r from-slate-400 via-white to-slate-400 shadow-[0_0_8px_rgba(255,255,255,0.4)]'}`}
+                                            animate={robotLevel >= 5 ? { opacity: [0.6, 1, 0.6] } : { width: `${extractionCycleProgress[point.id] || 0}%` }}
+                                            transition={robotLevel >= 5 ? { duration: 2, repeat: Infinity, ease: "easeInOut" } : { duration: 0.3, ease: "linear" }}
+                                            style={robotLevel >= 5 ? { width: '100%' } : {}}
                                           />
                                         </div>
                                       </div>
@@ -13976,10 +14822,23 @@ export const GameDashboard = memo(({
                         </div>
 
                         <div className="col-span-2">
-                          <div className={`h-full glass-panel ${isInterstellar ? 'neon-border-orange' : 'neon-border-cyan'} rounded-3xl p-6 bg-white/5 border-2 flex items-center justify-center relative overflow-hidden`}>
-                            <h2 className={`text-xl font-orbitron font-bold ${SHIPS.find(s => s.level === (ROUTES.find(r => r.id === selectedUpgradeLocation)?.requiredShipLevel || 1) && s.tier === (ROUTES.find(r => r.id === selectedUpgradeLocation)?.tier || routeTier))?.color || (isInterstellar ? 'text-orange-400' : 'text-cyan-400')} uppercase tracking-widest flex items-center gap-4`}>
-                              <Settings className="w-8 h-8 animate-spin-slow" /> {SHIPS.find(s => s.level === (ROUTES.find(r => r.id === selectedUpgradeLocation)?.requiredShipLevel || 1) && s.tier === (ROUTES.find(r => r.id === selectedUpgradeLocation)?.tier || routeTier))?.name} {t('upgrades')}
-                            </h2>
+                          <div className={`h-full glass-panel ${isInterstellar ? 'neon-border-orange' : 'neon-border-cyan'} rounded-3xl p-6 bg-white/5 border-2 flex items-center justify-start px-10 relative overflow-hidden`}>
+                            <div className="flex items-center gap-8">
+                              <h2 className={`text-xl font-orbitron font-bold ${SHIPS.find(s => s.level === (ROUTES.find(r => r.id === selectedUpgradeLocation)?.requiredShipLevel || 1) && s.tier === (ROUTES.find(r => r.id === selectedUpgradeLocation)?.tier || routeTier))?.color || (isInterstellar ? 'text-orange-400' : 'text-cyan-400')} uppercase tracking-widest flex items-center gap-4`}>
+                                <Settings className="w-8 h-8 animate-spin-slow" /> {SHIPS.find(s => s.level === (ROUTES.find(r => r.id === selectedUpgradeLocation)?.requiredShipLevel || 1) && s.tier === (ROUTES.find(r => r.id === selectedUpgradeLocation)?.tier || routeTier))?.name} {t('upgrades')}
+                              </h2>
+
+                              {/* Bulk Upgrade Button */}
+                              <motion.button
+                                whileHover={{ scale: 1.1 }}
+                                whileTap={{ scale: 0.9 }}
+                                onClick={() => buyAllUpgradesForShip(selectedUpgradeLocation)}
+                                className="flex items-center justify-center w-12 h-12 rounded-full bg-emerald-500/20 border-2 border-emerald-500/50 text-emerald-400 hover:bg-emerald-500/40 transition-all shadow-[0_0_15px_rgba(16,185,129,0.2)]"
+                                title={language === 'pt' ? 'Melhorar Tudo' : 'Upgrade All'}
+                              >
+                                <ChevronUp className="w-8 h-8" />
+                              </motion.button>
+                            </div>
                           </div>
                         </div>
 
@@ -14099,7 +14958,10 @@ export const GameDashboard = memo(({
                         {language === 'pt' ? 'CONFIRMAR E SAIR' : 'CONFIRM AND EXIT'}
                       </button>
                       <button
-                        onClick={() => setActiveTab(isEarth ? 'colonies' : isVoid ? 'void_aircraft' : isInterstellar ? 'routes2' : 'routes')}
+                        onClick={() => {
+                          playSfx('aba_click');
+                          setActiveTab(isEarth ? 'colonies' : isVoid ? 'void_aircraft' : isInterstellar ? 'routes2' : 'routes');
+                        }}
                         className="w-full py-2 text-base font-orbitron text-slate-500 hover:text-white transition-colors uppercase tracking-widest"
                       >
                         {language === 'pt' ? 'VOLTAR' : 'BACK'}
@@ -14380,78 +15242,27 @@ export const GameDashboard = memo(({
                               {tier === 'Void' ? (
                                 <div className="flex-1 flex flex-col items-center justify-center space-y-8 py-12">
                                   <motion.div 
-                                    className="relative w-48 h-48"
-                                    animate={{ y: [0, -10, 0] }}
-                                    transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+                                    className="relative w-64 h-64"
+                                    animate={{ 
+                                      y: [0, -15, 0],
+                                      rotate: [-2, 2, -2]
+                                    }}
+                                    transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
                                   >
-                                    {/* Stylized Robot Head */}
-                                    <div className="absolute inset-0 bg-gradient-to-br from-purple-500/20 via-purple-900/40 to-black/60 rounded-[2.5rem] border-2 border-purple-400/50 shadow-[0_0_40px_rgba(168,85,247,0.2)] overflow-hidden backdrop-blur-sm">
-                                      {/* Scanning Line */}
-                                      <motion.div 
-                                        className="absolute inset-x-0 h-px bg-purple-400/30 z-10"
-                                        animate={{ top: ["0%", "100%", "0%"] }}
-                                        transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
+                                    <div className="absolute inset-0 bg-gradient-to-br from-purple-500/20 via-black to-black rounded-[2.5rem] border-2 border-purple-500/40 shadow-[0_0_50px_rgba(168,85,247,0.2)] overflow-hidden">
+                                      <img 
+                                        src="/images/bobby_blue/bobby_blue_sad.png" 
+                                        alt="Sad Bobby" 
+                                        className="w-full h-full object-cover opacity-70 mix-blend-lighten"
                                       />
-                                      
-                                      {/* Eyes Container */}
-                                      <motion.div 
-                                        className="absolute top-1/3 left-0 right-0 flex justify-around px-10"
-                                        animate={{ x: [-8, 8, -8] }}
-                                        transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
-                                      >
-                                        {/* Left Eye */}
-                                        <div className="w-6 h-6 bg-purple-400 rounded-full shadow-[0_0_15px_rgba(168,85,247,0.8)] relative">
-                                          <div className="absolute top-1.5 left-1.5 w-2 h-2 bg-white rounded-full opacity-90" />
-                                          <motion.div 
-                                            className="absolute inset-0 bg-black/40"
-                                            animate={{ height: ["0%", "0%", "100%", "0%", "0%"] }}
-                                            transition={{ duration: 4, repeat: Infinity, times: [0, 0.8, 0.85, 0.9, 1] }}
-                                          />
-                                        </div>
-                                        {/* Right Eye */}
-                                        <div className="w-6 h-6 bg-purple-400 rounded-full shadow-[0_0_15px_rgba(168,85,247,0.8)] relative">
-                                          <div className="absolute top-1.5 left-1.5 w-2 h-2 bg-white rounded-full opacity-90" />
-                                          <motion.div 
-                                            className="absolute inset-0 bg-black/40"
-                                            animate={{ height: ["0%", "0%", "100%", "0%", "0%"] }}
-                                            transition={{ duration: 4, repeat: Infinity, times: [0, 0.8, 0.85, 0.9, 1] }}
-                                          />
-                                        </div>
-                                      </motion.div>
-                                      
-                                      {/* Sad Mouth */}
-                                      <div className="absolute bottom-1/4 left-1/2 -translate-x-1/2 w-12 h-4">
-                                        <svg viewBox="0 0 100 40" className="w-full h-full fill-none stroke-purple-400/60 stroke-[4]">
-                                          <path d="M10,30 Q50,0 90,30" />
-                                        </svg>
-                                      </div>
-
-                                      {/* Glossy Overlay */}
-                                      <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/5 to-white/10 pointer-events-none" />
+                                      {/* Scanline overlay for tech feel */}
+                                      <div className="absolute inset-0 bg-[linear-gradient(rgba(168,85,247,0)_50%,rgba(168,85,247,0.1)_50%)] bg-[length:100%_4px] pointer-events-none" />
+                                      <div className="absolute inset-0 bg-gradient-to-t from-purple-900/60 via-transparent to-transparent" />
                                     </div>
 
-                                    {/* Antennas */}
-                                    <div className="absolute -top-6 left-1/3 w-1.5 h-8 bg-gradient-to-t from-purple-400/50 to-transparent rounded-full" />
-                                    <div className="absolute -top-6 right-1/3 w-1.5 h-8 bg-gradient-to-t from-purple-400/50 to-transparent rounded-full" />
-                                    
-                                    {/* Floating Particles */}
-                                    {[...Array(5)].map((_, i) => (
-                                      <motion.div
-                                        key={i}
-                                        className="absolute w-1 h-1 bg-purple-400/40 rounded-full"
-                                        animate={{ 
-                                          y: [0, -40], 
-                                          x: [0, (i - 2) * 20],
-                                          opacity: [0, 1, 0] 
-                                        }}
-                                        transition={{ 
-                                          duration: 2 + i, 
-                                          repeat: Infinity, 
-                                          delay: i * 0.4 
-                                        }}
-                                        style={{ bottom: '10%', left: '50%' }}
-                                      />
-                                    ))}
+                                    {/* Decorative corners */}
+                                    <div className="absolute -top-2 -left-2 w-6 h-6 border-t-2 border-l-2 border-purple-500/60 rounded-tl-lg" />
+                                    <div className="absolute -bottom-2 -right-2 w-6 h-6 border-b-2 border-r-2 border-purple-500/60 rounded-br-lg" />
                                   </motion.div>
                                   
                                   <div className="text-center space-y-4">
@@ -14625,7 +15436,7 @@ export const GameDashboard = memo(({
                 <button
                   key={item.id}
                   onClick={() => {
-                    playSfx('click');
+                    playSfx('aba_click');
                     setActiveTab(item.id as any);
                   }}
                   className={`flex flex-col items-center gap-1 p-2 transition-all rounded-lg relative ${
@@ -15880,6 +16691,7 @@ export const GameDashboard = memo(({
             language={language}
             theme="purple"
             completeText={language === 'pt' ? 'INICIAR ROTA 3' : 'START ROUTE 3'}
+            videoSrc="/videos/bobby_blue/transition.webm"
           />
         )}
       </AnimatePresence>
@@ -15901,6 +16713,7 @@ export const GameDashboard = memo(({
             language={language}
             theme="orange"
             completeText={language === 'pt' ? 'INICIAR ROTA 2' : 'START ROUTE 2'}
+            videoSrc="/videos/bobby_blue/transition.webm"
           />
         )}
       </AnimatePresence>
@@ -15929,11 +16742,13 @@ export const GameDashboard = memo(({
               }, 3000);
 
               playSfx('alert_alert');
+              setIsFirstInvasionBattle(true);
               addLog(language === 'pt' ? 'INVASÃO DETECTADA! Defenda a estrutura de reconstrução!' : 'INVASION DETECTED! Defend the reconstruction structure!', 'error');
             }}
             language={language}
             theme="purple"
             completeText={language === 'pt' ? 'DEFENDER TERRA' : 'DEFEND EARTH'}
+            imageSrc="/images/bobby_blue/bobby_blue_fear.png"
           />
         )}
       </AnimatePresence>

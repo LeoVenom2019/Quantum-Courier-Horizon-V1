@@ -42,7 +42,15 @@ export type SFXType =
   | 'buy_new_robot'
   | 'bobby_mining'
   | 'mining_stones'
-  | 'alert_alert';
+  | 'serve_glass'
+  | 'alert_alert'
+  | 'alien_explosion_zero' | 'alien_explosion_1' | 'alien_explosion_2' | 'alien_explosion_3' | 'alien_explosion_4' | 'alien_explosion_5' | 'alien_explosion_6' | 'alien_explosion_7' | 'alien_explosion_8' | 'alien_explosion_9'
+  | 'boss_explosion_zero' | 'boss_explosion_1' | 'boss_explosion_2' | 'boss_explosion_3' | 'boss_explosion_4' | 'boss_explosion_5' | 'boss_explosion_6' | 'boss_explosion_7' | 'boss_explosion_8' | 'boss_explosion_9'
+  | 'boss_scream_zero' | 'boss_scream_1' | 'boss_scream_2' | 'boss_scream_3' | 'boss_scream_4' | 'boss_scream_5' | 'boss_scream_6' | 'boss_scream_7' | 'boss_scream_8' | 'boss_scream_9'
+  | 'shoot_monster_zero' | 'shoot_monster_1' | 'shoot_monster_2' | 'shoot_monster_3' | 'shoot_monster_4' | 'shoot_monster_5' | 'shoot_monster_6' | 'shoot_monster_7' | 'shoot_monster_8' | 'shoot_monster_9'
+  | 'shoot_elite_zero' | 'shoot_elite_1' | 'shoot_elite_2' | 'shoot_elite_3' | 'shoot_elite_4' | 'shoot_elite_5' | 'shoot_elite_6' | 'shoot_elite_7' | 'shoot_elite_8' | 'shoot_elite_9'
+  | 'shoot_boss_zero' | 'shoot_boss_1' | 'shoot_boss_2' | 'shoot_boss_3' | 'shoot_boss_4' | 'shoot_boss_5' | 'shoot_boss_6' | 'shoot_boss_7' | 'shoot_boss_8' | 'shoot_boss_9'
+  | 'laser_up' | 'shield_up' | 'target_up' | 'epic_battle_ship' | 'target_up_2' | 'login_start' | 'aba_click';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ATENÇÃO: Só adicione aqui arquivos que JÁ EXISTEM em public/audio/sfx/
@@ -78,7 +86,77 @@ const SFX_PATHS: Partial<Record<string, string>> = {
   buy_new_robot: '/audio/sfx/buy_new_robot.ogg',
   bobby_mining: '/audio/sfx/bobby_mining.ogg',
   mining_stones: '/audio/sfx/mining_stones.ogg',
+  serve_glass: '/audio/sfx/serve_glass.ogg',
   alert_alert: '/audio/sfx/alert_alert.ogg',
+  // Void Monster SFX
+  alien_explosion_zero: '/audio/sfx/void/alien_explosion_zero.ogg',
+  alien_explosion_1: '/audio/sfx/void/alien_explosion_1.ogg',
+  alien_explosion_2: '/audio/sfx/void/alien_explosion_2.ogg',
+  alien_explosion_3: '/audio/sfx/void/alien_explosion_3.ogg',
+  alien_explosion_4: '/audio/sfx/void/alien_explosion_4.ogg',
+  alien_explosion_5: '/audio/sfx/void/alien_explosion_5.ogg',
+  alien_explosion_6: '/audio/sfx/void/alien_explosion_6.ogg',
+  alien_explosion_7: '/audio/sfx/void/alien_explosion_7.ogg',
+  alien_explosion_8: '/audio/sfx/void/alien_explosion_8.ogg',
+  alien_explosion_9: '/audio/sfx/void/alien_explosion_9.ogg',
+  boss_explosion_zero: '/audio/sfx/void/boss_explosion_zero.ogg',
+  boss_explosion_1: '/audio/sfx/void/boss_explosion_1.ogg',
+  boss_explosion_2: '/audio/sfx/void/boss_explosion_2.ogg',
+  boss_explosion_3: '/audio/sfx/void/boss_explosion_3.ogg',
+  boss_explosion_4: '/audio/sfx/void/boss_explosion_4.ogg',
+  boss_explosion_5: '/audio/sfx/void/boss_explosion_5.ogg',
+  boss_explosion_6: '/audio/sfx/void/boss_explosion_6.ogg',
+  boss_explosion_7: '/audio/sfx/void/boss_explosion_7.ogg',
+  boss_explosion_8: '/audio/sfx/void/boss_explosion_8.ogg',
+  boss_explosion_9: '/audio/sfx/void/boss_explosion_9.ogg',
+  boss_scream_zero: '/audio/sfx/void/boss_scream_zero.ogg',
+  boss_scream_1: '/audio/sfx/void/boss_scream_1.ogg',
+  boss_scream_2: '/audio/sfx/void/boss_scream_2.ogg',
+  boss_scream_3: '/audio/sfx/void/boss_scream_3.ogg',
+  boss_scream_4: '/audio/sfx/void/boss_scream_4.ogg',
+  boss_scream_5: '/audio/sfx/void/boss_scream_5.ogg',
+  boss_scream_6: '/audio/sfx/void/boss_scream_6.ogg',
+  boss_scream_7: '/audio/sfx/void/boss_scream_7.ogg',
+  boss_scream_8: '/audio/sfx/void/boss_scream_8.ogg',
+  boss_scream_9: '/audio/sfx/void/boss_scream_9.ogg',
+  // Void Attack SFX
+  shoot_monster_zero: '/audio/sfx/void/shoot_monster_zero.ogg',
+  shoot_monster_1: '/audio/sfx/void/shoot_monster_1.ogg',
+  shoot_monster_2: '/audio/sfx/void/shoot_monster_2.ogg',
+  shoot_monster_3: '/audio/sfx/void/shoot_monster_3.ogg',
+  shoot_monster_4: '/audio/sfx/void/shoot_monster_4.ogg',
+  shoot_monster_5: '/audio/sfx/void/shoot_monster_5.ogg',
+  shoot_monster_6: '/audio/sfx/void/shoot_monster_6.ogg',
+  shoot_monster_7: '/audio/sfx/void/shoot_monster_7.ogg',
+  shoot_monster_8: '/audio/sfx/void/shoot_monster_8.ogg',
+  shoot_monster_9: '/audio/sfx/void/shoot_monster_9.ogg',
+  shoot_elite_zero: '/audio/sfx/void/shoot_elite_zero.ogg',
+  shoot_elite_1: '/audio/sfx/void/shoot_elite_1.ogg',
+  shoot_elite_2: '/audio/sfx/void/shoot_elite_2.ogg',
+  shoot_elite_3: '/audio/sfx/void/shoot_elite_3.ogg',
+  shoot_elite_4: '/audio/sfx/void/shoot_elite_4.ogg',
+  shoot_elite_5: '/audio/sfx/void/shoot_elite_5.ogg',
+  shoot_elite_6: '/audio/sfx/void/shoot_elite_6.ogg',
+  shoot_elite_7: '/audio/sfx/void/shoot_elite_7.ogg',
+  shoot_elite_8: '/audio/sfx/void/shoot_elite_8.ogg',
+  shoot_elite_9: '/audio/sfx/void/shoot_elite_9.ogg',
+  shoot_boss_zero: '/audio/sfx/void/shoot_boss_zero.ogg',
+  shoot_boss_1: '/audio/sfx/void/shoot_boss_1.ogg',
+  shoot_boss_2: '/audio/sfx/void/shoot_boss_2.ogg',
+  shoot_boss_3: '/audio/sfx/void/shoot_boss_3.ogg',
+  shoot_boss_4: '/audio/sfx/void/shoot_boss_4.ogg',
+  shoot_boss_5: '/audio/sfx/void/shoot_boss_5.ogg',
+  shoot_boss_6: '/audio/sfx/void/shoot_boss_6.ogg',
+  shoot_boss_7: '/audio/sfx/void/shoot_boss_7.ogg',
+  shoot_boss_8: '/audio/sfx/void/shoot_boss_8.ogg',
+  shoot_boss_9: '/audio/sfx/void/shoot_boss_9.ogg',
+  laser_up: '/audio/sfx/laser_up.ogg',
+  shield_up: '/audio/sfx/shield_up.ogg',
+  target_up: '/audio/sfx/target_up.ogg',
+  epic_battle_ship: '/audio/sfx/epic_battle_ship.ogg',
+  target_up_2: '/audio/sfx/target_up_2.ogg',
+  login_start: '/audio/sfx/login_start.ogg',
+  aba_click: '/audio/sfx/aba_click.ogg',
 };
 
 // Singleton Cache para evitar recriação de objetos e preloading redundante
@@ -103,6 +181,7 @@ if (typeof window !== 'undefined') {
 
 interface SFXConfig {
   volume?: number;
+  loop?: boolean;
 }
 
 export function useSFX(sfxOn: boolean = true) {
@@ -120,7 +199,16 @@ export function useSFX(sfxOn: boolean = true) {
   const playSfx = useCallback((type: string, config: SFXConfig = {}) => {
     if (!sfxOnRef.current || typeof window === 'undefined') return;
 
-    const path = SFX_PATHS[type];
+    let path = SFX_PATHS[type];
+    
+    // Fallback logic para sons do Vazio (Rota 3)
+    // Se o som de um local específico (ex: _1) não existir, tenta o local _zero
+    if (!path && type.includes('_') && !type.endsWith('_zero')) {
+      const baseType = type.split('_').slice(0, -1).join('_'); // Pega 'alien_explosion' de 'alien_explosion_1'
+      const fallbackType = `${baseType}_zero`;
+      path = SFX_PATHS[fallbackType];
+    }
+
     if (!path) return;
 
     try {
@@ -132,12 +220,14 @@ export function useSFX(sfxOn: boolean = true) {
         globalAudioCache[type] = audio;
       }
 
-      // Se o som já estiver tocando, reinicia
-      if (!audio.paused) {
+      // Configurações dinâmicas
+      audio.loop = config.loop ?? false;
+      audio.volume = config.volume ?? 0.4;
+
+      // Se o som já estiver tocando e não for loop, reinicia
+      if (!audio.paused && !audio.loop) {
         audio.currentTime = 0;
-      } else {
-        // Só define volume e tempo se necessário para reduzir chamadas ao motor de áudio
-        audio.volume = config.volume ?? 0.4;
+      } else if (audio.paused) {
         audio.currentTime = 0;
       }
 

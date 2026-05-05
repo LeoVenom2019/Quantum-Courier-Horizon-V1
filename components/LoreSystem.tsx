@@ -104,6 +104,8 @@ interface LoreScreenProps {
   language: 'pt' | 'en';
   theme: 'orange' | 'purple';
   completeText: string;
+  videoSrc?: string;
+  imageSrc?: string;
 }
 
 export const LoreScreen = React.memo(({ 
@@ -113,9 +115,11 @@ export const LoreScreen = React.memo(({
   onComplete, 
   language, 
   theme,
-  completeText
+  completeText,
+  videoSrc,
+  imageSrc
 }: LoreScreenProps) => {
-  const isTitle = lines[currentIndex].startsWith('Ano') || lines[currentIndex].startsWith('Prólogo');
+  const isTitle = lines[currentIndex].startsWith('Ano') || lines[currentIndex].startsWith('Prólogo') || lines[currentIndex].startsWith('---');
   const accentClass = theme === 'purple' ? 'text-purple-400' : 'text-orange-400';
   const borderClass = theme === 'purple' ? 'border-purple-500/30' : 'border-orange-500/30';
   const bgClass = theme === 'purple' ? 'bg-purple-500/10 hover:bg-purple-500/20' : 'bg-orange-500/10 hover:bg-orange-500/20';
@@ -131,27 +135,59 @@ export const LoreScreen = React.memo(({
     >
       <LoreBackground />
 
-      <div className="max-w-3xl w-full space-y-12 relative z-10">
-        <div className="flex flex-col items-center mb-8">
-          <RobotVisual theme={theme} />
+      <div className="max-w-4xl w-full space-y-8 relative z-10">
+        <div className="flex flex-col items-center mb-4">
+          {videoSrc ? (
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              className={`relative w-[300px] h-[300px] rounded-[3rem] overflow-hidden border-4 ${theme === 'purple' ? 'border-purple-500/50 shadow-[0_0_50px_rgba(168,85,247,0.3)]' : 'border-orange-500/50 shadow-[0_0_50px_rgba(249,115,22,0.3)]'} bg-black mb-8`}
+            >
+              <video 
+                src={videoSrc}
+                autoPlay 
+                loop 
+                muted 
+                playsInline 
+                className="w-full h-full object-cover"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent pointer-events-none" />
+            </motion.div>
+          ) : imageSrc ? (
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              className={`relative w-[300px] h-[300px] rounded-[3rem] overflow-hidden border-4 ${theme === 'purple' ? 'border-purple-500/50 shadow-[0_0_50px_rgba(168,85,247,0.3)]' : 'border-orange-500/50 shadow-[0_0_50px_rgba(249,115,22,0.3)]'} bg-black mb-8`}
+            >
+              <img 
+                src={imageSrc}
+                alt="Narrative Visual"
+                className="w-full h-full object-cover"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent pointer-events-none" />
+            </motion.div>
+          ) : (
+            <RobotVisual theme={theme} />
+          )}
           <div className={`h-px w-full bg-gradient-to-r from-transparent ${theme === 'purple' ? 'via-purple-500/50' : 'via-orange-500/50'} to-transparent`} />
         </div>
 
-        <div className="min-h-[300px] space-y-6 font-mono text-lg leading-relaxed text-center">
-          <AnimatePresence mode="popLayout">
+        <div className="min-h-[250px] space-y-6 font-mono text-lg lg:text-xl leading-relaxed text-center px-4">
+          <AnimatePresence mode="wait">
             <motion.p
               key={currentIndex}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              className={`${textContainerClass} ${isTitle ? `text-2xl font-orbitron font-black ${accentClass} uppercase tracking-[0.2em]` : ""}`}
+              initial={{ opacity: 0, filter: 'blur(10px)', y: 20 }}
+              animate={{ opacity: 1, filter: 'blur(0px)', y: 0 }}
+              exit={{ opacity: 0, filter: 'blur(10px)', y: -20 }}
+              transition={{ duration: 0.6 }}
+              className={`${textContainerClass} ${isTitle ? `text-2xl lg:text-3xl font-orbitron font-black ${accentClass} uppercase tracking-[0.3em]` : ""}`}
             >
               {lines[currentIndex]}
             </motion.p>
           </AnimatePresence>
         </div>
 
-        <div className="flex justify-between items-center pt-8 border-t border-white/10">
+        <div className="flex justify-between items-center pt-8 border-t border-white/10 px-4">
           <div className={`text-base font-orbitron ${accentClass}/50 uppercase tracking-[0.3em]`}>
             {currentIndex + 1} / {lines.length}
           </div>
@@ -167,7 +203,7 @@ export const LoreScreen = React.memo(({
           ) : (
             <button
               onClick={onComplete}
-              className={`px-10 py-4 ${btnAccent} text-white font-orbitron font-black text-base tracking-[0.3em] rounded-xl transition-all uppercase animate-pulse-glow`}
+              className={`px-10 py-4 ${btnAccent} text-white font-orbitron font-black text-lg tracking-[0.4em] rounded-xl transition-all uppercase animate-pulse-glow shadow-xl`}
             >
               {completeText}
             </button>

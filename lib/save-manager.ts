@@ -100,6 +100,8 @@ export interface ModularSaveData {
     fleetPower: number;
     voidAutoShipmentUnlocked: boolean;
     voidAutoShipmentActive: boolean;
+    unlockedVoidAircraft: string[];
+    voidAircraftConstruction: Record<string, { endTime: number }>;
   };
   earth_reconstruction: {
     earthReconstructionProgress: Record<string, number>;
@@ -222,7 +224,9 @@ export const SaveManager = {
         warCoreLevel: flatData.warCoreLevel || 1,
         fleetPower: flatData.fleetPower || 0,
         voidAutoShipmentUnlocked: flatData.voidAutoShipmentUnlocked || false,
-        voidAutoShipmentActive: flatData.voidAutoShipmentActive || false
+        voidAutoShipmentActive: flatData.voidAutoShipmentActive || false,
+        unlockedVoidAircraft: flatData.unlockedVoidAircraft || ['va-1'],
+        voidAircraftConstruction: flatData.voidAircraftConstruction || {}
       },
       earth_reconstruction: {
         earthReconstructionProgress: flatData.earthReconstructionProgress || {},

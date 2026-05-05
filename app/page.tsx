@@ -1297,10 +1297,7 @@ export default function GameHome() {
     setTimeout(() => setCodeSuccess(''), 3000);
     
     if (sfxOn) {
-      // Digital sound effect placeholder
-      const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3');
-      audio.volume = 0.3;
-      audio.play().catch(() => {});
+      playSfx('login_start', { volume: 0.3 }); // Using login_start as a generic success sound or click
     }
   };
 
@@ -1346,12 +1343,7 @@ export default function GameHome() {
     setActiveCodes(next);
 
     if (sfxOn) {
-      const soundUrl = newState 
-        ? 'https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3' 
-        : 'https://assets.mixkit.co/active_storage/sfx/2567/2567-preview.mp3';
-      const audio = new Audio(soundUrl);
-      audio.volume = 0.2;
-      audio.play().catch(() => {});
+      playSfx(newState ? 'aba_click' : 'aba_click', { volume: 0.2 }); 
     }
   };
 
@@ -1411,6 +1403,9 @@ export default function GameHome() {
     await GameStorage.remove('time_travel_save');
     setHasSave(false);
     setPlayerName('');
+    setIsRoute2Unlocked(false);
+    setUnlockedAchievements([]);
+    setAchievementProgress({});
     setShowResetConfirm(false);
     setShowOptions(false);
   };
@@ -1469,6 +1464,7 @@ export default function GameHome() {
         language={language} 
         playerName={playerName}
         setPlayerName={setPlayerName}
+        sfxOn={sfxOn}
       />
     );
   }
@@ -1651,16 +1647,16 @@ export default function GameHome() {
             label={tl('CONTINUE', 'CONTINUAR')} 
             icon={Play} 
             onClick={() => {
-              playSfx('click');
+              playSfx('aba_click');
               handleContinue();
             }} 
             disabled={!hasSave}
             theme={theme}
           />
-          <MenuButton label={tl('CAMPAIGN', 'CAMPANHA')} icon={Rocket} onClick={() => { playSfx('click'); handleStartGame(false); }} theme={theme} />
-          <MenuButton label={tl('SPEED RUN', 'SPEED RUN')} icon={Timer} onClick={() => { playSfx('click'); setShowSpeedRunMenu(true); }} theme={theme} />
-          <MenuButton label={tl('OPTIONS', 'OPÇÕES')} icon={Settings} onClick={() => { playSfx('click'); setShowOptions(true); }} theme={theme} />
-          <MenuButton label={tl('ACHIEVEMENTS', 'CONQUISTAS')} icon={Trophy} onClick={() => { playSfx('click'); setShowAchievements(true); }} theme={theme} />
+          <MenuButton label={tl('CAMPAIGN', 'CAMPANHA')} icon={Rocket} onClick={() => { playSfx('aba_click'); handleStartGame(false); }} theme={theme} />
+          <MenuButton label={tl('SPEED RUN', 'SPEED RUN')} icon={Timer} onClick={() => { playSfx('aba_click'); setShowSpeedRunMenu(true); }} theme={theme} />
+          <MenuButton label={tl('OPTIONS', 'OPÇÕES')} icon={Settings} onClick={() => { playSfx('aba_click'); setShowOptions(true); }} theme={theme} />
+          <MenuButton label={tl('ACHIEVEMENTS', 'CONQUISTAS')} icon={Trophy} onClick={() => { playSfx('aba_click'); setShowAchievements(true); }} theme={theme} />
           
           <div className={`mt-4 flex flex-col gap-1 text-[15px] font-mono ${theme === 'cyan' ? 'text-cyan-500/40' : 'text-orange-500/40'} uppercase tracking-widest`}>
             <div className="flex justify-between">
@@ -1712,13 +1708,13 @@ export default function GameHome() {
                   </h3>
                   <div className="flex gap-2">
                     <button 
-                      onClick={() => { playSfx('click'); setMusicOn(true); }}
+                      onClick={() => { playSfx('aba_click'); setMusicOn(true); }}
                       className={`flex-1 py-1.5 rounded font-orbitron text-sm border transition-all ${musicOn ? 'bg-cyan-500 text-black border-cyan-500' : 'bg-transparent text-cyan-500/40 border-cyan-500/20'}`}
                     >
                       {tl('ON', 'LIGADO')}
                     </button>
                     <button 
-                      onClick={() => { playSfx('click'); setMusicOn(false); }}
+                      onClick={() => { playSfx('aba_click'); setMusicOn(false); }}
                       className={`flex-1 py-1.5 rounded font-orbitron text-sm border transition-all ${!musicOn ? 'bg-cyan-500 text-black border-cyan-500' : 'bg-transparent text-cyan-500/40 border-cyan-500/20'}`}
                     >
                       {tl('OFF', 'DESLIGADO')}
@@ -1733,13 +1729,13 @@ export default function GameHome() {
                   </h3>
                   <div className="flex gap-2">
                     <button 
-                      onClick={() => { playSfx('click'); setSfxOn(true); }}
+                      onClick={() => { playSfx('aba_click'); setSfxOn(true); }}
                       className={`flex-1 py-1.5 rounded font-orbitron text-sm border transition-all ${sfxOn ? 'bg-cyan-500 text-black border-cyan-500' : 'bg-transparent text-cyan-500/40 border-cyan-500/20'}`}
                     >
                       {tl('ON', 'LIGADO')}
                     </button>
                     <button 
-                      onClick={() => { playSfx('click'); setSfxOn(false); }}
+                      onClick={() => { playSfx('aba_click'); setSfxOn(false); }}
                       className={`flex-1 py-1.5 rounded font-orbitron text-sm border transition-all ${!sfxOn ? 'bg-cyan-500 text-black border-cyan-500' : 'bg-transparent text-cyan-500/40 border-cyan-500/20'}`}
                     >
                       {tl('OFF', 'DESLIGADO')}
@@ -1754,13 +1750,13 @@ export default function GameHome() {
                   </h3>
                   <div className="grid grid-cols-1 gap-2">
                     <button 
-                      onClick={() => { playSfx('click'); setLanguage('pt'); }}
+                      onClick={() => { playSfx('aba_click'); setLanguage('pt'); }}
                       className={`w-full py-1.5 rounded font-orbitron text-sm border transition-all ${language === 'pt' ? 'bg-cyan-500 text-black border-cyan-500' : 'bg-transparent text-cyan-500/40 border-cyan-500/20'}`}
                     >
                       {tl('PORTUGUESE', 'PORTUGUÊS')}
                     </button>
                     <button 
-                      onClick={() => { playSfx('click'); setLanguage('en'); }}
+                      onClick={() => { playSfx('aba_click'); setLanguage('en'); }}
                       className={`w-full py-1.5 rounded font-orbitron text-sm border transition-all ${language === 'en' ? 'bg-cyan-500 text-black border-cyan-500' : 'bg-transparent text-cyan-500/40 border-cyan-500/20'}`}
                     >
                       {tl('ENGLISH', 'INGLÊS')}
@@ -1791,6 +1787,7 @@ export default function GameHome() {
                 <div className="grid grid-cols-2 gap-3 pt-3 border-t border-cyan-500/30">
                   <button 
                     onClick={() => {
+                      playSfx('aba_click');
                       setShowOptions(false);
                       setShowJukeboxModal(true);
                     }}
@@ -1800,7 +1797,10 @@ export default function GameHome() {
                   </button>
 
                   <button 
-                    onClick={() => setShowCodesModal(true)}
+                    onClick={() => {
+                      playSfx('aba_click');
+                      setShowCodesModal(true);
+                    }}
                     className="w-full py-3 bg-slate-800/40 border border-cyan-500/30 text-cyan-400 font-orbitron text-sm tracking-widest rounded-lg hover:bg-cyan-500/20 hover:border-cyan-500 transition-all uppercase flex items-center justify-center gap-2 group"
                   >
                     <ShieldCheck className="w-4 h-4 group-hover:scale-110 transition-transform" /> {tl('CODES', 'CÓDIGOS')}
@@ -1811,6 +1811,7 @@ export default function GameHome() {
                 <div className="pt-3 border-t border-cyan-500/20">
                   <button 
                     onClick={() => {
+                      playSfx('aba_click');
                       setShowResetConfirm(true);
                     }}
                     className="w-full py-2 rounded font-orbitron text-sm bg-rose-600/20 text-rose-400 border border-rose-500/50 hover:bg-rose-600 hover:text-white transition-all flex items-center justify-center gap-2"
@@ -2176,6 +2177,7 @@ export default function GameHome() {
               <div className="flex flex-col gap-3">
                 <button 
                   onClick={() => {
+                    playSfx('login_start');
                     setShowSpeedRunConfirm(false);
                     setShowOptions(false);
                     handleStartGame(true);
@@ -2185,7 +2187,10 @@ export default function GameHome() {
                   {tl('CONFIRM & START', 'CONFIRMAR E INICIAR')}
                 </button>
                 <button 
-                  onClick={() => setShowSpeedRunConfirm(false)}
+                  onClick={() => {
+                    playSfx('aba_click');
+                    setShowSpeedRunConfirm(false);
+                  }}
                   className="w-full py-3 text-white/40 font-orbitron text-base hover:text-white transition-colors uppercase"
                 >
                   {tl('CANCEL', 'CANCELAR')}

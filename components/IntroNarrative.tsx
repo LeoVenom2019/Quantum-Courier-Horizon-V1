@@ -6,6 +6,7 @@ import { Language, t } from '@/lib/i18n';
 import { Rocket, ShieldCheck, ArrowRight, X, Sparkles } from 'lucide-react';
 import { SpaceAmbience } from './SpaceAmbience';
 import { BobbyBlueCharacter, BobbyBlueVariant } from './BobbyBlueCharacter';
+import { useSFX } from '@/hooks/useSFX';
 
 const STORY_TEXT = [
   {
@@ -84,18 +85,63 @@ const KeyboardVisual = () => {
   ];
 
   return (
-    <div className="mt-8 p-4 bg-slate-900/80 border border-cyan-500/20 rounded-xl space-y-2">
+    <div className="mt-8 p-6 bg-[#08080c] border border-white/5 rounded-xl space-y-3 relative overflow-hidden shadow-[inset_0_0_40px_rgba(0,0,0,0.8)]">
+      {/* Keyboard RGB Underglow Wave */}
+      <div className="absolute inset-0 opacity-10 blur-3xl pointer-events-none">
+        <motion.div 
+          animate={{ 
+            background: [
+              'linear-gradient(90deg, #ff0000, #ff00ff, #0000ff, #00ffff, #00ff00, #ffff00, #ff0000)',
+              'linear-gradient(90deg, #ff00ff, #0000ff, #00ffff, #00ff00, #ffff00, #ff0000, #ff00ff)',
+            ]
+          }}
+          transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
+          className="w-[200%] h-full -ml-[50%]"
+        />
+      </div>
+
       {rows.map((row, i) => (
-        <div key={i} className="flex justify-center gap-1.5">
-          {row.map(key => (
-            <div key={key} className="w-6 h-6 bg-slate-800 border border-cyan-500/10 rounded flex items-center justify-center text-[8px] text-cyan-500/40 font-orbitron">
+        <div key={i} className="flex justify-center gap-2 relative z-10">
+          {row.map((key, keyIdx) => (
+            <motion.div 
+              key={key}
+              animate={{ 
+                color: ['#ff4444', '#44ff44', '#4444ff', '#ff4444'],
+                boxShadow: [
+                  '0 0 10px rgba(255,68,68,0.2)',
+                  '0 0 10px rgba(68,255,68,0.2)',
+                  '0 0 10px rgba(68,68,255,0.2)',
+                  '0 0 10px rgba(255,68,68,0.2)'
+                ]
+              }}
+              transition={{ 
+                duration: 4, 
+                repeat: Infinity, 
+                delay: (i * 0.1) + (keyIdx * 0.05) 
+              }}
+              className="w-8 h-8 bg-[#121218] border border-white/10 rounded flex items-center justify-center text-[10px] font-orbitron font-bold relative shadow-[0_2px_4px_rgba(0,0,0,0.5),inset_0_1px_1px_rgba(255,255,255,0.05)]"
+            >
               {key}
-            </div>
+              <div className="absolute inset-0 bg-gradient-to-b from-white/5 to-transparent rounded pointer-events-none" />
+            </motion.div>
           ))}
         </div>
       ))}
-      <div className="flex justify-center mt-2">
-        <div className="w-32 h-6 bg-slate-800 border border-cyan-500/10 rounded" />
+      <div className="flex justify-center mt-3 relative z-10">
+        <motion.div 
+          animate={{ 
+            boxShadow: [
+              '0 0 15px rgba(255,68,68,0.3)',
+              '0 0 15px rgba(68,255,68,0.3)',
+              '0 0 15px rgba(68,68,255,0.3)',
+              '0 0 15px rgba(255,68,68,0.3)'
+            ]
+          }}
+          transition={{ duration: 4, repeat: Infinity }}
+          className="w-48 h-8 bg-[#121218] border border-white/10 rounded shadow-[0_2px_4px_rgba(0,0,0,0.5)] relative overflow-hidden"
+        >
+           <div className="absolute inset-0 bg-gradient-to-b from-white/5 to-transparent" />
+        </motion.div>
       </div>
     </div>
   );
@@ -106,14 +152,17 @@ export const IntroNarrative = ({
   onCancel,
   language,
   playerName,
-  setPlayerName 
+  setPlayerName,
+  sfxOn
 }: { 
   onComplete: () => void; 
   onCancel: () => void;
   language: Language;
   playerName: string;
   setPlayerName: (name: string) => void;
+  sfxOn?: boolean;
 }) => {
+  const { playSfx } = useSFX(sfxOn);
   const [index, setIndex] = useState(0);
   const [showPlayerId, setShowPlayerId] = useState(false);
   const [isTyping, setIsTyping] = useState(true);
@@ -121,6 +170,9 @@ export const IntroNarrative = ({
   const [isLoading, setIsLoading] = useState(false);
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [loadingStatus, setLoadingStatus] = useState("");
+  const [isAlienEggActive, setIsAlienEggActive] = useState(false);
+  const [showAlienMessage, setShowAlienMessage] = useState(false);
+  const [showFullAlienGlitch, setShowFullAlienGlitch] = useState(false);
 
   const LOADING_STEPS = [
     { progress: 10, en: "Initializing systems...", pt: "Inicializando sistemas..." },
@@ -167,8 +219,32 @@ export const IntroNarrative = ({
     setShowPlayerId(true);
   };
 
+  const triggerAlienEasterEgg = () => {
+    playSfx('alert_alert');
+    setIsAlienEggActive(true);
+    setTimeout(() => {
+      setShowAlienMessage(true);
+    }, 800);
+  };
+
+  const closeAlienMessage = () => {
+    setShowAlienMessage(false);
+    setShowFullAlienGlitch(true);
+    playSfx('error');
+    setTimeout(() => {
+      setShowFullAlienGlitch(false);
+      setIsAlienEggActive(false);
+      setPlayerName('');
+    }, 2500);
+  };
+
   const handleConfirmName = () => {
+    if (playerName.toLowerCase().trim() === 'alien') {
+      triggerAlienEasterEgg();
+      return;
+    }
     if (playerName.trim() && !isLoading) {
+      playSfx('login_start', { volume: 0.8 });
       setIsLoading(true);
       let stepIndex = 0;
       
@@ -231,7 +307,10 @@ export const IntroNarrative = ({
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 0.5 }}
                 whileHover={{ opacity: 1, scale: 1.05 }}
-                onClick={handleSkip}
+                onClick={() => {
+                  playSfx('aba_click');
+                  handleSkip();
+                }}
                 className="mt-12 text-cyan-500 font-orbitron text-[10px] tracking-[0.3em] uppercase border border-cyan-500/30 px-6 py-2 rounded-full hover:bg-cyan-500/10 transition-all"
               >
                 {t(language, "Skip Narrative", "Pular Narrativa")}
@@ -241,7 +320,15 @@ export const IntroNarrative = ({
             <motion.div
               key="player-id"
               initial={{ opacity: 0, scale: 0.9, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
+              animate={{ 
+                opacity: 1, 
+                scale: 1, 
+                y: 0,
+                x: isAlienEggActive ? [0, -4, 4, -4, 4, 0] : 0
+              }}
+              transition={{
+                x: isAlienEggActive ? { duration: 0.2, repeat: Infinity } : { duration: 0.5 }
+              }}
               className="w-full max-w-2xl relative"
             >
               {/* Notebook Frame */}
@@ -249,7 +336,10 @@ export const IntroNarrative = ({
                 <div className="bg-[#0a0a1a] border-2 border-cyan-500/30 rounded-2xl p-8 relative overflow-hidden min-h-[400px] flex flex-col justify-center">
                   {/* Close Button */}
                   <button 
-                    onClick={onCancel}
+                    onClick={() => {
+                      playSfx('aba_click');
+                      onCancel();
+                    }}
                     className="absolute top-4 right-4 text-cyan-500/50 hover:text-cyan-400 transition-colors z-30"
                   >
                     <X className="w-6 h-6" />
@@ -276,7 +366,7 @@ export const IntroNarrative = ({
 
                         <div className="space-y-3 max-w-md mx-auto">
                           <label className="text-[10px] font-orbitron text-cyan-400 uppercase tracking-[0.4em] block ml-1">
-                            {t(language, "Pilot Name", "Nome do Piloto")}
+                            {t(language, "Master Key Name", "Master Key Name")}
                           </label>
                           <div className="relative">
                             <input 
@@ -352,20 +442,74 @@ export const IntroNarrative = ({
               </div>
 
               {/* Notebook Base / Keyboard */}
-              <div className="bg-slate-800 border-x-8 border-b-8 border-slate-700 rounded-b-3xl p-4 shadow-2xl relative overflow-hidden">
-                <div className="absolute top-0 left-0 w-full h-1 bg-slate-900" />
+              <div className="bg-[#1a1c25] border-x-[12px] border-b-[12px] border-[#252836] rounded-b-[4rem] p-6 shadow-[0_30px_60px_rgba(0,0,0,0.8)] relative overflow-hidden">
+                {/* Brushed metal texture overlay */}
+                <div className="absolute inset-0 opacity-[0.03] pointer-events-none bg-[url('https://www.transparenttextures.com/patterns/brushed-alum.png')]" />
+                
+                {/* RGB Side Strips */}
+                <motion.div 
+                  animate={{ background: ['linear-gradient(to bottom, #ff0000, #00ff00, #0000ff, #ff0000)'] }}
+                  transition={{ duration: 5, repeat: Infinity, ease: "linear" }}
+                  className="absolute left-0 top-0 w-1 h-full blur-[2px]" 
+                />
+                <motion.div 
+                  animate={{ background: ['linear-gradient(to bottom, #ff0000, #00ff00, #0000ff, #ff0000)'] }}
+                  transition={{ duration: 5, repeat: Infinity, ease: "linear" }}
+                  className="absolute right-0 top-0 w-1 h-full blur-[2px]" 
+                />
+
+                <div className="absolute top-0 left-0 w-full h-1.5 bg-[#0a0a0f] shadow-[0_2px_10px_rgba(0,0,0,0.5)]" />
+                
+                {/* Branding Section */}
+                <div className="flex flex-col items-center mb-4 space-y-1 relative z-10">
+                   <motion.div 
+                    animate={{ filter: ['drop-shadow(0 0 5px #00ffff)', 'drop-shadow(0 0 15px #ff00ff)', 'drop-shadow(0 0 5px #00ffff)'] }}
+                    transition={{ duration: 3, repeat: Infinity }}
+                   >
+                     <Sparkles className="w-8 h-8 text-white mb-1" />
+                   </motion.div>
+                   <h3 className="font-orbitron font-black text-white tracking-[0.5em] text-xs uppercase opacity-80">
+                     ALIEN WAIT
+                   </h3>
+                </div>
+
                 <KeyboardVisual />
                 
                 {/* Trackpad area */}
-                <div className="mt-6 flex justify-center">
-                  <div className="w-40 h-24 bg-slate-900/50 border border-cyan-500/10 rounded-xl" />
+                <div className="mt-8 flex justify-center relative items-end">
+                  {/* Alien Wait Sticker Card */}
+                  <motion.div 
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    className="absolute left-8 bottom-2 w-24 h-16 bg-gradient-to-br from-[#1e1e26] to-[#0a0a0f] border border-white/10 rounded-lg shadow-[0_10px_20px_rgba(0,0,0,0.4)] flex items-center justify-center overflow-hidden hover:scale-105 transition-all duration-500 cursor-default z-20 group"
+                  >
+                    <div className="absolute inset-0 bg-gradient-to-tr from-white/5 via-transparent to-transparent opacity-50" />
+                    <img 
+                      src="/images/ui/alien_wait.png" 
+                      alt="Alien Wait Badge" 
+                      className="w-20 h-12 object-contain filter drop-shadow-[0_0_8px_rgba(0,0,0,0.5)] group-hover:drop-shadow-[0_0_12px_rgba(255,255,255,0.2)] transition-all"
+                    />
+                    {/* Holographic shine effect */}
+                    <motion.div 
+                      animate={{ x: ['-100%', '200%'] }}
+                      transition={{ duration: 3, repeat: Infinity, ease: "linear", repeatDelay: 2 }}
+                      className="absolute inset-0 w-1/2 bg-gradient-to-r from-transparent via-white/10 to-transparent skew-x-[-20deg]"
+                    />
+                  </motion.div>
+
+                  <div className="w-48 h-28 bg-[#0a0a0f] border border-white/5 rounded-2xl shadow-[inset_0_4px_10px_rgba(0,0,0,0.8)] relative group overflow-hidden">
+                    <div className="absolute inset-0 bg-gradient-to-tr from-cyan-500/5 to-transparent" />
+                    <div className="absolute bottom-4 right-4 opacity-20 group-hover:opacity-100 transition-opacity">
+                      <div className="w-2 h-2 bg-cyan-400 rounded-full animate-pulse" />
+                    </div>
+                  </div>
                 </div>
 
                 {/* Status Lights */}
-                <div className="absolute bottom-4 right-8 flex gap-2">
-                  <div className="w-1.5 h-1.5 bg-cyan-500 rounded-full animate-pulse" />
-                  <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse [animation-delay:0.2s]" />
-                  <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse [animation-delay:0.4s]" />
+                <div className="absolute bottom-6 right-10 flex gap-3">
+                  <div className="w-2 h-2 bg-red-500 rounded-full shadow-[0_0_8px_rgba(239,68,68,0.8)] animate-pulse" />
+                  <div className="w-2 h-2 bg-green-500 rounded-full shadow-[0_0_8px_rgba(34,197,94,0.8)] animate-pulse [animation-delay:0.2s]" />
+                  <div className="w-2 h-2 bg-blue-500 rounded-full shadow-[0_0_8px_rgba(59,130,246,0.8)] animate-pulse [animation-delay:0.4s]" />
                 </div>
               </div>
             </motion.div>
@@ -384,6 +528,98 @@ export const IntroNarrative = ({
           />
         </div>
       )}
+      {/* Alien Easter Egg Modal */}
+      <AnimatePresence>
+        {showAlienMessage && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
+          >
+            <div className="bg-slate-900 border-2 border-rose-500/50 p-8 rounded-2xl max-w-md w-full shadow-[0_0_50px_rgba(244,63,94,0.3)]">
+              <div className="flex items-center gap-4 mb-6">
+                <div className="w-12 h-12 rounded-full bg-rose-500/20 flex items-center justify-center border border-rose-500/50">
+                  <span className="text-2xl font-bold text-rose-500">!</span>
+                </div>
+                <h3 className="text-xl font-orbitron text-white uppercase tracking-widest">{language === 'pt' ? 'ERRO DE SISTEMA' : 'SYSTEM ERROR'}</h3>
+              </div>
+              <p className="text-slate-300 font-orbitron text-sm leading-relaxed mb-8">
+                {language === 'pt' ? 'NOME DE USUÁRIO JÁ FOI USADO...' : 'USER NAME ALREADY IN USE...'}
+              </p>
+              <button
+                onClick={closeAlienMessage}
+                className="w-full py-4 bg-rose-600 hover:bg-rose-500 text-white font-orbitron text-xs tracking-[0.3em] uppercase rounded-xl transition-all shadow-lg"
+              >
+                {language === 'pt' ? 'FECHAR' : 'CLOSE'}
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Full Alien Glitch Overlay */}
+      <AnimatePresence>
+        {showFullAlienGlitch && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[400] bg-black flex items-center justify-center overflow-hidden"
+          >
+            <div className="absolute inset-0 z-10 opacity-30">
+               <div className="w-full h-full bg-[url('https://media.giphy.com/media/oEI9uWUicGv37FzCIs/giphy.gif')] bg-cover mix-blend-screen" />
+            </div>
+            
+            <motion.div
+              animate={{
+                x: [0, -10, 10, -5, 5, 0],
+                y: [0, 5, -5, 2, -2, 0],
+                scale: [1, 1.1, 0.9, 1.05, 1],
+                filter: [
+                  'hue-rotate(0deg) brightness(1)',
+                  'hue-rotate(90deg) brightness(2)',
+                  'hue-rotate(180deg) brightness(0.5)',
+                  'hue-rotate(270deg) brightness(1.5)',
+                  'hue-rotate(360deg) brightness(1)'
+                ]
+              }}
+              transition={{
+                duration: 0.2,
+                repeat: Infinity,
+                repeatType: 'reverse'
+              }}
+              className="relative w-96 h-96"
+            >
+              <img 
+                src="/images/ui/alien_wait.png" 
+                alt="Alien Easter Egg" 
+                className="w-full h-full object-contain drop-shadow-[0_0_30px_rgba(6,182,212,0.8)]"
+              />
+              
+              {/* RGB Split Effect Layers */}
+              <motion.img 
+                src="/images/ui/alien_wait.png" 
+                className="absolute inset-0 w-full h-full object-contain mix-blend-screen opacity-50"
+                animate={{ x: [-5, 5, -5], y: [2, -2, 2] }}
+                transition={{ duration: 0.1, repeat: Infinity }}
+                style={{ filter: 'invert(100%) sepia(100%) saturate(1000%) hue-rotate(0deg)' }}
+              />
+              <motion.img 
+                src="/images/ui/alien_wait.png" 
+                className="absolute inset-0 w-full h-full object-contain mix-blend-screen opacity-50"
+                animate={{ x: [5, -5, 5], y: [-2, 2, -2] }}
+                transition={{ duration: 0.1, repeat: Infinity }}
+                style={{ filter: 'invert(100%) sepia(100%) saturate(1000%) hue-rotate(180deg)' }}
+              />
+            </motion.div>
+            
+            {/* Scanlines and Noise */}
+            <div className="absolute inset-0 pointer-events-none bg-[url('https://media.giphy.com/media/Vj97qNut69Snu/giphy.gif')] opacity-20 mix-blend-overlay" />
+            <div className="absolute inset-0 pointer-events-none bg-gradient-to-b from-transparent via-white/5 to-transparent h-1 bg-[length:100%_200%] animate-scan" />
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

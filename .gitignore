@@ -5,3 +5,6 @@ coverage/
 *.log
 .env*
 !.env.example
+
+# Vorathon Bridge Folder
+Vorathon - Não usar essa pasta para upar no git hub da QCH/

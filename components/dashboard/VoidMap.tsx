@@ -21,6 +21,7 @@ interface VoidMapProps {
   donateQCToPOI: (poiId: string) => void;
   setVoidDonationModes: React.Dispatch<React.SetStateAction<{ [poiId: string]: '1x' | '10x' | 'max' }>>;
   voidPOIQCDonations: { [poiId: string]: number };
+  playSfx: (type: string) => void;
 }
 
 const VoidMap: React.FC<VoidMapProps> = ({
@@ -33,7 +34,8 @@ const VoidMap: React.FC<VoidMapProps> = ({
   donateToPOI,
   donateQCToPOI,
   setVoidDonationModes,
-  voidPOIQCDonations
+  voidPOIQCDonations,
+  playSfx
 }) => {
   const getPOIColor = (id: string) => {
     switch(id) {
@@ -123,7 +125,10 @@ const VoidMap: React.FC<VoidMapProps> = ({
                           <div className="flex items-center gap-2">
                              <span className="text-[10px] font-mono text-white/60 tabular-nums">{progress.toFixed(1)}%</span>
                              <button
-                               onClick={() => donateToPOI(poi.id, res.name)}
+                               onClick={() => {
+                                 donateToPOI(poi.id, res.name);
+                                 playSfx('level_up');
+                               }}
                                disabled={progress >= 20}
                                className={`px-1.5 py-0.5 rounded text-[9px] font-black uppercase transition-all flex items-center gap-0.5 ${
                                  progress >= 20 
@@ -157,7 +162,11 @@ const VoidMap: React.FC<VoidMapProps> = ({
                     {['1x', '10x', 'max'].map(mode => (
                       <button
                         key={mode}
-                        onClick={() => setVoidDonationModes(prev => ({ ...prev, [poi.id]: mode as any }))}
+                        onClick={() => {
+                          setVoidDonationModes(prev => ({ ...prev, [poi.id]: mode as any }));
+                          const sfxMap = { '1x': 'close_window', '10x': 'ask_window', 'max': 'open_window' };
+                          playSfx(sfxMap[mode as '1x' | '10x' | 'max']);
+                        }}
                         className={`px-2 py-0.5 rounded text-[9px] font-orbitron font-black uppercase transition-all ${
                           currentDonationMode === mode 
                             ? 'bg-white text-black' 

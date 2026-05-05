@@ -106,7 +106,10 @@ const VoidWarCore: React.FC<VoidWarCoreProps> = ({
 
                     <div className="flex gap-2">
                       <button
-                        onClick={() => compactVoidResource(res.id)}
+                        onClick={() => {
+                          compactVoidResource(res.id);
+                          playSfx('target_up_2');
+                        }}
                         disabled={!canCompact}
                         className={`flex-1 py-1 rounded-lg font-orbitron font-bold text-[10px] uppercase tracking-widest transition-all active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed ${
                           canCompact ? 'bg-white text-black shadow-lg' : 'bg-white/5 text-white/40 border border-white/10'
@@ -115,7 +118,10 @@ const VoidWarCore: React.FC<VoidWarCoreProps> = ({
                         {t('compact')}
                       </button>
                       <button
-                        onClick={() => sendCompactedToEarth(res.id)}
+                        onClick={() => {
+                          sendCompactedToEarth(res.id);
+                          playSfx('laser_up');
+                        }}
                         disabled={compactedAmount <= 0}
                         className={`flex-1 py-1 rounded-lg font-orbitron font-bold text-[10px] uppercase tracking-widest transition-all active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed border ${
                           compactedAmount > 0 ? 'bg-cyan-600 border-cyan-400 text-white shadow-[0_0_8px_rgba(6,182,212,0.4)]' : 'bg-white/5 border-white/10 text-white/40'
@@ -173,8 +179,9 @@ const VoidWarCore: React.FC<VoidWarCoreProps> = ({
                     </div>
                     <button
                       onClick={() => {
+                        const isActivating = !voidAutoShipmentActive;
                         setVoidAutoShipmentActive(!voidAutoShipmentActive);
-                        playSfx('click');
+                        playSfx(isActivating ? 'close_window' : 'open_window');
                       }}
                       className={`w-full py-2 rounded-lg font-orbitron font-black text-[12px] uppercase tracking-widest transition-all active:scale-95 border ${
                         voidAutoShipmentActive 
