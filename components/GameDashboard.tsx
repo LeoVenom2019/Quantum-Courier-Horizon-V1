@@ -65,7 +65,9 @@ import {
   Building2,
   Plane,
   MousePointer2,
-  Loader2
+  Loader2,
+  Play,
+  Pause
 } from 'lucide-react';
 import { 
   ROUTES, 
@@ -108,7 +110,7 @@ import VoidEarth from './dashboard/VoidEarth';
 import EarthSidebar from './dashboard/EarthSidebar';
 import VoidWarCore from './dashboard/VoidWarCore';
 import VoidMap from './dashboard/VoidMap';
-import { ROUTE_THEMES, getRandomTrackForRoute } from '@/lib/music-data';
+import { ROUTE_THEMES, ARCADE_THEMES, getRandomTrackForRoute } from '@/lib/music-data';
 
 const ShipVisual = ({ ship, className = "" }: { ship: Ship; className?: string }) => {
   const [lottieData, setLottieData] = React.useState<any>(null);
@@ -3354,20 +3356,43 @@ export const GameDashboard = memo(({
 
   // Route Music System
   useEffect(() => {
-    if (!isLoaded || !musicOn) return;
+    // Only run when loaded and music is ON
+    if (!isLoaded || !musicOn) {
+      if (isLoaded && !musicOn) {
+        console.log('[MusicEngine] Music is OFF, skipping route playlist');
+      }
+      return;
+    }
+
+    // Priority for Arcade Music
+    if (activeMiniGameId) {
+      const arcadeTheme = ARCADE_THEMES[activeMiniGameId];
+      if (arcadeTheme && arcadeTheme.playlist.length > 0) {
+        const currentUrl = jukebox.currentTrack?.url;
+        const isArcadeTrack = currentUrl && arcadeTheme.playlist.some((t: any) => t.url === currentUrl);
+        
+        if (!isArcadeTrack) {
+          console.log(`[MusicEngine] Arcade detected: ${activeMiniGameId}. Switching to arcade playlist...`);
+          jukebox.playPlaylist(arcadeTheme.playlist);
+        }
+        return; // Stay in arcade music
+      }
+    }
 
     const theme = ROUTE_THEMES[routeTier];
     if (theme && theme.playlist.length > 0) {
-      // Check if current track is already from this theme
-      const isThemeTrack = jukebox.currentTrack && theme.playlist.some((t: any) => t.url === jukebox.currentTrack.url);
+      const currentUrl = jukebox.currentTrack?.url;
+      const isThemeTrack = currentUrl && theme.playlist.some((t: any) => t.url === currentUrl);
       
       if (!isThemeTrack) {
-        jukebox.setPlaylist(theme.playlist);
-        // Play first track of new theme
-        jukebox.setCurrentTrackIndex(0);
+        console.log(`[MusicEngine] Route detected: ${routeTier}. Switching to theme playlist...`);
+        jukebox.playPlaylist(theme.playlist);
       }
+    } else {
+      console.warn(`[MusicEngine] No playlist found for route: ${routeTier}. Stopping playback.`);
+      jukebox.stop();
     }
-  }, [routeTier, isLoaded, musicOn, jukebox]);
+  }, [activeMiniGameId || routeTier, isLoaded, musicOn, jukebox.playPlaylist, jukebox.currentTrack?.url]);
   const [historyStats, setHistoryStats] = useState<{ [tier: string]: RouteStats }>({
     Solar: { 
       deliveries: 0, manualDeliveries: 0, autoDeliveries: 0, 
@@ -4828,9 +4853,8 @@ export const GameDashboard = memo(({
   const upgradeRadar = useCallback(() => {
     if (radarLevel >= 8) return;
     const nextLevel = radarLevel + 1;
-    // Costs: 10k, 25k, 50k, 100k, 150k, 250k, 350k, 500k
-    const costs = [10000, 25000, 50000, 100000, 150000, 250000, 350000, 500000];
-    const cost = costs[nextLevel - 1];
+    const costs = [5000, 25000, 100000, 500000, 2500000, 10000000, 50000000, 250000000];
+    const cost = costs[radarLevel];
     
     if (qc < cost) {
       addLog(t('insufficientQCRadar'), 'error');
@@ -12798,6 +12822,29 @@ export const GameDashboard = memo(({
                 )}
                 <button 
                   onClick={() => {
+                    jukebox.togglePlay();
+                    playSfx(jukebox.isPlaying ? 'close_window' : 'open_window');
+                  }}
+                  className={`relative px-4 py-1.5 rounded-full border text-base font-orbitron font-bold transition-all uppercase tracking-widest flex items-center gap-2 overflow-hidden group ${
+                    jukebox.isPlaying 
+                    ? (isInterstellar 
+                        ? 'bg-orange-500/20 border-orange-500/50 text-orange-400 shadow-[0_0_15px_rgba(249,115,22,0.4)]' 
+                        : 'bg-cyan-500/20 border-cyan-500/50 text-cyan-400 shadow-[0_0_15px_rgba(6,182,212,0.4)]') 
+                    : 'bg-white/5 border-white/10 text-slate-500'
+                  }`}
+                  title={jukebox.isPlaying ? (language === 'pt' ? 'Pausar Música' : 'Pause Music') : (language === 'pt' ? 'Tocar Música' : 'Play Music')}
+                >
+                  <div className={`w-1.5 h-1.5 rounded-full ${
+                    jukebox.isPlaying 
+                    ? (isInterstellar ? 'bg-orange-400 animate-pulse shadow-[0_0_8px_rgba(249,115,22,0.8)]' : 'bg-cyan-400 animate-pulse shadow-[0_0_8px_rgba(6,182,212,0.8)]') 
+                    : 'bg-slate-600'
+                  }`} />
+                  {jukebox.isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+                  <span>{jukebox.isPlaying ? 'MUSIC ON' : 'MUSIC OFF'}</span>
+                </button>
+
+                <button 
+                  onClick={() => {
                     const next = !formatNumbers;
                     setFormatNumbers(next);
                     playSfx(next ? 'open_window' : 'close_window');
@@ -12815,7 +12862,7 @@ export const GameDashboard = memo(({
                     ? (isInterstellar ? 'bg-orange-400 animate-pulse shadow-[0_0_8px_rgba(249,115,22,0.8)]' : 'bg-cyan-400 animate-pulse shadow-[0_0_8px_rgba(6,182,212,0.8)]') 
                     : 'bg-slate-600'
                   }`} />
-                  <span>{formatNumbers ? 'ON' : 'OFF'}</span>
+                  <span>{formatNumbers ? 'NUM COMPACT' : 'NUM FULL'}</span>
                   {formatNumbers && (
                     <motion.div 
                       className={`absolute inset-0 opacity-20 bg-gradient-to-r ${isInterstellar ? 'from-orange-500 to-transparent' : 'from-cyan-500 to-transparent'}`}

@@ -22,32 +22,32 @@ export const ROUTE_THEMES: Record<string, RouteTheme> = {
     id: 'route2',
     name: 'Interstellar (Route 2)',
     playlist: [
-      { id: 'r2_t1', title: 'Route 2 Track 1', url: '/audio/themes/route2/track1.ogg' },
-      { id: 'r2_t2', title: 'Route 2 Track 2', url: '/audio/themes/route2/track2.ogg' },
-      { id: 'r2_t3', title: 'Route 2 Track 3', url: '/audio/themes/route2/track3.ogg' },
-      { id: 'r2_t4', title: 'Route 2 Track 4', url: '/audio/themes/route2/track4.ogg' },
+      { id: 'r2_t1', title: 'Ballad From Stars', url: '/audio/themes/route2/ballad_from _stars.ogg' },
+      { id: 'r2_t2', title: 'Far Horizon Drift', url: '/audio/themes/route2/far_horizon _drift.ogg' },
+      { id: 'r2_t3', title: 'Going to Future', url: '/audio/themes/route2/going_to_future.ogg' },
+      { id: 'r2_t4', title: 'This Way', url: '/audio/themes/route2/this_way.ogg' },
     ]
   },
-  'Void': {
+  'The Void': {
     id: 'route3',
     name: 'The Void (Route 3)',
     playlist: [
-      { id: 'r3_t1', title: 'Route 3 Track 1', url: '/audio/themes/route3/track1.ogg' },
-      { id: 'r3_t2', title: 'Route 3 Track 2', url: '/audio/themes/route3/track2.ogg' },
-      { id: 'r3_t3', title: 'Route 3 Track 3', url: '/audio/themes/route3/track3.ogg' },
-      { id: 'r3_t4', title: 'Route 3 Track 4', url: '/audio/themes/route3/track4.ogg' },
+      { id: 'r3_t1', title: 'Abyssal War', url: '/audio/themes/route3/abyssal_war.ogg' },
+      { id: 'r3_t2', title: 'Alien Instinct', url: '/audio/themes/route3/alien_instinct.ogg' },
+      { id: 'r3_t3', title: 'Alien Username', url: '/audio/themes/route3/alien_username.ogg' },
+      { id: 'r3_t4', title: 'Knight From Space', url: '/audio/themes/route3/knight_from_space.ogg' },
     ]
   },
   'Singularity': {
     id: 'route4',
     name: 'Singularity (Route 4)',
     playlist: [
-      { id: 'r4_t1', title: 'Route 4 Track 1', url: '/audio/themes/route4/track1.ogg' },
-      { id: 'r4_t2', title: 'Route 4 Track 2', url: '/audio/themes/route4/track2.ogg' },
-      { id: 'r4_t3', title: 'Route 4 Track 3', url: '/audio/themes/route4/track3.ogg' },
-      { id: 'r4_t4', title: 'Route 4 Track 4', url: '/audio/themes/route4/track4.ogg' },
-      { id: 'r4_t5', title: 'Route 4 Track 5', url: '/audio/themes/route4/track5.ogg' },
-      { id: 'r4_t6', title: 'Route 4 Track 6', url: '/audio/themes/route4/track6.ogg' },
+      { id: 'r4_t1', title: 'Living For Tomorrow', url: '/audio/themes/route4/living_for_tomorrow.ogg' },
+      { id: 'r4_t2', title: 'Looking Out The Window', url: '/audio/themes/route4/looking_out the_window.ogg' },
+      { id: 'r4_t3', title: 'Maybe Green', url: '/audio/themes/route4/maybe_green.ogg' },
+      { id: 'r4_t4', title: 'New Dawn Archive', url: '/audio/themes/route4/new_dawn_archive.ogg' },
+      { id: 'r4_t5', title: 'Prelude of the Stars', url: '/audio/themes/route4/prelude_of the_stars.ogg' },
+      { id: 'r4_t6', title: 'So This Is Home', url: '/audio/themes/route4/so_this_is_home.ogg' },
     ]
   }
 };
@@ -57,42 +57,42 @@ export const ARCADE_THEMES: Record<string, RouteTheme> = {
     id: 'salto-espacial',
     name: 'Salto Espacial',
     playlist: [
-      // { id: 'arcade_1_t1', title: 'Track 1', url: '/audio/themes/fliperamas/salto-espacial/track1.ogg' }
+      { id: 'arcade_1_t1', title: 'Salto Espacial', url: '/audio/themes/fliperamas/salto-espacial/salto_espacial.ogg' }
     ]
   },
   'ruptura-estelar': {
     id: 'ruptura-estelar',
     name: 'Ruptura Estelar',
     playlist: [
-      // { id: 'arcade_2_t1', title: 'Track 1', url: '/audio/themes/fliperamas/ruptura-estelar/track1.ogg' }
+      { id: 'arcade_2_t1', title: 'Ruptura Estelar', url: '/audio/themes/fliperamas/ruptura-estelar/ruptura_estelar.ogg' }
     ]
   },
   'danger-zoom-zones': {
     id: 'danger-zoom-zones',
     name: 'Danger Zoom Zones',
     playlist: [
-      // { id: 'arcade_3_t1', title: 'Track 1', url: '/audio/themes/fliperamas/danger-zoom-zones/track1.ogg' }
+      { id: 'arcade_3_t1', title: 'Danger Zoom', url: '/audio/themes/fliperamas/danger-zoom-zones/danger_zoom.ogg' }
     ]
   },
   'grid-collapse': {
     id: 'grid-collapse',
     name: 'Grid Collapse',
     playlist: [
-      // { id: 'arcade_4_t1', title: 'Track 1', url: '/audio/themes/fliperamas/grid-collapse/track1.ogg' }
+      { id: 'arcade_4_t1', title: 'Grid Collapse', url: '/audio/themes/fliperamas/grid-collapse/grid_collapse.ogg' }
     ]
   },
   'robot-runner': {
     id: 'robot-runner',
     name: 'Robot Runner',
     playlist: [
-      // { id: 'arcade_5_t1', title: 'Track 1', url: '/audio/themes/fliperamas/robot-runner/track1.ogg' }
+      { id: 'arcade_5_t1', title: 'Robot Runner', url: '/audio/themes/fliperamas/robot-runner/robot_runner.ogg' }
     ]
   },
   'neo-catcher': {
     id: 'neo-catcher',
     name: 'Neo Catcher',
     playlist: [
-      // { id: 'arcade_6_t1', title: 'Track 1', url: '/audio/themes/fliperamas/neo-catcher/track1.ogg' }
+      { id: 'arcade_6_t1', title: 'Neo Catcher', url: '/audio/themes/fliperamas/neo-catcher/neo_catcher.ogg' }
     ]
   }
 };

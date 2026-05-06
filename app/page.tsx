@@ -1243,6 +1243,7 @@ export default function GameHome() {
         playerName={playerName}
         onReturnToMenu={async () => {
           setView('landing');
+          jukeboxState.stop();
           const hasSavedGame = await GameStorage.load('time_travel_save');
           setHasSave(!!hasSavedGame);
           
@@ -1599,7 +1600,10 @@ export default function GameHome() {
       <HorizonRadioModal 
         isOpen={showHorizonRadio}
         onClose={() => setShowHorizonRadio(false)}
-        onOpenJukebox={() => setShowJukeboxModal(true)}
+        onOpenJukebox={() => {
+          setShowJukeboxModal(true);
+          setShowHorizonRadio(false);
+        }}
         language={language}
       />
 

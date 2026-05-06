@@ -66,10 +66,12 @@ export function useJukebox(onPlayStateChange?: (isPlaying: boolean) => void) {
         if (saved.isLoop !== undefined) setIsLoop(saved.isLoop);
         if (saved.isShuffle !== undefined) setIsShuffle(saved.isShuffle);
         if (saved.currentTrackIndex !== undefined && saved.currentTrackIndex < fullPlaylist.length) {
+          console.log(`[Jukebox] Restoring track index: ${saved.currentTrackIndex}`);
           setCurrentTrackIndex(saved.currentTrackIndex);
         }
       }
       setIsLoaded(true);
+      console.log(`[Jukebox] Engine loaded with ${fullPlaylist.length} tracks`);
     };
     loadSettings();
   }, [fullPlaylist.length]);
@@ -162,26 +164,50 @@ export function useJukebox(onPlayStateChange?: (isPlaying: boolean) => void) {
     return () => audio.removeEventListener('ended', handleEnded);
   }, [isLoop, playNext]);
 
+  const playPlaylist = useCallback((newPlaylist: Track[]) => {
+    setPlaylist(newPlaylist);
+    setCurrentTrackIndex(0);
+    setIsPlaying(true);
+  }, []);
+
+  const stop = useCallback(() => {
+    setIsPlaying(false);
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+    }
+  }, []);
+
   // Handle track changes
   useEffect(() => {
     if (audioRef.current && isLoaded && playlist[currentTrackIndex]) {
       const newUrl = playlist[currentTrackIndex].url;
+      const currentSrc = audioRef.current.src;
+      
+      console.log(`[Jukebox] Attempting to play: ${playlist[currentTrackIndex].title} (${newUrl})`);
+      
       // Only change src if it's different
-      if (!audioRef.current.src.endsWith(newUrl)) {
+      if (!currentSrc.endsWith(newUrl)) {
+        console.log(`[Jukebox] Source change detected. Loading new track...`);
         audioRef.current.src = newUrl;
         audioRef.current.load();
       }
       
       if (isPlaying) {
-        audioRef.current.play().catch(e => {
-          console.error("Jukebox playback error", e);
-          setIsPlaying(false);
-        });
+        audioRef.current.play()
+          .then(() => console.log(`[Jukebox] Playback started successfully`))
+          .catch(e => {
+            console.error("[Jukebox] Playback failed:", e.message);
+            // Don't set isPlaying(false) immediately, might be a temporary block
+          });
+      } else {
+        audioRef.current.pause();
+        console.log(`[Jukebox] Playback paused`);
       }
     }
   }, [currentTrackIndex, playlist, isPlaying, isLoaded]);
 
-  return {
+  return useMemo(() => ({
     playlist,
     currentTrackIndex,
     isPlaying,
@@ -194,10 +220,26 @@ export function useJukebox(onPlayStateChange?: (isPlaying: boolean) => void) {
     setPlaylist,
     setCurrentTrackIndex,
     setTrack,
+    setIsPlaying,
+    playPlaylist,
+    stop,
     togglePlay,
     playNext,
     playPrev,
     isEmpty: playlist.length === 0,
     currentTrack: playlist[currentTrackIndex]
-  };
+  }), [
+    playlist, 
+    currentTrackIndex, 
+    isPlaying, 
+    masterMusicVolume, 
+    isLoop, 
+    isShuffle, 
+    playPlaylist, 
+    stop,
+    togglePlay, 
+    playNext, 
+    playPrev, 
+    setTrack
+  ]);
 }
