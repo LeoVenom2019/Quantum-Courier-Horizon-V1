@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Rocket, Settings, Trophy, Play, Music, Volume2, Globe, X, Timer, Trash2, ShieldCheck, Clock, Navigation, Database, Coffee, ArrowRight, ChevronRight, ChevronLeft } from 'lucide-react';
+import { Rocket, Settings, Trophy, Play, Music, Volume2, Globe, X, Timer, Trash2, ShieldCheck, Clock, Navigation, Database, Coffee, ArrowRight, ChevronRight, ChevronLeft, Radio, Sliders } from 'lucide-react';
 import { IntroNarrative } from '@/components/IntroNarrative';
 import { GameDashboard } from '@/components/GameDashboard';
 import { AchievementsModal } from '@/components/AchievementsModal';
@@ -10,6 +10,8 @@ import { ThemeInfoWindow } from '@/components/ThemeInfoWindow';
 import { Jukebox } from '@/components/Jukebox';
 import { useJukebox } from '@/hooks/useJukebox';
 import { useSFX } from '@/hooks/useSFX';
+import { useSoundMaster } from '@/hooks/useSoundMaster';
+import { HorizonRadioModal } from '@/components/HorizonRadioModal';
 import { GameStorage } from '@/lib/game-storage';
 import { Language, t } from '@/lib/i18n';
 import { ThemeColor, GAME_THEMES } from '@/lib/game-data';
@@ -297,12 +299,12 @@ const SpaceShip = ({
         {/* Ship Asset */}
         <div className="relative overflow-visible">
           <img 
-            src={currentPath} 
+            src={`${currentPath}?v=2`} 
             alt="Space Traffic"
             className="object-contain"
             onError={(e) => {
               // Fallback to _right if _left is not yet available
-              (e.target as HTMLImageElement).src = `${shipType.basePath}_right.png`;
+              (e.target as HTMLImageElement).src = `${shipType.basePath}_right.png?v=2`;
             }}
             style={{ 
               width: shipType.size.w * finalScale, 
@@ -881,22 +883,28 @@ const MenuButton = ({ label, icon: Icon, onClick, disabled = false, theme = 'cya
       }}
       whileTap={disabled ? {} : { scale: 0.97, x: 6 }}
       onClick={disabled ? undefined : onClick}
-      className={`w-full group relative flex items-center justify-start gap-4 py-4 px-8 border ${accentBorder} rounded-xl overflow-hidden transition-all duration-500 ${
+      className={`w-full group relative flex items-center justify-start gap-4 py-4 px-8 rounded-xl overflow-hidden transition-all duration-500 ${
         disabled 
-          ? 'bg-slate-900/5 border-slate-800/10 cursor-not-allowed opacity-30' 
-          : 'bg-slate-900/20 backdrop-blur-md'
+          ? 'bg-slate-900/5 border border-slate-800/10 cursor-not-allowed opacity-30' 
+          : 'bg-black/40 backdrop-blur-md'
       }`}
     >
-      {/* Lightning Border Effect - Electric Pulse */}
+      {/* Refined RGB Animated Border (Google AI Studio style) with Glassmorphism */}
       {!disabled && (
-        <div className="absolute inset-0 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-500">
+        <div 
+          className="absolute inset-0 pointer-events-none rounded-xl p-[1px]"
+          style={{
+            WebkitMask: 'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
+            WebkitMaskComposite: 'xor',
+            maskComposite: 'exclude',
+          }}
+        >
           <div 
-            className="absolute inset-[-400%] animate-[spin_3s_linear_infinite] opacity-60 blur-[1px]" 
+            className="absolute inset-[-200%] animate-[spin_8s_linear_infinite] opacity-80 group-hover:opacity-100 transition-opacity duration-500" 
             style={{
-              background: `conic-gradient(from_0deg,transparent_0%,transparent_49.5%,#fff_50%,${lightningColor}_50.5%,transparent_51%,transparent_100%)`
+              background: `conic-gradient(from 0deg, transparent 0%, transparent 70%, #4285f4 80%, #ea4335 87%, #fbbc04 94%, #34a853 100%)`
             }}
           />
-          <div className="absolute inset-[1px] bg-slate-950/40 rounded-[11px] z-[-1]" />
         </div>
       )}
 
@@ -927,11 +935,10 @@ export default function GameHome() {
   const [view, setView] = useState<'landing' | 'narrative' | 'game'>('landing');
   const [showOptions, setShowOptions] = useState(false);
   const [language, setLanguage] = useState<Language>('pt');
-  const [musicOn, setMusicOn] = useState(true);
-  const [sfxOn, setSfxOn] = useState(true);
+  const { masterMusicOn, masterMusicVolume, masterSfxOn, updateSettings } = useSoundMaster();
+  const [showHorizonRadio, setShowHorizonRadio] = useState(false);
   const [playerName, setPlayerName] = useState('');
   const [showNamePrompt, setShowNamePrompt] = useState(false);
-  const [isSpeedRun, setIsSpeedRun] = useState(false);
   const [isRoute2Unlocked, setIsRoute2Unlocked] = useState(false);
   const [currentThemeIndex, setCurrentThemeIndex] = useState(0);
   const theme = GAME_THEMES[currentThemeIndex].color;
@@ -950,27 +957,14 @@ export default function GameHome() {
     };
     saveTheme();
   }, [currentThemeIndex]);
-
-  const [showSpeedRunConfirm, setShowSpeedRunConfirm] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
-  const [showClearRecordsConfirm, setShowClearRecordsConfirm] = useState(false);
   const [hasSave, setHasSave] = useState(false);
-
-  const [showSpeedRunMenu, setShowSpeedRunMenu] = useState(false);
-  const [showLocalRecords, setShowLocalRecords] = useState(false);
-  const [showOnlineRecords, setShowOnlineRecords] = useState(false);
   const [showAchievements, setShowAchievements] = useState(false);
   const [showJukeboxModal, setShowJukeboxModal] = useState(false);
   const [unlockedAchievements, setUnlockedAchievements] = useState<string[]>([]);
   const [achievementProgress, setAchievementProgress] = useState<{ [key: string]: number }>({});
-  const [showCodesModal, setShowCodesModal] = useState(false);
-  const [unlockedCodes, setUnlockedCodes] = useState<string[]>([]);
-  const [activeCodes, setActiveCodes] = useState<{ [key: string]: boolean }>({});
   const [isShaking, setIsShaking] = useState(false);
-  const [codesView, setCodesView] = useState<'input' | 'list'>('input');
-  const [codeInput, setCodeInput] = useState('');
-  const [codeError, setCodeError] = useState('');
-  const [codeSuccess, setCodeSuccess] = useState('');
+
   const [localRecords, setLocalRecords] = useState<{ name: string; time: number; date: string }[]>([]);
   const [isMounted, setIsMounted] = useState(false);
   const [randomVisual, setRandomVisual] = useState<React.ReactNode | null>(null);
@@ -1001,7 +995,7 @@ export default function GameHome() {
   const jukeboxState = useJukebox();
   
   // SFX Hook
-  const { playSfx } = useSFX(sfxOn);
+  const { playSfx } = useSFX();
 
   // BGM da tela inicial
   const bgmRef = useRef<HTMLAudioElement | null>(null);
@@ -1038,14 +1032,15 @@ export default function GameHome() {
 
     const bgm = bgmRef.current;
 
-    if (view === 'landing' && musicOn && !jukeboxState.isPlaying && audioUnlocked) {
+    if (view === 'landing' && masterMusicOn && !jukeboxState.isPlaying && audioUnlocked) {
       // Fade in
       bgm.play().catch((err) => console.warn('Audio play blocked:', err));
       let vol = bgm.volume;
+      const targetVol = 0.45 * masterMusicVolume;
       const fadeIn = setInterval(() => {
-        vol = Math.min(vol + 0.02, 0.45);
+        vol = Math.min(vol + 0.02, targetVol);
         bgm.volume = vol;
-        if (vol >= 0.45) clearInterval(fadeIn);
+        if (vol >= targetVol) clearInterval(fadeIn);
       }, 80);
       return () => clearInterval(fadeIn);
     } else {
@@ -1061,7 +1056,7 @@ export default function GameHome() {
       }, 80);
       return () => clearInterval(fadeOut);
     }
-  }, [view, musicOn, jukeboxState.isPlaying, audioUnlocked]);
+  }, [view, masterMusicOn, masterMusicVolume, jukeboxState.isPlaying, audioUnlocked]);
 
   // Cleanup ao desmontar
   useEffect(() => {
@@ -1126,26 +1121,7 @@ export default function GameHome() {
           } catch (e) {}
         }
 
-        const savedCodes = await GameStorage.load('game_unlocked_codes');
-        if (savedCodes) {
-          try {
-            setUnlockedCodes(savedCodes);
-          } catch (e) {}
-        }
 
-        const savedActiveCodes = await GameStorage.load('game_active_codes');
-        if (savedActiveCodes) {
-          try {
-            setActiveCodes(savedActiveCodes);
-          } catch (e) {}
-        }
-
-        const savedRecords = await GameStorage.load('speed_run_records');
-        if (savedRecords) {
-          try {
-            setLocalRecords(savedRecords);
-          } catch (e) {}
-        }
       };
       loadAllData();
     }, 0);
@@ -1153,216 +1129,13 @@ export default function GameHome() {
     return () => clearTimeout(timer);
   }, []);
 
-  useEffect(() => {
-    const saveCodes = async () => {
-      await GameStorage.save(unlockedCodes, 'game_unlocked_codes');
-    };
-    saveCodes();
-  }, [unlockedCodes]);
+  
 
-  useEffect(() => {
-    const saveActiveCodes = async () => {
-      await GameStorage.save(activeCodes, 'game_active_codes');
-    };
-    saveActiveCodes();
-  }, [activeCodes]);
+  
 
-  const AVAILABLE_CODES = [
-    { 
-      code: 'MONEY', 
-      name: 'Quantum Wealth', 
-      description: { 
-        en: 'Start new games with 500,000 QC.', 
-        pt: 'Comece novos jogos com 500.000 QC.' 
-      } 
-    },
-    { 
-      code: 'NEON', 
-      name: 'Neon Horizon', 
-      description: { 
-        en: 'Unlocks a special visual theme (Visual only).', 
-        pt: 'Desbloqueia um tema visual especial (Apenas visual).' 
-      } 
-    },
-    { 
-      code: 'EASY', 
-      name: 'Easy Mode', 
-      description: { 
-        en: '-50% cost and +50% profit in mining for "Routes 1" and "Routes 2".', 
-        pt: '-50% de custo e +50% de lucro em mineração "Rotas 1" e "Rotas 2".' 
-      } 
-    },
-    { 
-      code: 'SIGNAL', 
-      name: 'Strange Signal', 
-      description: { 
-        en: 'Detects strange signals from space.', 
-        pt: 'Detecta sinais estranhos vindo do espaço.' 
-      } 
-    },
-    { 
-      code: 'GLITCH', 
-      name: 'Glitch Mode', 
-      description: { 
-        en: 'Visual glitches on the landing page (Visual only).', 
-        pt: 'A tela inicial fica com glitchs visuais interessantes (Apenas Visual).' 
-      } 
-    },
-    { 
-      code: 'HARD', 
-      name: 'Hard Mode', 
-      description: { 
-        en: '-50% profit in all routes. (New game only)', 
-        pt: 'Diminui todo o lucro gerado em todas as Rotas em 50%. (Apenas novo jogo)' 
-      } 
-    },
-    { 
-      code: 'SPEED', 
-      name: 'Speed Demon', 
-      description: { 
-        en: 'Changes Speed Run Mode colors to Red and Black.', 
-        pt: 'Muda as cores do Modo Speed Run (e apenas ele).' 
-      } 
-    },
-    { 
-      code: 'SLIKE', 
-      name: 'Impossible Mode', 
-      description: { 
-        en: 'No auto-deliveries, no auto-sell, 1h research. (New game only)', 
-        pt: 'Ativa o Modo Impossível (?)! (Apenas jogo novo)' 
-      } 
-    },
-    { 
-      code: 'NEILA', 
-      name: 'Emerald Theme', 
-      description: { 
-        en: 'Unlocks the Emerald theme.', 
-        pt: 'Desbloqueia o tema Esmeralda.' 
-      } 
-    }
-  ];
 
-  const ECONOMIC_CODES = ['MONEY', 'EASY', 'HARD', 'SLIKE'];
-  const VISUAL_CODES = ['NEON', 'SIGNAL', 'GLITCH', 'SPEED', 'NEILA'];
-  const LANDING_CODES: string[] = [];
-
-  const handleActivateCode = async () => {
-    const code = codeInput.trim().toUpperCase();
-    if (!code) return;
-
-    const found = AVAILABLE_CODES.find(c => c.code === code);
-    if (!found) {
-      setCodeError(tl('CODE NOT RECOGNIZED', 'CÓDIGO NÃO RECONHECIDO'));
-      setTimeout(() => setCodeError(''), 3000);
-      return;
-    }
-
-    if (unlockedCodes.includes(code)) {
-      setCodeError(tl('CODE ALREADY ACTIVATED', 'CÓDIGO JÁ ATIVADO'));
-      setTimeout(() => setCodeError(''), 3000);
-      return;
-    }
-
-    setUnlockedCodes(prev => [...prev, code]);
-    
-    const next = { ...activeCodes };
-    
-    // Mutual Exclusivity
-    if (ECONOMIC_CODES.includes(code)) {
-      ECONOMIC_CODES.forEach(ec => { if (ec !== code) next[ec] = false; });
-    }
-    
-    next[code] = true;
-
-    // Save Invalidation
-    const saved = await GameStorage.load('time_travel_save');
-    if (saved) {
-      try {
-        const data = saved;
-        if ((data.activeCodes?.HARD && !next.HARD) || (data.activeCodes?.SLIKE && !next.SLIKE)) {
-          await GameStorage.remove('time_travel_save');
-          setHasSave(false);
-        }
-      } catch (e) {}
-    }
-
-    setActiveCodes(next);
-    if (code === 'SIGNAL') {
-      setIsShaking(true);
-      setTimeout(() => setIsShaking(false), 1000);
-    }
-
-    setCodeSuccess(tl('CODE ACTIVATED!', 'CÓDIGO ATIVADO!'));
-    setCodeInput('');
-    setTimeout(() => setCodeSuccess(''), 3000);
-    
-    if (sfxOn) {
-      playSfx('login_start', { volume: 0.3 }); // Using login_start as a generic success sound or click
-    }
-  };
-
-  const toggleCode = async (code: string) => {
-    const newState = !activeCodes[code];
-    const next = { ...activeCodes };
-
-    // Mutual Exclusivity
-    if (newState) {
-      if (ECONOMIC_CODES.includes(code)) {
-        ECONOMIC_CODES.forEach(ec => { if (ec !== code) next[ec] = false; });
-      }
-      if (LANDING_CODES.includes(code)) {
-        LANDING_CODES.forEach(lc => { if (lc !== code) next[lc] = false; });
-      }
-    }
-    
-    next[code] = newState;
-
-    // Save Invalidation
-    const saved = await GameStorage.load('time_travel_save');
-    if (saved) {
-      try {
-        const data = saved;
-        if ((data.activeCodes?.HARD && !next.HARD) || (data.activeCodes?.SLIKE && !next.SLIKE)) {
-          await GameStorage.remove('time_travel_save');
-          setHasSave(false);
-        }
-      } catch (e) {}
-    }
-
-    if (code === 'NEILA' && newState) {
-      setTheme('neila');
-    } else if (code === 'NEILA' && !newState) {
-      if (theme === 'neila') setTheme('cyan');
-    }
-
-    if (code === 'SIGNAL' && newState) {
-      setIsShaking(true);
-      setTimeout(() => setIsShaking(false), 1000);
-    }
-
-    setActiveCodes(next);
-
-    if (sfxOn) {
-      playSfx(newState ? 'aba_click' : 'aba_click', { volume: 0.2 }); 
-    }
-  };
-
-  const handleStartGame = (speedRun = false) => {
-    setIsSpeedRun(speedRun);
+  const handleStartGame = () => {
     setView('narrative');
-  };
-
-  const handleClearRecords = async () => {
-    await GameStorage.remove('speed_run_records');
-    setLocalRecords([]);
-    setShowClearRecordsConfirm(false);
-  };
-
-  const handleDeleteRecord = async (index: number) => {
-    const updatedRecords = [...localRecords];
-    updatedRecords.splice(index, 1);
-    setLocalRecords(updatedRecords);
-    await GameStorage.save(updatedRecords, 'speed_run_records');
   };
 
   const handleContinue = async () => {
@@ -1373,7 +1146,6 @@ export default function GameHome() {
         if (data.playerName) {
           setPlayerName(data.playerName);
         }
-        setIsSpeedRun(false);
         setView('game');
       } catch (e) {
         console.error("Failed to load save", e);
@@ -1391,11 +1163,7 @@ export default function GameHome() {
   const confirmName = () => {
     if (playerName.trim()) {
       setShowNamePrompt(false);
-      if (isSpeedRun) {
-        setView('game');
-      } else {
-        setView('narrative');
-      }
+      setView('narrative');
     }
   };
 
@@ -1414,9 +1182,6 @@ export default function GameHome() {
     const data = {
       time_travel_save: await GameStorage.load('time_travel_save'),
       game_theme_index: await GameStorage.load('game_theme_index'),
-      game_unlocked_codes: await GameStorage.load('game_unlocked_codes'),
-      game_active_codes: await GameStorage.load('game_active_codes'),
-      speed_run_records: await GameStorage.load('speed_run_records'),
       export_date: new Date().toISOString(),
       version: '1.0'
     };
@@ -1443,9 +1208,6 @@ export default function GameHome() {
         const data = JSON.parse(e.target?.result as string);
         if (data.time_travel_save) await GameStorage.save(data.time_travel_save, 'time_travel_save');
         if (data.game_theme_index !== undefined) await GameStorage.save(data.game_theme_index, 'game_theme_index');
-        if (data.game_unlocked_codes) await GameStorage.save(data.game_unlocked_codes, 'game_unlocked_codes');
-        if (data.game_active_codes) await GameStorage.save(data.game_active_codes, 'game_active_codes');
-        if (data.speed_run_records) await GameStorage.save(data.speed_run_records, 'speed_run_records');
         
         playSfx('click');
         setTimeout(() => window.location.reload(), 500);
@@ -1464,7 +1226,7 @@ export default function GameHome() {
         language={language} 
         playerName={playerName}
         setPlayerName={setPlayerName}
-        sfxOn={sfxOn}
+        sfxOn={masterSfxOn}
       />
     );
   }
@@ -1473,22 +1235,14 @@ export default function GameHome() {
     return (
       <GameDashboard 
         language={language} 
-        musicOn={musicOn} 
-        sfxOn={sfxOn} 
+        musicOn={masterMusicOn} 
+        sfxOn={masterSfxOn} 
         setLanguage={setLanguage}
-        setMusicOn={setMusicOn}
-        setSfxOn={setSfxOn}
+        setMusicOn={(val) => updateSettings({ masterMusicOn: val })}
+        setSfxOn={(val) => updateSettings({ masterSfxOn: val })}
         playerName={playerName}
-        isSpeedRun={isSpeedRun}
-        activeCodes={activeCodes}
-        setActiveCodes={setActiveCodes}
-        unlockedCodes={unlockedCodes}
-        setUnlockedCodes={setUnlockedCodes}
-        localRecords={localRecords}
-        setLocalRecords={setLocalRecords}
         onReturnToMenu={async () => {
           setView('landing');
-          setIsSpeedRun(false);
           const hasSavedGame = await GameStorage.load('time_travel_save');
           setHasSave(!!hasSavedGame);
           
@@ -1527,16 +1281,9 @@ export default function GameHome() {
   const tl = (en: string, pt: string) => t(language, en, pt);
 
   return (
-    <main className={`relative min-h-screen w-full flex flex-col items-start justify-center pl-12 md:pl-24 bg-[#050510] overflow-hidden ${isMounted && activeCodes['GLITCH'] ? 'animate-[glitch-bg_0.2s_infinite]' : ''}`}>
+    <main className={`relative min-h-screen w-full flex flex-col items-start justify-center pl-12 md:pl-24 bg-[#050510] overflow-hidden `}>
       {/* Glitch Overlay for Code */}
-      {activeCodes['GLITCH'] && (
-        <div className="fixed inset-0 z-[200] pointer-events-none opacity-30 overflow-hidden">
-          <div className={`absolute inset-0 ${theme === 'cyan' ? 'bg-cyan-500/5' : theme === 'orange' ? 'bg-orange-500/5' : 'bg-emerald-500/5'} animate-pulse`} />
-          <div className="absolute top-0 left-0 w-full h-1 bg-pink-500/50 animate-[glitch-line_2s_infinite]" />
-          <div className={`absolute top-1/4 left-0 w-full h-2 ${theme === 'cyan' ? 'bg-cyan-500/30' : theme === 'orange' ? 'bg-orange-500/30' : 'bg-emerald-500/30'} animate-[glitch-line_3s_infinite_reverse]`} />
-          <div className="absolute top-3/4 left-0 w-full h-1 bg-white/40 animate-[glitch-line_1.5s_infinite]" />
-        </div>
-      )}
+      
       {/* Background Elements (Vacuum Focus) */}
       <StarField theme={theme} />
       
@@ -1653,8 +1400,7 @@ export default function GameHome() {
             disabled={!hasSave}
             theme={theme}
           />
-          <MenuButton label={tl('CAMPAIGN', 'CAMPANHA')} icon={Rocket} onClick={() => { playSfx('aba_click'); handleStartGame(false); }} theme={theme} />
-          <MenuButton label={tl('SPEED RUN', 'SPEED RUN')} icon={Timer} onClick={() => { playSfx('aba_click'); setShowSpeedRunMenu(true); }} theme={theme} />
+          <MenuButton label={tl('CAMPAIGN', 'CAMPANHA')} icon={Rocket} onClick={() => { playSfx('aba_click'); handleStartGame(); }} theme={theme} />
           <MenuButton label={tl('OPTIONS', 'OPÇÕES')} icon={Settings} onClick={() => { playSfx('aba_click'); setShowOptions(true); }} theme={theme} />
           <MenuButton label={tl('ACHIEVEMENTS', 'CONQUISTAS')} icon={Trophy} onClick={() => { playSfx('aba_click'); setShowAchievements(true); }} theme={theme} />
           
@@ -1701,46 +1447,23 @@ export default function GameHome() {
               </h2>
 
               <div className="space-y-8">
-                {/* Music */}
-                <div className="space-y-3">
-                  <h3 className="text-[14px] font-orbitron text-cyan-400 uppercase tracking-widest flex items-center gap-2">
-                    <Music className="w-4 h-4" /> {tl('MUSIC', 'MÚSICA')}
+                {/* Horizon Radio - Master Audio Control */}
+                <div className="space-y-3 p-4 bg-cyan-500/5 border border-cyan-500/20 rounded-xl relative overflow-hidden group">
+                  <div className="absolute inset-0 bg-gradient-to-r from-cyan-500/10 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000" />
+                  <h3 className="text-[12px] font-orbitron text-cyan-400 uppercase tracking-widest flex items-center justify-between">
+                    <span className="flex items-center gap-2"><Radio className="w-4 h-4" /> {tl('AUDIO ENGINE', 'MOTOR DE ÁUDIO')}</span>
+                    <span className="text-[8px] font-mono text-cyan-500/40">v3.0</span>
                   </h3>
-                  <div className="flex gap-2">
-                    <button 
-                      onClick={() => { playSfx('aba_click'); setMusicOn(true); }}
-                      className={`flex-1 py-1.5 rounded font-orbitron text-sm border transition-all ${musicOn ? 'bg-cyan-500 text-black border-cyan-500' : 'bg-transparent text-cyan-500/40 border-cyan-500/20'}`}
-                    >
-                      {tl('ON', 'LIGADO')}
-                    </button>
-                    <button 
-                      onClick={() => { playSfx('aba_click'); setMusicOn(false); }}
-                      className={`flex-1 py-1.5 rounded font-orbitron text-sm border transition-all ${!musicOn ? 'bg-cyan-500 text-black border-cyan-500' : 'bg-transparent text-cyan-500/40 border-cyan-500/20'}`}
-                    >
-                      {tl('OFF', 'DESLIGADO')}
-                    </button>
-                  </div>
-                </div>
-
-                {/* SFX */}
-                <div className="space-y-3">
-                  <h3 className="text-[14px] font-orbitron text-cyan-400 uppercase tracking-widest flex items-center gap-2">
-                    <Volume2 className="w-4 h-4" /> {tl('SOUND EFFECTS', 'EFEITOS SONOROS')}
-                  </h3>
-                  <div className="flex gap-2">
-                    <button 
-                      onClick={() => { playSfx('aba_click'); setSfxOn(true); }}
-                      className={`flex-1 py-1.5 rounded font-orbitron text-sm border transition-all ${sfxOn ? 'bg-cyan-500 text-black border-cyan-500' : 'bg-transparent text-cyan-500/40 border-cyan-500/20'}`}
-                    >
-                      {tl('ON', 'LIGADO')}
-                    </button>
-                    <button 
-                      onClick={() => { playSfx('aba_click'); setSfxOn(false); }}
-                      className={`flex-1 py-1.5 rounded font-orbitron text-sm border transition-all ${!sfxOn ? 'bg-cyan-500 text-black border-cyan-500' : 'bg-transparent text-cyan-500/40 border-cyan-500/20'}`}
-                    >
-                      {tl('OFF', 'DESLIGADO')}
-                    </button>
-                  </div>
+                  <button 
+                    onClick={() => {
+                      playSfx('aba_click');
+                      setShowHorizonRadio(true);
+                    }}
+                    className="w-full py-4 rounded-lg bg-cyan-500/10 border border-cyan-500/40 text-cyan-400 font-orbitron text-sm tracking-[0.2em] hover:bg-cyan-500 hover:text-black transition-all flex items-center justify-center gap-3 shadow-[0_0_20px_rgba(6,182,212,0.1)]"
+                  >
+                    <Sliders className="w-4 h-4" />
+                    {tl('HORIZON RADIO', 'HORIZON RADIO')}
+                  </button>
                 </div>
 
                 {/* Language */}
@@ -1783,28 +1506,10 @@ export default function GameHome() {
                   </div>
                 </div>
 
-                {/* Jukebox & Codes Buttons */}
-                <div className="grid grid-cols-2 gap-3 pt-3 border-t border-cyan-500/30">
-                  <button 
-                    onClick={() => {
-                      playSfx('aba_click');
-                      setShowOptions(false);
-                      setShowJukeboxModal(true);
-                    }}
-                    className="w-full py-3 bg-slate-800/40 border border-cyan-500/30 text-cyan-400 font-orbitron text-sm tracking-widest rounded-lg hover:bg-cyan-500/20 hover:border-cyan-500 transition-all uppercase flex items-center justify-center gap-2 group"
-                  >
-                    <Music className="w-4 h-4 group-hover:scale-110 transition-transform" /> JUKEBOX
-                  </button>
-
-                  <button 
-                    onClick={() => {
-                      playSfx('aba_click');
-                      setShowCodesModal(true);
-                    }}
-                    className="w-full py-3 bg-slate-800/40 border border-cyan-500/30 text-cyan-400 font-orbitron text-sm tracking-widest rounded-lg hover:bg-cyan-500/20 hover:border-cyan-500 transition-all uppercase flex items-center justify-center gap-2 group"
-                  >
-                    <ShieldCheck className="w-4 h-4 group-hover:scale-110 transition-transform" /> {tl('CODES', 'CÓDIGOS')}
-                  </button>
+                <div className="grid grid-cols-1 gap-3 pt-3 border-t border-cyan-500/30">
+                  <p className="text-[9px] font-mono text-slate-600 text-center uppercase tracking-widest">
+                    {tl('Advanced audio settings available in Horizon Radio', 'Configurações avançadas de áudio disponíveis no Horizon Radio')}
+                  </p>
                 </div>
 
                 {/* Reset Progress */}
@@ -1819,265 +1524,6 @@ export default function GameHome() {
                     <Trash2 className="w-4 h-4" /> {tl('RESET PROGRESS', 'RESETAR PROGRESSO')}
                   </button>
                 </div>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Speed Run Menu Modal */}
-      <AnimatePresence>
-        {showSpeedRunMenu && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[120] flex items-center justify-center bg-black/95 backdrop-blur-xl p-4"
-          >
-            <motion.div
-              initial={{ scale: 0.9, y: 20 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.9, y: 20 }}
-              className="w-full max-w-md glass-panel neon-border-pink rounded-2xl p-8 relative overflow-hidden"
-            >
-              <div className="absolute inset-0 bg-gradient-to-b from-pink-500/10 to-transparent pointer-events-none" />
-              
-              <button 
-                onClick={() => setShowSpeedRunMenu(false)}
-                className="absolute top-4 right-4 text-pink-500 hover:text-white transition-colors"
-              >
-                <X className="w-6 h-6" />
-              </button>
-
-              <h2 className="text-2xl font-orbitron font-bold text-white mb-8 tracking-widest text-center neon-text-pink">
-                {tl('SPEED RUN MODE', 'MODO SPEED RUN')}
-              </h2>
-
-              <div className="flex flex-col gap-4">
-                <button 
-                  onClick={() => {
-                    setShowSpeedRunMenu(false);
-                    setShowSpeedRunConfirm(true);
-                  }}
-                  className="w-full py-4 bg-pink-600/20 border border-pink-500 text-white font-orbitron tracking-widest rounded-lg hover:bg-pink-600 transition-all uppercase flex items-center justify-center gap-3"
-                >
-                  <Rocket className="w-5 h-5" /> {tl('NEW SPEED RUN', 'NOVA SPEED RUN')}
-                </button>
-                
-                <button 
-                  onClick={() => {
-                    setShowLocalRecords(true);
-                  }}
-                  className="w-full py-4 bg-slate-800/40 border border-cyan-500/30 text-white font-orbitron tracking-widest rounded-lg hover:border-cyan-500 transition-all uppercase flex items-center justify-center gap-3"
-                >
-                  <Trophy className="w-5 h-5 text-yellow-400" /> {tl('LOCAL RECORDS', 'RECORDES LOCAIS')}
-                </button>
-
-                <button 
-                  onClick={() => {
-                    setShowOnlineRecords(true);
-                  }}
-                  className="w-full py-4 bg-slate-800/40 border border-cyan-500/30 text-white/50 font-orbitron tracking-widest rounded-lg transition-all uppercase flex items-center justify-center gap-3 cursor-not-allowed"
-                >
-                  <Globe className="w-5 h-5" /> {tl('ONLINE RECORDS (SOON)', 'RECORDES ONLINE (FUTURAMENTE)')}
-                </button>
-
-                <button 
-                  onClick={() => {
-                    setShowClearRecordsConfirm(true);
-                  }}
-                  className="w-full py-4 bg-rose-900/20 border border-rose-500/30 text-rose-400 font-orbitron tracking-widest rounded-lg hover:bg-rose-900/40 hover:border-rose-500 transition-all uppercase flex items-center justify-center gap-3"
-                >
-                  <Trash2 className="w-5 h-5" /> {tl('CLEAR LOCAL RECORDS', 'APAGAR RECORDES LOCAIS')}
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Local Records Modal */}
-      <AnimatePresence>
-        {showLocalRecords && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[130] flex items-center justify-center bg-black/95 backdrop-blur-xl p-4"
-          >
-            <motion.div
-              initial={{ scale: 0.9, y: 20 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.9, y: 20 }}
-              className="w-full max-w-lg glass-panel neon-border-cyan rounded-2xl p-8 relative overflow-hidden"
-            >
-              <button 
-                onClick={() => setShowLocalRecords(false)}
-                className="absolute top-4 right-4 text-cyan-500 hover:text-white transition-colors"
-              >
-                <X className="w-6 h-6" />
-              </button>
-
-              <h2 className="text-2xl font-orbitron font-bold text-white mb-8 tracking-widest text-center neon-text-cyan">
-                {tl('LOCAL RECORDS', 'RECORDES LOCAIS')}
-              </h2>
-
-              <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar p-1">
-                {localRecords.length === 0 ? (
-                  <p className="text-center text-slate-500 font-orbitron py-8 uppercase tracking-widest">
-                    {tl('No records found', 'Nenhum recorde encontrado')}
-                  </p>
-                ) : (
-                  localRecords.slice(0, 10).map((record, index) => {
-                    const isTop3 = index < 3;
-                    const trophyColor = index === 0 ? 'text-yellow-400' : index === 1 ? 'text-slate-300' : 'text-amber-600';
-                    const glowClass = index === 0 ? 'shadow-[0_0_15px_rgba(250,204,21,0.4)] border-yellow-400/50' : 
-                                     index === 1 ? 'shadow-[0_0_15px_rgba(203,213,225,0.3)] border-slate-300/50' : 
-                                     index === 2 ? 'shadow-[0_0_15px_rgba(217,119,6,0.3)] border-amber-600/50' : 
-                                     'border-white/5';
-                    
-                    return (
-                      <motion.div 
-                        key={index} 
-                        initial={{ opacity: 0, x: -20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: index * 0.05 }}
-                        className={`flex items-center justify-between p-4 bg-slate-800/40 border rounded-lg relative group transition-all duration-300 ${glowClass} ${isTop3 ? 'hover:scale-[1.02]' : ''}`}
-                      >
-                        {isTop3 && (
-                          <div className={`absolute inset-0 bg-gradient-to-r ${index === 0 ? 'from-yellow-400/5' : index === 1 ? 'from-slate-300/5' : 'from-amber-600/5'} to-transparent pointer-events-none rounded-lg`} />
-                        )}
-                        
-                        <div className="flex items-center gap-4 relative z-10">
-                          <div className="flex flex-col items-center justify-center w-10">
-                            {isTop3 ? (
-                              <motion.div
-                                animate={{ 
-                                  filter: ['drop-shadow(0 0 2px currentColor)', 'drop-shadow(0 0 8px currentColor)', 'drop-shadow(0 0 2px currentColor)'],
-                                  scale: [1, 1.1, 1]
-                                }}
-                                transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-                                className={trophyColor}
-                              >
-                                <Trophy className="w-6 h-6" />
-                              </motion.div>
-                            ) : (
-                              <span className="text-lg font-orbitron font-bold text-slate-500">
-                                #{index + 1}
-                              </span>
-                            )}
-                          </div>
-                          <div>
-                            <p className="text-white font-orbitron text-base uppercase tracking-wider flex items-center gap-2">
-                              {record.name}
-                              {index === 0 && <span className="text-[14px] bg-yellow-400 text-black px-1 rounded font-bold animate-pulse">CHAMPION</span>}
-                            </p>
-                            <p className="text-base text-slate-500 font-mono">{record.date}</p>
-                          </div>
-                        </div>
-                        
-                        <div className="flex items-center gap-4 relative z-10">
-                          <span className={`font-orbitron text-base ${index === 0 ? 'text-yellow-400' : 'text-cyan-400'}`}>
-                            {formatTime(record.time)}
-                          </span>
-                          <button 
-                            onClick={() => handleDeleteRecord(index)}
-                            className="p-2 text-slate-600 hover:text-rose-500 transition-colors opacity-20 group-hover:opacity-100"
-                            title={tl('Delete record', 'Apagar recorde')}
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </motion.div>
-                    );
-                  })
-                )}
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Online Records Modal (Placeholder) */}
-      <AnimatePresence>
-        {showOnlineRecords && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[130] flex items-center justify-center bg-black/95 backdrop-blur-xl p-4"
-          >
-            <motion.div
-              initial={{ scale: 0.9, y: 20 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.9, y: 20 }}
-              className="w-full max-w-md glass-panel neon-border-pink rounded-2xl p-8 relative overflow-hidden"
-            >
-              <button 
-                onClick={() => setShowOnlineRecords(false)}
-                className="absolute top-4 right-4 text-pink-500 hover:text-white transition-colors"
-              >
-                <X className="w-6 h-6" />
-              </button>
-
-              <h2 className="text-2xl font-orbitron font-bold text-white mb-6 tracking-widest text-center neon-text-pink">
-                {tl('ONLINE RECORDS', 'RECORDES ONLINE')}
-              </h2>
-
-              <div className="text-center py-12 space-y-4">
-                <Globe className="w-16 h-16 text-pink-500/50 mx-auto animate-pulse" />
-                <p className="text-pink-400 font-orbitron text-base uppercase tracking-widest">
-                  {tl('Coming Soon in v3.0', 'Em breve na v3.0')}
-                </p>
-                <p className="text-slate-500 text-[14px] font-orbitron">
-                  {tl('Global leaderboards are under development.', 'Placares globais estão em desenvolvimento.')}
-                </p>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Clear Records Confirmation Modal */}
-      <AnimatePresence>
-        {showClearRecordsConfirm && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[140] flex items-center justify-center bg-black/95 backdrop-blur-xl p-4"
-          >
-            <motion.div
-              initial={{ scale: 0.9, y: 20 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.9, y: 20 }}
-              className="w-full max-w-md glass-panel neon-border-rose rounded-2xl p-8 relative overflow-hidden"
-            >
-              <div className="absolute inset-0 bg-gradient-to-b from-rose-500/10 to-transparent pointer-events-none" />
-              
-              <h2 className="text-2xl font-orbitron font-bold text-white mb-6 tracking-widest text-center neon-text-rose">
-                {tl('CLEAR ALL RECORDS', 'APAGAR TODOS OS RECORDES')}
-              </h2>
-
-              <div className="space-y-4 text-center mb-8">
-                <p className="text-rose-400 font-orbitron text-base leading-relaxed">
-                  {tl('This will permanently delete ALL your speed run records. This action cannot be undone.', 'Isso excluirá permanentemente TODOS os seus recordes de speed run. Esta ação não pode ser desfeita.')}
-                </p>
-              </div>
-
-              <div className="flex flex-col gap-3">
-                <button 
-                  onClick={handleClearRecords}
-                  className="w-full py-4 bg-rose-600 text-white font-orbitron font-bold tracking-widest rounded-lg hover:bg-white hover:text-rose-600 transition-all uppercase"
-                >
-                  {tl('CONFIRM & CLEAR', 'CONFIRMAR E APAGAR')}
-                </button>
-                <button 
-                  onClick={() => setShowClearRecordsConfirm(false)}
-                  className="w-full py-3 text-white/40 font-orbitron text-base hover:text-white transition-colors uppercase"
-                >
-                  {tl('CANCEL', 'CANCELAR')}
-                </button>
               </div>
             </motion.div>
           </motion.div>
@@ -2130,321 +1576,7 @@ export default function GameHome() {
         )}
       </AnimatePresence>
 
-      {/* Speed Run Confirmation Modal */}
-      <AnimatePresence>
-        {showSpeedRunConfirm && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[120] flex items-center justify-center bg-black/95 backdrop-blur-xl p-4"
-          >
-            <motion.div
-              initial={{ scale: 0.9, y: 20 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.9, y: 20 }}
-              className="w-full max-w-md glass-panel neon-border-pink rounded-2xl p-8 relative overflow-hidden"
-            >
-              <div className="absolute inset-0 bg-gradient-to-b from-pink-500/10 to-transparent pointer-events-none" />
-              
-              <h2 className="text-2xl font-orbitron font-bold text-white mb-6 tracking-widest text-center neon-text-pink">
-                {tl('SPEED RUN MODE', 'MODO SPEED RUN')}
-              </h2>
-
-              <div className="space-y-4 text-center mb-8">
-                <p className="text-cyan-400 font-orbitron text-base leading-relaxed">
-                  {tl('Start a new game focused on Route 1.', 'Inicie uma nova partida focada na Rota 1.')}
-                </p>
-                
-                <div className="py-6 border-y border-white/5 space-y-4">
-                  <p className="text-white/60 text-base font-orbitron uppercase tracking-[0.2em]">{tl('OBJECTIVE:', 'OBJETIVO:')}</p>
-                  <p className="text-white text-base font-orbitron leading-relaxed uppercase tracking-wider">
-                    {tl('Buy, Unlock, Upgrade, Automate...', 'Compre, Desbloqueie, Melhore, automatize...')}
-                  </p>
-                  <p className="text-cyan-400 text-[14px] font-orbitron font-bold uppercase tracking-widest animate-pulse">
-                    {tl('Rule Route 1 as fast as you can.', 'Reine na Rota 1 o mais rápido que puder.')}
-                  </p>
-                </div>
-
-                <p className="text-pink-400 font-orbitron text-[14px]">
-                  ⏱️ {tl('The game ends when everything is completed.', 'O jogo termina ao completar tudo.')}
-                </p>
-                <p className="text-white font-orbitron text-[14px] italic">
-                  {tl('Be fast. Every second counts.', 'Seja rápido. Cada segundo conta.')}
-                </p>
-              </div>
-
-              <div className="flex flex-col gap-3">
-                <button 
-                  onClick={() => {
-                    playSfx('login_start');
-                    setShowSpeedRunConfirm(false);
-                    setShowOptions(false);
-                    handleStartGame(true);
-                  }}
-                  className="w-full py-4 bg-pink-600 text-white font-orbitron font-bold tracking-widest rounded-lg hover:bg-white hover:text-pink-600 transition-all uppercase"
-                >
-                  {tl('CONFIRM & START', 'CONFIRMAR E INICIAR')}
-                </button>
-                <button 
-                  onClick={() => {
-                    playSfx('aba_click');
-                    setShowSpeedRunConfirm(false);
-                  }}
-                  className="w-full py-3 text-white/40 font-orbitron text-base hover:text-white transition-colors uppercase"
-                >
-                  {tl('CANCEL', 'CANCELAR')}
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Codes Modal */}
-      <AnimatePresence>
-        {showCodesModal && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[150] flex items-center justify-center bg-black/95 backdrop-blur-xl p-4"
-          >
-            <motion.div
-              initial={{ scale: 0.9, y: 20 }}
-              animate={{ 
-                scale: 1, 
-                y: 0,
-                x: isShaking ? [0, -5, 5, -5, 5, 0] : 0
-              }}
-              transition={{ 
-                x: isShaking ? { duration: 0.1, repeat: 10 } : { duration: 0.3 }
-              }}
-              exit={{ scale: 0.9, y: 20 }}
-              className={`w-full ${codesView === 'list' ? 'max-w-6xl' : 'max-w-lg'} glass-panel neon-border-cyan rounded-2xl p-8 relative overflow-hidden transition-all duration-500`}
-            >
-              <button 
-                onClick={() => {
-                  setShowCodesModal(false);
-                  setCodesView('input');
-                }}
-                className="absolute top-4 right-4 text-cyan-500 hover:text-white transition-colors"
-              >
-                <X className="w-6 h-6" />
-              </button>
-
-              <h2 className="text-2xl font-orbitron font-bold text-white mb-8 tracking-widest text-center neon-text-cyan">
-                {codesView === 'input' ? tl('CODES SYSTEM', 'SISTEMA DE CÓDIGOS') : tl('DISCOVERED CODES', 'CÓDIGOS DESCOBERTOS')}
-              </h2>
-
-              {isSpeedRun && (
-                <div className="mb-6 p-4 bg-rose-500/20 border border-rose-500/50 rounded-lg text-center">
-                  <p className="text-rose-500 font-orbitron text-base uppercase tracking-widest">
-                    {tl('CODES DISABLED IN SPEED RUN MODE', 'CÓDIGOS DESCOBERTOS DESATIVADOS NO MODO SPEED RUN')}
-                  </p>
-                </div>
-              )}
-
-              <div className="relative min-h-[250px]">
-                <AnimatePresence mode="wait">
-                  {codesView === 'input' ? (
-                    <motion.div
-                      key="input-view"
-                      initial={{ opacity: 0, x: -20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      exit={{ opacity: 0, x: 20 }}
-                      className="space-y-8"
-                    >
-                      {/* Input Section */}
-                      <div className="space-y-4">
-                        <label className="text-base font-orbitron text-cyan-400 uppercase tracking-widest block">
-                          {tl('INSERT CODE', 'INSERIR CÓDIGO')}
-                        </label>
-                        <div className="flex gap-2">
-                          <input 
-                            type="text"
-                            value={codeInput}
-                            onChange={(e) => setCodeInput(e.target.value.toUpperCase())}
-                            placeholder="********"
-                            className="flex-1 bg-slate-800 border border-cyan-500/30 rounded px-4 py-3 text-white font-orbitron text-base focus:outline-none focus:border-cyan-500 transition-colors uppercase"
-                          />
-                          <button 
-                            onClick={handleActivateCode}
-                            className="px-6 bg-cyan-500 text-black font-orbitron font-bold tracking-widest rounded hover:bg-white transition-all uppercase"
-                          >
-                            {tl('ACTIVATE', 'ATIVAR')}
-                          </button>
-                        </div>
-                        <AnimatePresence mode="wait">
-                          {codeError && (
-                            <motion.p 
-                              initial={{ opacity: 0, y: -10 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              exit={{ opacity: 0 }}
-                              className="text-rose-500 font-orbitron text-base uppercase tracking-widest"
-                            >
-                              {codeError}
-                            </motion.p>
-                          )}
-                          {codeSuccess && (
-                            <motion.p 
-                              initial={{ opacity: 0, y: -10 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              exit={{ opacity: 0 }}
-                              className="text-emerald-500 font-orbitron text-base uppercase tracking-widest"
-                            >
-                              {codeSuccess}
-                            </motion.p>
-                          )}
-                        </AnimatePresence>
-                      </div>
-
-                      {/* Arrow to List View */}
-                      {unlockedCodes.length > 0 && (
-                        <div className="flex justify-end mt-8">
-                          <button 
-                            onClick={() => setCodesView('list')}
-                            className="flex items-center gap-2 text-cyan-500 hover:text-white transition-all group"
-                          >
-                            <span className="text-base font-orbitron uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity">
-                              {tl('DISCOVERED', 'DESCOBERTOS')}
-                            </span>
-                            <div className="w-10 h-10 rounded-full border border-cyan-500/30 flex items-center justify-center group-hover:border-cyan-500 group-hover:bg-cyan-500/10 transition-all">
-                              <ChevronRight className="w-6 h-6" />
-                            </div>
-                          </button>
-                        </div>
-                      )}
-                    </motion.div>
-                  ) : (
-                    <motion.div
-                      key="list-view"
-                      initial={{ opacity: 0, x: 20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      exit={{ opacity: 0, x: -20 }}
-                      className="space-y-6"
-                    >
-                      <div className="flex items-center gap-4 mb-4">
-                        <button 
-                          onClick={() => setCodesView('input')}
-                          className="w-8 h-8 rounded-full border border-white/10 flex items-center justify-center hover:bg-white/10 transition-colors"
-                        >
-                          <ChevronLeft className="w-5 h-5 text-white" />
-                        </button>
-                        <span className="text-base font-orbitron text-white/40 uppercase tracking-[0.3em]">
-                          {tl('BACK TO INPUT', 'VOLTAR AO INÍCIO')}
-                        </span>
-                      </div>
-
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
-                        {unlockedCodes.map(code => {
-                          const info = AVAILABLE_CODES.find(c => c.code === code);
-                          const isActive = activeCodes[code];
-                          
-                          let colorClass = 'text-cyan-400';
-                          let glowClass = 'shadow-[0_0_20px_rgba(6,182,212,0.1)]';
-                          let borderClass = 'border-cyan-500/40';
-                          let bgClass = 'bg-cyan-500/5';
-                          let dotClass = 'bg-cyan-400';
-                          let toggleBorderClass = 'border-cyan-500';
-                          let toggleBgClass = 'bg-cyan-500/20';
-                          let toggleThumbClass = 'bg-cyan-400';
-                          let toggleShadowClass = 'shadow-[0_0_15px_rgba(6,182,212,0.5)]';
-
-                          if (isActive) {
-                            if (ECONOMIC_CODES.includes(code)) {
-                              colorClass = 'text-green-400';
-                              glowClass = 'shadow-[0_0_20px_rgba(74,222,128,0.1)]';
-                              borderClass = 'border-green-500/40';
-                              bgClass = 'bg-green-500/5';
-                              dotClass = 'bg-green-400';
-                              toggleBorderClass = 'border-green-500';
-                              toggleBgClass = 'bg-green-500/20';
-                              toggleThumbClass = 'bg-green-400';
-                              toggleShadowClass = 'shadow-[0_0_15px_rgba(74,222,128,0.5)]';
-                            } else if (VISUAL_CODES.includes(code)) {
-                              colorClass = 'text-yellow-400';
-                              glowClass = 'shadow-[0_0_20px_rgba(250,204,21,0.1)]';
-                              borderClass = 'border-yellow-500/40';
-                              bgClass = 'bg-yellow-500/5';
-                              dotClass = 'bg-yellow-400';
-                              toggleBorderClass = 'border-yellow-500';
-                              toggleBgClass = 'bg-yellow-500/20';
-                              toggleThumbClass = 'bg-yellow-400';
-                              toggleShadowClass = 'shadow-[0_0_15px_rgba(250,204,21,0.5)]';
-                            } else if (LANDING_CODES.includes(code)) {
-                              colorClass = 'text-blue-400';
-                              glowClass = 'shadow-[0_0_20px_rgba(96,165,250,0.1)]';
-                              borderClass = 'border-blue-500/40';
-                              bgClass = 'bg-blue-500/5';
-                              dotClass = 'bg-blue-400';
-                              toggleBorderClass = 'border-blue-500';
-                              toggleBgClass = 'bg-blue-500/20';
-                              toggleThumbClass = 'bg-blue-400';
-                              toggleShadowClass = 'shadow-[0_0_15px_rgba(96,165,250,0.5)]';
-                            }
-                          } else {
-                            colorClass = 'text-rose-400';
-                            glowClass = 'shadow-[0_0_20px_rgba(244,63,94,0.1)]';
-                            borderClass = 'border-rose-500/40';
-                            bgClass = 'bg-rose-500/5';
-                            dotClass = 'bg-rose-400';
-                            toggleBorderClass = 'border-rose-500';
-                            toggleBgClass = 'bg-rose-500/20';
-                            toggleThumbClass = 'bg-rose-400';
-                            toggleShadowClass = 'shadow-[0_0_15px_rgba(244,63,94,0.5)]';
-                          }
-
-                          return (
-                            <div 
-                              key={code} 
-                              className={`relative overflow-hidden p-5 rounded-xl border transition-all duration-500 group ${bgClass} ${borderClass} ${glowClass}`}
-                            >
-                              {/* Background Glow */}
-                              <div className={`absolute inset-0 opacity-10 transition-opacity duration-500 ${isActive ? (ECONOMIC_CODES.includes(code) ? 'bg-green-500' : VISUAL_CODES.includes(code) ? 'bg-yellow-500' : 'bg-blue-500') : 'bg-rose-500'}`} />
-                              
-                              <div className="relative z-10 flex items-center justify-between">
-                                <div className="flex-1">
-                                  <div className="flex items-center gap-3">
-                                    <div className={`w-2 h-2 rounded-full animate-pulse ${dotClass}`} />
-                                    <p className={`font-orbitron text-base uppercase tracking-wider transition-colors ${colorClass}`}>
-                                      {info?.name || code}
-                                    </p>
-                                  </div>
-                                  <p className="text-base text-slate-400 font-orbitron uppercase tracking-widest mt-2 leading-relaxed">
-                                    {tl(info?.description.en || '', info?.description.pt || '')}
-                                  </p>
-                                </div>
-
-                                <button 
-                                  onClick={() => toggleCode(code)}
-                                  className={`relative w-20 h-10 rounded-full border-2 transition-all duration-500 flex items-center px-1 ${toggleBorderClass} ${toggleBgClass} ${toggleShadowClass}`}
-                                >
-                                  <motion.div 
-                                    animate={{ x: isActive ? 40 : 0 }}
-                                    transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-                                    className={`w-6 h-6 rounded-full shadow-lg flex items-center justify-center ${toggleThumbClass}`}
-                                  >
-                                    <div className="w-2 h-2 rounded-full bg-white/40" />
-                                  </motion.div>
-                                  <span className={`absolute ${isActive ? 'left-3' : 'right-3'} text-[15px] font-orbitron font-bold tracking-tighter`}>
-                                    {isActive ? 'ON' : 'OFF'}
-                                  </span>
-                                </button>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
+      
       {/* Achievements Modal */}
       <AchievementsModal 
         isOpen={showAchievements}
@@ -2461,6 +1593,14 @@ export default function GameHome() {
         onClose={() => setShowJukeboxModal(false)} 
         language={language}
         {...jukeboxState} 
+      />
+
+      {/* Horizon Radio Modal */}
+      <HorizonRadioModal 
+        isOpen={showHorizonRadio}
+        onClose={() => setShowHorizonRadio(false)}
+        onOpenJukebox={() => setShowJukeboxModal(true)}
+        language={language}
       />
 
       <style jsx global>{`

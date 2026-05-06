@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
+import { useSoundMaster } from '@/hooks/useSoundMaster';
 
 interface SpaceAmbienceProps {
   isPlaying: boolean;
@@ -8,6 +9,7 @@ interface SpaceAmbienceProps {
 }
 
 export const SpaceAmbience: React.FC<SpaceAmbienceProps> = ({ isPlaying, volume = 0.3 }) => {
+  const { masterMusicOn, masterMusicVolume } = useSoundMaster();
   const audioCtxRef = useRef<AudioContext | null>(null);
   const masterGainRef = useRef<GainNode | null>(null);
   const oscillatorsRef = useRef<OscillatorNode[]>([]);
@@ -25,8 +27,7 @@ export const SpaceAmbience: React.FC<SpaceAmbienceProps> = ({ isPlaying, volume 
     masterGain.connect(ctx.destination);
     masterGainRef.current = masterGain;
 
-    // Create a series of low-frequency oscillators for a deep space pad
-    const frequencies = [55, 110, 164.81, 220, 329.63]; // A1, A2, E3, A3, E4
+    const frequencies = [55, 110, 164.81, 220, 329.63]; 
     
     frequencies.forEach((freq, i) => {
       const osc = ctx.createOscillator();
@@ -35,8 +36,6 @@ export const SpaceAmbience: React.FC<SpaceAmbienceProps> = ({ isPlaying, volume 
 
       osc.type = i % 2 === 0 ? 'sine' : 'triangle';
       osc.frequency.setValueAtTime(freq, ctx.currentTime);
-
-      // Add some slight detune for thickness
       osc.detune.setValueAtTime(Math.random() * 10 - 5, ctx.currentTime);
 
       filter.type = 'lowpass';
@@ -52,7 +51,6 @@ export const SpaceAmbience: React.FC<SpaceAmbienceProps> = ({ isPlaying, volume 
       osc.start();
       oscillatorsRef.current.push(osc);
 
-      // LFO for volume movement
       const lfo = ctx.createOscillator();
       const lfoGain = ctx.createGain();
       lfo.type = 'sine';
@@ -63,7 +61,6 @@ export const SpaceAmbience: React.FC<SpaceAmbienceProps> = ({ isPlaying, volume 
       lfo.start();
     });
 
-    // Add some noise for texture
     const bufferSize = 2 * ctx.sampleRate;
     const noiseBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
     const output = noiseBuffer.getChannelData(0);
@@ -91,7 +88,7 @@ export const SpaceAmbience: React.FC<SpaceAmbienceProps> = ({ isPlaying, volume 
   };
 
   useEffect(() => {
-    if (isPlaying && !isInitialized) {
+    if (isPlaying && masterMusicOn && !isInitialized) {
       const handleInteraction = () => {
         initAudio();
         window.removeEventListener('click', handleInteraction);
@@ -99,15 +96,15 @@ export const SpaceAmbience: React.FC<SpaceAmbienceProps> = ({ isPlaying, volume 
       window.addEventListener('click', handleInteraction);
       return () => window.removeEventListener('click', handleInteraction);
     }
-  }, [isPlaying, isInitialized]);
+  }, [isPlaying, masterMusicOn, isInitialized]);
 
   useEffect(() => {
     if (masterGainRef.current && audioCtxRef.current) {
       const ctx = audioCtxRef.current;
-      const targetVolume = isPlaying ? volume : 0;
+      const targetVolume = (isPlaying && masterMusicOn) ? (volume * masterMusicVolume) : 0;
       masterGainRef.current.gain.setTargetAtTime(targetVolume, ctx.currentTime, 1.5);
     }
-  }, [isPlaying, volume]);
+  }, [isPlaying, masterMusicOn, masterMusicVolume, volume]);
 
   return null;
 };

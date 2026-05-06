@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useRef, useEffect } from 'react';
+import { useSoundMaster } from './useSoundMaster';
 
 // Tipos conhecidos com arquivos reais
 export type SFXType = 
@@ -184,13 +185,16 @@ interface SFXConfig {
   loop?: boolean;
 }
 
-export function useSFX(sfxOn: boolean = true) {
-  const sfxOnRef = useRef(sfxOn);
+export function useSFX(_deprecatedSfxOn: boolean = true) {
+  const { masterSfxOn, masterSfxVolume } = useSoundMaster();
+  const sfxOnRef = useRef(masterSfxOn);
+  const sfxVolumeRef = useRef(masterSfxVolume);
 
-  // Mantém sfxOnRef sempre atualizado sem causar re-renders
+  // Mantém refs sempre atualizados
   useEffect(() => {
-    sfxOnRef.current = sfxOn;
-  }, [sfxOn]);
+    sfxOnRef.current = masterSfxOn;
+    sfxVolumeRef.current = masterSfxVolume;
+  }, [masterSfxOn, masterSfxVolume]);
 
   /**
    * Toca um efeito sonoro pelo tipo.
@@ -202,9 +206,8 @@ export function useSFX(sfxOn: boolean = true) {
     let path = SFX_PATHS[type];
     
     // Fallback logic para sons do Vazio (Rota 3)
-    // Se o som de um local específico (ex: _1) não existir, tenta o local _zero
     if (!path && type.includes('_') && !type.endsWith('_zero')) {
-      const baseType = type.split('_').slice(0, -1).join('_'); // Pega 'alien_explosion' de 'alien_explosion_1'
+      const baseType = type.split('_').slice(0, -1).join('_');
       const fallbackType = `${baseType}_zero`;
       path = SFX_PATHS[fallbackType];
     }
@@ -214,15 +217,15 @@ export function useSFX(sfxOn: boolean = true) {
     try {
       let audio = globalAudioCache[type];
       
-      // Lazy load se por algum motivo não foi pré-carregado
       if (!audio) {
         audio = new Audio(path);
         globalAudioCache[type] = audio;
       }
 
-      // Configurações dinâmicas
+      // Configurações dinâmicas escaladas pelo Volume Mestre
       audio.loop = config.loop ?? false;
-      audio.volume = config.volume ?? 0.4;
+      const baseVolume = config.volume ?? 0.4;
+      audio.volume = baseVolume * sfxVolumeRef.current;
 
       // Se o som já estiver tocando e não for loop, reinicia
       if (!audio.paused && !audio.loop) {
@@ -234,7 +237,6 @@ export function useSFX(sfxOn: boolean = true) {
       const promise = audio.play();
       if (promise !== undefined) {
         promise.catch(err => {
-          // Silenciosamente ignora erros de "autoplay policy" ou interrupção
           if (err.name !== 'AbortError') {
             console.warn(`SFX [${type}] playback failed:`, err);
           }

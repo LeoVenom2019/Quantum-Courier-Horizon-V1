@@ -1923,6 +1923,7 @@ interface Battle {
   enemyTier?: number;
   predeterminedResult?: 'victory' | 'defeat';
   isCinematicFinished?: boolean;
+  isAutoSkipped?: boolean;
   playerImage?: string;
   enemyImage?: string;
 }
@@ -1955,11 +1956,6 @@ interface GameDashboardProps {
   setMusicOn: (on: boolean) => void;
   setSfxOn: (on: boolean) => void;
   playerName: string;
-  isSpeedRun: boolean;
-  activeCodes?: { [key: string]: boolean };
-  setActiveCodes?: (codes: { [key: string]: boolean }) => void;
-  unlockedCodes?: string[];
-  setUnlockedCodes?: (codes: string[]) => void;
   localRecords?: { name: string; time: number; date: string }[];
   setLocalRecords?: (records: { name: string; time: number; date: string }[]) => void;
   onReturnToMenu: () => void;
@@ -3185,17 +3181,13 @@ export const GameDashboard = memo(({
   setMusicOn, 
   setSfxOn,
   playerName,
-  isSpeedRun,
-  activeCodes = {},
-  setActiveCodes,
-  unlockedCodes = [],
-  setUnlockedCodes,
   localRecords = [],
   setLocalRecords,
   onReturnToMenu,
   currentThemeIndex,
   jukebox
 }: GameDashboardProps) => {
+  const isSpeedRun = false;
   const [routeTier, setRouteTier] = useState<'Solar' | 'Interstellar' | 'Void' | 'Earth'>('Solar');
   const isArcadeUnlocked = routeTier === 'Earth';
   const [showRoute3Ending, setShowRoute3Ending] = useState(false);
@@ -3209,7 +3201,7 @@ export const GameDashboard = memo(({
   const [showRoute2Lore, setShowRoute2Lore] = useState(false);
   const [showRoute3Confirm, setShowRoute3Confirm] = useState(false);
   const [loreLineIndex, setLoreLineIndex] = useState(0);
-  const isNeon = activeCodes['NEON'] && !isSpeedRun;
+  const isNeon = false;
   
   const currentTheme = typeof currentThemeIndex === 'number' ? GAME_THEMES[currentThemeIndex] : null;
   
@@ -4247,7 +4239,6 @@ export const GameDashboard = memo(({
       totalDeliveries: totalDeliveriesRef.current,
       deliveriesByLocation: deliveriesByLocationRef.current,
       historyStats: historyStatsRef.current,
-      activeCodes,
       missions,
       missionMythicBonus,
       missionAlienBonus,
@@ -4316,7 +4307,7 @@ export const GameDashboard = memo(({
 
     const modularSave = SaveManager.createSave(saveData);
     await GameStorage.save(modularSave, 'time_travel_save');
-  }, [isSpeedRun, isLoaded, playerName, seenTutorials, activeCodes, missions, missionMythicBonus, missionAlienBonus, missionLegendaryBonus, missionRewardLevel, skillLendariaLevel, skillMiticaLevel, skillAlienLevel, skillTempoDinheiroLevel, skillRobosOlimpicosLevel, autoClaimMissions, radarUnlocked, completedInitialMissions, miningCompressionLevels, lastScanTime, isVoidWarActive, voidWarProgress, voidCompactedResources, voidDonationModes, route4Unlocked, unlockedAchievements, achievementProgress, earthEvents]);
+  }, [isSpeedRun, isLoaded, playerName, seenTutorials, missions, missionMythicBonus, missionAlienBonus, missionLegendaryBonus, missionRewardLevel, skillLendariaLevel, skillMiticaLevel, skillAlienLevel, skillTempoDinheiroLevel, skillRobosOlimpicosLevel, autoClaimMissions, radarUnlocked, completedInitialMissions, miningCompressionLevels, lastScanTime, isVoidWarActive, voidWarProgress, voidCompactedResources, voidDonationModes, route4Unlocked, unlockedAchievements, achievementProgress, earthEvents]);
 
   // Auto-save logic
   useEffect(() => {
@@ -4376,8 +4367,8 @@ export const GameDashboard = memo(({
   }, []);
 
   const getEconomicMultipliers = useCallback(() => {
-    const isEasy = activeCodes['EASY'] && !isSpeedRun;
-    const isHard = activeCodes['HARD'] && !isSpeedRun;
+    const isEasy = false;
+    const isHard = false;
     let costMult = 1;
     let profitMult = 1;
 
@@ -4396,7 +4387,7 @@ export const GameDashboard = memo(({
     }
 
     return { cost: costMult, profit: profitMult };
-  }, [routeTier, isSpeedRun, activeCodes]);
+  }, [routeTier, isSpeedRun]);
 
   const getMissionUpgradeCost = useCallback((level: number, tier: string) => {
     if (tier === 'Solar') {
@@ -5098,7 +5089,7 @@ export const GameDashboard = memo(({
                       </div>
                     ) : (
                       <div className="text-center">
-                        <div className="text-2xl font-black text-cyan-400 leading-none">{scanProgress}%</div>
+                        <Radar className="w-8 h-8 text-cyan-400 mx-auto mb-1 animate-spin" />
                         <div className="text-[15px] text-cyan-500 uppercase font-bold tracking-widest mt-1">SCANNING</div>
                       </div>
                     )
@@ -5743,6 +5734,66 @@ export const GameDashboard = memo(({
       const elapsed = Date.now() - last;
       return Math.min(100, (elapsed / cooldowns[type]) * 100);
     };
+
+        if (activeBattle.isAutoSkipped) {
+      return (
+        <AnimatePresence>
+          <motion.div
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[300] flex items-center justify-center bg-black/60 backdrop-blur-md p-4 overflow-hidden"
+          >
+            <div className="w-full max-w-lg bg-slate-900 border border-slate-700/50 rounded-3xl p-8 relative shadow-[0_0_50px_rgba(0,0,0,0.8)] text-center space-y-6">
+              <h3 className={`text-4xl font-orbitron font-bold tracking-[0.3em] uppercase ${activeBattle.isVictory ? 'text-emerald-400 neon-text-emerald' : 'text-rose-500 neon-text-rose'}`}>
+                {activeBattle.isVictory ? (language === 'pt' ? 'VITÓRIA' : 'VICTORY') : (language === 'pt' ? 'DERROTA' : 'DEFEAT')}
+              </h3>
+              
+              {activeBattle.isVictory ? (
+                <div className="space-y-2">
+                  <p className="text-slate-300 font-orbitron text-[14px] tracking-widest uppercase">
+                    {language === 'pt' ? 'RECOMPENSAS RECEBIDAS' : 'REWARDS RECEIVED'}
+                  </p>
+                  <div className="flex flex-wrap items-center justify-center gap-4">
+                    <div className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/30 px-4 py-2 rounded-xl">
+                      <Coins className="w-4 h-4 text-emerald-400" />
+                      <span className="text-emerald-400 font-orbitron font-bold">+{formatValue(activeBattle.reward)} QC</span>
+                    </div>
+                    {(activeBattle.xpReward ?? 0) > 0 && (
+                      <div className="flex items-center gap-2 bg-purple-500/10 border border-purple-500/30 px-4 py-2 rounded-xl">
+                        <Trophy className="w-4 h-4 text-purple-400" />
+                        <span className="text-purple-400 font-orbitron font-bold">+{activeBattle.xpReward} XP</span>
+                      </div>
+                    )}
+                    {(activeBattle.aetherionReward ?? 0) > 0 && (
+                      <div className="flex items-center gap-2 bg-orange-500/10 border border-orange-500/30 px-4 py-2 rounded-xl">
+                        <Zap className="w-4 h-4 text-orange-400" />
+                        <span className="text-orange-400 font-orbitron font-bold">+{activeBattle.aetherionReward} ET</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <p className="text-slate-400 font-orbitron text-[14px] tracking-widest uppercase">
+                  {language === 'pt' ? 'SUA NAVE FOI DESTRUÍDA E A CARGA PERDIDA' : 'YOUR SHIP WAS DESTROYED AND CARGO LOST'}
+                </p>
+              )}
+
+              <button
+                onClick={finishBattle}
+                className={`px-12 py-4 mt-4 rounded-xl font-orbitron font-bold text-[14px] tracking-[0.4em] uppercase transition-all ${
+                  activeBattle.isVictory 
+                    ? 'bg-emerald-500 text-black hover:bg-emerald-400 shadow-[0_0_30px_rgba(16,185,129,0.4)]' 
+                    : 'bg-rose-600 text-white hover:bg-rose-500 shadow-[0_0_30px_rgba(225,29,72,0.4)]'
+                }`}
+              >
+                {language === 'pt' ? 'CONTINUAR' : 'CONTINUE'}
+              </button>
+            </div>
+          </motion.div>
+        </AnimatePresence>
+      );
+    }
 
     return (
       <AnimatePresence>
@@ -6611,7 +6662,7 @@ export const GameDashboard = memo(({
     return Math.pow(base, routeIndex >= 0 ? routeIndex % 9 : 0);
   }, [routeTier]);
 
-  const isSpeedMode = activeCodes['SPEED'] && isSpeedRun;
+  const isSpeedMode = false;
 
   const exportGameData = useCallback(() => {
     const saveData: any = {
@@ -6670,8 +6721,6 @@ export const GameDashboard = memo(({
       voidAircraftAutoToggles,
       gameTimeSeconds,
       // Status
-      activeCodes,
-      unlockedCodes,
       unlockedAchievements,
       achievementProgress,
       localRecords,
@@ -6715,7 +6764,7 @@ export const GameDashboard = memo(({
     URL.revokeObjectURL(url);
     
     addLog(t('exportSuccess' as any), 'success');
-  }, [qc, aetherion, miningWaste, solarEnergy, aetherionTubes, unlockedRouteIds, ownedShips, techLevels, autoTravelSlots, miningRobots, miningRobotLevels, oresCollected, autoSellByOre, autoSellUnlockedByOre, unlockedTechLevels, seenTutorials, routeTier, totalDeliveries, deliveriesByLocation, historyStats, activeCodes, unlockedCodes, localRecords, missions, missionMythicBonus, missionAlienBonus, missionLegendaryBonus, autoClaimMissions, radarUnlocked, missionRewardLevel, miningCompressionLevels, completedInitialMissions, shipXP, shipLevel, addLog, t, isFatigueActive, isRetributionActive, battleLevel, radarLevel, privatePoliceLevel, autoSkipRandomBattles, warCoreLevel, fleetPower, extractionTechLevel, solarMappingLevel, doubleRouteLevel, doomPLevel, captureLevel, earthReconstructionProgress, voidResources, voidCompactedResources, voidAircraftMissions, voidAircraftUpgrades, voidBattleShipStats, voidPOIsInspiration, voidPOIQCDonations, voidDonationModes, unlockedExtractionPoints, extractionPacks, extractionRobotLevels, extractionProductionLevels, extractionAutoSell, extractionAutoSellUnlocked, extractionCompressionLevels, totalExtractionProfit, skillLendariaLevel, skillMiticaLevel, skillAlienLevel, skillTempoDinheiroLevel, skillRobosOlimpicosLevel, unlockedAchievements, achievementProgress, hasSeenRoute2UnlockMessage, isVoidWarActive, voidWarProgress, gameTimeSeconds, earthPopulation, earthMaleRatio, earthBiodiversity, earthEvents, voidAircraftAutoToggles, arcadeScores, route4Unlocked, earthHealth, earthHappiness, earthSecurity, earthQualityOfLife, earthCouples, earthBirthRegistry, colonies, voidAutoShipmentUnlocked, voidAutoShipmentActive]);
+  }, [qc, aetherion, miningWaste, solarEnergy, aetherionTubes, unlockedRouteIds, ownedShips, techLevels, autoTravelSlots, miningRobots, miningRobotLevels, oresCollected, autoSellByOre, autoSellUnlockedByOre, unlockedTechLevels, seenTutorials, routeTier, totalDeliveries, deliveriesByLocation, historyStats, localRecords, missions, missionMythicBonus, missionAlienBonus, missionLegendaryBonus, autoClaimMissions, radarUnlocked, missionRewardLevel, miningCompressionLevels, completedInitialMissions, shipXP, shipLevel, addLog, t, isFatigueActive, isRetributionActive, battleLevel, radarLevel, privatePoliceLevel, autoSkipRandomBattles, warCoreLevel, fleetPower, extractionTechLevel, solarMappingLevel, doubleRouteLevel, doomPLevel, captureLevel, earthReconstructionProgress, voidResources, voidCompactedResources, voidAircraftMissions, voidAircraftUpgrades, voidBattleShipStats, voidPOIsInspiration, voidPOIQCDonations, voidDonationModes, unlockedExtractionPoints, extractionPacks, extractionRobotLevels, extractionProductionLevels, extractionAutoSell, extractionAutoSellUnlocked, extractionCompressionLevels, totalExtractionProfit, skillLendariaLevel, skillMiticaLevel, skillAlienLevel, skillTempoDinheiroLevel, skillRobosOlimpicosLevel, unlockedAchievements, achievementProgress, hasSeenRoute2UnlockMessage, isVoidWarActive, voidWarProgress, gameTimeSeconds, earthPopulation, earthMaleRatio, earthBiodiversity, earthEvents, voidAircraftAutoToggles, arcadeScores, route4Unlocked, earthHealth, earthHappiness, earthSecurity, earthQualityOfLife, earthCouples, earthBirthRegistry, colonies, voidAutoShipmentUnlocked, voidAutoShipmentActive]);
 
   const importGameData = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -6772,8 +6821,8 @@ export const GameDashboard = memo(({
         if (data.deliveriesByLocation) setDeliveriesByLocation(data.deliveriesByLocation);
         if (data.historyStats) setHistoryStats(data.historyStats);
         
-        if (data.activeCodes && setActiveCodes) setActiveCodes(data.activeCodes);
-        if (data.unlockedCodes && setUnlockedCodes) setUnlockedCodes(data.unlockedCodes);
+        
+        
         if (data.shipXP !== undefined) setShipXP(data.shipXP);
         if (data.shipLevel !== undefined) setShipLevel(data.shipLevel);
         if (data.isRetributionActive !== undefined) setIsRetributionActive(data.isRetributionActive);
@@ -6850,7 +6899,7 @@ export const GameDashboard = memo(({
       }
     };
     reader.readAsText(file);
-  }, [setQc, setAetherion, setMiningWaste, setSolarEnergy, setAetherionTubes, setUnlockedRouteIds, setOwnedShips, setTechLevels, setAutoTravelSlots, setMiningRobots, setMiningRobotLevels, setOresCollected, setAutoSellByOre, setAutoSellUnlockedByOre, setMiningCompressionLevels, setUnlockedTechLevels, setSeenTutorials, setRouteTier, setTotalDeliveries, setDeliveriesByLocation, setHistoryStats, setActiveCodes, setUnlockedCodes, setShipXP, setShipLevel, setLocalRecords, addLog, t, setIsRetributionActive, setIsFatigueActive, setBattleLevel, setRadarLevel, setPrivatePoliceLevel, setAutoSkipRandomBattles, setWarCoreLevel, setFleetPower, setExtractionTechLevel, setSolarMappingLevel, setDoubleRouteLevel, setDoomPLevel, setCaptureLevel, setEarthReconstructionProgress, setVoidResources, setVoidCompactedResources, setVoidAircraftMissions, setVoidAircraftUpgrades, setVoidBattleShipStats, setVoidPOIsInspiration, setVoidPOIQCDonations, setUnlockedExtractionPoints, setExtractionPacks, setExtractionRobotLevels, setExtractionProductionLevels, setExtractionAutoSell, setExtractionAutoSellUnlocked, setExtractionCompressionLevels, setTotalExtractionProfit, setSkillLendariaLevel, setSkillMiticaLevel, setSkillAlienLevel, setSkillTempoDinheiroLevel, setSkillRobosOlimpicosLevel, setUnlockedAchievements, setAchievementProgress, setHasSeenRoute2UnlockMessage, setRoute4Unlocked, setEarthPopulation, setEarthMaleRatio, setEarthBiodiversity, setEarthHealth, setEarthHappiness, setEarthSecurity, setEarthQualityOfLife, setEarthEvents, setEarthCouples, setEarthBirthRegistry, setColonies, setGameTimeSeconds, setVoidAircraftAutoToggles, setArcadeScores, setVoidAutoShipmentUnlocked, setVoidAutoShipmentActive]);
+  }, [setQc, setAetherion, setMiningWaste, setSolarEnergy, setAetherionTubes, setUnlockedRouteIds, setOwnedShips, setTechLevels, setAutoTravelSlots, setMiningRobots, setMiningRobotLevels, setOresCollected, setAutoSellByOre, setAutoSellUnlockedByOre, setMiningCompressionLevels, setUnlockedTechLevels, setSeenTutorials, setRouteTier, setTotalDeliveries, setDeliveriesByLocation, setHistoryStats, setShipXP, setShipLevel, setLocalRecords, addLog, t, setIsRetributionActive, setIsFatigueActive, setBattleLevel, setRadarLevel, setPrivatePoliceLevel, setAutoSkipRandomBattles, setWarCoreLevel, setFleetPower, setExtractionTechLevel, setSolarMappingLevel, setDoubleRouteLevel, setDoomPLevel, setCaptureLevel, setEarthReconstructionProgress, setVoidResources, setVoidCompactedResources, setVoidAircraftMissions, setVoidAircraftUpgrades, setVoidBattleShipStats, setVoidPOIsInspiration, setVoidPOIQCDonations, setUnlockedExtractionPoints, setExtractionPacks, setExtractionRobotLevels, setExtractionProductionLevels, setExtractionAutoSell, setExtractionAutoSellUnlocked, setExtractionCompressionLevels, setTotalExtractionProfit, setSkillLendariaLevel, setSkillMiticaLevel, setSkillAlienLevel, setSkillTempoDinheiroLevel, setSkillRobosOlimpicosLevel, setUnlockedAchievements, setAchievementProgress, setHasSeenRoute2UnlockMessage, setRoute4Unlocked, setEarthPopulation, setEarthMaleRatio, setEarthBiodiversity, setEarthHealth, setEarthHappiness, setEarthSecurity, setEarthQualityOfLife, setEarthEvents, setEarthCouples, setEarthBirthRegistry, setColonies, setGameTimeSeconds, setVoidAircraftAutoToggles, setArcadeScores, setVoidAutoShipmentUnlocked, setVoidAutoShipmentActive]);
   const incrementDeliveries = useCallback((source: 'manual' | 'auto', count: number = 1) => {
     const tier = routeTier;
     setHistoryStats(prev => {
@@ -7232,7 +7281,7 @@ export const GameDashboard = memo(({
       boostCost = Math.floor(tech.cost * multipliers.cost * 0.75);
     } else {
       // Original logic for Void/Earth
-      let researchTime = activeCodes['SLIKE'] && !isSpeedRun ? 3600000 : tech.researchTime;
+      let researchTime = tech.researchTime;
       // No more conditional for Interstellar here because it's handled in the if block above
       
       const elapsed = Date.now() - researchingTech.startTime;
@@ -7514,22 +7563,19 @@ export const GameDashboard = memo(({
         if (data.activeDeliveries) setActiveDeliveries(data.activeDeliveries);
         if (data.researchingTech) setResearchingTech(data.researchingTech);
         if (data.researchingExtractionPoint) setResearchingExtractionPoint(data.researchingExtractionPoint);
-        if (data.activeCodes && setActiveCodes) setActiveCodes(data.activeCodes);
+        
         if (data.colonies) setColonies(data.colonies);
       } catch (e) {
         console.error("Failed to load save", e);
       }
     } else {
       // New Game - Apply Codes
-      if (activeCodes['MONEY']) {
-        setQc(500000);
-        addLog('Quantum Wealth code active: Starting with 500k QC!', 'success');
-      }
+      
     }
     setIsLoaded(true);
   };
   loadFromStorage();
-  }, [isSpeedRun, activeCodes, addLog, setActiveCodes, isLoaded, setQc, setUnlockedRouteIds, setOwnedShips, setOresCollected, setTechLevels, setAutoTravelSlots, setAutoTravelActive, setMiningRobots, setMiningRobotLevels, setAutoSellByOre, setHistoryStats, setMissions, setMissionMythicBonus, setMissionAlienBonus, setMissionLegendaryBonus, setAutoClaimMissions, setRadarUnlocked, setCompletedInitialMissions, setMiningCompressionLevels, setMissionRewardLevel, setSkillLendariaLevel, setSkillMiticaLevel, setSkillAlienLevel, setSkillTempoDinheiroLevel, setSkillRobosOlimpicosLevel, setLastScanTime, setAetherion, setMiningWaste, setSolarEnergy, setAetherionTubes]);
+  }, [isSpeedRun, addLog, isLoaded, setQc, setUnlockedRouteIds, setOwnedShips, setOresCollected, setTechLevels, setAutoTravelSlots, setAutoTravelActive, setMiningRobots, setMiningRobotLevels, setAutoSellByOre, setHistoryStats, setMissions, setMissionMythicBonus, setMissionAlienBonus, setMissionLegendaryBonus, setAutoClaimMissions, setRadarUnlocked, setCompletedInitialMissions, setMiningCompressionLevels, setMissionRewardLevel, setSkillLendariaLevel, setSkillMiticaLevel, setSkillAlienLevel, setSkillTempoDinheiroLevel, setSkillRobosOlimpicosLevel, setLastScanTime, setAetherion, setMiningWaste, setSolarEnergy, setAetherionTubes]);
 
   // Auto-Save and Load Colonies
   useEffect(() => {
@@ -7686,7 +7732,7 @@ export const GameDashboard = memo(({
       return;
     }
 
-    let researchTime = activeCodes['SLIKE'] && !isSpeedRun ? 3600000 : tech.researchTime;
+    let researchTime = tech.researchTime;
     if (routeTier === 'Interstellar') researchTime *= 0.5;
 
     if (isSpeedRun || researchTime === 0) {
@@ -7770,7 +7816,6 @@ export const GameDashboard = memo(({
       totalDeliveries,
       deliveriesByLocation,
       historyStats,
-      activeCodes,
       missions,
       missionMythicBonus,
       missionAlienBonus,
@@ -8152,6 +8197,7 @@ export const GameDashboard = memo(({
                   battle.isDefeat = true;
                   battle.playerHp = 0;
                 }
+                battle.isAutoSkipped = true;
                 setActiveBattle(battle);
                 playSfx(victory ? 'success' : 'error');
               } else {
@@ -8555,7 +8601,7 @@ export const GameDashboard = memo(({
       if (researching) {
         const tech = TECHNOLOGIES.find(t => t.tier === researching.tier && t.level === researching.level);
         if (tech) {
-          let researchTime = activeCodes['SLIKE'] && !isSpeedRunRef.current ? 3600000 : tech.researchTime;
+          let researchTime = tech.researchTime;
           if (researching.tier === 'Interstellar') researchTime *= 0.5;
           
           const elapsed = Date.now() - researching.startTime;
@@ -8919,10 +8965,7 @@ export const GameDashboard = memo(({
   };
 
   const buyAutoSell = (oreId: string) => {
-    if (activeCodes['SLIKE'] && !isSpeedRun) {
-      addLog('Impossible Mode: Auto-Sell disabled', 'error');
-      return;
-    }
+    
     
     const ore = ORES.find(o => o.id === oreId);
     if (!ore) return;
@@ -8960,10 +9003,7 @@ export const GameDashboard = memo(({
   };
 
   const buyAutoTravelSlot = (routeId: string) => {
-    if (activeCodes['SLIKE'] && !isSpeedRun) {
-      addLog(t('impossibleModeAutoTravelDisabled'), 'error');
-      return;
-    }
+    
     const baseCosts = [1000, 5000, 10000, 15000, 20000];
     const currentSlots = autoTravelSlots[routeId] || 0;
     if (currentSlots >= 5) {
@@ -12580,7 +12620,7 @@ export const GameDashboard = memo(({
       </AnimatePresence>
 
       {/* Signal Effect Overlay */}
-      {activeCodes['SIGNAL'] && !isSpeedRun && (
+      {false && (
         <div className="fixed inset-0 z-[150] pointer-events-none overflow-hidden">
           <div className="absolute inset-0 bg-emerald-500/5 animate-pulse" />
           <div className="absolute top-0 left-0 w-full h-full opacity-10 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] animate-[flicker_0.1s_infinite]" />
@@ -14377,7 +14417,7 @@ export const GameDashboard = memo(({
                         const shipColorClass = shipForTech?.color || 'text-cyan-400';
                         
                         let progress = 0;
-                        let researchTime = activeCodes['SLIKE'] && !isSpeedRun ? 3600000 : tech.researchTime;
+                        let researchTime = tech.researchTime;
                         if (routeTier === 'Interstellar') researchTime *= 0.5;
 
                         if (isResearching && researchingTech) {
