@@ -197,8 +197,11 @@ export function useJukebox(onPlayStateChange?: (isPlaying: boolean) => void) {
         audioRef.current.play()
           .then(() => console.log(`[Jukebox] Playback started successfully`))
           .catch(e => {
-            console.error("[Jukebox] Playback failed:", e.message);
-            // Don't set isPlaying(false) immediately, might be a temporary block
+            if (e.name !== 'AbortError') {
+              console.error("[Jukebox] Playback failed:", e.message);
+            } else {
+              console.log("[Jukebox] Playback interrupted by new request (AbortError)");
+            }
           });
       } else {
         audioRef.current.pause();

@@ -4187,9 +4187,15 @@ export const GameDashboard = memo(({
   useEffect(() => { oresCollectedRef.current = oresCollected; }, [oresCollected]);
   useEffect(() => { historyStatsRef.current = historyStats; }, [historyStats]);
 
-  const updateHistoryStats = useCallback((type: 'acquired' | 'spent', amount: number, source?: 'delivery' | 'mining' | 'battle' | 'mission') => {
-    const tier = routeTier;
+  const updateHistoryStats = useCallback((
+    type: 'acquired' | 'spent' | 'mission_complete' | 'battle_win' | 'manual_mining' | 'auto_mining' | 'manual_extraction' | 'auto_extraction' | 'perfect_delivery', 
+    amount: number, 
+    tier: string,
+    source?: 'delivery' | 'mining' | 'battle' | 'mission' | 'extraction' | 'tutorial'
+  ) => {
     const current = historyStatsRef.current[tier];
+    if (!current) return;
+    
     const next = { ...current };
     
     if (type === 'acquired') {
@@ -4198,12 +4204,28 @@ export const GameDashboard = memo(({
       if (source === 'mining') next.qcFromMining += amount;
       if (source === 'battle') next.qcFromBattles += amount;
       if (source === 'mission') next.qcFromMissions += amount;
-    } else {
+      if (source === 'extraction') next.qcFromExtraction += amount;
+      if (source === 'tutorial') next.qcFromTutorial += amount;
+    } else if (type === 'spent') {
       next.qcSpent += amount;
+    } else if (type === 'mission_complete') {
+      next.missionsCompleted += 1;
+    } else if (type === 'battle_win') {
+      next.battlesWon += 1;
+    } else if (type === 'manual_mining') {
+      next.manualMiningPacksSold = (next.manualMiningPacksSold || 0) + amount;
+    } else if (type === 'auto_mining') {
+      next.autoMiningPacksSold = (next.autoMiningPacksSold || 0) + amount;
+    } else if (type === 'manual_extraction') {
+      next.manualExtractionPacksSold = (next.manualExtractionPacksSold || 0) + amount;
+    } else if (type === 'auto_extraction') {
+      next.autoExtractionPacksSold = (next.autoExtractionPacksSold || 0) + amount;
+    } else if (type === 'perfect_delivery') {
+      next.perfectDeliveries = (next.perfectDeliveries || 0) + amount;
     }
     
     historyStatsRef.current = { ...historyStatsRef.current, [tier]: next };
-  }, [routeTier]);
+  }, []);
 
   const handleSkillUpgrade = (cost: number, setter: (val: number) => void, level: number, name: string) => {
     if (qc >= cost) {
@@ -4215,7 +4237,7 @@ export const GameDashboard = memo(({
       // Background Log
       GameStorage.log('SKILL_UPGRADE', { skill: name, newLevel: level + 1, cost }, playerName);
       
-      updateHistoryStats('spent', cost);
+      updateHistoryStats('spent', cost, routeTier);
       performSave();
     }
   };
@@ -4559,19 +4581,12 @@ export const GameDashboard = memo(({
       // Side effects outside of state setter
       if (hasSold) {
         setExtractionPacks(next);
-        setQc(q => q + totalQcGained);
+        setQc(q => { const nextVal = q + totalQcGained; qcRef.current = nextVal; return nextVal; });
         setTotalExtractionProfit(prev => prev + totalQcGained);
         
         // Update history stats
-        setHistoryStats(prev => ({
-          ...prev,
-          Interstellar: {
-            ...prev.Interstellar,
-            qcFromExtraction: (prev.Interstellar.qcFromExtraction || 0) + totalQcGained,
-            qcTotalAcquired: (prev.Interstellar.qcTotalAcquired || 0) + totalQcGained,
-            autoExtractionPacksSold: (prev.Interstellar.autoExtractionPacksSold || 0) + totalPacksSold
-          }
-        }));
+        updateHistoryStats('acquired', totalQcGained, 'Interstellar', 'extraction');
+        updateHistoryStats('auto_extraction', totalPacksSold, 'Interstellar');
 
         playSfx('success');
       }
@@ -4625,7 +4640,7 @@ export const GameDashboard = memo(({
     }
 
     setQc(prev => prev - boostCost);
-    updateHistoryStats('spent', boostCost);
+    updateHistoryStats('spent', boostCost, 'Interstellar');
     setUnlockedExtractionPoints(prev => prev.includes(researchingExtractionPoint.id) ? prev : [...prev, researchingExtractionPoint.id]);
     setResearchingExtractionPoint(null);
     playSfx('ask_window');
@@ -5571,14 +5586,8 @@ export const GameDashboard = memo(({
       return next;
     });
     addXP(xpReward);
-    updateHistoryStats('acquired', qcReward, 'battle');
-    setHistoryStats(prev => ({
-      ...prev,
-      [routeTier]: {
-        ...prev[routeTier],
-        battlesWon: (prev[routeTier].battlesWon || 0) + 1
-      }
-    }));
+    updateHistoryStats('acquired', qcReward, routeTier, 'battle');
+    updateHistoryStats('battle_win', 1, routeTier);
 
     const xpText = xpReward > 0 ? `, +${formatValue(xpReward)} XP` : '';
     const bonusText = bonusMultiplier > 1 ? ` (+${Math.round((bonusMultiplier - 1) * 100)}% BONUS)` : '';
@@ -6476,18 +6485,8 @@ export const GameDashboard = memo(({
       });
     }
     if (mission.rewardXP) addXP(mission.rewardXP);
-    updateHistoryStats('acquired', mission.reward, 'mission');
-    setHistoryStats(prev => {
-      const tier = mission.tier;
-      const current = prev[tier];
-      return {
-        ...prev,
-        [tier]: {
-          ...current,
-          missionsCompleted: current.missionsCompleted + 1
-        }
-      };
-    });
+    updateHistoryStats('acquired', mission.reward, mission.tier, 'mission');
+    updateHistoryStats('mission_complete', 1, mission.tier);
 
     // Remove mission from screen after claim
     setMissions(prev => {
@@ -7321,7 +7320,7 @@ export const GameDashboard = memo(({
     }
 
     setQc(prev => prev - boostCost);
-    updateHistoryStats('spent', boostCost);
+    updateHistoryStats('spent', boostCost, routeTier);
     setUnlockedTechLevels(prev => ({ ...prev, [researchingTech.tier]: researchingTech.level }));
     
     if (isSpeedRun) {
@@ -7672,7 +7671,7 @@ export const GameDashboard = memo(({
     const status = currentlyInUse < totalOwned ? 'delivering' : 'queued';
 
     setQc(c => c - fuelCost);
-    updateHistoryStats('spent', fuelCost);
+    updateHistoryStats('spent', fuelCost, route.tier);
     performSave();
     completeInitialMission('init_4');
     setActiveDeliveries(prev => [
@@ -7720,7 +7719,7 @@ export const GameDashboard = memo(({
     }
     
     setQc(c => c - actualCost);
-    if (actualCost > 0) updateHistoryStats('spent', actualCost);
+    if (actualCost > 0) updateHistoryStats('spent', actualCost, routeTier);
     setOwnedShips(prev => ({
       ...prev,
       [`${routeTier}-${level}`]: (prev[`${routeTier}-${level}`] || 0) + 1
@@ -7762,7 +7761,7 @@ export const GameDashboard = memo(({
     if (isSpeedRun || researchTime === 0) {
       // Instant unlock
       setQc(c => c - cost);
-      updateHistoryStats('spent', cost);
+      updateHistoryStats('spent', cost, routeTier);
       setUnlockedTechLevels(prev => ({ ...prev, [routeTier]: tech.level }));
       if (tech.id === 'solar-1') {
         completeInitialMission('init_1');
@@ -7778,7 +7777,7 @@ export const GameDashboard = memo(({
       }
     } else {
       setQc(c => c - cost);
-      updateHistoryStats('spent', cost);
+      updateHistoryStats('spent', cost, routeTier);
       setResearchingTech({
         tier: routeTier,
         level: tech.level,
@@ -8371,7 +8370,7 @@ export const GameDashboard = memo(({
               if (canAfford && shipsAvailable) {
                 setQc(c => c - attemptCost);
                 setAetherion(prev => Math.max(0, prev - aetherionTripCost));
-                updateHistoryStats('spent', attemptCost);
+                updateHistoryStats('spent', attemptCost, 'Void');
                 // Start progress
                 nextAutoProgress[routeId] = 0.01; 
               } else {
@@ -8470,19 +8469,13 @@ export const GameDashboard = memo(({
               locationUpdates[route.destination] = (locationUpdates[route.destination] || 0) + 1;
               totalCompletedCount++;
               if (isPerfect) {
-                setHistoryStats(prev => ({
-                  ...prev,
-                  [routeTier]: {
-                    ...prev[routeTier],
-                    perfectDeliveries: (prev[routeTier].perfectDeliveries || 0) + 1
-                  }
-                }));
+                updateHistoryStats('perfect_delivery', 1, route.tier);
               }
+              updateHistoryStats('acquired', Math.floor(reward), route.tier, 'delivery');
             }
           });
 
           setQc(c => c + totalRewardBatch);
-          updateHistoryStats('acquired', totalRewardBatch, 'delivery');
           
           const manualCount = completions.filter(c => c.isManual).reduce((acc, curr) => acc + curr.count, 0);
           const autoCount = completions.filter(c => !c.isManual).reduce((acc, curr) => acc + curr.count, 0);
@@ -8617,7 +8610,7 @@ export const GameDashboard = memo(({
       }
       if (miningQcBonus > 0) {
         qcRef.current += miningQcBonus;
-        updateHistoryStats('acquired', miningQcBonus, 'mining');
+        updateHistoryStats('acquired', miningQcBonus, routeTierRef.current, 'mining');
       }
 
       // 4. Handle Technology Research
@@ -8745,7 +8738,7 @@ export const GameDashboard = memo(({
 
     if (qc >= (route.unlockCost || 0)) {
       setQc(c => c - (route.unlockCost || 0));
-      updateHistoryStats('spent', route.unlockCost || 0);
+      updateHistoryStats('spent', route.unlockCost || 0, route.tier);
       setUnlockedRouteIds(prev => [...prev, route.id]);
       if (route.tier === 'Solar') playSfx('start_engine_1');
       else if (route.tier === 'Interstellar') playSfx('start_engine_2');
@@ -8849,7 +8842,7 @@ export const GameDashboard = memo(({
 
     if (anyUpgraded) {
       setQc(currentQc);
-      updateHistoryStats('spent', totalSpent);
+      updateHistoryStats('spent', totalSpent, routeTier);
       setTechLevels(prev => ({ ...prev, [locationId]: newLevels }));
       playSfx('level_up');
       addLog(language === 'pt' ? 'Todas as melhorias possíveis foram adquiridas!' : 'All possible upgrades acquired!', 'success');
@@ -8874,7 +8867,7 @@ export const GameDashboard = memo(({
     }
 
     setQc(c => c - cost);
-    updateHistoryStats('spent', cost);
+    updateHistoryStats('spent', cost, 'Interstellar');
     setMiningRobots(prev => ({ ...prev, [oreId]: currentRobots + 1 }));
     completeInitialMission('init_6');
     playSfx('buy_new_robot');
@@ -8898,7 +8891,7 @@ export const GameDashboard = memo(({
     }
 
     setQc(c => c - cost);
-    updateHistoryStats('spent', cost);
+    updateHistoryStats('spent', cost, 'Interstellar');
     setMiningRobotLevels(prev => ({ ...prev, [oreId]: currentLevel + 1 }));
     playSfx('level_up');
     addLog(`${t('robotUpgraded')} ${currentLevel + 1}`, 'success');
@@ -8917,7 +8910,7 @@ export const GameDashboard = memo(({
     
     if (qc >= cost) {
       setQc(prev => prev - cost);
-      updateHistoryStats('spent', cost);
+      updateHistoryStats('spent', cost, routeTier);
       setMiningCompressionLevels(prev => ({ ...prev, [oreId]: currentLevel + 1 }));
       playSfx('buying_iten');
       addLog(`${t('refinedCompression')} ${ore.name} Lvl ${currentLevel + 1}`, 'success');
@@ -8961,14 +8954,8 @@ export const GameDashboard = memo(({
     }
 
     setQc(c => c + value);
-    updateHistoryStats('acquired', value, 'mining');
-    setHistoryStats(prev => ({
-      ...prev,
-      [routeTier]: {
-        ...prev[routeTier],
-        manualMiningPacksSold: (prev[routeTier].manualMiningPacksSold || 0) + packs
-      }
-    }));
+    updateHistoryStats('acquired', value, routeTier, 'mining');
+    updateHistoryStats('manual_mining', packs, routeTier);
     setOresCollected(prev => ({ ...prev, [oreId]: prev[oreId] - (packs * ore.packSize) }));
     
     // RHSE Mining Waste (Increased by 100%)
@@ -9001,7 +8988,7 @@ export const GameDashboard = memo(({
         return;
       }
       setQc(c => c - cost);
-      updateHistoryStats('spent', cost);
+      updateHistoryStats('spent', cost, routeTier);
       setAutoSellUnlockedByOre(prev => ({ ...prev, [oreId]: true }));
       setAutoSellByOre(prev => ({ ...prev, [oreId]: true }));
       addLog(t('autoSellUnlocked'), 'success');
@@ -9046,7 +9033,7 @@ export const GameDashboard = memo(({
 
     if (qc >= cost) {
       setQc(c => c - cost);
-      updateHistoryStats('spent', cost);
+      updateHistoryStats('spent', cost, routeTier);
       setAutoTravelSlots(prev => ({
         ...prev,
         [routeId]: (prev[routeId] || 0) + 1
@@ -9269,7 +9256,7 @@ export const GameDashboard = memo(({
 
     setVoidResources(prev => ({ ...prev, energy: prev.energy - costs.energy }));
     setQc(prev => prev - costs.qc);
-    updateHistoryStats('spent', costs.qc);
+    updateHistoryStats('spent', costs.qc, 'Void');
 
     setVoidAircraftConstruction(prev => {
       const next = { ...prev };
@@ -12306,7 +12293,7 @@ export const GameDashboard = memo(({
                   const cost = getMissionUpgradeCost(missionRewardLevel[routeTier], routeTier);
                   if (qc >= cost) {
                     setQc(prev => prev - cost);
-                    updateHistoryStats('spent', cost);
+                    updateHistoryStats('spent', cost, routeTier);
                     setMissionRewardLevel(prev => ({ ...prev, [routeTier]: prev[routeTier] + 1 }));
                     playSfx('level_up');
                     addLog(`${t('missionBaseValueIncreased')} ${missionRewardLevel[routeTier] + 1}!`, 'success');
@@ -14399,7 +14386,7 @@ export const GameDashboard = memo(({
                                     onClick={() => {
                                       if (canResearch) {
                                         setQc(c => c - point.cost);
-                                        updateHistoryStats('spent', point.cost);
+                                        updateHistoryStats('spent', point.cost, 'Interstellar');
                                         setResearchingExtractionPoint({
                                           id: point.id,
                                           startTime: Date.now(),
