@@ -47,16 +47,18 @@ export const GameStorage = {
         return JSON.parse(serializedData);
       }
 
-      // 2. Fallback to AppData API if LocalStorage is empty
-      console.log('GameStorage: LocalStorage empty, checking AppData fallback...');
-      const response = await fetch('/api/save');
-      if (response.ok) {
-        const result = await response.json();
-        if (result.success && result.data) {
-          console.log('GameStorage: Restored save from AppData!');
-          // Repopulate localStorage for next time
-          localStorage.setItem(key, JSON.stringify(result.data));
-          return result.data;
+      // 2. Fallback to AppData API if LocalStorage is empty (ONLY for main save)
+      if (key === 'time_travel_save' || key === 'speed_run_save') {
+        console.log(`GameStorage: LocalStorage empty for ${key}, checking AppData fallback...`);
+        const response = await fetch(`/api/save?key=${key}&t=${Date.now()}`, { cache: 'no-store' });
+        if (response.ok) {
+          const result = await response.json();
+          if (result.success && result.data) {
+            console.log('GameStorage: Restored save from AppData!');
+            // Repopulate localStorage for next time
+            localStorage.setItem(key, JSON.stringify(result.data));
+            return result.data;
+          }
         }
       }
 
@@ -123,8 +125,9 @@ export const GameStorage = {
 
       // If it's the main save, also clear from AppData backend
       if (key === 'time_travel_save') {
-        await fetch('/api/save', {
+        await fetch(`/api/save?t=${Date.now()}`, {
           method: 'DELETE',
+          cache: 'no-store'
         }).catch(err => console.error('Background Delete failed:', err));
       }
     } catch (error) {

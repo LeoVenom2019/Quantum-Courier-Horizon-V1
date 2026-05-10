@@ -87,9 +87,11 @@ export const AchievementsModal: React.FC<AchievementsModalProps> = ({
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {ACHIEVEMENTS.slice(page * 9, (page + 1) * 9).map((achievement) => {
+                if (!achievement || !achievement.id) return null;
                 const isUnlocked = unlockedAchievements.includes(achievement.id);
                 const progress = achievementProgress[achievement.id] || 0;
-                const percent = Math.min(100, (progress / achievement.target) * 100);
+                const target = achievement.target || 1;
+                const percent = Math.min(100, (progress / target) * 100);
                 
                 return (
                   <motion.div

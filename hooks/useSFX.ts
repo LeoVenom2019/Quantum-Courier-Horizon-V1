@@ -51,13 +51,15 @@ export type SFXType =
   | 'shoot_monster_zero' | 'shoot_monster_1' | 'shoot_monster_2' | 'shoot_monster_3' | 'shoot_monster_4' | 'shoot_monster_5' | 'shoot_monster_6' | 'shoot_monster_7' | 'shoot_monster_8' | 'shoot_monster_9'
   | 'shoot_elite_zero' | 'shoot_elite_1' | 'shoot_elite_2' | 'shoot_elite_3' | 'shoot_elite_4' | 'shoot_elite_5' | 'shoot_elite_6' | 'shoot_elite_7' | 'shoot_elite_8' | 'shoot_elite_9'
   | 'shoot_boss_zero' | 'shoot_boss_1' | 'shoot_boss_2' | 'shoot_boss_3' | 'shoot_boss_4' | 'shoot_boss_5' | 'shoot_boss_6' | 'shoot_boss_7' | 'shoot_boss_8' | 'shoot_boss_9'
-  | 'laser_up' | 'shield_up' | 'target_up' | 'epic_battle_ship' | 'target_up_2' | 'login_start' | 'aba_click';
+  | 'laser_up' | 'shield_up' | 'target_up' | 'epic_battle_ship' | 'target_up_2' | 'login_start' | 'aba_click'
+  | 'buy';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ATENÇÃO: Só adicione aqui arquivos que JÁ EXISTEM em public/audio/sfx/
 // ─────────────────────────────────────────────────────────────────────────────
 const SFX_PATHS: Partial<Record<string, string>> = {
   tech_success: '/audio/sfx/tech.success.ogg',
+  success: '/audio/sfx/cash_register.ogg',
   enemy_explosion: '/audio/sfx/enemy_explosion.ogg',
   level_up: '/audio/sfx/level_up.ogg',
   shoot_player: '/audio/sfx/shoot_player.ogg',
@@ -113,6 +115,7 @@ const SFX_PATHS: Partial<Record<string, string>> = {
   target_up_2: '/audio/sfx/target_up_2.ogg',
   login_start: '/audio/sfx/login_start.ogg',
   aba_click: '/audio/sfx/aba_click.ogg',
+  buy: '/audio/sfx/buying_iten.ogg',
 };
 
 // Singleton Cache para evitar recriação de objetos e preloading redundante

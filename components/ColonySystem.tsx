@@ -122,10 +122,10 @@ const CONSTRUCTION_CONFIG: Record<ConstructionType, {
 const INITIAL_CONSTRUCTORS = 500;
 const INITIAL_POP_CAPACITY = 10000;
 
-export const cleanColoniesData = (data: any[], language: 'en' | 'pt'): Colony[] => {
+export const cleanColoniesData = (data: any, language: 'en' | 'pt'): Colony[] => {
   const t = (en: string, pt: string) => language === 'pt' ? pt : en;
 
-  if (!data || data.length === 0) {
+  if (!data || !Array.isArray(data) || data.length === 0) {
     return [{
       id: 'colony-1',
       name: t('Alpha Colony', 'Colônia Alpha'),
@@ -305,6 +305,7 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
         });
 
         if (!hasChanges) return prev;
+
 
         // Check habitability: ALL 10 of EACH
         const allMaxed = updatedConstructions.every(c => c.level === 10);

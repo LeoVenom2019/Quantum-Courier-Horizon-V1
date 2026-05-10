@@ -173,6 +173,7 @@ export const IntroNarrative = ({
   const [isAlienEggActive, setIsAlienEggActive] = useState(false);
   const [showAlienMessage, setShowAlienMessage] = useState(false);
   const [showFullAlienGlitch, setShowFullAlienGlitch] = useState(false);
+  const loadingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const LOADING_STEPS = [
     { progress: 10, en: "Initializing systems...", pt: "Inicializando sistemas..." },
@@ -215,6 +216,15 @@ export const IntroNarrative = ({
     }
   }, [index, charCount, currentText.length]);
 
+  // Cleanup loading timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (loadingTimeoutRef.current) {
+        clearTimeout(loadingTimeoutRef.current);
+      }
+    };
+  }, []);
+
   const handleSkip = () => {
     setShowPlayerId(true);
   };
@@ -239,7 +249,8 @@ export const IntroNarrative = ({
   };
 
   const handleConfirmName = () => {
-    if (playerName.toLowerCase().trim() === 'alien') {
+    if (playerName.toLowerCase().trim() === 'alien' && !isLoading) {
+      setPlayerName(''); // Immediately clear the name to prevent bypass
       triggerAlienEasterEgg();
       return;
     }
@@ -254,7 +265,7 @@ export const IntroNarrative = ({
           setLoadingProgress(step.progress);
           setLoadingStatus(t(language, step.en, step.pt));
           stepIndex++;
-          setTimeout(updateLoading, 800 + Math.random() * 1200);
+          loadingTimeoutRef.current = setTimeout(updateLoading, 800 + Math.random() * 1200);
         } else {
           onComplete();
         }
@@ -338,6 +349,11 @@ export const IntroNarrative = ({
                   <button 
                     onClick={() => {
                       playSfx('aba_click');
+                      if (loadingTimeoutRef.current) {
+                        clearTimeout(loadingTimeoutRef.current);
+                        loadingTimeoutRef.current = null;
+                      }
+                      setIsLoading(false);
                       onCancel();
                     }}
                     className="absolute top-4 right-4 text-cyan-500/50 hover:text-cyan-400 transition-colors z-30"
@@ -444,7 +460,7 @@ export const IntroNarrative = ({
               {/* Notebook Base / Keyboard */}
               <div className="bg-[#1a1c25] border-x-[12px] border-b-[12px] border-[#252836] rounded-b-[4rem] p-6 shadow-[0_30px_60px_rgba(0,0,0,0.8)] relative overflow-hidden">
                 {/* Brushed metal texture overlay */}
-                <div className="absolute inset-0 opacity-[0.03] pointer-events-none bg-[url('https://www.transparenttextures.com/patterns/brushed-alum.png')]" />
+                <div className="absolute inset-0 opacity-[0.03] pointer-events-none " />
                 
                 {/* RGB Side Strips */}
                 <motion.div 
@@ -485,7 +501,7 @@ export const IntroNarrative = ({
                   >
                     <div className="absolute inset-0 bg-gradient-to-tr from-white/5 via-transparent to-transparent opacity-50" />
                     <img 
-                      src="/images/ui/alien_wait.png" 
+                      src="/images/ui/alien_wait.webp" 
                       alt="Alien Wait Badge" 
                       className="w-20 h-12 object-contain filter drop-shadow-[0_0_8px_rgba(0,0,0,0.5)] group-hover:drop-shadow-[0_0_12px_rgba(255,255,255,0.2)] transition-all"
                     />
@@ -568,7 +584,7 @@ export const IntroNarrative = ({
             className="fixed inset-0 z-[400] bg-black flex items-center justify-center overflow-hidden"
           >
             <div className="absolute inset-0 z-10 opacity-30">
-               <div className="w-full h-full bg-[url('https://media.giphy.com/media/oEI9uWUicGv37FzCIs/giphy.gif')] bg-cover mix-blend-screen" />
+               <div className="w-full h-full  bg-cover mix-blend-screen" />
             </div>
             
             <motion.div
@@ -592,21 +608,21 @@ export const IntroNarrative = ({
               className="relative w-96 h-96"
             >
               <img 
-                src="/images/ui/alien_wait.png" 
+                src="/images/ui/alien_wait.webp" 
                 alt="Alien Easter Egg" 
                 className="w-full h-full object-contain drop-shadow-[0_0_30px_rgba(6,182,212,0.8)]"
               />
               
               {/* RGB Split Effect Layers */}
               <motion.img 
-                src="/images/ui/alien_wait.png" 
+                src="/images/ui/alien_wait.webp" 
                 className="absolute inset-0 w-full h-full object-contain mix-blend-screen opacity-50"
                 animate={{ x: [-5, 5, -5], y: [2, -2, 2] }}
                 transition={{ duration: 0.1, repeat: Infinity }}
                 style={{ filter: 'invert(100%) sepia(100%) saturate(1000%) hue-rotate(0deg)' }}
               />
               <motion.img 
-                src="/images/ui/alien_wait.png" 
+                src="/images/ui/alien_wait.webp" 
                 className="absolute inset-0 w-full h-full object-contain mix-blend-screen opacity-50"
                 animate={{ x: [5, -5, 5], y: [-2, 2, -2] }}
                 transition={{ duration: 0.1, repeat: Infinity }}
@@ -615,7 +631,7 @@ export const IntroNarrative = ({
             </motion.div>
             
             {/* Scanlines and Noise */}
-            <div className="absolute inset-0 pointer-events-none bg-[url('https://media.giphy.com/media/Vj97qNut69Snu/giphy.gif')] opacity-20 mix-blend-overlay" />
+            <div className="absolute inset-0 pointer-events-none  opacity-20 mix-blend-overlay" />
             <div className="absolute inset-0 pointer-events-none bg-gradient-to-b from-transparent via-white/5 to-transparent h-1 bg-[length:100%_200%] animate-scan" />
           </motion.div>
         )}

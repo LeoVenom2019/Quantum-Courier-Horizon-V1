@@ -28,6 +28,7 @@ export interface ModularSaveData {
     miningWaste: number;
     solarEnergy: number;
     aetherionTubes: number;
+    hasSeenRoute2UnlockMessage: boolean;
   };
   routes: {
     unlockedRouteIds: string[];
@@ -151,7 +152,8 @@ export const SaveManager = {
         aetherion: flatData.aetherion || 0,
         miningWaste: flatData.miningWaste || 0,
         solarEnergy: flatData.solarEnergy || 0,
-        aetherionTubes: flatData.aetherionTubes || 0
+        aetherionTubes: flatData.aetherionTubes || 0,
+        hasSeenRoute2UnlockMessage: flatData.hasSeenRoute2UnlockMessage || false
       },
       routes: {
         unlockedRouteIds: flatData.unlockedRouteIds || [],
@@ -250,31 +252,259 @@ export const SaveManager = {
   loadSave: (rawData: any): any => {
     if (!rawData) return null;
 
-    // Check if it's a legacy flat save
+    // 1. If it's a legacy flat save, we need to wrap it into the structured format
     if (!rawData.version) {
-      // It's a legacy save, just return it as flat (or migrate it)
-      // Since GameDashboard.tsx expects flat structure currently (or handles flat directly)
-      // We will map it to flat for the UI
-      return rawData;
+      return {
+        economy: {
+          qc: rawData.qc || 0,
+          aetherion: rawData.aetherion || 0,
+          miningWaste: rawData.miningWaste || 0,
+          solarEnergy: rawData.solarEnergy || 0,
+          aetherionTubes: rawData.aetherionTubes || 0,
+          totalExtractionProfit: rawData.totalExtractionProfit || 0
+        },
+        progression: {
+          routeTier: rawData.routeTier || 'Solar',
+          unlockedRouteIds: rawData.unlockedRouteIds || ['solar-1', 'solar-2'],
+          ownedShips: rawData.ownedShips || { 'solar-1': 1 },
+          techLevels: rawData.techLevels || {},
+          unlockedTechLevels: rawData.unlockedTechLevels || {},
+          autoTravelSlots: rawData.autoTravelSlots || {},
+          shipLevel: rawData.shipLevel || 1,
+          shipXP: rawData.shipXP || 0,
+          battleLevel: rawData.battleLevel || 1,
+          radarLevel: rawData.radarLevel || 1,
+          privatePoliceLevel: rawData.privatePoliceLevel || 0,
+          doubleRouteLevel: rawData.doubleRouteLevel || 0,
+          doomPLevel: rawData.doomPLevel || 0,
+          captureLevel: rawData.captureLevel || 0,
+          extractionTechLevel: rawData.extractionTechLevel || 0,
+          solarMappingLevel: rawData.solarMappingLevel || 0,
+          warCoreLevel: rawData.warCoreLevel || 0,
+          battleShipUpgradeLevel: rawData.battleShipUpgradeLevel || 0,
+          route4Unlocked: rawData.route4Unlocked || false,
+          gameTimeSeconds: rawData.gameTimeSeconds || 0,
+          researchingTech: null
+        },
+        mining: {
+          miningRobots: rawData.miningRobots || {},
+          miningRobotLevels: rawData.miningRobotLevels || {},
+          oresCollected: rawData.oresCollected || {},
+          autoSellByOre: rawData.autoSellByOre || {},
+          autoSellUnlockedByOre: rawData.autoSellUnlockedByOre || {},
+          miningCompressionLevels: rawData.miningCompressionLevels || {},
+          extractionPacks: rawData.extractionPacks || {},
+          extractionRobotLevels: rawData.extractionRobotLevels || {},
+          extractionProductionLevels: rawData.extractionProductionLevels || {},
+          extractionAutoSell: rawData.extractionAutoSell || {},
+          extractionAutoSellUnlocked: rawData.extractionAutoSellUnlocked || {},
+          extractionCompressionLevels: rawData.extractionCompressionLevels || {},
+          unlockedExtractionPoints: rawData.unlockedExtractionPoints || [],
+          researchingExtractionPoint: null,
+          voidAutoShipmentUnlocked: rawData.voidAutoShipmentUnlocked || false,
+          voidAutoShipmentActive: rawData.voidAutoShipmentActive || false
+        },
+        combat: {
+          activeBattle: null,
+          foundBattle: null,
+          voidBattleStatus: 'idle',
+          voidBattleShipStats: rawData.voidBattleShipStats || { hp: 100, maxHp: 100, shield: 0, maxShield: 50, damage: 10, critChance: 0.05, lootEfficiency: 1, rarity: 'common', upgrades: { damage: 0, shield: 0, crit: 0, loot: 0 } },
+          isRetributionActive: rawData.isRetributionActive || false,
+          isFatigueActive: rawData.isFatigueActive || false,
+          voidResources: rawData.voidResources || { minerals: 0, energy: 0, food: 0, tech: 0, meds: 0 },
+          voidCompactedResources: rawData.voidCompactedResources || {},
+          voidPOIsInspiration: rawData.voidPOIsInspiration || {},
+          isVoidWarActive: rawData.isVoidWarActive || false,
+          voidWarProgress: rawData.voidWarProgress || { currentSector: 1, currentBattle: 1 },
+          robotRepairProgress: rawData.robotRepairProgress || 0,
+          isRobotRepaired: rawData.isRobotRepaired || false
+        },
+        missions: {
+          missions: rawData.missions || [],
+          historyStats: rawData.historyStats || {},
+          unlockedAchievements: rawData.unlockedAchievements || [],
+          achievementProgress: rawData.achievementProgress || {},
+          skillLendariaLevel: rawData.skillLendariaLevel || { Solar: 0, Interstellar: 0 },
+          skillMiticaLevel: rawData.skillMiticaLevel || { Solar: 0, Interstellar: 0 },
+          skillAlienLevel: rawData.skillAlienLevel || { Solar: 0, Interstellar: 0 },
+          skillTempoDinheiroLevel: rawData.skillTempoDinheiroLevel || { Solar: 0, Interstellar: 0 },
+          skillRobosOlimpicosLevel: rawData.skillRobosOlimpicosLevel || { Solar: 0, Interstellar: 0 },
+          missionRewardLevel: rawData.missionRewardLevel || { Solar: 0, Interstellar: 0 },
+          missionMythicBonus: rawData.missionMythicBonus || 0,
+          missionAlienBonus: rawData.missionAlienBonus || 0,
+          missionLegendaryBonus: rawData.missionLegendaryBonus || 0,
+          autoClaimMissions: rawData.autoClaimMissions || false,
+          radarUnlocked: rawData.radarUnlocked || {},
+          completedInitialMissions: rawData.completedInitialMissions || [],
+          lastScanTime: rawData.lastScanTime || 0
+        },
+        earth: {
+          population: rawData.earthPopulation || 0,
+          maleRatio: rawData.earthMaleRatio || 0.5,
+          biodiversity: rawData.earthBiodiversity || 0,
+          health: rawData.earthHealth || 0,
+          happiness: rawData.earthHappiness || 0,
+          security: rawData.earthSecurity || 0,
+          qualityOfLife: rawData.earthQualityOfLife || 0,
+          season: 0,
+          events: rawData.earthEvents || [],
+          reconstructionProgress: rawData.earthReconstructionProgress || {},
+          couples: rawData.earthCouples || 0,
+          birthRegistry: rawData.earthBirthRegistry || {},
+        },
+        system: {
+          seenTutorials: rawData.seenTutorials || {},
+          arcadeScores: rawData.arcadeScores || {},
+          localRecords: rawData.localRecords || [],
+          hasSeenRoute2UnlockMessage: rawData.hasSeenRoute2UnlockMessage || false,
+          playerName: rawData.playerName || '',
+        }
+      };
     }
 
-    // It's a modular save (>= 1.1.0)
-    // We flatten it back out for GameDashboard to use in setState,
-    // providing default fallbacks if missing
+    // 2. It's a modular save (>= 1.1.0)
+    // Map modular structure to Redux structured state
+    const g = rawData.global || {};
+    const r = rawData.routes || {};
+    const s = rawData.ships || {};
+    const tech = rawData.tech || {};
+    const min = rawData.mining || {};
+    const ex = rawData.extraction_interstellar || {};
+    const v = rawData.void_aircraft || {};
+    const sk = rawData.skills || {};
+    const er = rawData.earth_reconstruction || {};
+
     return {
-      version: rawData.version,
-      arcadeScores: rawData.arcadeScores,
-      localRecords: rawData.localRecords,
-      unlockedCodes: rawData.unlockedCodes,
-      ...rawData.global,
-      ...rawData.routes,
-      ...rawData.ships,
-      ...rawData.tech,
-      ...rawData.mining,
-      ...rawData.skills,
-      ...rawData.extraction_interstellar,
-      ...rawData.void_aircraft,
-      ...rawData.earth_reconstruction
+      economy: {
+        qc: g.qc || 0,
+        aetherion: g.aetherion || 0,
+        miningWaste: g.miningWaste || 0,
+        solarEnergy: g.solarEnergy || 0,
+        aetherionTubes: g.aetherionTubes || 0,
+        totalExtractionProfit: ex.totalExtractionProfit || 0
+      },
+      progression: {
+        routeTier: g.routeTier || 'Solar',
+        unlockedRouteIds: r.unlockedRouteIds || ['solar-1'],
+        ownedShips: (() => {
+          const ships = s.ownedShips || {};
+          const normalized: any = {};
+          Object.keys(ships).forEach(k => {
+            const normalizedKey = k.charAt(0).toUpperCase() + k.slice(1);
+            normalized[normalizedKey] = ships[k];
+          });
+          return normalized;
+        })(),
+        techLevels: tech.techLevels || {},
+        unlockedTechLevels: (() => {
+          const techs = tech.unlockedTechLevels || {};
+          const normalized: any = {};
+          Object.keys(techs).forEach(k => {
+            const normalizedKey = k.charAt(0).toUpperCase() + k.slice(1);
+            normalized[normalizedKey] = techs[k];
+          });
+          return normalized;
+        })(),
+        autoTravelSlots: r.autoTravelSlots || {},
+        shipLevel: s.shipLevel || 1,
+        shipXP: s.shipXP || 0,
+        battleLevel: ex.battleLevel || 1,
+        radarLevel: ex.radarLevel || 1,
+        privatePoliceLevel: ex.privatePoliceLevel || 0,
+        doubleRouteLevel: r.doubleRouteLevel || 0,
+        doomPLevel: ex.doomPLevel || 0,
+        captureLevel: ex.captureLevel || 0,
+        extractionTechLevel: ex.extractionTechLevel || 0,
+        solarMappingLevel: ex.solarMappingLevel || 0,
+        warCoreLevel: v.warCoreLevel || 1,
+        battleShipUpgradeLevel: v.battleShipUpgradeLevel || 0,
+        route4Unlocked: g.route4Unlocked || false,
+        gameTimeSeconds: g.gameTimeSeconds || 0,
+        researchingTech: null
+      },
+      mining: {
+        miningRobots: min.miningRobots || {},
+        miningRobotLevels: min.miningRobotLevels || {},
+        oresCollected: min.oresCollected || {},
+        autoSellByOre: min.autoSellByOre || {},
+        autoSellUnlockedByOre: min.autoSellUnlockedByOre || {},
+        miningCompressionLevels: min.miningCompressionLevels || {},
+        extractionPacks: ex.extractionPacks || {},
+        extractionRobotLevels: ex.extractionRobotLevels || {},
+        extractionProductionLevels: ex.extractionProductionLevels || {},
+        extractionAutoSell: ex.extractionAutoSell || {},
+        extractionAutoSellUnlocked: ex.extractionAutoSellUnlocked || {},
+        extractionCompressionLevels: ex.extractionCompressionLevels || {},
+        unlockedExtractionPoints: ex.unlockedExtractionPoints || [],
+        researchingExtractionPoint: null,
+        voidAutoShipmentUnlocked: v.voidAutoShipmentUnlocked || false,
+        voidAutoShipmentActive: v.voidAutoShipmentActive || false
+      },
+      combat: {
+        activeBattle: null,
+        foundBattle: null,
+        voidBattleStatus: 'idle',
+        voidBattleShipStats: v.voidBattleShipStats || { hp: 100, maxHp: 100, shield: 0, maxShield: 50, damage: 10, critChance: 0.05, lootEfficiency: 1, rarity: 'common', upgrades: { damage: 0, shield: 0, crit: 0, loot: 0 } },
+        isRetributionActive: ex.isRetributionActive || false,
+        isFatigueActive: ex.isFatigueActive || false,
+        voidResources: v.voidResources || { minerals: 0, energy: 0, food: 0, tech: 0, meds: 0 },
+        voidCompactedResources: v.voidCompactedResources || {},
+        voidPOIsInspiration: v.voidPOIsInspiration || {},
+        isVoidWarActive: v.isVoidWarActive || false,
+        voidWarProgress: v.voidWarProgress || { currentSector: 1, currentBattle: 1 },
+        robotRepairProgress: v.robotRepairProgress || 0,
+        isRobotRepaired: v.isRobotRepaired || false
+      },
+      missions: {
+        missions: g.missions || [],
+        historyStats: g.historyStats || {},
+        unlockedAchievements: g.unlockedAchievements || [],
+        achievementProgress: g.achievementProgress || {},
+        skillLendariaLevel: sk.skillLendariaLevel || { Solar: 0, Interstellar: 0 },
+        skillMiticaLevel: sk.skillMiticaLevel || { Solar: 0, Interstellar: 0 },
+        skillAlienLevel: sk.skillAlienLevel || { Solar: 0, Interstellar: 0 },
+        skillTempoDinheiroLevel: sk.skillTempoDinheiroLevel || { Solar: 0, Interstellar: 0 },
+        skillRobosOlimpicosLevel: sk.skillRobosOlimpicosLevel || { Solar: 0, Interstellar: 0 },
+        missionRewardLevel: g.missionRewardLevel || { Solar: 0, Interstellar: 0 },
+        missionMythicBonus: g.missionMythicBonus || 0,
+        missionAlienBonus: g.missionAlienBonus || 0,
+        missionLegendaryBonus: g.missionLegendaryBonus || 0,
+        autoClaimMissions: g.autoClaimMissions || false,
+        radarUnlocked: (() => {
+          const radar = g.radarUnlocked || {};
+          const normalized: any = {};
+          Object.keys(radar).forEach(k => {
+            const normalizedKey = k.charAt(0).toUpperCase() + k.slice(1);
+            normalized[normalizedKey] = radar[k];
+          });
+          return normalized;
+        })(),
+        completedInitialMissions: g.completedInitialMissions || [],
+        lastScanTime: g.lastScanTime || 0
+      },
+      earth: {
+        population: er.earthPopulation || 0,
+        maleRatio: er.earthMaleRatio || 0.5,
+        biodiversity: er.earthBiodiversity || 0,
+        health: er.earthHealth || 0,
+        happiness: er.earthHappiness || 0,
+        security: er.earthSecurity || 0,
+        qualityOfLife: er.earthQualityOfLife || 0,
+        season: 0,
+        events: er.earthEvents || [],
+        reconstructionProgress: er.earthReconstructionProgress || {},
+        couples: er.earthCouples || 0,
+        birthRegistry: er.earthBirthRegistry || {},
+        projectBoostCount: 0
+      },
+      system: {
+        seenTutorials: g.seenTutorials || {},
+        arcadeScores: rawData.arcadeScores || {},
+        localRecords: rawData.localRecords || [],
+        hasSeenRoute2UnlockMessage: g.hasSeenRoute2UnlockMessage || false,
+        playerName: g.playerName || '',
+      }
     };
+
   }
 };
