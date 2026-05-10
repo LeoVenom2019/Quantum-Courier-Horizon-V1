@@ -1,5 +1,5 @@
 import React from 'react';
-import { motion } from 'framer-motion';
+import { motion } from 'motion/react';
 import { Zap, Database, Cpu, Coffee, Activity, Globe } from 'lucide-react';
 
 interface VoidEarthProps {

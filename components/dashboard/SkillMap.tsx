@@ -1,5 +1,5 @@
 import React from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'motion/react';
 import { LogOut, Trophy, Zap, Globe, Clock, Pickaxe, Coins } from 'lucide-react';
 
 interface Skill {

@@ -1,5 +1,5 @@
 import React from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'motion/react';
 import { Zap, Database, Cpu, Coffee, Activity, ChevronRight, MousePointer2, Coins } from 'lucide-react';
 
 interface VoidPOI {

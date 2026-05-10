@@ -1,36 +1,26 @@
-import React from 'react';
-import { motion } from 'framer-motion';
+'use client';
+
+import React, { memo } from 'react';
+import { motion } from 'motion/react';
 import { Zap, Database, Coffee, Activity, Cpu, Home, Globe, Plane } from 'lucide-react';
+import { useDashboard } from './DashboardProvider';
 
-interface VoidWarCoreProps {
-  voidResources: { [key: string]: number };
-  voidCompactedResources: { [key: string]: number };
-  voidAutoShipmentUnlocked: boolean;
-  voidAutoShipmentActive: boolean;
-  setVoidAutoShipmentActive: (active: boolean) => void;
-  compactVoidResource: (id: any) => void;
-  sendCompactedToEarth: (id: any) => void;
-  buyVoidAutoShipment: () => void;
-  playSfx: (id: string) => void;
-  language: string;
-  t: (key: string) => string;
-  formatValue: (val: number) => string;
-}
+const VoidWarCore = () => {
+  const {
+    voidResources,
+    voidCompactedResources,
+    voidAutoShipmentUnlocked,
+    voidAutoShipmentActive,
+    setVoidAutoShipmentActive,
+    compactVoidResource,
+    sendCompactedToEarth,
+    buyVoidAutoShipment,
+    playSfx,
+    language,
+    t,
+    formatValue
+  } = useDashboard();
 
-const VoidWarCore: React.FC<VoidWarCoreProps> = ({
-  voidResources,
-  voidCompactedResources,
-  voidAutoShipmentUnlocked,
-  voidAutoShipmentActive,
-  setVoidAutoShipmentActive,
-  compactVoidResource,
-  sendCompactedToEarth,
-  buyVoidAutoShipment,
-  playSfx,
-  language,
-  t,
-  formatValue
-}) => {
   const reservoirs = [
     { id: 'energy', name: 'Células Quânticas', raw: 'Energia', icon: Zap, color: 'text-yellow-400', bg: 'bg-yellow-400/10', border: 'border-yellow-400/20' },
     { id: 'minerals', name: 'Núcleos Minerais Compactados', raw: 'Minérios', icon: Database, color: 'text-orange-400', bg: 'bg-orange-400/10', border: 'border-orange-400/20' },
@@ -62,12 +52,11 @@ const VoidWarCore: React.FC<VoidWarCoreProps> = ({
       </div>
 
       <div className="flex flex-row gap-4 flex-1 min-h-0 pb-1">
-        {/* Left Side: 2x3 Grid */}
         <div className="w-1/2 h-full">
           <div className="grid grid-cols-2 grid-rows-3 gap-2 h-full">
             {reservoirs.map(res => {
-              const rawAmount = voidResources[res.id];
-              const compactedAmount = voidCompactedResources[res.id];
+              const rawAmount = voidResources[res.id] || 0;
+              const compactedAmount = voidCompactedResources[res.id] || 0;
               const canCompact = rawAmount >= 50000;
 
               return (
@@ -106,10 +95,7 @@ const VoidWarCore: React.FC<VoidWarCoreProps> = ({
 
                     <div className="flex gap-2">
                       <button
-                        onClick={() => {
-                          compactVoidResource(res.id);
-                          playSfx('target_up_2');
-                        }}
+                        onClick={() => compactVoidResource(res.id)}
                         disabled={!canCompact}
                         className={`flex-1 py-1 rounded-lg font-orbitron font-bold text-[10px] uppercase tracking-widest transition-all active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed ${
                           canCompact ? 'bg-white text-black shadow-lg' : 'bg-white/5 text-white/40 border border-white/10'
@@ -118,10 +104,7 @@ const VoidWarCore: React.FC<VoidWarCoreProps> = ({
                         {t('compact')}
                       </button>
                       <button
-                        onClick={() => {
-                          sendCompactedToEarth(res.id);
-                          playSfx('laser_up');
-                        }}
+                        onClick={() => sendCompactedToEarth(res.id)}
                         disabled={compactedAmount <= 0}
                         className={`flex-1 py-1 rounded-lg font-orbitron font-bold text-[10px] uppercase tracking-widest transition-all active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed border ${
                           compactedAmount > 0 ? 'bg-cyan-600 border-cyan-400 text-white shadow-[0_0_8px_rgba(6,182,212,0.4)]' : 'bg-white/5 border-white/10 text-white/40'
@@ -135,7 +118,6 @@ const VoidWarCore: React.FC<VoidWarCoreProps> = ({
               );
             })}
 
-            {/* 6th Card: Drones de Auto Envio */}
             <div className={`glass-panel border p-2 rounded-xl flex flex-col gap-1.5 transition-all relative overflow-hidden ${voidAutoShipmentUnlocked ? 'border-blue-500/40 bg-blue-500/10' : 'border-white/5 bg-white/5 hover:border-white/20'}`}>
               <div className="flex justify-between items-start">
                 <div className="flex items-center gap-2">
@@ -198,10 +180,8 @@ const VoidWarCore: React.FC<VoidWarCoreProps> = ({
           </div>
         </div>
 
-        {/* Right Side: Video Player */}
         <div className="w-1/2 h-full">
           <div className="h-full glass-panel border-2 border-white/10 rounded-2xl relative overflow-hidden shadow-2xl bg-black">
-            {/* Scanlines Overlay */}
             <div className="absolute inset-0 pointer-events-none z-10 bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06))] bg-[length:100%_4px,3px_100%] opacity-20" />
             
             <video 
@@ -215,7 +195,6 @@ const VoidWarCore: React.FC<VoidWarCoreProps> = ({
 
             <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/20" />
 
-            {/* Data Overlay UI */}
             <div className="absolute top-4 left-4 right-4 flex justify-between items-start z-20">
               <div className="flex flex-col gap-1">
                 <div className="flex items-center gap-2 text-cyan-400">
@@ -253,4 +232,4 @@ const VoidWarCore: React.FC<VoidWarCoreProps> = ({
   );
 };
 
-export default React.memo(VoidWarCore);
+export default memo(VoidWarCore);

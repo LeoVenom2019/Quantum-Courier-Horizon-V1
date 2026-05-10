@@ -1,5 +1,5 @@
 import React from 'react';
-import { motion } from 'framer-motion';
+import { motion } from 'motion/react';
 
 interface Goal {
   id: string;
@@ -17,7 +17,7 @@ interface EconomicGoalsProps {
 
 const EconomicGoals: React.FC<EconomicGoalsProps> = ({ goals, isInterstellar }) => {
   return (
-    <div className="space-y-6">
+    <div className="space-y-3">
       {goals.map((goal) => (
         <div key={goal.id} className="space-y-2">
           <div className="flex justify-between items-end">

@@ -1,5 +1,5 @@
 import React from 'react';
-import { motion } from 'framer-motion';
+import { motion } from 'motion/react';
 import { Globe, Clock, Users, Activity, History as HistoryIcon } from 'lucide-react';
 
 interface EarthSidebarProps {
