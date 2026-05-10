@@ -43,6 +43,8 @@ export interface Route {
     route2Unlocked?: boolean;
     route3Unlocked?: boolean;
   };
+  description?: string;
+  difficulty?: 'Easy' | 'Medium' | 'Hard';
 }
 
 export interface VoidAircraft {
@@ -453,6 +455,7 @@ export interface ExtractionPoint {
   cost: number;
   researchTime: number; // in milliseconds
   valuePerPack: number;
+  tier: 'Solar' | 'Interstellar' | 'Void';
 }
 
 export const EXTRACTION_POINTS: ExtractionPoint[] = [
@@ -465,6 +468,7 @@ export const EXTRACTION_POINTS: ExtractionPoint[] = [
     cost: 500000000, // 500 Mi
     researchTime: 600000, // 10 minutes
     valuePerPack: 25000000, // 25 Mi
+    tier: 'Interstellar',
   },
   {
     id: 'ext-2',
@@ -475,6 +479,7 @@ export const EXTRACTION_POINTS: ExtractionPoint[] = [
     cost: 2500000000, // 2.5 Bi
     researchTime: 900000, // 15 minutes
     valuePerPack: 100000000, // 100 Mi
+    tier: 'Interstellar',
   },
   {
     id: 'ext-3',
@@ -485,6 +490,7 @@ export const EXTRACTION_POINTS: ExtractionPoint[] = [
     cost: 10000000000, // 10 Bi
     researchTime: 1200000, // 20 minutes
     valuePerPack: 500000000, // 500 Mi
+    tier: 'Interstellar',
   },
   {
     id: 'ext-4',
@@ -495,6 +501,7 @@ export const EXTRACTION_POINTS: ExtractionPoint[] = [
     cost: 50000000000, // 50 Bi
     researchTime: 1500000, // 25 minutes
     valuePerPack: 2500000000, // 2.5 Bi
+    tier: 'Interstellar',
   },
   {
     id: 'ext-5',
@@ -505,6 +512,7 @@ export const EXTRACTION_POINTS: ExtractionPoint[] = [
     cost: 200000000000, // 200 Bi
     researchTime: 1800000, // 30 minutes
     valuePerPack: 10000000000, // 10 Bi
+    tier: 'Interstellar',
   },
   {
     id: 'ext-6',
@@ -515,6 +523,7 @@ export const EXTRACTION_POINTS: ExtractionPoint[] = [
     cost: 400000000, // 400 Mi
     researchTime: 2400000, // 40 minutes
     valuePerPack: 175000, // 175k (Decreased by 99% again for balance)
+    tier: 'Interstellar',
   },
   {
     id: 'ext-7',
@@ -525,6 +534,7 @@ export const EXTRACTION_POINTS: ExtractionPoint[] = [
     cost: 500000000, // 500 Mi
     researchTime: 3000000, // 50 minutes
     valuePerPack: 200000, // 200k (Decreased by 99% again for balance)
+    tier: 'Interstellar',
   },
   {
     id: 'ext-8',
@@ -535,6 +545,7 @@ export const EXTRACTION_POINTS: ExtractionPoint[] = [
     cost: 600000000, // 600 Mi
     researchTime: 3600000, // 60 minutes
     valuePerPack: 225000, // 225k (Decreased by 99% again for balance)
+    tier: 'Interstellar',
   },
   {
     id: 'ext-9',
@@ -545,6 +556,7 @@ export const EXTRACTION_POINTS: ExtractionPoint[] = [
     cost: 750000000, // 750 Mi
     researchTime: 4500000, // 75 minutes
     valuePerPack: 250000, // 250k (Decreased by 99% again for balance)
+    tier: 'Interstellar',
   },
 ];
 
@@ -588,7 +600,7 @@ export const VOID_AIRCRAFT: VoidAircraft[] = [
     rareChance: 0.05,
     missionTime: 150000, // 2.5 min
     description: 'Uma aeronave leve e ágil, ideal para incursões rápidas em zonas de baixa densidade.',
-    image: '/images/ships/seeker-alpha.png',
+    image: '/images/ships/seeker-alpha.webp',
     video: '/videos/ships/seeker-alpha.webm'
   },
   {
@@ -599,7 +611,7 @@ export const VOID_AIRCRAFT: VoidAircraft[] = [
     rareChance: 0.10,
     missionTime: 210000, // 3.5 min
     description: 'Projetada para transporte de carga pesada, com sistemas de filtragem de recursos aprimorados.',
-    image: '/images/ships/collector-beta.png',
+    image: '/images/ships/collector-beta.webp',
     video: '/videos/ships/collector-beta.webm'
   },
   {
@@ -610,7 +622,7 @@ export const VOID_AIRCRAFT: VoidAircraft[] = [
     rareChance: 0.25,
     missionTime: 270000, // 4.5 min
     description: 'Equipada com sensores de longo alcance e tecnologia de ocultação para encontrar o que outros ignoram.',
-    image: '/images/ships/ghost-gamma.png',
+    image: '/images/ships/ghost-gamma.webp',
     video: '/videos/ships/ghost-gamma.webm'
   }
 ];
@@ -667,7 +679,7 @@ export const SHIPS: Ship[] = [
     cost: 0,
     tier: 'Solar',
     color: 'text-cyan-400',
-    image: '/images/ships/atlas-courier.png'
+    image: '/images/ships/atlas-courier.webp'
   },
   {
     level: 2,
@@ -680,7 +692,7 @@ export const SHIPS: Ship[] = [
     cost: 10000,
     tier: 'Solar',
     color: 'text-blue-400',
-    image: '/images/ships/lunar-runner.png'
+    image: '/images/ships/lunar-runner.webp'
   },
   {
     level: 3,
@@ -693,7 +705,7 @@ export const SHIPS: Ship[] = [
     cost: 50000,
     tier: 'Solar',
     color: 'text-yellow-400',
-    image: '/images/ships/solar-swift.png'
+    image: '/images/ships/solar-swift.webp'
   },
   {
     level: 4,
@@ -706,7 +718,7 @@ export const SHIPS: Ship[] = [
     cost: 200000,
     tier: 'Solar',
     color: 'text-red-400',
-    image: '/images/ships/red-horizon.png'
+    image: '/images/ships/red-horizon.webp'
   },
   {
     level: 5,
@@ -719,7 +731,7 @@ export const SHIPS: Ship[] = [
     cost: 1000000,
     tier: 'Solar',
     color: 'text-orange-400',
-    image: '/images/ships/helios-freighter.png'
+    image: '/images/ships/helios-freighter.webp'
   },
   {
     level: 6,
@@ -732,7 +744,7 @@ export const SHIPS: Ship[] = [
     cost: 5000000,
     tier: 'Solar',
     color: 'text-purple-400',
-    image: '/images/ships/jovian-hauler.png'
+    image: '/images/ships/jovian-hauler.webp'
   },
   {
     level: 7,
@@ -745,7 +757,7 @@ export const SHIPS: Ship[] = [
     cost: 25000000,
     tier: 'Solar',
     color: 'text-amber-400',
-    image: '/images/ships/titan-carrier.png'
+    image: '/images/ships/titan-carrier.webp'
   },
   {
     level: 8,
@@ -758,7 +770,7 @@ export const SHIPS: Ship[] = [
     cost: 100000000,
     tier: 'Solar',
     color: 'text-indigo-400',
-    image: '/images/ships/void-strider.png'
+    image: '/images/ships/void-strider.webp'
   },
   {
     level: 9,
@@ -771,7 +783,7 @@ export const SHIPS: Ship[] = [
     cost: 500000000,
     tier: 'Solar',
     color: 'text-teal-400',
-    image: '/images/ships/neptune-vanguard.png'
+    image: '/images/ships/neptune-vanguard.webp'
   },
 
   // ROTA 2: Interstellar
@@ -786,7 +798,7 @@ export const SHIPS: Ship[] = [
     cost: 0,
     tier: 'Interstellar',
     color: 'text-pink-400',
-    image: '/images/ships/pulsar-i.png'
+    image: '/images/ships/pulsar-i.webp'
   },
   {
     level: 2,
@@ -799,7 +811,7 @@ export const SHIPS: Ship[] = [
     cost: 50000000,
     tier: 'Interstellar',
     color: 'text-rose-600',
-    image: '/images/ships/pulsar-ii.png'
+    image: '/images/ships/pulsar-ii.webp'
   },
   {
     level: 3,
@@ -812,7 +824,7 @@ export const SHIPS: Ship[] = [
     cost: 250000000,
     tier: 'Interstellar',
     color: 'text-violet-300',
-    image: '/images/ships/nebula-runner.png'
+    image: '/images/ships/nebula-runner.webp'
   },
   {
     level: 4,
@@ -825,7 +837,7 @@ export const SHIPS: Ship[] = [
     cost: 1000000000,
     tier: 'Interstellar',
     color: 'text-green-300',
-    image: '/images/ships/orion-vx.png'
+    image: '/images/ships/orion-vx.webp'
   },
   {
     level: 5,
@@ -838,7 +850,7 @@ export const SHIPS: Ship[] = [
     cost: 5000000000,
     tier: 'Interstellar',
     color: 'text-yellow-300',
-    image: '/images/ships/quasar-light.png'
+    image: '/images/ships/quasar-light.webp'
   },
   {
     level: 6,
@@ -851,7 +863,7 @@ export const SHIPS: Ship[] = [
     cost: 20000000000,
     tier: 'Interstellar',
     color: 'text-pink-200',
-    image: '/images/ships/zenith-core.png'
+    image: '/images/ships/zenith-core.webp'
   },
   {
     level: 7,
@@ -864,7 +876,7 @@ export const SHIPS: Ship[] = [
     cost: 100000000000,
     tier: 'Interstellar',
     color: 'text-red-500',
-    image: '/images/ships/nova-striker.png'
+    image: '/images/ships/nova-striker.webp'
   },
   {
     level: 8,
@@ -877,7 +889,7 @@ export const SHIPS: Ship[] = [
     cost: 500000000000,
     tier: 'Interstellar',
     color: 'text-sky-300',
-    image: '/images/ships/eclipse-prime.png'
+    image: '/images/ships/eclipse-prime.webp'
   },
   {
     level: 9,
@@ -890,7 +902,7 @@ export const SHIPS: Ship[] = [
     cost: 2500000000000,
     tier: 'Interstellar',
     color: 'text-lime-400',
-    image: '/images/ships/infinity-drive.png'
+    image: '/images/ships/infinity-drive.webp'
   },
   {
     level: 1,
