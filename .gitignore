@@ -8,3 +8,6 @@ coverage/
 
 # Vorathon Bridge Folder
 Vorathon - Não usar essa pasta para upar no git hub da QCH/
+
+# Exclude HTML reference folder from Tailwind v4 scanner
+HTML QCH VERIFICAR/
