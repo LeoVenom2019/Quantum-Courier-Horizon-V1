@@ -14,7 +14,7 @@ const michroma = Michroma({
 });
 
 const inter = Inter({
-  subsets: ['latin'],
+  subsets: ['latin', 'latin-ext'],
   variable: '--font-sans',
 });
 
@@ -23,10 +23,16 @@ export const metadata: Metadata = {
   description: 'Space Delivery Management Game',
 };
 
+import { GameProvider } from '@/lib/game-state';
+
 export default function RootLayout({children}: {children: React.ReactNode}) {
   return (
-    <html lang="en" className={`${orbitron.variable} ${inter.variable} ${michroma.variable}`}>
-      <body suppressHydrationWarning className="bg-black text-white font-sans overflow-hidden">{children}</body>
+    <html lang="pt-BR" className={`${orbitron.variable} ${inter.variable} ${michroma.variable}`}>
+      <body suppressHydrationWarning className="bg-black text-white font-sans overflow-hidden">
+        <GameProvider>
+          {children}
+        </GameProvider>
+      </body>
     </html>
   );
 }

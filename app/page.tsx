@@ -234,7 +234,7 @@ const SpaceShip = ({
   
   // Logic to choose Left/Right asset
   const isMovingRight = end.x > start.x;
-  const currentPath = `${shipType.basePath}_${isMovingRight ? 'right' : 'left'}.png`;
+  const currentPath = `${shipType.basePath}_${isMovingRight ? 'right' : 'left'}.webp`;
   // If moving left, the asset already points 180deg, so we rotate relative to that
   const displayRotation = isMovingRight ? angle : angle - 180;
 
@@ -304,7 +304,7 @@ const SpaceShip = ({
             className="object-contain"
             onError={(e) => {
               // Fallback to _right if _left is not yet available
-              (e.target as HTMLImageElement).src = `${shipType.basePath}_right.png?v=2`;
+              (e.target as HTMLImageElement).src = `${shipType.basePath}_right.webp?v=2`;
             }}
             style={{ 
               width: shipType.size.w * finalScale, 
@@ -468,7 +468,7 @@ const MoonVisual = () => {
         className="relative z-20 w-72 h-72"
       >
         <img 
-          src="/cinematic_moon_asset_qch_1777340494996.png" 
+          src="/cinematic_moon_asset_qch_1777340494996.webp" 
           alt="Moon"
           className="w-full h-full object-contain"
           style={{ mixBlendMode: 'screen' }}
@@ -502,7 +502,7 @@ const EarthVisual = () => {
         className="relative z-20 w-80 h-80"
       >
         <img 
-          src="/cinematic_earth_asset_qch_1777340390078.png" 
+          src="/cinematic_earth_asset_qch_1777340390078.webp" 
           alt="Earth"
           className="w-full h-full object-contain"
           style={{ mixBlendMode: 'screen' }}
@@ -536,7 +536,7 @@ const SaturnVisual = () => {
         className="relative z-20 w-[450px] h-80"
       >
         <img 
-          src="/cinematic_saturn_asset_qch_1777340512619.png" 
+          src="/cinematic_saturn_asset_qch_1777340512619.webp" 
           alt="Saturn"
           className="w-full h-full object-contain"
           style={{ mixBlendMode: 'screen' }}
@@ -569,7 +569,7 @@ const MuskVisual = () => (
       className="relative z-20 w-56 h-56"
     >
       <img 
-        src="/cinematic_x_asset_qch_1777340742793.png" 
+        src="/cinematic_x_asset_qch_1777340742793.webp" 
         alt="X Logo"
         className="w-full h-full object-contain"
         style={{ mixBlendMode: 'screen' }}
@@ -598,7 +598,7 @@ const BlackHoleVisual = () => {
         className="relative z-20 w-full h-full p-10"
       >
         <img 
-          src="/cinematic_blackhole_asset_qch_1777340542328.png" 
+          src="/cinematic_blackhole_asset_qch_1777340542328.webp" 
           alt="Black Hole"
           className="w-full h-full object-contain"
           style={{ mixBlendMode: 'screen' }}
@@ -629,7 +629,7 @@ const SunVisual = () => (
       className="relative z-20 w-80 h-80"
     >
       <img 
-        src="/cinematic_sun_asset_qch_1777340630570.png" 
+        src="/cinematic_sun_asset_qch_1777340630570.webp" 
         alt="Sun"
         className="w-full h-full object-contain"
         style={{ mixBlendMode: 'screen' }}
@@ -658,7 +658,7 @@ const RobotVisual = () => (
       className="relative z-20 w-64 h-64"
     >
       <img 
-        src="/cinematic_robot_asset_qch_1777340647368.png" 
+        src="/cinematic_robot_asset_qch_1777340647368.webp" 
         alt="Robot"
         className="w-full h-full object-contain"
         style={{ mixBlendMode: 'screen' }}
@@ -688,7 +688,7 @@ const ChessBoardVisual = () => (
       className="relative z-20 w-80 h-80"
     >
       <img 
-        src="/cinematic_chessboard_asset_qch_1777340695618.png" 
+        src="/cinematic_chessboard_asset_qch_1777340695618.webp" 
         alt="Chess Board"
         className="w-full h-full object-contain"
         style={{ mixBlendMode: 'screen' }}
@@ -718,7 +718,7 @@ const AlienVisual = () => (
       className="relative z-20 w-80 h-80"
     >
       <img 
-        src="/cinematic_alien_asset_qch_1777340712376.png" 
+        src="/cinematic_alien_asset_qch_1777340712376.webp" 
         alt="Alien"
         className="w-full h-full object-contain"
         style={{ mixBlendMode: 'screen' }}
@@ -1168,14 +1168,45 @@ export default function GameHome() {
   };
 
   const handleResetProgress = async () => {
-    await GameStorage.remove('time_travel_save');
-    setHasSave(false);
-    setPlayerName('');
-    setIsRoute2Unlocked(false);
-    setUnlockedAchievements([]);
-    setAchievementProgress({});
-    setShowResetConfirm(false);
-    setShowOptions(false);
+    try {
+      playSfx('aba_click');
+      setIsShaking(true);
+      setTimeout(() => setIsShaking(false), 500);
+
+      const keys = ['time_travel_save', 'speed_run_save', 'colonies_data', 'history_data', 'game_theme_index', 'qch_settings'];
+      for (const key of keys) {
+        await GameStorage.remove(key);
+        localStorage.removeItem(key);
+      }
+      localStorage.clear();
+      
+      // Reset all local states reactively
+      setHasSave(false);
+      setPlayerName('');
+      setIsRoute2Unlocked(false);
+      setUnlockedAchievements([]);
+      setAchievementProgress({});
+      setLocalRecords([]);
+      setCurrentThemeIndex(0); // Reset to default Cyan theme
+      
+      // Reset sound settings to defaults
+      updateSettings({
+        masterMusicOn: true,
+        masterMusicVolume: 0.5,
+        masterSfxOn: true,
+        masterSfxVolume: 0.5,
+      });
+
+      // Close modals
+      setShowResetConfirm(false);
+      setShowOptions(false);
+      
+      console.log("Progress reset successfully without reload.");
+    } catch (err) {
+      console.error("Reset failed:", err);
+      // Fallback only if critical failure
+      window.location.reload();
+    }
   };
 
   const handleExportSave = async () => {
@@ -1218,203 +1249,199 @@ export default function GameHome() {
     reader.readAsText(file);
   };
 
-  if (view === 'narrative') {
-    return (
-      <IntroNarrative 
-        onComplete={() => setView('game')} 
-        onCancel={() => setView('landing')}
-        language={language} 
-        playerName={playerName}
-        setPlayerName={setPlayerName}
-        sfxOn={masterSfxOn}
-      />
-    );
-  }
-
-  if (view === 'game') {
-    return (
-      <GameDashboard 
-        language={language} 
-        musicOn={masterMusicOn} 
-        sfxOn={masterSfxOn} 
-        setLanguage={setLanguage}
-        setMusicOn={(val) => updateSettings({ masterMusicOn: val })}
-        setSfxOn={(val) => updateSettings({ masterSfxOn: val })}
-        playerName={playerName}
-        onReturnToMenu={async () => {
-          setView('landing');
-          jukeboxState.stop();
-          const hasSavedGame = await GameStorage.load('time_travel_save');
-          setHasSave(!!hasSavedGame);
-          
-          // Refresh Route 2 status
-          const saved = await GameStorage.load('time_travel_save');
-          if (saved) {
-            try {
-              const data = saved;
-              const unlocked = data.routeTier === 'Interstellar' || (data.unlockedTechLevels?.Solar >= 9);
-              setIsRoute2Unlocked(unlocked);
-              if (unlocked) {
-                const savedThemeIndex = await GameStorage.load('game_theme_index');
-                if (savedThemeIndex === null || savedThemeIndex === undefined) {
-                  setCurrentThemeIndex(3); // Default to Saturn (orange) if unlocked
-                }
-              }
-            } catch (e) {}
-          }
-
-          // Refresh local records when returning to menu
-          const savedRecords = await GameStorage.load('speed_run_records');
-          if (savedRecords) {
-            try {
-              setLocalRecords(savedRecords);
-            } catch (e) {
-              setLocalRecords([]);
-            }
-          }
-        }}
-        currentThemeIndex={currentThemeIndex}
-        jukebox={jukeboxState}
-      />
-    );
-  }
-
   const tl = (en: string, pt: string) => t(language, en, pt);
 
   return (
-    <main className={`relative min-h-screen w-full flex flex-col items-start justify-center pl-12 md:pl-24 bg-[#050510] overflow-hidden `}>
-      {/* Glitch Overlay for Code */}
-      
-      {/* Background Elements (Vacuum Focus) */}
-      <StarField theme={theme} />
-      
-      {/* Meteors */}
-      <Meteor delay={2} theme={theme} />
-      <Meteor delay={7} theme={theme} />
-      <Meteor delay={12} theme={theme} />
-      
-      {/* Animated Ships */}
-      <SpaceTraffic />
+    <motion.main 
+      animate={isShaking ? { 
+        x: [-2, 2, -2, 2, 0],
+        rotate: [-0.5, 0.5, -0.5, 0.5, 0]
+      } : {}}
+      transition={{ duration: 0.4 }}
+      className={`relative min-h-screen w-full flex flex-col ${view === 'game' ? 'items-stretch justify-start' : 'items-start justify-center pl-12 md:pl-24'} bg-[#050510] overflow-hidden `}
+    >
+      {view === 'narrative' ? (
+        <IntroNarrative 
+          onComplete={() => setView('game')} 
+          onCancel={() => setView('landing')}
+          language={language} 
+          playerName={playerName}
+          setPlayerName={setPlayerName}
+          sfxOn={masterSfxOn}
+        />
+      ) : view === 'game' ? (
+        <GameDashboard 
+          language={language} 
+          musicOn={masterMusicOn} 
+          sfxOn={masterSfxOn} 
+          setLanguage={setLanguage}
+          setMusicOn={(val) => updateSettings({ masterMusicOn: val })}
+          setSfxOn={(val) => updateSettings({ masterSfxOn: val })}
+          playerName={playerName}
+          onReturnToMenu={async () => {
+            setView('landing');
+            jukeboxState.stop();
+            const hasSavedGame = await GameStorage.load('time_travel_save');
+            setHasSave(!!hasSavedGame);
+            
+            // Refresh Route 2 status
+            const saved = await GameStorage.load('time_travel_save');
+            if (saved) {
+              try {
+                const data = saved;
+                const unlocked = data.routeTier === 'Interstellar' || (data.unlockedTechLevels?.Solar >= 9);
+                setIsRoute2Unlocked(unlocked);
+                if (unlocked) {
+                  const savedThemeIndex = await GameStorage.load('game_theme_index');
+                  if (savedThemeIndex === null || savedThemeIndex === undefined) {
+                    setCurrentThemeIndex(3); // Default to Saturn (orange) if unlocked
+                  }
+                }
+              } catch (e) {}
+            }
 
-      {/* Random Visual Event (Stripped of Glows) */}
-      <AnimatePresence mode="wait">
-        {randomVisual && (
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.95 }}
-            transition={{ duration: 1 }}
-            className="absolute top-1/2 right-[10%] md:right-[15%] -translate-y-1/2 z-10 pointer-events-none hidden md:flex"
-          >
-            {randomVisual}
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-
-      {/* Futuristic Frame */}
-      <div className={`absolute inset-4 border ${theme === 'cyan' ? 'border-cyan-500/20' : 'border-orange-500/20'} pointer-events-none z-50`}>
-        <div className={`absolute top-0 left-0 w-32 h-32 border-t-4 border-l-4 ${theme === 'cyan' ? 'border-cyan-500/40' : 'border-orange-500/40'} rounded-tl-3xl`} />
-        <div className={`absolute top-0 right-0 w-32 h-32 border-t-4 border-r-4 ${theme === 'cyan' ? 'border-cyan-500/40' : 'border-orange-500/40'} rounded-tr-3xl`} />
-        <div className={`absolute bottom-0 left-0 w-32 h-32 border-b-4 border-l-4 ${theme === 'cyan' ? 'border-cyan-500/40' : 'border-orange-500/40'} rounded-bl-3xl`} />
-        <div className={`absolute bottom-0 right-0 w-32 h-32 border-b-4 border-r-4 ${theme === 'cyan' ? 'border-cyan-500/40' : 'border-orange-500/40'} rounded-br-3xl`} />
-        
-        {/* HUD Elements */}
-        <div className="absolute top-8 left-1/2 -translate-x-1/2 flex gap-8">
-          <div className={`h-1 w-24 ${theme === 'cyan' ? 'bg-cyan-500/30' : 'bg-orange-500/30'} rounded-full`} />
-          <div className="h-1 w-48 bg-pink-500/30 rounded-full" />
-          <div className={`h-1 w-24 ${theme === 'cyan' ? 'bg-cyan-500/30' : 'bg-orange-500/30'} rounded-full`} />
-        </div>
-      </div>
-
-      {/* Content */}
-      <div className="relative z-20 flex flex-col items-start gap-8 max-w-4xl w-full px-4">
-        {/* Title Section */}
-        <motion.div
-          initial={{ x: -50, opacity: 0 }}
-          animate={{ x: 0, opacity: 1 }}
-          transition={{ duration: 1, ease: "easeOut" }}
-          className="text-left relative"
-        >
-          {/* Decorative Elements Removed */}
+            // Refresh local records when returning to menu
+            const savedRecords = await GameStorage.load('speed_run_records');
+            if (savedRecords) {
+              try {
+                setLocalRecords(savedRecords);
+              } catch (e) {
+                setLocalRecords([]);
+              }
+            }
+          }}
+          currentThemeIndex={currentThemeIndex}
+          jukebox={jukeboxState}
+        />
+      ) : (
+        <>
+          {/* Background Elements (Vacuum Focus) */}
+          <StarField theme={theme} />
           
-          <motion.h1 
-            whileHover={{ scale: 1.02 }}
-            transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-            className="font-michroma tracking-tighter leading-tight flex flex-col items-start relative group cursor-default"
-          >
-            {/* Background Depth Layer */}
-            <div className="absolute inset-0 blur-2xl opacity-20 pointer-events-none select-none">
-              <span className="text-4xl md:text-6xl text-pink-500 block">
-                {tl('QUANTUM COURIER', 'QUANTUM COURIER')}
-              </span>
-              <span className={`text-3xl md:text-5xl ${theme === 'cyan' ? 'text-cyan-500' : 'text-orange-500'} block`}>
-                {tl('HORIZON', 'HORIZON')}
-              </span>
-            </div>
+          {/* Meteors */}
+          <Meteor delay={2} theme={theme} />
+          <Meteor delay={7} theme={theme} />
+          <Meteor delay={12} theme={theme} />
+          
+          {/* Animated Ships */}
+          <SpaceTraffic />
 
-            <span className="text-4xl md:text-6xl text-transparent bg-clip-text bg-gradient-to-b from-white via-pink-200 to-pink-500 drop-shadow-[0_0_15px_rgba(219,39,119,0.6)] relative z-10">
-              <span className="absolute inset-0 shimmer-text opacity-70 pointer-events-none">
-                {tl('QUANTUM COURIER', 'QUANTUM COURIER')}
-              </span>
-              {tl('QUANTUM COURIER', 'QUANTUM COURIER')}
-            </span>
-            <div className="relative inline-block">
-              <span className={`text-3xl md:text-5xl text-transparent bg-clip-text bg-gradient-to-b from-white ${theme === 'cyan' ? 'via-cyan-200 to-cyan-500 drop-shadow-[0_0_15px_rgba(6,182,212,0.6)]' : 'via-orange-200 to-orange-500 drop-shadow-[0_0_15px_rgba(249,115,22,0.6)]'} relative z-10`}>
-                <span className="absolute inset-0 shimmer-text opacity-70 pointer-events-none">
-                  {tl('HORIZON', 'HORIZON')}
-                </span>
-                {tl('HORIZON', 'HORIZON')}
-              </span>
-              
-              {/* Decorative underline restricted to HORIZON */}
+          {/* Random Visual Event (Stripped of Glows) */}
+          <AnimatePresence mode="wait">
+            {randomVisual && (
               <motion.div 
-                initial={{ width: 0 }}
-                animate={{ width: '100%' }}
-                transition={{ delay: 1.5, duration: 1 }}
-                className={`h-0.5 mt-1 z-10 ${theme === 'cyan' ? 'bg-cyan-500 shadow-[0_0_15px_rgba(6,182,212,1)]' : 'bg-orange-500 shadow-[0_0_15px_rgba(249,115,22,1)]'}`}
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                transition={{ duration: 1 }}
+                className="absolute top-1/2 right-[10%] md:right-[15%] -translate-y-1/2 z-10 pointer-events-none hidden md:flex"
+              >
+                {randomVisual}
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+
+          {/* Futuristic Frame */}
+          <div className={`absolute inset-4 border ${theme === 'cyan' ? 'border-cyan-500/20' : 'border-orange-500/20'} pointer-events-none z-50`}>
+            <div className={`absolute top-0 left-0 w-32 h-32 border-t-4 border-l-4 ${theme === 'cyan' ? 'border-cyan-500/40' : 'border-orange-500/40'} rounded-tl-3xl`} />
+            <div className={`absolute top-0 right-0 w-32 h-32 border-t-4 border-r-4 ${theme === 'cyan' ? 'border-cyan-500/40' : 'border-orange-500/40'} rounded-tr-3xl`} />
+            <div className={`absolute bottom-0 left-0 w-32 h-32 border-b-4 border-l-4 ${theme === 'cyan' ? 'border-cyan-500/40' : 'border-orange-500/40'} rounded-bl-3xl`} />
+            <div className={`absolute bottom-0 right-0 w-32 h-32 border-b-4 border-r-4 ${theme === 'cyan' ? 'border-cyan-500/40' : 'border-orange-500/40'} rounded-br-3xl`} />
+            
+            {/* HUD Elements */}
+            <div className="absolute top-8 left-1/2 -translate-x-1/2 flex gap-8">
+              <div className={`h-1 w-24 ${theme === 'cyan' ? 'bg-cyan-500/30' : 'bg-orange-500/30'} rounded-full`} />
+              <div className="h-1 w-48 bg-pink-500/30 rounded-full" />
+              <div className={`h-1 w-24 ${theme === 'cyan' ? 'bg-cyan-500/30' : 'bg-orange-500/30'} rounded-full`} />
+            </div>
+          </div>
+
+          {/* Content */}
+          <div className="relative z-20 flex flex-col items-start gap-8 max-w-4xl w-full px-4">
+            {/* Title Section */}
+            <motion.div
+              initial={{ x: -50, opacity: 0 }}
+              animate={{ x: 0, opacity: 1 }}
+              transition={{ duration: 1, ease: "easeOut" }}
+              className="text-left relative"
+            >
+              <motion.h1 
+                whileHover={{ scale: 1.02 }}
+                transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+                className="font-michroma tracking-tighter leading-tight flex flex-col items-start relative group cursor-default"
+              >
+                {/* Background Depth Layer */}
+                <div className="absolute inset-0 blur-2xl opacity-20 pointer-events-none select-none">
+                  <span className="text-4xl md:text-6xl text-pink-500 block">
+                    {tl('QUANTUM COURIER', 'QUANTUM COURIER')}
+                  </span>
+                  <span className={`text-3xl md:text-5xl ${theme === 'cyan' ? 'text-cyan-500' : 'text-orange-500'} block`}>
+                    {tl('HORIZON', 'HORIZON')}
+                  </span>
+                </div>
+
+                <span className="text-4xl md:text-6xl text-transparent bg-clip-text bg-gradient-to-b from-white via-pink-200 to-pink-500 drop-shadow-[0_0_15px_rgba(219,39,119,0.6)] relative z-10">
+                  <span className="absolute inset-0 shimmer-text opacity-70 pointer-events-none">
+                    {tl('QUANTUM COURIER', 'QUANTUM COURIER')}
+                  </span>
+                  {tl('QUANTUM COURIER', 'QUANTUM COURIER')}
+                </span>
+                <div className="relative inline-block">
+                  <span className={`text-3xl md:text-5xl text-transparent bg-clip-text bg-gradient-to-b from-white ${theme === 'cyan' ? 'via-cyan-200 to-cyan-500 drop-shadow-[0_0_15px_rgba(6,182,212,0.6)]' : 'via-orange-200 to-orange-500 drop-shadow-[0_0_15px_rgba(249,115,22,0.6)]'} relative z-10`}>
+                    <span className="absolute inset-0 shimmer-text opacity-70 pointer-events-none">
+                      {tl('HORIZON', 'HORIZON')}
+                    </span>
+                    {tl('HORIZON', 'HORIZON')}
+                  </span>
+                  
+                  {/* Decorative underline restricted to HORIZON */}
+                  <motion.div 
+                    initial={{ width: 0 }}
+                    animate={{ width: '100%' }}
+                    transition={{ delay: 1.5, duration: 1 }}
+                    className={`h-0.5 mt-1 z-10 ${theme === 'cyan' ? 'bg-cyan-500 shadow-[0_0_15px_rgba(6,182,212,1)]' : 'bg-orange-500 shadow-[0_0_15px_rgba(249,115,22,1)]'}`}
+                  />
+                </div>
+              </motion.h1>
+            </motion.div>
+
+            {/* Menu Section */}
+            <motion.div
+              initial={{ x: -30, opacity: 0 }}
+              animate={{ x: 0, opacity: 1 }}
+              transition={{ duration: 0.8, delay: 0.5 }}
+              className={`w-full max-w-md flex flex-col gap-4 p-8 bg-transparent backdrop-blur-sm border ${theme === 'cyan' ? 'border-cyan-500/5' : 'border-orange-500/5'} rounded-2xl relative`}
+            >
+              {/* Scanline Effect */}
+              <div className="absolute inset-0 overflow-hidden pointer-events-none rounded-2xl">
+                <div className={`w-full h-1 ${theme === 'cyan' ? 'bg-cyan-500/10' : 'bg-orange-500/10'} absolute top-0 animate-[scan_4s_linear_infinite]`} />
+              </div>
+
+              <MenuButton 
+                label={tl('CONTINUE', 'CONTINUAR')} 
+                icon={Play} 
+                onClick={() => {
+                  playSfx('aba_click');
+                  handleContinue();
+                }} 
+                disabled={!hasSave}
+                theme={theme}
               />
-            </div>
-          </motion.h1>
-          
-        </motion.div>
-
-        {/* Menu Section */}
-        <motion.div
-          initial={{ x: -30, opacity: 0 }}
-          animate={{ x: 0, opacity: 1 }}
-          transition={{ duration: 0.8, delay: 0.5 }}
-          className={`w-full max-w-md flex flex-col gap-4 p-8 bg-transparent backdrop-blur-sm border ${theme === 'cyan' ? 'border-cyan-500/5' : 'border-orange-500/5'} rounded-2xl relative`}
-        >
-          {/* Scanline Effect */}
-          <div className="absolute inset-0 overflow-hidden pointer-events-none rounded-2xl">
-            <div className={`w-full h-1 ${theme === 'cyan' ? 'bg-cyan-500/10' : 'bg-orange-500/10'} absolute top-0 animate-[scan_4s_linear_infinite]`} />
+              <MenuButton label={tl('CAMPAIGN', 'CAMPANHA')} icon={Rocket} onClick={() => { playSfx('aba_click'); handleStartGame(); }} theme={theme} />
+              <MenuButton label={tl('OPTIONS', 'OPÇÕES')} icon={Settings} onClick={() => { playSfx('aba_click'); setShowOptions(true); }} theme={theme} />
+              <MenuButton label={tl('ACHIEVEMENTS', 'CONQUISTAS')} icon={Trophy} onClick={() => { playSfx('aba_click'); setShowAchievements(true); }} theme={theme} />
+              
+              <div className={`mt-4 flex flex-col gap-1 text-[15px] font-mono ${theme === 'cyan' ? 'text-cyan-500/40' : 'text-orange-500/40'} uppercase tracking-widest`}>
+                <div className="flex justify-between">
+                  <span>{tl('System: Offline', 'Sistema: Offline')}</span>
+                  <span>{tl('Signal: Local', 'Sinal: Local')}</span>
+                </div>
+              </div>
+            </motion.div>
           </div>
-
-          <MenuButton 
-            label={tl('CONTINUE', 'CONTINUAR')} 
-            icon={Play} 
-            onClick={() => {
-              playSfx('aba_click');
-              handleContinue();
-            }} 
-            disabled={!hasSave}
-            theme={theme}
-          />
-          <MenuButton label={tl('CAMPAIGN', 'CAMPANHA')} icon={Rocket} onClick={() => { playSfx('aba_click'); handleStartGame(); }} theme={theme} />
-          <MenuButton label={tl('OPTIONS', 'OPÇÕES')} icon={Settings} onClick={() => { playSfx('aba_click'); setShowOptions(true); }} theme={theme} />
-          <MenuButton label={tl('ACHIEVEMENTS', 'CONQUISTAS')} icon={Trophy} onClick={() => { playSfx('aba_click'); setShowAchievements(true); }} theme={theme} />
-          
-          <div className={`mt-4 flex flex-col gap-1 text-[15px] font-mono ${theme === 'cyan' ? 'text-cyan-500/40' : 'text-orange-500/40'} uppercase tracking-widest`}>
-            <div className="flex justify-between">
-              <span>{tl('System: Offline', 'Sistema: Offline')}</span>
-              <span>{tl('Signal: Local', 'Sinal: Local')}</span>
-            </div>
-          </div>
-        </motion.div>
-      </div>
-
-      {/* Name Prompt Modal - Removed as it's now in IntroNarrative */}
+        </>
+      )}
 
       {/* Options Modal */}
       <AnimatePresence>
@@ -1577,7 +1604,6 @@ export default function GameHome() {
         )}
       </AnimatePresence>
 
-      
       {/* Achievements Modal */}
       <AchievementsModal 
         isOpen={showAchievements}
@@ -1591,7 +1617,10 @@ export default function GameHome() {
       {/* Jukebox Modal */}
       <Jukebox 
         isOpen={showJukeboxModal} 
-        onClose={() => setShowJukeboxModal(false)} 
+        onClose={() => {
+          setShowJukeboxModal(false);
+          jukeboxState.stop();
+        }} 
         language={language}
         {...jukeboxState} 
       />
@@ -1626,6 +1655,7 @@ export default function GameHome() {
           100% { background-color: #050510; }
         }
       `}</style>
-    </main>
+    </motion.main>
   );
 }
+

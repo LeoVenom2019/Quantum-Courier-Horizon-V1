@@ -53,7 +53,6 @@ export async function POST(request: NextRequest) {
     }
 
     // 4. Atomic Swap (Rename temp to actual)
-    // This is the most critical step - either it works or the old file remains intact.
     fs.renameSync(paths.temp, paths.autoSave);
 
     // 5. Release Lock
@@ -65,7 +64,6 @@ export async function POST(request: NextRequest) {
   } catch (error: any) {
     console.error('Advanced Save Error:', error);
     
-    // Log to crash log if possible
     try {
       const logDir = path.join(path.dirname(paths.profileDir), '..', 'Logs');
       if (!fs.existsSync(logDir)) fs.mkdirSync(logDir, { recursive: true });
@@ -80,53 +78,90 @@ export async function GET() {
   const paths = getSavePaths();
   
   try {
-    // 1. Check for Corruption (Lock file existence)
     if (fs.existsSync(paths.lock)) {
-      console.warn('SaveSystem: Lock detected! Possible corruption in progress. Restoring backup...');
+      console.warn('SaveSystem: Lock detected! Restoring backup...');
       if (fs.existsSync(paths.backup)) {
         fs.copyFileSync(paths.backup, paths.autoSave);
-        // Clean up lock after restoration
         fs.unlinkSync(paths.lock);
       }
     }
 
-    // 2. Load the Save
     if (!fs.existsSync(paths.autoSave)) {
       return NextResponse.json({ success: false, message: 'No save found' }, { status: 404 });
     }
 
     const data = fs.readFileSync(paths.autoSave, 'utf-8');
-    return NextResponse.json({ success: true, data: JSON.parse(data) });
+    return NextResponse.json({ success: true, data: JSON.parse(data) }, {
+      headers: {
+        'Cache-Control': 'no-store, max-age=0',
+      }
+    });
   } catch (error: any) {
     console.error('Advanced Load Error:', error);
-    
-    // Final Attempt: Try to load backup if main fails
-    try {
-       if (fs.existsSync(paths.backup)) {
-         const data = fs.readFileSync(paths.backup, 'utf-8');
-         return NextResponse.json({ success: true, data: JSON.parse(data), restoredFromBackup: true });
-       }
-    } catch(e) {}
-
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }
 
 export async function DELETE() {
   const paths = getSavePaths();
+  const requestId = Math.random().toString(36).substring(7);
   
   try {
-    const filesToRemove = [paths.autoSave, paths.backup, paths.temp, paths.lock];
+    console.log(`[SaveSystem][${requestId}] --- HARD RESET INITIATED ---`);
+    const filesToRemove = [
+      { name: 'Auto-Save', path: paths.autoSave },
+      { name: 'Backup', path: paths.backup },
+      { name: 'Temporary', path: paths.temp },
+      { name: 'Lock', path: paths.lock }
+    ];
     
+    let deletedCount = 0;
+    let errorCount = 0;
+
     filesToRemove.forEach(file => {
-      if (fs.existsSync(file)) {
-        fs.unlinkSync(file);
+      if (fs.existsSync(file.path)) {
+        try {
+          fs.unlinkSync(file.path);
+          console.log(`[SaveSystem][${requestId}] SUCCESS: Deleted ${file.name} (${path.basename(file.path)})`);
+          deletedCount++;
+        } catch (err: any) {
+          console.error(`[SaveSystem][${requestId}] ERROR: Failed to delete ${file.name}: ${err.message}`);
+          errorCount++;
+        }
+      } else {
+        console.log(`[SaveSystem][${requestId}] SKIP: ${file.name} not found.`);
       }
     });
 
-    return NextResponse.json({ success: true, message: 'All save data cleared' });
+    // Clean up profile directory
+    try {
+      if (fs.existsSync(paths.profileDir)) {
+        const remaining = fs.readdirSync(paths.profileDir);
+        if (remaining.length === 0) {
+          fs.rmdirSync(paths.profileDir);
+          console.log(`[SaveSystem][${requestId}] SUCCESS: Profile directory removed.`);
+        } else {
+          console.log(`[SaveSystem][${requestId}] INFO: Profile directory not empty (${remaining.length} files), keeping directory.`);
+        }
+      }
+    } catch (e: any) {
+      console.error(`[SaveSystem][${requestId}] ERROR: Directory cleanup failed: ${e.message}`);
+    }
+
+    console.log(`[SaveSystem][${requestId}] --- HARD RESET COMPLETE (Deleted: ${deletedCount}, Errors: ${errorCount}) ---`);
+    
+    return NextResponse.json({ 
+      success: true, 
+      message: 'Hard reset complete',
+      details: { deleted: deletedCount, errors: errorCount }
+    });
   } catch (error: any) {
-    console.error('Advanced Delete Error:', error);
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    console.error(`[SaveSystem][${requestId}] CRITICAL RESET ERROR:`, error);
+    return NextResponse.json({ 
+      success: false, 
+      error: error.message,
+      requestId 
+    }, { status: 500 });
   }
 }
+
