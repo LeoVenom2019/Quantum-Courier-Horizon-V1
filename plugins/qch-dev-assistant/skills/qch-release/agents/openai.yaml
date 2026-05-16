@@ -1,0 +1,4 @@
+interface:
+  display_name: "QCH Release"
+  short_description: "Prepare QCH changes for GitHub with checks and PR hygiene."
+  default_prompt: "Use QCH Release before sending changes to GitHub."

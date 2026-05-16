@@ -253,6 +253,14 @@ export function miningReducer(state: MiningState = initialMiningState, action: G
     case 'SET_EXTRACTION_PROGRESS':
       return { ...state, extractionCycleProgress: action.payload.progress };
 
+    case 'SET_MINING_DATA': {
+      return { ...state, ...action.payload };
+    }
+
+    case 'LOAD_SAVE': {
+      return action.payload.mining;
+    }
+
     case 'RESET_GAME':
       return initialMiningState;
 

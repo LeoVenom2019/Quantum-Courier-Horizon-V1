@@ -23,6 +23,7 @@ const MiningTab = memo(() => {
     buyMiningCompression, 
     buyAutoSell,
     toggleAutoSell,
+    sellExtractionPointPacks,
     getEconomicMultipliers 
   } = useDashboard();
 
@@ -137,19 +138,12 @@ const MiningTab = memo(() => {
           </div>
         </div>
 
-        {/* Collection Status */}
-        <div className="space-y-1 mb-2 lg:mb-4">
-          <div className="flex justify-between items-end">
-            <span className="text-[10px] text-slate-500 uppercase font-bold tracking-widest">{t('collection')}: {(amount % ore.packSize).toFixed(0)}/{ore.packSize}</span>
-            <span className={`text-[14px] font-orbitron font-bold ${themeAccent}`}>{Math.floor((amount % ore.packSize) / ore.packSize * 100)}%</span>
-          </div>
-          <div className="h-1.5 bg-slate-950 rounded-full overflow-hidden border border-white/5 relative">
-            <motion.div 
-              className={`h-full relative z-10 bg-gradient-to-r ${isInterstellar ? 'from-orange-600 to-orange-400' : 'from-cyan-600 to-cyan-400'}`} 
-              animate={{ width: `${(amount % ore.packSize) / ore.packSize * 100}%` }} 
-              transition={{ type: 'spring', bounce: 0, duration: 0.5 }}
-            />
-          </div>
+        {/* Collection Status - Only Text/Percentage for Performance */}
+        <div className="flex justify-between items-end mb-2">
+          <span className="text-[10px] text-slate-500 uppercase font-bold tracking-widest">{t('collection')}: {Math.min(ore.packSize, amount >= ore.packSize ? ore.packSize : (amount % ore.packSize)).toFixed(0)}/{ore.packSize}</span>
+          <span className={`text-[14px] font-orbitron font-bold ${themeAccent}`}>
+            {Math.floor(amount >= ore.packSize ? 100 : (amount % ore.packSize) / ore.packSize * 100)}%
+          </span>
         </div>
 
         {/* Video Container (16:9) - Compacted */}
@@ -229,17 +223,22 @@ const MiningTab = memo(() => {
 
           {/* Manual Sell */}
           <button 
-            onClick={(e) => sellOrePack(ore.id, e)} 
-            disabled={packs <= 0} 
+            onClick={(e) => isInterstellar ? sellExtractionPointPacks(ore.id, e) : sellOrePack(ore.id, e)} 
+            disabled={isInterstellar ? packs < 100 : packs <= 0} 
             className={`group relative p-2 lg:p-3 rounded-xl border transition-all flex flex-col items-center justify-center gap-1 ${
-              packs > 0 
+              (isInterstellar ? packs >= 100 : packs > 0)
                 ? 'border-white/10 bg-slate-900/60 text-yellow-400 hover:scale-[1.02] active:scale-[0.98] hover:border-white/20'
                 : 'border-white/5 bg-slate-900/40 text-slate-700 cursor-not-allowed'
             }`}
           >
             <Coins className="w-4 h-4 mb-1" />
             <div className="text-[10px] font-bold uppercase tracking-widest leading-none">{t('sell')}</div>
-            <div className="text-[12px] font-mono font-bold leading-none">{packs > 0 ? `${packs} PKS` : '---'}</div>
+            <div className="text-[12px] font-mono font-bold leading-none">
+              {isInterstellar 
+                ? (packs >= 100 ? `${packs} PKS` : 'MIN. 100')
+                : (packs > 0 ? `${packs} PKS` : '---')
+              }
+            </div>
           </button>
         </div>
       </div>

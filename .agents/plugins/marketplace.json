@@ -1,0 +1,20 @@
+{
+  "name": "qch-local",
+  "interface": {
+    "displayName": "QCH Local Plugins"
+  },
+  "plugins": [
+    {
+      "name": "qch-dev-assistant",
+      "source": {
+        "source": "local",
+        "path": "./plugins/qch-dev-assistant"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}

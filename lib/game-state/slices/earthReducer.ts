@@ -22,6 +22,11 @@ export const initialEarthState: EarthState = {
   couples: 0,
   birthRegistry: {},
   projectBoostCount: 0,
+  // Visual Restoration
+  atmosphere: 0,
+  temperature: 0,
+  hydrosphere: 0,
+  biosphere: 0,
 };
 
 export function earthReducer(state: EarthState = initialEarthState, action: GameAction): EarthState {
@@ -45,11 +50,14 @@ export function earthReducer(state: EarthState = initialEarthState, action: Game
       const { resourceKey } = action.payload;
       const newState = { ...state };
 
-      if (resourceKey === 'food') newState.population += 1000;
-      if (resourceKey === 'energy') newState.reconstructionProgress = { ...newState.reconstructionProgress, energy: Math.min(100, newState.reconstructionProgress.energy + 2) };
-      if (resourceKey === 'minerals') newState.reconstructionProgress = { ...newState.reconstructionProgress, minerals: Math.min(100, newState.reconstructionProgress.minerals + 2) };
-      if (resourceKey === 'meds') newState.reconstructionProgress = { ...newState.reconstructionProgress, meds: Math.min(100, newState.reconstructionProgress.meds + 2) };
-      if (resourceKey === 'tech') newState.reconstructionProgress = { ...newState.reconstructionProgress, tech: Math.min(100, newState.reconstructionProgress.tech + 2) };
+      if (resourceKey === 'food') {
+        newState.population += 1000;
+        newState.reconstructionProgress = { ...newState.reconstructionProgress, food: Math.min(100, (newState.reconstructionProgress.food || 0) + 0.1) };
+      }
+      if (resourceKey === 'energy') newState.reconstructionProgress = { ...newState.reconstructionProgress, energy: Math.min(100, (newState.reconstructionProgress.energy || 0) + 0.1) };
+      if (resourceKey === 'minerals') newState.reconstructionProgress = { ...newState.reconstructionProgress, minerals: Math.min(100, (newState.reconstructionProgress.minerals || 0) + 0.1) };
+      if (resourceKey === 'meds') newState.reconstructionProgress = { ...newState.reconstructionProgress, meds: Math.min(100, (newState.reconstructionProgress.meds || 0) + 0.1) };
+      if (resourceKey === 'tech') newState.reconstructionProgress = { ...newState.reconstructionProgress, tech: Math.min(100, (newState.reconstructionProgress.tech || 0) + 0.1) };
 
       return newState;
     }
@@ -58,8 +66,20 @@ export function earthReducer(state: EarthState = initialEarthState, action: Game
       return { ...state, ...action.payload };
     }
 
+    case 'LOAD_SAVE': {
+      return action.payload.earth;
+    }
+
     case 'UPDATE_EARTH_STATE': {
       return { ...state, ...action.payload };
+    }
+
+    case 'UPDATE_EARTH_RESTORATION': {
+      const { statId, progress } = action.payload;
+      return {
+        ...state,
+        [statId]: progress
+      };
     }
 
     case 'RESET_GAME':

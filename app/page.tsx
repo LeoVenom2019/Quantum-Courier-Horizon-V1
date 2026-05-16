@@ -13,6 +13,7 @@ import { useSFX } from '@/hooks/useSFX';
 import { useSoundMaster } from '@/hooks/useSoundMaster';
 import { HorizonRadioModal } from '@/components/HorizonRadioModal';
 import { GameStorage } from '@/lib/game-storage';
+import { SaveManager } from '@/lib/save-manager';
 import { Language, t } from '@/lib/i18n';
 import { ThemeColor, GAME_THEMES } from '@/lib/game-data';
 
@@ -932,6 +933,56 @@ const MenuButton = ({ label, icon: Icon, onClick, disabled = false, theme = 'cya
 };
 
 export default function GameHome() {
+  useEffect(() => {
+    const handleError = (event: ErrorEvent) => {
+      // Basic diagnostic info
+      const errorMsg = `[Global Error] ${event.message || 'Unknown error'} at ${event.filename || 'unknown'}:${event.lineno || 0}:${event.colno || 0}`;
+      console.error(errorMsg, event.error);
+      
+      // If it's a critical object error, log it as JSON but don't block the UI with alerts
+      if (typeof event.error === 'object' && event.error) {
+        try {
+          console.debug("Error Object Detail:", JSON.parse(JSON.stringify(event.error)));
+        } catch(e) {
+          console.debug("Error Object Detail (Circular):", event.error);
+        }
+      }
+    };
+
+    const handleRejection = (event: PromiseRejectionEvent) => {
+      const reason = event.reason;
+      
+      // Filter out common harmless browser-level rejections
+      if (reason && (
+        reason.name === 'AbortError' || 
+        reason.message?.includes('The play() request was interrupted') ||
+        reason.message?.includes('pause()')
+      )) {
+        console.warn("[Promise Rejection Filtered]", reason.message || "Playback interrupted");
+        return;
+      }
+
+      // Log detailed rejection info
+      console.error("UNHANDLED_REJECTION:", {
+        reason: reason,
+        message: reason?.message || "No message",
+        stack: reason?.stack || "No stack",
+        type: typeof reason
+      });
+
+      // Show a toast or notification instead of alert if possible, 
+      // but for now, we'll keep it to console only to avoid blocking the main thread.
+      // alert(`Unhandled Rejection: ${reason?.message || reason}`);
+    };
+    window.addEventListener('error', handleError);
+    window.addEventListener('unhandledrejection', handleRejection);
+    return () => {
+      window.removeEventListener('error', handleError);
+      window.removeEventListener('unhandledrejection', handleRejection);
+    };
+  }, []);
+
+
   const [view, setView] = useState<'landing' | 'narrative' | 'game'>('landing');
   const [showOptions, setShowOptions] = useState(false);
   const [language, setLanguage] = useState<Language>('pt');
@@ -955,7 +1006,7 @@ export default function GameHome() {
     const saveTheme = async () => {
       await GameStorage.save(currentThemeIndex, 'game_theme_index');
     };
-    saveTheme();
+    saveTheme().catch(() => {});
   }, [currentThemeIndex]);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [hasSave, setHasSave] = useState(false);
@@ -1094,11 +1145,32 @@ export default function GameHome() {
         const saved = await GameStorage.load('time_travel_save');
         if (saved) {
           try {
-            const data = saved;
-            setPlayerName(data.playerName || '');
-            const unlocked = data.routeTier === 'Interstellar' || (data.unlockedTechLevels?.Solar >= 9);
+            // Use SaveManager to handle both legacy (flat) and modular (structured) saves
+            const data = SaveManager.loadSave(saved);
+            
+            // Map structured state back to local UI states
+            setPlayerName(data.system?.playerName || data.playerName || '');
+            
+            // Improved Route 2 detection
+            const routeTier = data.progression?.routeTier || data.routeTier || 'Solar';
+            const techLevels = data.progression?.unlockedTechLevels || data.unlockedTechLevels || {};
+            const unlocked = routeTier !== 'Solar' || (techLevels.Solar >= 9);
+            
             setIsRoute2Unlocked(unlocked);
             setHasSave(true);
+            
+            // Achievement states
+            if (data.missions?.unlockedAchievements) {
+              setUnlockedAchievements(data.missions.unlockedAchievements);
+            } else if (data.unlockedAchievements) {
+              setUnlockedAchievements(data.unlockedAchievements);
+            }
+            
+            if (data.missions?.achievementProgress) {
+              setAchievementProgress(data.missions.achievementProgress);
+            } else if (data.achievementProgress) {
+              setAchievementProgress(data.achievementProgress);
+            }
             
             const savedThemeIndex = await GameStorage.load('game_theme_index');
             if (typeof savedThemeIndex === 'number' && savedThemeIndex >= 0 && savedThemeIndex < GAME_THEMES.length) {
@@ -1123,7 +1195,7 @@ export default function GameHome() {
 
 
       };
-      loadAllData();
+      loadAllData().catch(e => console.error("[InitialLoad] Failed:", e));
     }, 0);
 
     return () => clearTimeout(timer);
@@ -1173,12 +1245,14 @@ export default function GameHome() {
       setIsShaking(true);
       setTimeout(() => setIsShaking(false), 500);
 
+      GameStorage.markReset(10000);
       const keys = ['time_travel_save', 'speed_run_save', 'colonies_data', 'history_data', 'game_theme_index', 'qch_settings'];
       for (const key of keys) {
         await GameStorage.remove(key);
         localStorage.removeItem(key);
       }
       localStorage.clear();
+      GameStorage.markReset(10000);
       
       // Reset all local states reactively
       setHasSave(false);
@@ -1288,8 +1362,11 @@ export default function GameHome() {
             const saved = await GameStorage.load('time_travel_save');
             if (saved) {
               try {
-                const data = saved;
-                const unlocked = data.routeTier === 'Interstellar' || (data.unlockedTechLevels?.Solar >= 9);
+                const data = SaveManager.loadSave(saved);
+                const routeTier = data.progression?.routeTier || data.routeTier || 'Solar';
+                const techLevels = data.progression?.unlockedTechLevels || data.unlockedTechLevels || {};
+                const unlocked = routeTier !== 'Solar' || (techLevels.Solar >= 9);
+                
                 setIsRoute2Unlocked(unlocked);
                 if (unlocked) {
                   const savedThemeIndex = await GameStorage.load('game_theme_index');
@@ -1359,48 +1436,48 @@ export default function GameHome() {
 
           {/* Content */}
           <div className="relative z-20 flex flex-col items-start gap-8 max-w-4xl w-full px-4">
-            {/* Title Section */}
+            {/* Title Section - PC Impact Version */}
             <motion.div
-              initial={{ x: -50, opacity: 0 }}
-              animate={{ x: 0, opacity: 1 }}
-              transition={{ duration: 1, ease: "easeOut" }}
-              className="text-left relative"
+              initial={{ x: -100, opacity: 0, filter: 'blur(20px)' }}
+              animate={{ x: 0, opacity: 1, filter: 'blur(0px)' }}
+              transition={{ duration: 1.5, ease: "easeOut" }}
+              className="text-left relative py-12"
             >
               <motion.h1 
-                whileHover={{ scale: 1.02 }}
-                transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-                className="font-michroma tracking-tighter leading-tight flex flex-col items-start relative group cursor-default"
+                className="font-title leading-[0.9] flex flex-col items-start relative group cursor-default"
               >
-                {/* Background Depth Layer */}
-                <div className="absolute inset-0 blur-2xl opacity-20 pointer-events-none select-none">
-                  <span className="text-4xl md:text-6xl text-pink-500 block">
+                {/* Background Depth Aura */}
+                <div className="absolute inset-0 blur-[100px] opacity-30 pointer-events-none select-none -z-10">
+                  <span className="text-[7.5rem] text-pink-500 block tracking-[0.5em]">
                     {tl('QUANTUM COURIER', 'QUANTUM COURIER')}
                   </span>
-                  <span className={`text-3xl md:text-5xl ${theme === 'cyan' ? 'text-cyan-500' : 'text-orange-500'} block`}>
+                  <span className={`text-[6rem] ${theme === 'cyan' ? 'text-cyan-500' : 'text-orange-500'} block tracking-[0.8em] mt-4`}>
                     {tl('HORIZON', 'HORIZON')}
                   </span>
                 </div>
 
-                <span className="text-4xl md:text-6xl text-transparent bg-clip-text bg-gradient-to-b from-white via-pink-200 to-pink-500 drop-shadow-[0_0_15px_rgba(219,39,119,0.6)] relative z-10">
-                  <span className="absolute inset-0 shimmer-text opacity-70 pointer-events-none">
+                {/* Main Text Layer */}
+                <span className="text-[5.5rem] md:text-[7.5rem] text-transparent bg-clip-text bg-gradient-to-b from-white via-pink-200 to-pink-500 drop-shadow-[0_0_30px_rgba(219,39,119,0.8)] tracking-[0.5em] relative z-10">
+                  <span className="absolute inset-0 shimmer-text opacity-50 pointer-events-none">
                     {tl('QUANTUM COURIER', 'QUANTUM COURIER')}
                   </span>
                   {tl('QUANTUM COURIER', 'QUANTUM COURIER')}
                 </span>
-                <div className="relative inline-block">
-                  <span className={`text-3xl md:text-5xl text-transparent bg-clip-text bg-gradient-to-b from-white ${theme === 'cyan' ? 'via-cyan-200 to-cyan-500 drop-shadow-[0_0_15px_rgba(6,182,212,0.6)]' : 'via-orange-200 to-orange-500 drop-shadow-[0_0_15px_rgba(249,115,22,0.6)]'} relative z-10`}>
-                    <span className="absolute inset-0 shimmer-text opacity-70 pointer-events-none">
+
+                <div className="relative inline-block mt-4">
+                  <span className={`text-[4rem] md:text-[6rem] text-transparent bg-clip-text bg-gradient-to-b from-white ${theme === 'cyan' ? 'via-cyan-200 to-cyan-500 drop-shadow-[0_0_30px_rgba(6,182,212,0.8)]' : 'via-orange-200 to-orange-500 drop-shadow-[0_0_30px_rgba(249,115,22,0.8)]'} tracking-[0.8em] relative z-10 uppercase`}>
+                    <span className="absolute inset-0 shimmer-text opacity-50 pointer-events-none">
                       {tl('HORIZON', 'HORIZON')}
                     </span>
                     {tl('HORIZON', 'HORIZON')}
                   </span>
                   
-                  {/* Decorative underline restricted to HORIZON */}
+                  {/* High-Impact Neon Underline */}
                   <motion.div 
-                    initial={{ width: 0 }}
-                    animate={{ width: '100%' }}
-                    transition={{ delay: 1.5, duration: 1 }}
-                    className={`h-0.5 mt-1 z-10 ${theme === 'cyan' ? 'bg-cyan-500 shadow-[0_0_15px_rgba(6,182,212,1)]' : 'bg-orange-500 shadow-[0_0_15px_rgba(249,115,22,1)]'}`}
+                    initial={{ width: 0, opacity: 0 }}
+                    animate={{ width: '100%', opacity: 1 }}
+                    transition={{ delay: 1.5, duration: 1.2, ease: "circOut" }}
+                    className={`h-1.5 mt-2 z-10 ${theme === 'cyan' ? 'bg-cyan-400 shadow-[0_0_40px_rgba(6,182,212,1)]' : 'bg-orange-400 shadow-[0_0_40px_rgba(249,115,22,1)]'}`}
                   />
                 </div>
               </motion.h1>
@@ -1432,12 +1509,7 @@ export default function GameHome() {
               <MenuButton label={tl('OPTIONS', 'OPÇÕES')} icon={Settings} onClick={() => { playSfx('aba_click'); setShowOptions(true); }} theme={theme} />
               <MenuButton label={tl('ACHIEVEMENTS', 'CONQUISTAS')} icon={Trophy} onClick={() => { playSfx('aba_click'); setShowAchievements(true); }} theme={theme} />
               
-              <div className={`mt-4 flex flex-col gap-1 text-[15px] font-mono ${theme === 'cyan' ? 'text-cyan-500/40' : 'text-orange-500/40'} uppercase tracking-widest`}>
-                <div className="flex justify-between">
-                  <span>{tl('System: Offline', 'Sistema: Offline')}</span>
-                  <span>{tl('Signal: Local', 'Sinal: Local')}</span>
-                </div>
-              </div>
+
             </motion.div>
           </div>
         </>
@@ -1658,4 +1730,3 @@ export default function GameHome() {
     </motion.main>
   );
 }
-

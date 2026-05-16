@@ -18,13 +18,8 @@ export const HorizonRadioModal: React.FC<HorizonRadioModalProps> = ({
   onOpenJukebox,
   language 
 }) => {
-  const { 
-    masterMusicOn, 
-    masterMusicVolume, 
-    masterSfxOn, 
-    masterSfxVolume, 
-    updateSettings 
-  } = useSoundMaster();
+  const master = useSoundMaster();
+  const { masterMusicOn, masterMusicVolume, masterSfxOn, masterSfxVolume, updateSettings } = master;
 
   const tl = (en: string, pt: string) => language === 'pt' ? pt : en;
 
@@ -146,6 +141,71 @@ export const HorizonRadioModal: React.FC<HorizonRadioModalProps> = ({
                     <span className="text-[10px] font-mono text-orange-400 w-10 text-right">
                       {Math.round(masterSfxVolume * 100)}%
                     </span>
+                  </div>
+                </div>
+
+                {/* Advanced SFX Mixer */}
+                <div className="pt-6 border-t border-white/5 space-y-6">
+                  <h3 className="text-[10px] font-orbitron font-black text-slate-500 uppercase tracking-[0.4em] mb-4">
+                    {tl('ADVANCED MIXER', 'MIXER AVANÇADO')}
+                  </h3>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* UI Volume */}
+                    <div className="space-y-2">
+                      <div className="flex justify-between items-center text-[10px] font-orbitron font-bold text-slate-400">
+                        <span>{tl('INTERFACE', 'INTERFACE')}</span>
+                        <span className="text-cyan-400">{Math.round((master.uiVolume || 0) * 100)}%</span>
+                      </div>
+                      <input 
+                        type="range" min="0" max="1" step="0.01" 
+                        value={master.uiVolume ?? 0.6}
+                        onChange={(e) => master.updateSettings({ uiVolume: parseFloat(e.target.value) })}
+                        className="w-full h-1 bg-slate-800 rounded-full appearance-none cursor-pointer accent-cyan-500"
+                      />
+                    </div>
+
+                    {/* Player Volume */}
+                    <div className="space-y-2">
+                      <div className="flex justify-between items-center text-[10px] font-orbitron font-bold text-slate-400">
+                        <span>{tl('PLAYER', 'JOGADOR')}</span>
+                        <span className="text-purple-400">{Math.round((master.playerVolume || 0) * 100)}%</span>
+                      </div>
+                      <input 
+                        type="range" min="0" max="1" step="0.01" 
+                        value={master.playerVolume ?? 1.0}
+                        onChange={(e) => master.updateSettings({ playerVolume: parseFloat(e.target.value) })}
+                        className="w-full h-1 bg-slate-800 rounded-full appearance-none cursor-pointer accent-purple-500"
+                      />
+                    </div>
+
+                    {/* Enemy Volume */}
+                    <div className="space-y-2">
+                      <div className="flex justify-between items-center text-[10px] font-orbitron font-bold text-slate-400">
+                        <span>{tl('ENEMIES', 'INIMIGOS')}</span>
+                        <span className="text-red-400">{Math.round((master.enemyVolume || 0) * 100)}%</span>
+                      </div>
+                      <input 
+                        type="range" min="0" max="1" step="0.01" 
+                        value={master.enemyVolume ?? 0.7}
+                        onChange={(e) => master.updateSettings({ enemyVolume: parseFloat(e.target.value) })}
+                        className="w-full h-1 bg-slate-800 rounded-full appearance-none cursor-pointer accent-red-500"
+                      />
+                    </div>
+
+                    {/* Ambient Volume */}
+                    <div className="space-y-2">
+                      <div className="flex justify-between items-center text-[10px] font-orbitron font-bold text-slate-400">
+                        <span>{tl('AMBIENT', 'AMBIENTE')}</span>
+                        <span className="text-emerald-400">{Math.round((master.ambientVolume || 0) * 100)}%</span>
+                      </div>
+                      <input 
+                        type="range" min="0" max="1" step="0.01" 
+                        value={master.ambientVolume ?? 0.8}
+                        onChange={(e) => master.updateSettings({ ambientVolume: parseFloat(e.target.value) })}
+                        className="w-full h-1 bg-slate-800 rounded-full appearance-none cursor-pointer accent-emerald-500"
+                      />
+                    </div>
                   </div>
                 </div>
 

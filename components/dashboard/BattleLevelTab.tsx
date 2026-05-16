@@ -218,7 +218,7 @@ const BattleLevelTab = memo(({
                     DOOM PROTOCOL
                   </h4>
                   <p className="text-[15px] text-slate-500 font-mono">
-                    {language === 'pt' ? `Nível ${privatePoliceLevel} / 6` : `Level ${privatePoliceLevel} / 6`}
+                    {t('level')} {privatePoliceLevel} / 6
                   </p>
                 </div>
               </div>
@@ -239,36 +239,38 @@ const BattleLevelTab = memo(({
                 }`}
               >
                 {privatePoliceLevel < 6 
-                  ? (language === 'pt' ? `Melhorar (${formatValue(privatePoliceCost)})` : `Upgrade (${formatValue(privatePoliceCost)})`)
+                  ? `${t('upgrade')} (${formatValue(privatePoliceCost)})`
                   : t('max')}
               </button>
             </div>
 
           </div>
 
-          <div className={`glass-panel p-3 rounded-2xl border ${themeBorder} ${themeBg} relative overflow-hidden flex flex-col justify-center items-center`}>
-            <div className="flex items-center justify-between w-full">
-              <div className="flex items-center gap-3">
-                <div className={`w-10 h-10 rounded-xl bg-orange-500/20 border border-orange-500/40 flex items-center justify-center`}>
-                  <FastForward className="w-5 h-5 text-orange-400" />
+          {privatePoliceLevel > 0 && (
+            <div className={`glass-panel p-3 rounded-2xl border ${themeBorder} ${themeBg} relative overflow-hidden flex flex-col justify-center items-center`}>
+              <div className="flex items-center justify-between w-full">
+                <div className="flex items-center gap-3">
+                  <div className={`w-10 h-10 rounded-xl bg-orange-500/20 border border-orange-500/40 flex items-center justify-center`}>
+                    <FastForward className="w-5 h-5 text-orange-400" />
+                  </div>
+                  <div>
+                    <h4 className="text-[14px] font-bold text-white uppercase tracking-widest leading-tight">
+                      {t('skipBattles')}
+                    </h4>
+                    <p className="text-[15px] text-slate-500 font-mono">
+                      {t('skipRandomBattles')}
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <h4 className="text-[14px] font-bold text-white uppercase tracking-widest leading-tight">
-                    {language === 'pt' ? 'Pular Batalhas' : 'Skip Battles'}
-                  </h4>
-                  <p className="text-[15px] text-slate-500 font-mono">
-                    {language === 'pt' ? 'Pular batalhas aleatórias' : 'Skip random battles'}
-                  </p>
-                </div>
+                <button
+                  onClick={toggleAutoSkipRandomBattles}
+                  className={`relative w-12 h-6 rounded-full transition-all duration-300 ${autoSkipRandomBattles ? 'bg-orange-500' : 'bg-slate-700'}`}
+                >
+                  <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all duration-300 ${autoSkipRandomBattles ? 'left-7' : 'left-1'}`} />
+                </button>
               </div>
-              <button
-                onClick={toggleAutoSkipRandomBattles}
-                className={`relative w-12 h-6 rounded-full transition-all duration-300 ${autoSkipRandomBattles ? 'bg-orange-500' : 'bg-slate-700'}`}
-              >
-                <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all duration-300 ${autoSkipRandomBattles ? 'left-7' : 'left-1'}`} />
-              </button>
             </div>
-          </div>
+          )}
         </div>
 
         <div className="flex flex-col space-y-4 h-full">
@@ -280,10 +282,10 @@ const BattleLevelTab = memo(({
                 </div>
                 <div>
                   <h3 className={`text-lg font-bold ${themeText} leading-tight`}>
-                    {language === 'pt' ? `Nível de Batalha ${battleLevel}` : `Battle Level ${battleLevel}`}
+                    {t('battleLevel')} {battleLevel}
                   </h3>
                   <p className="text-slate-400 text-[14px]">
-                    {language === 'pt' ? 'Sua proficiência em combate' : 'Your combat proficiency'}
+                    {t('combatProficiency')}
                   </p>
                 </div>
               </div>
@@ -291,7 +293,7 @@ const BattleLevelTab = memo(({
               <div className="flex items-center gap-4">
                 <div className="flex flex-col items-end">
                   <div className="text-base font-bold text-slate-500 uppercase tracking-widest">
-                    {language === 'pt' ? 'Próximo Nível' : 'Next Level'}
+                    {t('nextLevel')}
                   </div>
                   <div className="text-base font-bold text-white">
                     {battleLevel < (routeTier === 'Solar' ? 25 : 55) ? `${formatValue(upgradeCost)} QC` : t('max')}
@@ -328,9 +330,9 @@ const BattleLevelTab = memo(({
                  { level: 20, title: language === 'pt' ? '+50% Dmg' : '+50% Dmg', description: language === 'pt' ? 'Parabéns, você ganhou um aumento de 50% total de dano! +50% de dano!' : 'Congratulations, you gained a 50% total damage increase in all skills! +50% damage!', color: 'emerald' },
                 { level: 25, title: language === 'pt' ? 'Skyring' : 'Skyring', description: language === 'pt' ? 'Parabéns, você ganhou a nave "Skyring". Ela tem 25% a mais de dano, 25% a mais de vida e todas as recargas de habilidades são de 1 segundo!' : 'Congratulations, you gained the "Skyring" ship. It has 25% more damage, 25% more life and all skill cooldowns are 1 second!', color: 'emerald' }
               ] : [
-                { level: 30, title: language === 'pt' ? 'Retribuição' : 'Retribution', description: language === 'pt' ? 'Parabéns! Suas habilidades de combate agora garantem 25% a mais de QC em todas as batalhas.' : 'Congratulations! Your combat skills now grant 25% more QC in all battles.', color: 'purple' },
+                { level: 30, title: language === 'pt' ? 'Retribuição' : 'Retribution', description: language === 'pt' ? 'Parabéns! Suas habilidades de combate agora garantem 25% a mais de QC em todas as batalhas.' : 'Congratulations! Your combat skills now grant 25% more QC in all battles.', color: 'purple', toggleable: true },
                 { level: 35, title: language === 'pt' ? 'Encrenqueiro' : 'Troublemaker', description: language === 'pt' ? 'Aumenta em 50% a frequência das batalhas aleatórias e em 100% o QC adquirido nas vitórias.' : 'Increases random battle frequency by 50% and QC acquired in victories by 100%.', color: 'purple' },
-                { level: 40, title: 'Why, so?', description: language === 'pt' ? 'Aumenta em 100x o valor adquirido da aba Mineração na Rota 2.' : 'Increases the value acquired from the Mining tab in Route 2 by 100x.', color: 'purple' },
+                { level: 40, title: 'Why, so?', description: language === 'pt' ? 'Aumenta em 5x o valor adquirido da aba Mineração no Capítulo 2.' : 'Increases the value acquired from the Mining tab in Chapter 2 by 5x.', color: 'purple' },
                 { level: 45, title: language === 'pt' ? 'Missão Possível' : 'Mission Possible', description: language === 'pt' ? 'Aumenta a chance de vitória sobre BOSSES em 25% em todos os modos e aumenta em 50% todo os recursos da batalha contra os BOSSES.' : 'Increases win chance against BOSSES by 25% in all modes and increases all resources from BOSS battles by 50%.', color: 'purple' },
                 { level: 50, title: language === 'pt' ? 'Fadiga' : 'Fatigue', description: language === 'pt' ? 'Sintetiza Etérion automaticamente no Reator Heliosingular quando a CCE estiver com nível crítico! Requer Tubos de Etérion Bruto. Pode ser desativado.' : 'Automatically synthesizes Etérion in the Heliosingular Reactor when CCE is at critical level! Requires Raw Etérion Tubes. Can be disabled.', color: 'purple', toggleable: true },
                 { level: 55, title: 'Kombat Wortal', description: language === 'pt' ? 'Retira totalmente o tempo de espera do Radar, o jogador pode buscar batalhas sempre que quiser, porém deixará de ganhar Etérion nas recompensas, ganhando apenas QC.' : 'Completely removes Radar waiting time, the player can search for battles whenever they want, but will stop earning Etérion in rewards, earning only QC.', color: 'purple' }

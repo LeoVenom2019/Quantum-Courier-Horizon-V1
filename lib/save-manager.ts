@@ -114,9 +114,16 @@ export interface ModularSaveData {
     earthSecurity: number;
     earthQualityOfLife: number;
     earthCouples: number;
-    earthBirthRegistry: number;
+    earthBirthRegistry: Record<string, number>;
+    earthProjectBoostCount: number;
+    earthSeason: number;
     earthEvents: any[];
     colonies: any[];
+    // Visual restoration
+    atmosphere: number;
+    temperature: number;
+    hydrosphere: number;
+    biosphere: number;
   };
   arcadeScores: Record<string, number>;
   localRecords: any[];
@@ -239,9 +246,15 @@ export const SaveManager = {
         earthSecurity: flatData.earthSecurity || 0,
         earthQualityOfLife: flatData.earthQualityOfLife || 0,
         earthCouples: flatData.earthCouples || 0,
-        earthBirthRegistry: flatData.earthBirthRegistry || 0,
+        earthBirthRegistry: flatData.earthBirthRegistry || {},
+        earthProjectBoostCount: flatData.earthProjectBoostCount || 0,
+        earthSeason: flatData.earthSeason || 0,
         earthEvents: flatData.earthEvents || [],
-        colonies: flatData.colonies || []
+        colonies: flatData.colonies || [],
+        atmosphere: flatData.atmosphere || 0,
+        temperature: flatData.temperature || 0,
+        hydrosphere: flatData.hydrosphere || 0,
+        biosphere: flatData.biosphere || 0
       },
       arcadeScores: flatData.arcadeScores || {},
       localRecords: flatData.localRecords || [],
@@ -346,11 +359,16 @@ export const SaveManager = {
           happiness: rawData.earthHappiness || 0,
           security: rawData.earthSecurity || 0,
           qualityOfLife: rawData.earthQualityOfLife || 0,
-          season: 0,
+          season: rawData.earthSeason || 0,
           events: rawData.earthEvents || [],
           reconstructionProgress: rawData.earthReconstructionProgress || {},
           couples: rawData.earthCouples || 0,
           birthRegistry: rawData.earthBirthRegistry || {},
+          projectBoostCount: rawData.earthProjectBoostCount || 0,
+          atmosphere: rawData.atmosphere || 0,
+          temperature: rawData.temperature || 0,
+          hydrosphere: rawData.hydrosphere || 0,
+          biosphere: rawData.biosphere || 0
         },
         system: {
           seenTutorials: rawData.seenTutorials || {},
@@ -420,7 +438,10 @@ export const SaveManager = {
         battleShipUpgradeLevel: v.battleShipUpgradeLevel || 0,
         route4Unlocked: g.route4Unlocked || false,
         gameTimeSeconds: g.gameTimeSeconds || 0,
-        researchingTech: null
+        totalDeliveries: g.totalDeliveries || 0,
+        deliveriesByLocation: g.deliveriesByLocation || {},
+        autoSkipRandomBattles: g.autoSkipRandomBattles || false,
+        researchingTech: g.researchingTech || null
       },
       mining: {
         miningRobots: min.miningRobots || {},
@@ -447,13 +468,26 @@ export const SaveManager = {
         voidBattleShipStats: v.voidBattleShipStats || { hp: 100, maxHp: 100, shield: 0, maxShield: 50, damage: 10, critChance: 0.05, lootEfficiency: 1, rarity: 'common', upgrades: { damage: 0, shield: 0, crit: 0, loot: 0 } },
         isRetributionActive: ex.isRetributionActive || false,
         isFatigueActive: ex.isFatigueActive || false,
-        voidResources: v.voidResources || { minerals: 0, energy: 0, food: 0, tech: 0, meds: 0 },
+        voidResources: {
+          minerals: v.voidResources?.minerals || 0,
+          energy: v.voidResources?.energy || 0,
+          food: v.voidResources?.food || 0,
+          tech: v.voidResources?.tech || 0,
+          meds: v.voidResources?.meds || 0
+        },
         voidCompactedResources: v.voidCompactedResources || {},
         voidPOIsInspiration: v.voidPOIsInspiration || {},
+        voidPOIQCDonations: v.voidPOIQCDonations || {},
         isVoidWarActive: v.isVoidWarActive || false,
         voidWarProgress: v.voidWarProgress || { currentSector: 1, currentBattle: 1 },
         robotRepairProgress: v.robotRepairProgress || 0,
-        isRobotRepaired: v.isRobotRepaired || false
+        isRobotRepaired: v.isRobotRepaired || false,
+        // New Aircraft fields
+        unlockedVoidAircraft: v.unlockedVoidAircraft || ['va-1'],
+        voidAircraftMissions: v.voidAircraftMissions || { 'va-1': { status: 'idle' }, 'va-2': { status: 'idle' }, 'va-3': { status: 'idle' } },
+        voidAircraftUpgrades: v.voidAircraftUpgrades || { 'va-1': { storage: 0, quality: 0, time: 0, auto: 0 }, 'va-2': { storage: 0, quality: 0, time: 0, auto: 0 }, 'va-3': { storage: 0, quality: 0, time: 0, auto: 0 } },
+        voidAircraftConstruction: v.voidAircraftConstruction || {},
+        voidAircraftAutoToggles: v.voidAircraftAutoToggles || {}
       },
       missions: {
         missions: g.missions || [],
@@ -490,12 +524,16 @@ export const SaveManager = {
         happiness: er.earthHappiness || 0,
         security: er.earthSecurity || 0,
         qualityOfLife: er.earthQualityOfLife || 0,
-        season: 0,
+        season: er.earthSeason || 0,
         events: er.earthEvents || [],
         reconstructionProgress: er.earthReconstructionProgress || {},
         couples: er.earthCouples || 0,
         birthRegistry: er.earthBirthRegistry || {},
-        projectBoostCount: 0
+        projectBoostCount: er.earthProjectBoostCount || 0,
+        atmosphere: er.atmosphere || 0,
+        temperature: er.temperature || 0,
+        hydrosphere: er.hydrosphere || 0,
+        biosphere: er.biosphere || 0
       },
       system: {
         seenTutorials: g.seenTutorials || {},
@@ -505,6 +543,5 @@ export const SaveManager = {
         playerName: g.playerName || '',
       }
     };
-
   }
 };

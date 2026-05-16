@@ -71,6 +71,10 @@ export function economyReducer(state: EconomyState = initialEconomyState, action
       };
     }
 
+    case 'LOAD_SAVE': {
+      return action.payload.economy;
+    }
+
     case 'RESET_GAME':
       return initialEconomyState;
 

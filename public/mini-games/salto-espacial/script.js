@@ -14,9 +14,52 @@ const CELL_SIZE = 32;
 
 // Colors
 const COLOR_HEAD = '#06b6d4';
-const COLOR_BODY = 'rgba(6, 182, 212, 0.4)';
-const COLOR_FOOD = '#10b981';
 const COLOR_BG = '#01040a';
+const SOUND_DEAD = '/audio/sfx/snake_dead.ogg';
+
+const SNAKE_COLOR_STAGES = [
+    { minLength: 0, color: '#06b6d4', trail: 'rgba(6, 182, 212, 0.2)', body: [6, 182, 212] },
+    { minLength: 9, color: '#10b981', trail: 'rgba(16, 185, 129, 0.22)', body: [16, 185, 129] },
+    { minLength: 16, color: '#facc15', trail: 'rgba(250, 204, 21, 0.24)', body: [250, 204, 21] },
+    { minLength: 25, color: '#ef4444', trail: 'rgba(239, 68, 68, 0.24)', body: [239, 68, 68] },
+    { minLength: 35, color: '#d946ef', trail: 'rgba(217, 70, 239, 0.26)', body: [217, 70, 239] }
+];
+
+const FOOD_TYPES = [
+    {
+        id: 'solar',
+        name: 'Nucleo Solar',
+        color: '#facc15',
+        glow: 'rgba(250, 204, 21, 0.9)',
+        flash: 'rgba(250, 204, 21, 0.18)',
+        sound: '/audio/sfx/snake_take_1.ogg',
+        score: 100,
+        growth: 1,
+        weight: 72
+    },
+    {
+        id: 'crimson',
+        name: 'Nucleo Carmesim',
+        color: '#ef4444',
+        glow: 'rgba(239, 68, 68, 0.95)',
+        flash: 'rgba(239, 68, 68, 0.18)',
+        sound: '/audio/sfx/snake_take_2.ogg',
+        score: 200,
+        growth: 2,
+        weight: 20
+    },
+    {
+        id: 'void',
+        name: 'Nucleo do Vazio',
+        color: '#d946ef',
+        glow: 'rgba(217, 70, 239, 1)',
+        flash: 'rgba(217, 70, 239, 0.18)',
+        sound: '/audio/sfx/snake_take_3.ogg',
+        score: 400,
+        growth: 3,
+        weight: 8
+    }
+];
 
 let snake = [];
 let food = null;
@@ -33,6 +76,7 @@ let highScore = parseInt(localStorage.getItem('salto_espacial_high_score')) || 0
 let stars = [];
 let particles = [];
 let foodPulse = 0;
+const soundCache = new Map();
 
 function createStars() {
     stars = [];
@@ -104,12 +148,74 @@ function spawnFood() {
     while (true) {
         newFood = {
             x: Math.floor(Math.random() * COLS),
-            y: Math.floor(Math.random() * ROWS)
+            y: Math.floor(Math.random() * ROWS),
+            type: pickFoodType()
         };
         const onSnake = snake.some(segment => segment.x === newFood.x && segment.y === newFood.y);
         if (!onSnake) break;
     }
     food = newFood;
+}
+
+function playSound(path, volume = 0.75) {
+    if (!path) return;
+
+    try {
+        if (!soundCache.has(path)) {
+            const audio = new Audio(path);
+            audio.preload = 'auto';
+            soundCache.set(path, audio);
+        }
+
+        const sound = soundCache.get(path).cloneNode();
+        sound.volume = volume;
+        sound.play().catch(() => {});
+    } catch (error) {
+        // Audio can be blocked before user interaction; gameplay must continue.
+    }
+}
+
+function spawnBurst(x, y, color, amount = 18, speed = 1.6, life = 36, size = 3) {
+    for (let i = 0; i < amount; i++) {
+        const angle = (Math.PI * 2 * i) / amount;
+        const drift = 0.65 + Math.random() * 0.7;
+
+        particles.push({
+            x, y,
+            vx: Math.cos(angle) * speed * drift,
+            vy: Math.sin(angle) * speed * drift,
+            life: life + Math.floor(Math.random() * 12),
+            maxLife: life + 12,
+            color,
+            size: 1 + Math.random() * size
+        });
+    }
+}
+
+function playTakeSound(foodType) {
+    playSound(foodType.sound, 0.75);
+}
+
+function pickFoodType() {
+    const totalWeight = FOOD_TYPES.reduce((total, type) => total + type.weight, 0);
+    let roll = Math.random() * totalWeight;
+
+    for (const type of FOOD_TYPES) {
+        roll -= type.weight;
+        if (roll <= 0) return type;
+    }
+
+    return FOOD_TYPES[0];
+}
+
+function getSnakeColorStage() {
+    let currentStage = SNAKE_COLOR_STAGES[0];
+
+    for (const stage of SNAKE_COLOR_STAGES) {
+        if (snake.length >= stage.minLength) currentStage = stage;
+    }
+
+    return currentStage;
 }
 
 function handleInput(e) {
@@ -161,15 +267,38 @@ function update() {
 
     // Food collection
     if (nextX === food.x && nextY === food.y) {
-        updateScore(score + 100);
-        spawnParticle(food.x * CELL_SIZE + CELL_SIZE/2, food.y * CELL_SIZE + CELL_SIZE/2, COLOR_FOOD, 2, 40);
-        spawnFood();
+        const foodType = food.type || FOOD_TYPES[0];
+        playTakeSound(foodType);
+        updateScore(score + foodType.score);
+        spawnParticle(
+            food.x * CELL_SIZE + CELL_SIZE / 2,
+            food.y * CELL_SIZE + CELL_SIZE / 2,
+            foodType.color,
+            1.5 + foodType.growth * 0.5,
+            34 + foodType.growth * 8
+        );
+        spawnBurst(
+            food.x * CELL_SIZE + CELL_SIZE / 2,
+            food.y * CELL_SIZE + CELL_SIZE / 2,
+            foodType.color,
+            12 + foodType.growth * 8,
+            1.2 + foodType.growth * 0.55,
+            24 + foodType.growth * 8,
+            2 + foodType.growth
+        );
         
         // Add new head
         snake.unshift({ x: nextX, y: nextY, px: head.x, py: head.y });
+
+        for (let i = 1; i < foodType.growth; i++) {
+            const tail = snake[snake.length - 1];
+            snake.push({ x: tail.x, y: tail.y, px: tail.px, py: tail.py });
+        }
+
+        spawnFood();
         
         // Collection flash
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+        ctx.fillStyle = foodType.flash;
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         
         if (tickSpeed > 70) tickSpeed -= 1.5;
@@ -239,6 +368,8 @@ function drawParticles() {
         const p = particles[i];
         p.x += p.vx;
         p.y += p.vy;
+        p.vx *= 0.985;
+        p.vy *= 0.985;
         p.life--;
         
         if (p.life <= 0) {
@@ -257,21 +388,40 @@ function drawParticles() {
 }
 
 function drawFood() {
+    if (!food) return;
+
     foodPulse += 0.05;
+    const foodType = food.type || FOOD_TYPES[0];
     const breathe = Math.sin(foodPulse) * 3;
+    const centerX = food.x * CELL_SIZE + CELL_SIZE / 2;
+    const centerY = food.y * CELL_SIZE + CELL_SIZE / 2;
+    const radius = CELL_SIZE / 3 + breathe / 2;
     
     ctx.save();
-    ctx.shadowBlur = 15 + breathe;
-    ctx.shadowColor = COLOR_FOOD;
-    ctx.fillStyle = COLOR_FOOD;
-    
+    ctx.shadowBlur = 18 + breathe;
+    ctx.shadowColor = foodType.color;
+    ctx.strokeStyle = foodType.glow;
+    ctx.lineWidth = foodType.growth;
+
     ctx.beginPath();
-    ctx.arc(
-        food.x * CELL_SIZE + CELL_SIZE / 2,
-        food.y * CELL_SIZE + CELL_SIZE / 2,
-        CELL_SIZE / 3 + breathe / 2,
-        0, Math.PI * 2
-    );
+    ctx.arc(centerX, centerY, radius + 6, 0, Math.PI * 2);
+    ctx.stroke();
+
+    if (foodType.id === 'void') {
+        ctx.rotate(0);
+        ctx.beginPath();
+        ctx.ellipse(centerX, centerY, radius + 9, radius / 2, foodPulse, 0, Math.PI * 2);
+        ctx.stroke();
+    }
+
+    ctx.fillStyle = foodType.color;
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+    ctx.beginPath();
+    ctx.arc(centerX - radius / 3, centerY - radius / 3, Math.max(2, radius / 5), 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
 }
@@ -279,10 +429,11 @@ function drawFood() {
 function drawSnake(interp) {
     // Draw body segments with interpolation
     ctx.shadowBlur = 0;
+    const colorStage = getSnakeColorStage();
     
     // Draw trail line
     ctx.beginPath();
-    ctx.strokeStyle = 'rgba(6, 182, 212, 0.2)';
+    ctx.strokeStyle = colorStage.trail;
     ctx.lineWidth = 8;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
@@ -305,7 +456,7 @@ function drawSnake(interp) {
         
         // Energy Segment
         const opacity = Math.max(0.1, 1 - (i / snake.length));
-        ctx.fillStyle = `rgba(6, 182, 212, ${opacity * 0.5})`;
+        ctx.fillStyle = `rgba(${colorStage.body[0]}, ${colorStage.body[1]}, ${colorStage.body[2]}, ${opacity * 0.55})`;
         ctx.fillRect(segX + 6, segY + 6, CELL_SIZE - 12, CELL_SIZE - 12);
         
         // Core
@@ -317,7 +468,7 @@ function drawSnake(interp) {
     const head = snake[0];
     const headX = (head.px + (head.x - head.px) * interp) * CELL_SIZE;
     const headY = (head.py + (head.y - head.py) * interp) * CELL_SIZE;
-    drawShip(headX, headY, direction);
+    drawShip(headX, headY, direction, colorStage.color);
     
     // Speed Particles (Exhaust)
     if (Math.random() > 0.5) {
@@ -333,13 +484,13 @@ function drawSnake(interp) {
             vy: (Math.random() - 0.5) * 2,
             life: 15,
             maxLife: 15,
-            color: 'rgba(6, 182, 212, 0.5)',
+            color: `rgba(${colorStage.body[0]}, ${colorStage.body[1]}, ${colorStage.body[2]}, 0.5)`,
             size: Math.random() * 2
         });
     }
 }
 
-function drawShip(x, y, dir) {
+function drawShip(x, y, dir, shipColor = COLOR_HEAD) {
     ctx.save();
     ctx.translate(x + CELL_SIZE / 2, y + CELL_SIZE / 2);
     
@@ -350,8 +501,8 @@ function drawShip(x, y, dir) {
 
     // Glow
     ctx.shadowBlur = 15;
-    ctx.shadowColor = COLOR_HEAD;
-    ctx.fillStyle = COLOR_HEAD;
+    ctx.shadowColor = shipColor;
+    ctx.fillStyle = shipColor;
 
     // Detailed ship shape
     ctx.beginPath();
@@ -380,10 +531,52 @@ function drawShip(x, y, dir) {
     ctx.restore();
 }
 
+function animateDeathBurst(startTime) {
+    const elapsed = performance.now() - startTime;
+    const progress = Math.min(1, elapsed / 520);
+
+    draw(1);
+    ctx.fillStyle = `rgba(239, 68, 68, ${0.16 * (1 - progress)})`;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    if (progress < 1) {
+        requestAnimationFrame(() => animateDeathBurst(startTime));
+    }
+}
+
 function gameOver() {
+    const head = snake[0];
+    const colorStage = getSnakeColorStage();
+
     gameActive = false;
+    playSound(SOUND_DEAD, 0.85);
+
+    if (head) {
+        spawnBurst(
+            head.x * CELL_SIZE + CELL_SIZE / 2,
+            head.y * CELL_SIZE + CELL_SIZE / 2,
+            colorStage.color,
+            34,
+            2.6,
+            48,
+            4
+        );
+        spawnBurst(
+            head.x * CELL_SIZE + CELL_SIZE / 2,
+            head.y * CELL_SIZE + CELL_SIZE / 2,
+            '#ef4444',
+            18,
+            1.8,
+            38,
+            3
+        );
+        animateDeathBurst(performance.now());
+    }
+
     finalScoreElement.innerText = score;
-    overlay.classList.remove('hidden');
+    setTimeout(() => {
+        if (!gameActive) overlay.classList.remove('hidden');
+    }, 420);
     statusElement.innerText = 'OFFLINE';
     statusElement.className = 'status-danger';
     updateHighScore();

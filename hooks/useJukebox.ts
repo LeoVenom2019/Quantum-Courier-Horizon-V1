@@ -154,7 +154,11 @@ export function useJukebox(onPlayStateChange?: (isPlaying: boolean) => void) {
     const handleEnded = () => {
       if (isLoop) {
         audio.currentTime = 0;
-        audio.play().catch(console.error);
+        audio.play().catch(err => {
+          if (err.name !== 'AbortError') {
+            console.warn('[Jukebox] Loop playback failed:', err.message);
+          }
+        });
       } else {
         playNext();
       }

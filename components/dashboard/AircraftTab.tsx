@@ -58,7 +58,10 @@ const AircraftTab = memo(({ renderBattleLevelTab }: { renderBattleLevelTab: () =
         
         <div className="flex bg-black/40 p-1 rounded-xl border border-white/10">
           <button
-            onClick={() => setAircraftSubTab('fleet')}
+            onClick={() => {
+              setAircraftSubTab('fleet');
+              playSfx('laser_up');
+            }}
             className={`px-3 py-1.5 lg:px-4 lg:py-2 rounded-lg text-[14px] font-bold transition-all ${
               aircraftSubTab === 'fleet' ? 'bg-white/10 text-white' : 'text-white/40 hover:text-white/60'
             }`}
@@ -66,7 +69,10 @@ const AircraftTab = memo(({ renderBattleLevelTab }: { renderBattleLevelTab: () =
             {t('fleet')}
           </button>
           <button
-            onClick={() => setAircraftSubTab('battle')}
+            onClick={() => {
+              setAircraftSubTab('battle');
+              playSfx('laser_up');
+            }}
             className={`px-3 py-1.5 lg:px-4 lg:py-2 rounded-lg text-[14px] font-bold transition-all ${
               aircraftSubTab === 'battle' ? 'bg-purple-500/20 text-purple-400' : 'text-white/40 hover:text-white/60'
             }`}
@@ -228,18 +234,18 @@ const AircraftTab = memo(({ renderBattleLevelTab }: { renderBattleLevelTab: () =
                       <div className="absolute inset-0 opacity-10 star-grid pointer-events-none" />
                       
                       {(() => {
-                        const shipId = currentShips[shipPageIndex].name.toLowerCase().replace(/\s+/g, '-');
+                        const shipId = currentShips[shipPageIndex].name.toLowerCase().replace(/[\s_]+/g, '-');
                         return (
                           <video 
                             key={`v-${shipId}`}
-                            src={`/videos/ships/${shipId}.webm`}
                             autoPlay 
                             loop 
                             muted 
                             playsInline
-                            className="absolute inset-0 w-full h-full object-cover z-0"
-                            style={{ backgroundColor: 'black' }}
-                          />
+                            className="w-full h-full object-cover relative z-0"
+                          >
+                            <source src={`/videos/ships/${shipId}.webm`} type="video/webm" />
+                          </video>
                         );
                       })()}
 

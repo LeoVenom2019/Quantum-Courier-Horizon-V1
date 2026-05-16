@@ -52,11 +52,11 @@ const MissionsTab = memo(() => {
   const getRarityLabel = (rarity: Mission['rarity']) => {
     const isSolar = routeTier === 'Solar';
     switch (rarity) {
-      case 'rare': return { label: language === 'pt' ? 'RARA' : 'RARE', color: 'text-blue-400', mult: '10x' };
-      case 'legendary': return { label: language === 'pt' ? 'LENDÁRIA' : 'LEGENDARY', color: 'text-orange-400', mult: isSolar ? '25x' : '50x' };
-      case 'mythic': return { label: language === 'pt' ? 'MÍTICA' : 'MYTHIC', color: 'text-slate-300', mult: isSolar ? '35x' : '150x' };
-      case 'alien': return { label: language === 'pt' ? 'ALIEN' : 'ALIEN', color: 'text-green-400', mult: isSolar ? '50x' : '150x' };
-      default: return { label: language === 'pt' ? 'COMUM' : 'COMMON', color: 'text-slate-400', mult: '1x' };
+      case 'rare': return { label: t('rare'), color: 'text-blue-400', mult: '10x' };
+      case 'legendary': return { label: t('legendary'), color: 'text-orange-400', mult: isSolar ? '25x' : '50x' };
+      case 'mythic': return { label: t('mythic'), color: 'text-slate-300', mult: isSolar ? '35x' : '150x' };
+      case 'alien': return { label: t('alien'), color: 'text-green-400', mult: isSolar ? '50x' : '150x' };
+      default: return { label: t('common'), color: 'text-slate-400', mult: '1x' };
     }
   };
 
@@ -78,8 +78,8 @@ const MissionsTab = memo(() => {
             }}
             className="px-4 py-2 lg:py-3 lg:px-6 rounded-lg font-orbitron text-base tracking-widest transition-all uppercase flex flex-col items-center justify-center h-[64px] lg:h-[72px] w-[180px] lg:w-[220px] leading-snug bg-amber-500/10 text-amber-400 border border-amber-500/30 hover:bg-amber-500/20 hover:border-amber-500/60 shadow-[0_0_15px_rgba(245,158,11,0.1)]"
           >
-            <span className="font-black text-[14px] lg:text-base">{language === 'pt' ? 'Mapa de Habilidades' : 'Skill Map'}</span>
-            <span className="opacity-70 font-mono text-[14px] lg:text-[15px]">{language === 'pt' ? 'MELHORIAS' : 'UPGRADES'}</span>
+            <span className="font-black text-[14px] lg:text-base">{t('skillMap')}</span>
+            <span className="opacity-70 font-mono text-[14px] lg:text-[15px]">{t('upgradesCaps')}</span>
           </button>
 
           <button
@@ -104,7 +104,7 @@ const MissionsTab = memo(() => {
                 : 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/30 hover:bg-indigo-500/20 hover:border-indigo-500/60 shadow-[0_0_15px_rgba(99,102,241,0.1)]'
             }`}
           >
-            <span className="font-black text-[14px] lg:text-base">{language === 'pt' ? 'Melhorar' : 'Upgrade'}</span>
+            <span className="font-black text-[14px] lg:text-base">{t('upgrade')}</span>
             <div className="flex flex-col items-center">
               <span className="opacity-70 font-mono text-[14px] lg:text-[15px]">LVL {missionRewardLevel[routeTier]}/10</span>
               {missionRewardLevel[routeTier] < 10 && (
@@ -125,10 +125,10 @@ const MissionsTab = memo(() => {
                   setRadarUnlocked((prev: any) => ({ ...prev, [routeTier]: true }));
                   setAutoClaimMissions(!autoClaimMissions);
                   playSfx('cash');
-                  addLog(`${language === 'pt' ? 'Radar de Missões desbloqueado!' : 'Mission Radar unlocked!'}`, 'success');
+                  addLog(t('missionRadarUnlocked'), 'success');
                 } else {
                   playSfx('error');
-                  addLog(`${language === 'pt' ? `QC insuficiente para o Radar (${formatValue(unlockCost)} necessário)` : `Insufficient QC for Radar (${formatValue(unlockCost)} required)`}`, 'error');
+                  addLog(`${t('insufficientQCForRadar')} (${formatValue(unlockCost)} ${t('required')})`, 'error');
                 }
                 return;
               }
@@ -136,9 +136,9 @@ const MissionsTab = memo(() => {
               setAutoClaimMissions(!autoClaimMissions);
               playSfx(autoClaimMissions ? 'close_window' : 'ask_window');
               if (!autoClaimMissions) {
-                addLog(`${language === 'pt' ? 'Auto-Resgate de Missões ativado!' : 'Auto-Claim Missions activated!'}`, 'success');
+                addLog(t('autoClaimMissionsActivated'), 'success');
               } else {
-                addLog(`${language === 'pt' ? 'Auto-Resgate de Missões desativado!' : 'Auto-Claim Missions deactivated!'}`, 'info');
+                addLog(t('autoClaimMissionsDeactivated'), 'info');
               }
             }}
             className={`px-4 py-2 lg:py-3 lg:px-6 rounded-lg text-base lg:text-[14px] font-bold font-orbitron transition-all flex items-center justify-center h-[64px] lg:h-[72px] w-[180px] lg:w-[220px] gap-2 ${
@@ -153,8 +153,8 @@ const MissionsTab = memo(() => {
               <>
                 <Target className="w-4 h-4" />
                 <div className="flex flex-col items-start leading-none">
-                  <span>{language === 'pt' ? 'COMPRAR RADAR' : 'BUY RADAR'}</span>
-                  <span className="text-[14px] text-amber-500/70 font-mono mt-0.5">500k QC</span>
+                  <span>{t('buyRadar')}</span>
+                  <span className="text-[14px] text-amber-500/70 font-mono mt-0.5">{formatValue(isInterstellar ? 1000000 : 500000)} QC</span>
                 </div>
               </>
             ) : autoClaimMissions ? (
@@ -165,7 +165,7 @@ const MissionsTab = memo(() => {
             ) : (
               <>
                 <div className="w-2 h-2 bg-slate-500 rounded-full" />
-                <span>{language === 'pt' ? 'AUTO RESGATE' : 'AUTO CLAIM'} {readyToClaimCount > 0 ? `(${readyToClaimCount})` : ''}</span>
+                <span>{t('autoClaim')} {readyToClaimCount > 0 ? `(${readyToClaimCount})` : ''}</span>
               </>
             )}
           </button>
@@ -214,7 +214,7 @@ const MissionsTab = memo(() => {
                       transition={{ repeat: Infinity, duration: 2 }}
                       className="text-[10px] font-orbitron font-bold text-green-400 border border-green-400/30 px-2 py-0.5 rounded uppercase"
                     >
-                      {language === 'pt' ? 'Concluída' : 'Completed'}
+                      {t('completed')}
                     </motion.div>
                   )}
                 </div>
@@ -226,7 +226,7 @@ const MissionsTab = memo(() => {
 
                 <div className="space-y-3">
                   <div className="flex justify-between text-[14px] font-mono mb-1">
-                    <span className="text-slate-500 uppercase tracking-wider">{language === 'pt' ? 'Progresso' : 'Progress'}</span>
+                    <span className="text-slate-500 uppercase tracking-wider">{t('status')}</span>
                     <span className="text-white">{mission.current} / {mission.target}</span>
                   </div>
                   <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden border border-white/5">
@@ -257,7 +257,7 @@ const MissionsTab = memo(() => {
                             : 'bg-white/5 text-slate-500 border border-white/10 opacity-50 cursor-not-allowed'
                       }`}
                     >
-                      {mission.claimed ? (language === 'pt' ? 'RESGATADO' : 'CLAIMED') : (language === 'pt' ? 'RESGATAR' : 'CLAIM')}
+                      {mission.claimed ? t('claimed') : t('claim')}
                     </button>
                   </div>
                 </div>

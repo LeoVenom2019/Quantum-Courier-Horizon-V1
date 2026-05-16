@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QCH | Hellfire Barrage</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;900&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: #060300;
+            color: white;
+            font-family: 'Orbitron', sans-serif;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+        }
+        canvas {
+            background: #000;
+            border: 1px solid rgba(255,120,0,0.06);
+            border-radius: 4px;
+            box-shadow: 0 0 80px rgba(0,0,0,1);
+            cursor: crosshair;
+        }
+        .hud {
+            position: absolute;
+            top: 30px;
+            text-align: center;
+            pointer-events: none;
+        }
+        .hud h1 {
+            font-size: 12px;
+            letter-spacing: 14px;
+            color: rgba(255,120,0,0.25);
+            font-weight: 900;
+            text-transform: uppercase;
+        }
+        .hud .status {
+            font-size: 8px;
+            color: rgba(255,60,0,0.2);
+            margin-top: 8px;
+            letter-spacing: 3px;
+        }
+        .controls {
+            position: absolute;
+            bottom: 40px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+        }
+        button {
+            padding: 16px 48px;
+            background: rgba(255,80,0,0.04);
+            border: 1px solid rgba(255,80,0,0.18);
+            color: rgba(255,140,0,0.45);
+            font-family: 'Orbitron', sans-serif;
+            font-weight: 900;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 5px;
+            cursor: pointer;
+            transition: all 0.5s cubic-bezier(0.2,1,0.2,1);
+            border-radius: 2px;
+        }
+        button:hover {
+            background: rgba(255,80,0,0.85);
+            color: #fff;
+            border-color: #ff5000;
+            box-shadow: 0 0 40px rgba(255,80,0,0.4);
+            transform: translateY(-2px) scale(1.04);
+        }
+        .hint {
+            font-size: 9px;
+            color: rgba(255,255,255,0.12);
+            letter-spacing: 2px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="hud">
+    <h1>Hellfire Barrage System</h1>
+    <div class="status">QCH • SPECIAL WEAPON • FIRE DAMAGE MODULE</div>
+</div>
+
+<canvas id="canvas"></canvas>
+
+<div class="controls">
+    <button onclick="triggerBarrage()">▶ Lançar Barragem</button>
+    <div class="hint">Clique nos inimigos para posicioná-los • Botão para disparar</div>
+</div>
+
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+
+function resize() {
+    canvas.width  = window.innerWidth  * 0.95;
+    canvas.height = window.innerHeight * 0.78;
+}
+window.addEventListener('resize', resize);
+resize();
+
+// ─── CONSTANTS ────────────────────────────────────────────────
+const SHIP_X = 160;
+const FIREBALL_COUNT  = 5;
+const FIRE_INTERVAL   = 500;    // ms between each ball
+const DOT_DURATION    = 3000;   // ms of burn after impact
+const SPLASH_RADIUS   = 90;
+
+// ─── STATE ────────────────────────────────────────────────────
+let enemies      = [];
+let fireballs    = [];
+let trailParts   = [];   // fire + smoke trail particles
+let explosions   = [];   // impact burst particles
+let burnZones    = [];   // persistent fire on ground
+let damageNums   = [];   // floating damage numbers
+let screenShake  = { x:0, y:0 };
+let barrageActive = false;
+let barrageQueue  = [];
+
+// Spawn default enemies
+function spawnDefaultEnemies() {
+    enemies = [
+        { x: canvas.width * 0.55, y: canvas.height * 0.35, hp: 8000, maxHp: 8000, dead: false, burnTimer: 0, dotDmg: 0, dotTick: 0 },
+        { x: canvas.width * 0.72, y: canvas.height * 0.62, hp: 6000, maxHp: 6000, dead: false, burnTimer: 0, dotDmg: 0, dotTick: 0 },
+        { x: canvas.width * 0.88, y: canvas.height * 0.45, hp: 5000, maxHp: 5000, dead: false, burnTimer: 0, dotDmg: 0, dotTick: 0 },
+    ];
+}
+spawnDefaultEnemies();
+
+// Click to reposition enemies
+canvas.addEventListener('click', (e) => {
+    if (barrageActive) return;
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+    // Find nearest or add
+    let nearest = null, nd = Infinity;
+    enemies.forEach(en => {
+        const d = Math.hypot(en.x - mx, en.y - my);
+        if (d < nd) { nd = d; nearest = en; }
+    });
+    if (nd < 60 && nearest) {
+        nearest.x = mx; nearest.y = my;
+    }
+});
+
+// ─── LAUNCH BARRAGE ───────────────────────────────────────────
+function triggerBarrage() {
+    if (barrageActive) return;
+    barrageActive = true;
+    // Revive enemies for demo
+    enemies.forEach(en => { en.hp = en.maxHp; en.dead = false; en.burnTimer = 0; });
+    fireballs = []; trailParts = []; explosions = []; burnZones = []; damageNums = [];
+
+    const dirs = ['up','forward','down'];
+    barrageQueue = [];
+    for (let i = 0; i < FIREBALL_COUNT; i++) {
+        const dir = dirs[Math.floor(Math.random() * dirs.length)];
+        barrageQueue.push({ dir, delay: i * FIRE_INTERVAL });
+    }
+
+    const start = performance.now();
+    barrageQueue.forEach(item => {
+        setTimeout(() => launchFireball(item.dir), item.delay);
+    });
+    setTimeout(() => { barrageActive = false; }, FIRE_INTERVAL * FIREBALL_COUNT + 4000);
+}
+
+function launchFireball(dir) {
+    const shipY = canvas.height / 2;
+    let ox, oy, vx, vy;
+
+    // Origin offset by direction
+    if      (dir === 'up')      { ox = SHIP_X + 60; oy = shipY - 30; }
+    else if (dir === 'forward') { ox = SHIP_X + 80; oy = shipY; }
+    else                        { ox = SHIP_X + 60; oy = shipY + 30; }
+
+    // Find nearest living enemy
+    let target = null, td = Infinity;
+    enemies.forEach(en => {
+        if (en.dead) return;
+        const d = Math.hypot(en.x - ox, en.y - oy);
+        if (d < td) { td = d; target = en; }
+    });
+
+    // Arc control point & velocity
+    let tx, ty, arcCY;
+    if (target) {
+        tx = target.x; ty = target.y;
+    } else {
+        // straight off screen
+        const offDir = dir === 'up' ? -1 : dir === 'down' ? 1 : 0;
+        tx = canvas.width + 200;
+        ty = oy + offDir * 80;
+    }
+
+    const speed   = 4.5 + Math.random() * 1.5;
+    const dist    = Math.hypot(tx - ox, ty - oy);
+    const travelT = dist / speed; // frames estimate
+
+    fireballs.push({
+        ox, oy, tx, ty,
+        x: ox, y: oy,
+        t: 0,           // 0..1 progress
+        speed: speed / dist,
+        arcBend: (dir === 'up' ? -1 : dir === 'down' ? 1 : 0) * (60 + Math.random() * 60),
+        target,
+        done: false,
+        dir,
+        size: 18 + Math.random() * 10,
+        rot: Math.random() * Math.PI * 2,
+        rotSpeed: (Math.random() - 0.5) * 0.25,
+    });
+}
+
+// ─── QUADRATIC BEZIER ─────────────────────────────────────────
+function bezier(p0, p1, p2, t) {
+    const mt = 1 - t;
+    return mt*mt*p0 + 2*mt*t*p1 + t*t*p2;
+}
+
+// ─── SPAWN IMPACT ─────────────────────────────────────────────
+function spawnImpact(x, y, fb) {
+    screenShake = { x: 18, y: 18 };
+
+    // Explosion burst particles
+    for (let i = 0; i < 180; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const spd   = 2 + Math.random() * 9;
+        const big   = Math.random() < 0.15;
+        explosions.push({
+            x, y,
+            vx: Math.cos(angle) * spd,
+            vy: Math.sin(angle) * spd - Math.random() * 3,
+            life: 1,
+            decay: 0.008 + Math.random() * 0.014,
+            size: big ? (12 + Math.random() * 20) : (2 + Math.random() * 8),
+            smoke: i > 120,
+            color: pickFireColor(Math.random()),
+        });
+    }
+
+    // Burn zone
+    const immDmg = Math.floor(1500 + Math.random() * 1000);
+    const dotDmg = Math.floor(400  + Math.random() * 500);
+    burnZones.push({
+        x, y,
+        life: 1,
+        startTime: performance.now(),
+        duration: DOT_DURATION + 500,
+        radius: 55 + Math.random() * 25,
+    });
+
+    // Damage nearby enemies (splash)
+    enemies.forEach(en => {
+        if (en.dead) return;
+        const d = Math.hypot(en.x - x, en.y - y);
+        if (d > SPLASH_RADIUS) return;
+
+        const falloff = 1 - d / SPLASH_RADIUS;
+        const dmg = Math.floor(immDmg * (d < 10 ? 1 : falloff));
+        applyDamage(en, dmg, x, y, 'imm');
+
+        // Apply DoT
+        en.burnTimer = DOT_DURATION;
+        en.dotDmg    = dotDmg;
+        en.dotTick   = 0;
+    });
+}
+
+function applyDamage(en, dmg, srcX, srcY, type) {
+    if (en.dead) return;
+    en.hp = Math.max(0, en.hp - dmg);
+    if (en.hp <= 0) en.dead = true;
+
+    const offX = (Math.random() - 0.5) * 40;
+    const offY = -10 - Math.random() * 20;
+    damageNums.push({
+        x: en.x + offX,
+        y: en.y + offY,
+        vy: -1.2 - Math.random() * 0.8,
+        text: dmg.toLocaleString(),
+        life: 1,
+        type, // 'imm' | 'dot'
+    });
+}
+
+function pickFireColor(r) {
+    if (r < 0.25) return 'rgba(255,255,180,1)';
+    if (r < 0.5)  return 'rgba(255,160,20,1)';
+    if (r < 0.75) return 'rgba(255,80,10,1)';
+    return 'rgba(200,50,0,1)';
+}
+
+// ─── UPDATE ───────────────────────────────────────────────────
+let lastTime = 0;
+function update(now) {
+    const dt = Math.min(now - lastTime, 32);
+    lastTime = now;
+
+    // ── Fireballs ──
+    fireballs.forEach(fb => {
+        if (fb.done) return;
+        fb.t += fb.speed * (dt / 16);
+        if (fb.t >= 1) { fb.t = 1; fb.done = true; }
+
+        const cx = (fb.ox + fb.tx) / 2;
+        const cy = (fb.oy + fb.ty) / 2 + fb.arcBend;
+        fb.x = bezier(fb.ox, cx, fb.tx, fb.t);
+        fb.y = bezier(fb.oy, cy, fb.ty, fb.t);
+        fb.rot += fb.rotSpeed;
+
+        // Trail particles
+        if (Math.random() < 0.85) {
+            const isSpark = Math.random() < 0.3;
+            trailParts.push({
+                x: fb.x + (Math.random()-0.5)*8,
+                y: fb.y + (Math.random()-0.5)*8,
+                vx: (Math.random()-0.5)*1.5,
+                vy: -0.4 - Math.random()*1.2,
+                life: 1,
+                decay: isSpark ? 0.04 + Math.random()*0.05 : 0.012 + Math.random()*0.018,
+                size: isSpark ? 2+Math.random()*4 : 8+Math.random()*20,
+                smoke: !isSpark && Math.random() < 0.45,
+                color: pickFireColor(Math.random()),
+            });
+        }
+
+        if (fb.done) spawnImpact(fb.tx, fb.ty, fb);
+    });
+    fireballs = fireballs.filter(fb => !fb.done || fb.t < 1.01);
+
+    // ── Trail particles ──
+    trailParts.forEach(p => {
+        p.x += p.vx; p.y += p.vy;
+        p.vy -= 0.04; // rise
+        p.life -= p.decay;
+    });
+    trailParts = trailParts.filter(p => p.life > 0);
+
+    // ── Explosion particles ──
+    explosions.forEach(e => {
+        e.x += e.vx; e.y += e.vy;
+        e.vx *= 0.94; e.vy *= 0.94;
+        e.vy += e.smoke ? -0.15 : 0.08;
+        e.life -= e.decay;
+    });
+    explosions = explosions.filter(e => e.life > 0);
+
+    // ── Burn zones ──
+    burnZones.forEach(bz => {
+        const age = now - bz.startTime;
+        bz.life = Math.max(0, 1 - age / bz.duration);
+    });
+    burnZones = burnZones.filter(bz => bz.life > 0);
+
+    // ── DoT on enemies ──
+    enemies.forEach(en => {
+        if (en.dead || en.burnTimer <= 0) return;
+        en.burnTimer -= dt;
+        en.dotTick   += dt;
+        if (en.dotTick >= 1000) { // tick every second
+            en.dotTick -= 1000;
+            const dmg = Math.floor(en.dotDmg * (0.9 + Math.random()*0.2));
+            applyDamage(en, dmg, en.x, en.y, 'dot');
+        }
+    });
+
+    // ── Damage numbers ──
+    damageNums.forEach(d => {
+        d.y += d.vy;
+        d.life -= 0.016;
+    });
+    damageNums = damageNums.filter(d => d.life > 0);
+
+    // ── Screen shake ──
+    screenShake.x *= 0.85;
+    screenShake.y *= 0.85;
+}
+
+// ─── RENDER ───────────────────────────────────────────────────
+function render(now) {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    ctx.save();
+    ctx.translate(
+        (Math.random()-0.5)*screenShake.x,
+        (Math.random()-0.5)*screenShake.y
+    );
+
+    const shipY = canvas.height / 2;
+
+    // ── Draw ship placeholder ──
+    ctx.save();
+    ctx.globalAlpha = 0.18;
+    ctx.fillStyle = '#ff7700';
+    ctx.font = '11px Orbitron';
+    ctx.fillText('[ NAVE ]', SHIP_X - 30, shipY + 4);
+    ctx.globalAlpha = 0.08;
+    ctx.strokeStyle = '#ff7700';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(SHIP_X - 35, shipY - 18, 95, 36);
+    ctx.restore();
+
+    // ── Draw burn zones (ground fire) ──
+    burnZones.forEach(bz => {
+        const flicker = 0.8 + Math.sin(now * 0.012 + bz.x) * 0.2;
+        const r = bz.radius * (1.2 - bz.life * 0.2) * flicker;
+        const g = ctx.createRadialGradient(bz.x, bz.y, 0, bz.x, bz.y, r);
+        g.addColorStop(0,   `rgba(255,220,80,${bz.life * 0.9})`);
+        g.addColorStop(0.25,`rgba(255,100,10,${bz.life * 0.75})`);
+        g.addColorStop(0.6, `rgba(200,30,0,${bz.life * 0.5})`);
+        g.addColorStop(1,   'transparent');
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.arc(bz.x, bz.y, r, 0, Math.PI*2);
+        ctx.fill();
+        ctx.restore();
+
+        // Small dancing fire particles on burn
+        for (let i = 0; i < 2; i++) {
+            const a = now * 0.004 + i * Math.PI;
+            const fx = bz.x + Math.cos(a + i*1.3) * (Math.random()*bz.radius*0.6);
+            const fy = bz.y + Math.sin(a * 0.7)   * (Math.random()*bz.radius*0.3) - Math.random()*8;
+            ctx.save();
+            ctx.globalAlpha = bz.life * 0.5 * Math.random();
+            ctx.globalCompositeOperation = 'lighter';
+            ctx.fillStyle = pickFireColor(Math.random());
+            ctx.shadowBlur = 15; ctx.shadowColor = '#ff8800';
+            ctx.beginPath();
+            ctx.arc(fx, fy, 3+Math.random()*5, 0, Math.PI*2);
+            ctx.fill();
+            ctx.restore();
+        }
+    });
+
+    // ── Draw trail particles ──
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    trailParts.forEach(p => {
+        const a = p.life * (p.smoke ? 0.18 : 0.7);
+        ctx.globalAlpha = a;
+        if (p.smoke) {
+            const sg = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.size);
+            sg.addColorStop(0, `rgba(255,120,20,${p.life*0.5})`);
+            sg.addColorStop(0.4,`rgba(200,80,0,${p.life*0.3})`);
+            sg.addColorStop(1, 'transparent');
+            ctx.fillStyle = sg;
+        } else {
+            ctx.fillStyle = p.color;
+            ctx.shadowBlur = 20; ctx.shadowColor = '#ff6600';
+        }
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size * p.life, 0, Math.PI*2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+    });
+    ctx.restore();
+
+    // ── Draw explosion particles ──
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    explosions.forEach(e => {
+        ctx.globalAlpha = e.life * (e.smoke ? 0.22 : 0.85);
+        if (e.smoke) {
+            const sg = ctx.createRadialGradient(e.x, e.y, 0, e.x, e.y, e.size*e.life);
+            sg.addColorStop(0,   `rgba(255,140,30,${e.life*0.6})`);
+            sg.addColorStop(0.5, `rgba(180,60,0,${e.life*0.35})`);
+            sg.addColorStop(1,   'transparent');
+            ctx.fillStyle = sg;
+        } else {
+            ctx.fillStyle = e.color;
+            ctx.shadowBlur = 18; ctx.shadowColor = '#ff7700';
+        }
+        ctx.beginPath();
+        ctx.arc(e.x, e.y, e.size * Math.max(0.1, e.life), 0, Math.PI*2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+    });
+    ctx.restore();
+
+    // ── Draw fireballs ──
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    fireballs.forEach(fb => {
+        if (fb.done) return;
+        const pulse = 1 + Math.sin(now * 0.025 + fb.x) * 0.12;
+        const r = fb.size * pulse;
+
+        // Outer halo
+        const halo = ctx.createRadialGradient(fb.x, fb.y, 0, fb.x, fb.y, r * 2.8);
+        halo.addColorStop(0,   'rgba(255,200,60,0.0)');
+        halo.addColorStop(0.3, 'rgba(255,120,10,0.18)');
+        halo.addColorStop(1,   'transparent');
+        ctx.globalAlpha = 0.7;
+        ctx.fillStyle = halo;
+        ctx.beginPath(); ctx.arc(fb.x, fb.y, r*2.8, 0, Math.PI*2); ctx.fill();
+
+        // Core fireball
+        const cg = ctx.createRadialGradient(fb.x, fb.y, 0, fb.x, fb.y, r);
+        cg.addColorStop(0,   'rgba(255,255,200,1)');
+        cg.addColorStop(0.2, 'rgba(255,180,30,1)');
+        cg.addColorStop(0.55,'rgba(255,60,0,0.9)');
+        cg.addColorStop(0.85,'rgba(180,20,0,0.6)');
+        cg.addColorStop(1,   'transparent');
+        ctx.globalAlpha = 1;
+        ctx.shadowBlur = 50; ctx.shadowColor = '#ff8800';
+        ctx.fillStyle = cg;
+        ctx.beginPath(); ctx.arc(fb.x, fb.y, r, 0, Math.PI*2); ctx.fill();
+
+        // Bright nucleus
+        ctx.shadowBlur = 80; ctx.shadowColor = '#ffffc0';
+        ctx.fillStyle = 'rgba(255,255,220,0.9)';
+        ctx.beginPath(); ctx.arc(fb.x, fb.y, r*0.22, 0, Math.PI*2); ctx.fill();
+        ctx.shadowBlur = 0;
+    });
+    ctx.restore();
+
+    // ── Draw enemies ──
+    enemies.forEach(en => {
+        ctx.save();
+
+        // Burn glow on enemy
+        if (en.burnTimer > 0 && !en.dead) {
+            const bIntensity = Math.min(1, en.burnTimer / 500) * (0.5 + Math.sin(now*0.02)*0.5);
+            const eg = ctx.createRadialGradient(en.x, en.y, 5, en.x, en.y, 50);
+            eg.addColorStop(0, `rgba(255,120,0,${bIntensity*0.6})`);
+            eg.addColorStop(1, 'transparent');
+            ctx.globalCompositeOperation = 'lighter';
+            ctx.fillStyle = eg;
+            ctx.beginPath(); ctx.arc(en.x, en.y, 50, 0, Math.PI*2); ctx.fill();
+        }
+
+        // Enemy body
+        ctx.globalCompositeOperation = 'source-over';
+        const deadAlpha = en.dead ? 0.25 : 1;
+        ctx.globalAlpha = deadAlpha;
+        ctx.strokeStyle = en.dead ? '#444' : (en.burnTimer > 0 ? '#ff6600' : '#cc4400');
+        ctx.lineWidth = 1.5;
+        ctx.fillStyle = en.dead ? 'rgba(30,15,0,0.5)' : 'rgba(60,20,0,0.6)';
+        // diamond shape
+        ctx.beginPath();
+        ctx.moveTo(en.x,      en.y - 22);
+        ctx.lineTo(en.x + 22, en.y);
+        ctx.lineTo(en.x,      en.y + 22);
+        ctx.lineTo(en.x - 22, en.y);
+        ctx.closePath();
+        ctx.fill(); ctx.stroke();
+
+        // HP bar
+        if (!en.dead) {
+            const bw = 50, bh = 5;
+            ctx.fillStyle = 'rgba(0,0,0,0.6)';
+            ctx.fillRect(en.x - bw/2, en.y - 35, bw, bh);
+            const hpRatio = en.hp / en.maxHp;
+            const hpColor = hpRatio > 0.5 ? '#ff6600' : hpRatio > 0.2 ? '#ff3300' : '#ff0000';
+            ctx.fillStyle = hpColor;
+            ctx.fillRect(en.x - bw/2, en.y - 35, bw * hpRatio, bh);
+            ctx.strokeStyle = 'rgba(255,80,0,0.3)';
+            ctx.lineWidth = 0.5;
+            ctx.strokeRect(en.x - bw/2, en.y - 35, bw, bh);
+
+            // HP text
+            ctx.globalAlpha = 0.55;
+            ctx.fillStyle = '#ff9966';
+            ctx.font = '7px Orbitron';
+            ctx.textAlign = 'center';
+            ctx.fillText(en.hp.toLocaleString(), en.x, en.y - 40);
+        } else {
+            ctx.globalAlpha = 0.3;
+            ctx.fillStyle = '#ff3300';
+            ctx.font = '8px Orbitron';
+            ctx.textAlign = 'center';
+            ctx.fillText('DESTRUÍDO', en.x, en.y - 38);
+        }
+        ctx.restore();
+    });
+
+    // ── Draw damage numbers ──
+    damageNums.forEach(d => {
+        ctx.save();
+        const a = Math.min(1, d.life * 2.5);
+        ctx.globalAlpha = a;
+
+        if (d.type === 'imm') {
+            // Immediate: bright yellow-white, bigger
+            ctx.font = `bold ${Math.floor(9 + d.life * 3)}px Orbitron`;
+            ctx.fillStyle = d.life > 0.5 ? '#ffe066' : '#ffaa22';
+            ctx.shadowBlur = 10; ctx.shadowColor = '#ff6600';
+        } else {
+            // DoT: smaller orange
+            ctx.font = `${Math.floor(7 + d.life * 2)}px Orbitron`;
+            ctx.fillStyle = '#ff6622';
+            ctx.shadowBlur = 6; ctx.shadowColor = '#ff3300';
+        }
+        ctx.textAlign = 'center';
+        ctx.fillText(d.type === 'dot' ? `🔥${d.text}` : d.text, d.x, d.y);
+        ctx.restore();
+    });
+
+    ctx.restore(); // end shake
+
+    // ── HUD: ability name ──
+    if (!barrageActive && fireballs.length === 0) {
+        ctx.save();
+        ctx.globalAlpha = 0.12;
+        ctx.fillStyle = '#ff7700';
+        ctx.font = '9px Orbitron';
+        ctx.textAlign = 'center';
+        ctx.fillText('INIMIGOS REAPARECEM AO DISPARAR  •  CLIQUE PARA MOVER INIMIGOS', canvas.width/2, canvas.height - 12);
+        ctx.restore();
+    }
+
+    requestAnimationFrame(t => { update(t); render(t); });
+}
+
+requestAnimationFrame(t => { lastTime = t; update(t); render(t); });
+</script>
+</body>
+</html>

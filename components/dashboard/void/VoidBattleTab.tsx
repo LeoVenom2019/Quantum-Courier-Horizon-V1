@@ -1,6 +1,7 @@
 'use client';
 
 import React, { memo } from 'react';
+import Image from 'next/image';
 import { motion } from 'motion/react';
 import { Radar, Sword, Crosshair, Trophy, Database, X, Skull, Shield, Zap, Target, ArrowUpCircle, Bot, TrendingUp, Star } from 'lucide-react';
 import VoidBattleArena from '../../VoidBattleArena';
@@ -25,7 +26,7 @@ interface VoidBattleTabProps {
   setShowVoidWarMap: (show: boolean) => void;
 }
 
-const VoidBattleTab = memo(({
+const VoidBattleTab = memo(function VoidBattleTab({
   isVoid,
   isRobotRepaired,
   setShowBattleShipUpgradeModal,
@@ -42,7 +43,7 @@ const VoidBattleTab = memo(({
   setVoidWarProgress,
   voidWarProgress,
   setShowVoidWarMap
-}: VoidBattleTabProps) => {
+}: VoidBattleTabProps) {
   const {
     progression,
     economy,
@@ -76,16 +77,16 @@ const VoidBattleTab = memo(({
     if (newResources.energy !== combat.voidResources.energy) deltas.energy = combat.voidResources.energy - newResources.energy;
     if (newResources.tech !== combat.voidResources.tech) deltas.tech = combat.voidResources.tech - newResources.tech;
     if (newResources.minerals !== combat.voidResources.minerals) deltas.minerals = combat.voidResources.minerals - newResources.minerals;
-    
+
     if (Object.keys(deltas).length > 0) {
       dispatch({ type: 'SPEND_VOID_RESOURCES', payload: deltas });
     }
   };
 
   const { qc } = economy;
-  const { routeTier, battleShipUpgradeLevel, battleLevel } = progression;
+  const { routeTier, battleLevel } = progression;
   const stats = voidBattleShipStats;
-  
+
   const effectiveStats = getEffectiveVoidStats(voidBattleShipStats);
 
   const hpPercent = (stats.hp / effectiveStats.maxHp) * 100;
@@ -165,7 +166,7 @@ const VoidBattleTab = memo(({
       <div className="space-y-4">
         <div className="flex justify-between items-center">
           <h3 className="text-lg font-orbitron font-black text-white tracking-widest uppercase">{t('targetsDetected')}</h3>
-          <button 
+          <button
             onClick={() => setVoidBattleStatus('idle')}
             className="px-3 py-1.5 bg-white/5 border border-white/10 rounded-lg text-[15px] font-orbitron text-white/60 hover:text-white transition-all uppercase tracking-widest"
           >
@@ -178,13 +179,15 @@ const VoidBattleTab = memo(({
               <div className="flex gap-4 items-center">
                 <div className="relative w-20 h-20 shrink-0 bg-white/5 rounded-xl border border-white/10 flex items-center justify-center overflow-hidden group-hover:border-red-500/30 transition-all">
                   <div className="absolute inset-0 bg-gradient-to-tr from-red-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                  <img 
-                    src={enemy.image} 
+                  <Image
+                    src={enemy.image}
                     alt={enemy.type}
-                    className="w-16 h-16 object-contain drop-shadow-[0_0_8px_rgba(239,68,68,0.3)] group-hover:scale-110 transition-transform duration-500"
+                    width={64}
+                    height={64}
+                    className="object-contain drop-shadow-[0_0_8px_rgba(239,68,68,0.3)] group-hover:scale-110 transition-transform duration-500"
                   />
                 </div>
-                
+
                 <div className="flex-1 space-y-2">
                   <div className="flex justify-between items-start">
                     <div className={`px-3 py-1 rounded-md text-[9px] font-orbitron font-black tracking-[0.2em] uppercase shadow-lg ${
@@ -199,7 +202,7 @@ const VoidBattleTab = memo(({
                   </div>
                 </div>
               </div>
-              
+
               <div className="space-y-3 pt-2 border-t border-white/5">
                  <div className="space-y-1.5">
                    <div className="flex justify-between text-[13px] font-orbitron font-bold leading-none">
@@ -207,30 +210,30 @@ const VoidBattleTab = memo(({
                      <span className="text-cyan-400">{formatValue(enemy.maxShield)}</span>
                    </div>
                    <div className="h-1.5 bg-black/60 rounded-full overflow-hidden border border-white/5">
-                     <motion.div 
+                     <motion.div
                        initial={{ width: 0 }}
                        animate={{ width: '100%' }}
-                       className="h-full bg-cyan-500 shadow-[0_0_8px_rgba(6,182,212,0.5)]" 
+                       className="h-full bg-cyan-500 shadow-[0_0_8px_rgba(6,182,212,0.5)]"
                      />
                    </div>
                  </div>
-                 
+
                  <div className="space-y-1.5">
                    <div className="flex justify-between text-[13px] font-orbitron font-bold leading-none">
                      <span className="text-white/30 uppercase tracking-tighter">Integridade</span>
                      <span className="text-red-400">{formatValue(enemy.maxHp)}</span>
                    </div>
                    <div className="h-1.5 bg-black/60 rounded-full overflow-hidden border border-white/5">
-                     <motion.div 
+                     <motion.div
                        initial={{ width: 0 }}
                        animate={{ width: '100%' }}
-                       className="h-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]" 
+                       className="h-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]"
                      />
                    </div>
                  </div>
               </div>
 
-              <button 
+              <button
                 onClick={() => selectVoidBattle(enemy)}
                 className="w-full py-3 bg-red-600 text-white font-orbitron font-black text-base rounded-xl hover:bg-red-500 transition-all uppercase tracking-[0.2em] shadow-[0_4px_15px_rgba(239,68,68,0.3)] group-hover:scale-[1.02] active:scale-95 flex items-center justify-center gap-2"
               >
@@ -246,14 +249,20 @@ const VoidBattleTab = memo(({
 
   if (voidBattleStatus === 'fighting' && activeVoidBattle) {
     const effectiveStats = getEffectiveVoidStats(voidBattleShipStats);
+    const activeEnemies = Array.isArray(activeVoidBattle.enemies)
+      ? activeVoidBattle.enemies
+      : [activeVoidBattle];
+    const queuedEnemies = activeVoidBattle.enemyQueue || [];
+
     return (
-      <VoidBattleArena 
-        initialEnemies={activeVoidBattle.enemies}
+      <VoidBattleArena
+        initialEnemies={activeEnemies}
         playerShipStats={effectiveStats}
         voidResources={combat.voidResources}
         routeTier={routeTier}
         locationId={activeVoidBattle.locationId ?? 0}
         activeShipImage={battleLevel >= 25 ? '/images/battle/skyring.png' : '/images/battle/standard_ship.png'}
+        battleLevel={battleLevel}
         onBattleEnd={(status, result) => {
            setVoidBattleShipStats((prev: any) => ({
              ...prev,
@@ -264,7 +273,7 @@ const VoidBattleTab = memo(({
            if (status === 'won') {
              setVoidBattleStatus('won');
              playSfx('bobby_blue_theme_victory');
-             
+
              if (voidWarAlertActive) {
                setHasWonEliminateEnemiesRoute3(true);
                setVoidWarAlertActive(false);
@@ -287,30 +296,24 @@ const VoidBattleTab = memo(({
                  });
                }
              }
-             
+
              const rarityQCBonus = { common: 1, rare: 1.3, elite: 1.4, legendary: 1.5, mythic: 1.6 }[voidBattleShipStats.rarity as 'common' | 'rare' | 'elite' | 'legendary' | 'mythic'] || 1;
              const finalReward = Math.floor((result?.reward || 0) * voidBattleShipStats.lootEfficiency * rarityQCBonus);
-             const xpReward = Math.floor(finalReward * 0.05) + 10;
-             const aetherionReward = Math.floor(finalReward * 0.01) + 2;
 
-             setVoidBattleResult({ 
+             setVoidBattleResult({
                reward: finalReward,
-               xp: xpReward,
-               aetherion: aetherionReward,
                destroyedMeteors: result?.destroyedMeteors || 0,
                destroyedMeteorites: result?.destroyedMeteorites || 0
              });
 
              dispatch({ type: 'EARN_QC', payload: { amount: finalReward, source: 'battle' } });
-             dispatch({ type: 'ADD_SHIP_XP', payload: { amount: xpReward } });
-             dispatch({ type: 'EARN_AETHERION', payload: { amount: aetherionReward } });
 
-             addLog(`${t('victoryCaps')}! +${formatValue(finalReward)} QC, +${xpReward} XP, +${aetherionReward} Etérion.`, 'success');
+             addLog(`${t('victoryCaps')}! +${formatValue(finalReward)} QC.`, 'success');
              playSfx('success');
            } else {
              setVoidBattleStatus('lost');
              addLog(t('defeatShipDamaged'), 'error');
-             playSfx('error');
+             playSfx('game_over');
            }
         }}
         onUpdateResources={handleUpdateResources}
@@ -321,17 +324,26 @@ const VoidBattleTab = memo(({
         addLog={addLog as any}
         formatValue={formatValue as any}
         isGroupBattle={activeVoidBattle.isGroupBattle || false}
-        enemyQueue={activeVoidBattle.enemyQueue}
+        enemyQueue={queuedEnemies}
+        onExitBattle={() => {
+          setVoidBattleShipStats((prev: any) => ({
+            ...prev,
+            hp: 0
+          }));
+          setVoidBattleStatus('lost');
+          addLog(t('defeatShipDamaged'), 'error');
+          playSfx('game_over');
+        }}
       />
     );
   }
 
   if (voidBattleStatus === 'won') {
     return (
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/95 backdrop-blur-2xl overflow-y-auto"
+        className="fixed inset-0 z-[20000] flex items-center justify-center p-4 bg-black/95 backdrop-blur-2xl overflow-y-auto"
       >
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-emerald-500/20 rounded-full blur-[120px] animate-pulse" />
@@ -339,13 +351,13 @@ const VoidBattleTab = memo(({
         </div>
 
         <div className="relative w-full max-w-5xl glass-panel border-2 border-emerald-500/40 rounded-[2.5rem] p-8 lg:p-12 flex flex-col items-center gap-8 lg:gap-10 bg-gradient-to-br from-emerald-500/10 via-black/90 to-cyan-500/10 shadow-[0_0_100px_rgba(16,185,129,0.2)] overflow-hidden">
-          <motion.div 
+          <motion.div
             animate={{ x: ['-100%', '200%'] }}
             transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
             className="absolute top-0 left-0 w-60 h-1 bg-gradient-to-r from-transparent via-emerald-400 to-transparent"
           />
 
-          <button 
+          <button
             onClick={() => {
               setVoidBattleStatus('idle');
               stopSfx('bobby_blue_theme_victory');
@@ -354,7 +366,7 @@ const VoidBattleTab = memo(({
           >
             <X className="w-6 h-6" />
           </button>
-          
+
           <div className="text-center space-y-2">
             <motion.div
               initial={{ y: -20, opacity: 0 }}
@@ -371,70 +383,48 @@ const VoidBattleTab = memo(({
           </div>
 
           <div className="flex flex-col lg:flex-row items-center gap-10 w-full">
-            <motion.div 
+            <motion.div
               initial={{ x: -50, opacity: 0 }}
               animate={{ x: 0, opacity: 1 }}
               transition={{ delay: 0.4 }}
               className="w-full lg:w-1/2 aspect-square glass-panel border-2 border-white/10 rounded-[2rem] relative overflow-hidden bg-black shadow-2xl group"
             >
-              <video 
+              <video
                 src="/videos/bobby_blue/bobby_blue_victory.webm"
-                autoPlay 
-                loop 
-                muted 
+                autoPlay
+                loop
+                muted
                 playsInline
                 poster="/images/bobby_blue/bobby_blue_victory_poster.png"
                 className="absolute inset-0 w-full h-full object-cover"
               />
-              
+
               <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-black/20" />
               <div className="absolute top-6 left-6 flex items-center gap-2">
                 <div className="w-3 h-3 bg-cyan-500 rounded-full animate-ping" />
                 <span className="text-[10px] font-mono text-white/60 tracking-widest uppercase">BOBBY_LIVE_CAM • LIVE</span>
               </div>
-              <div className="absolute bottom-6 left-6 right-6 flex justify-between items-end">
-                <div className="space-y-1">
-                  <span className="text-xs text-emerald-400 font-orbitron font-bold tracking-widest block">{language === 'pt' ? 'NOSSO MASCOTE' : 'OUR MASCOT'}</span>
-                  <span className="text-xl lg:text-2xl text-white font-black font-orbitron uppercase">Bobby Blue Dance</span>
-                </div>
+              <div className="absolute bottom-6 left-6 right-6 flex justify-end items-end">
                 <div className="p-3 bg-emerald-500/20 border border-emerald-500/40 rounded-xl">
                   <Trophy className="w-6 h-6 lg:w-8 lg:h-8 text-emerald-400" />
                 </div>
               </div>
             </motion.div>
 
-            <motion.div 
+            <motion.div
               initial={{ x: 50, opacity: 0 }}
               animate={{ x: 0, opacity: 1 }}
               transition={{ delay: 0.6 }}
               className="w-full lg:w-1/2 space-y-8"
             >
               <div className="glass-panel border border-white/5 rounded-3xl p-6 lg:p-8 space-y-6 bg-white/5">
-                <div className="grid grid-cols-3 gap-3">
-                  <div className="p-4 bg-emerald-500/10 rounded-2xl border border-emerald-500/20 flex flex-col items-center justify-center">
+                  <div className="p-4 bg-emerald-500/10 rounded-2xl border border-emerald-500/20 flex flex-col items-center justify-center col-span-3">
                     <Database className="w-5 h-5 text-emerald-400 mb-1" />
                     <span className="text-[10px] text-white/40 uppercase tracking-widest">QC</span>
                     <div className="text-xl font-orbitron font-black text-white">
                       +{formatValue(voidBattleResult?.reward || 0)}
                     </div>
                   </div>
-                  
-                  <div className="p-4 bg-blue-500/10 rounded-2xl border border-blue-500/20 flex flex-col items-center justify-center">
-                    <Star className="w-5 h-5 text-blue-400 mb-1" />
-                    <span className="text-[10px] text-white/40 uppercase tracking-widest">XP</span>
-                    <div className="text-xl font-orbitron font-black text-white">
-                      +{voidBattleResult?.xp || 0}
-                    </div>
-                  </div>
-
-                  <div className="p-4 bg-orange-500/10 rounded-2xl border border-orange-500/20 flex flex-col items-center justify-center">
-                    <Zap className="w-5 h-5 text-orange-400 mb-1" />
-                    <span className="text-[10px] text-white/40 uppercase tracking-widest">Etérion</span>
-                    <div className="text-xl font-orbitron font-black text-white">
-                      +{voidBattleResult?.aetherion || 0}
-                    </div>
-                  </div>
-                </div>
 
                 {(voidBattleResult?.destroyedMeteors > 0 || voidBattleResult?.destroyedMeteorites > 0) && (
                   <div className="grid grid-cols-2 gap-4 p-4 bg-white/5 border border-white/10 rounded-2xl">
@@ -467,7 +457,7 @@ const VoidBattleTab = memo(({
                 </div>
               </div>
 
-              <motion.button 
+              <motion.button
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
                 onClick={() => {
@@ -487,22 +477,120 @@ const VoidBattleTab = memo(({
 
   if (voidBattleStatus === 'lost') {
     return (
-      <div className="h-[450px] lg:h-[400px] glass-panel border border-white/10 rounded-2xl flex flex-col items-center justify-center space-y-6 bg-black/60">
-         <div className="w-20 h-20 rounded-2xl flex items-center justify-center border-2 bg-red-500/10 border-red-500/40 text-red-400">
-           <Skull className="w-10 h-10" />
-         </div>
-         <div className="text-center space-y-2">
-           <h3 className="text-3xl font-orbitron font-black tracking-[0.2em] uppercase text-red-400">
-             {t('defeat')}
-           </h3>
-         </div>
-         <button 
-           onClick={() => setVoidBattleStatus('idle')}
-           className="px-12 py-4 bg-white/10 border border-white/20 rounded-xl text-base font-orbitron font-bold text-white hover:bg-white/20 transition-all uppercase tracking-widest"
-         >
-           {t('backToRadar')}
-         </button>
-      </div>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        className="fixed inset-0 z-[20000] flex items-center justify-center p-4 bg-black/95 backdrop-blur-2xl overflow-y-auto"
+      >
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-red-500/20 rounded-full blur-[120px] animate-pulse" />
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-red-500/10 rounded-full blur-[100px] animate-float" />
+        </div>
+
+        <div className="relative w-full max-w-5xl glass-panel border-2 border-red-500/40 rounded-[2.5rem] p-8 lg:p-12 flex flex-col items-center gap-8 lg:gap-10 bg-gradient-to-br from-red-500/10 via-black/90 to-red-950/20 shadow-[0_0_100px_rgba(239,68,68,0.2)] overflow-hidden">
+          <motion.div
+            animate={{ x: ['-100%', '200%'] }}
+            transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
+            className="absolute top-0 left-0 w-60 h-1 bg-gradient-to-r from-transparent via-red-500 to-transparent"
+          />
+
+          <button
+            onClick={() => {
+              setVoidBattleStatus('idle');
+              stopSfx('game_over');
+            }}
+            className="absolute top-6 right-6 p-3 rounded-full bg-white/5 border border-white/10 text-white/40 hover:bg-white/10 hover:text-white transition-all z-30"
+          >
+            <X className="w-6 h-6" />
+          </button>
+
+          <div className="text-center space-y-2">
+            <motion.div
+              initial={{ y: -20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 0.2 }}
+            >
+              <h2 className="text-5xl lg:text-8xl font-orbitron font-black tracking-[0.3em] text-transparent bg-clip-text bg-gradient-to-b from-white via-red-500 to-red-800 drop-shadow-[0_0_30px_rgba(239,68,68,0.5)] uppercase">
+                {t('defeat')}
+              </h2>
+              <p className="text-base lg:text-xl text-red-400/60 font-mono uppercase tracking-[0.5em] mt-2">
+                {language === 'pt' ? 'Sistema Crítico • Nave Desativada' : 'Critical System • Vessel Disabled'}
+              </p>
+            </motion.div>
+          </div>
+
+          <div className="flex flex-col lg:flex-row items-center gap-10 w-full">
+            <motion.div
+              initial={{ x: -50, opacity: 0 }}
+              animate={{ x: 0, opacity: 1 }}
+              transition={{ delay: 0.4 }}
+              className="w-full lg:w-1/2 aspect-square glass-panel border-2 border-white/10 rounded-[2rem] relative overflow-hidden bg-black shadow-2xl group"
+            >
+              <video
+                src="/videos/bobby_blue/bobby_game_over.webm"
+                autoPlay
+                loop
+                muted
+                playsInline
+                className="absolute inset-0 w-full h-full object-cover"
+              />
+
+              <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-black/20" />
+              <div className="absolute top-6 left-6 flex items-center gap-2">
+                <div className="w-3 h-3 bg-red-500 rounded-full animate-ping" />
+                <span className="text-[10px] font-mono text-white/60 tracking-widest uppercase">BOBBY_LIVE_CAM • OFFLINE</span>
+              </div>
+              <div className="absolute bottom-6 left-6 right-6 flex justify-end items-end">
+                <div className="p-3 bg-red-500/20 border border-red-500/40 rounded-xl">
+                  <Skull className="w-6 h-6 lg:w-8 lg:h-8 text-red-400" />
+                </div>
+              </div>
+            </motion.div>
+
+            <motion.div
+              initial={{ x: 50, opacity: 0 }}
+              animate={{ x: 0, opacity: 1 }}
+              transition={{ delay: 0.6 }}
+              className="w-full lg:w-1/2 space-y-8"
+            >
+              <div className="glass-panel border border-white/5 rounded-3xl p-6 lg:p-8 space-y-6 bg-white/5">
+                  <div className="p-4 bg-red-500/10 rounded-2xl border border-red-500/20 flex flex-col items-center justify-center">
+                    <Skull className="w-5 h-5 text-red-400 mb-1" />
+                    <span className="text-[10px] text-white/40 uppercase tracking-widest">{t('status')}</span>
+                    <div className="text-xl font-orbitron font-black text-red-500 uppercase">
+                      {t('destroyed')}
+                    </div>
+                  </div>
+
+                <div className="h-px w-full bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <span className="text-[10px] text-white/40 uppercase tracking-widest">{language === 'pt' ? 'Integridade da Nave' : 'Ship Integrity'}</span>
+                    <div className="text-lg lg:text-xl font-orbitron text-red-600 font-black">0%</div>
+                  </div>
+                  <div className="text-right space-y-1">
+                    <span className="text-[10px] text-white/40 uppercase tracking-widest">{language === 'pt' ? 'Reparo Necessário' : 'Repair Required'}</span>
+                    <div className="text-lg lg:text-xl font-orbitron text-red-400 font-bold uppercase">{language === 'pt' ? 'Crítico' : 'Critical'}</div>
+                  </div>
+                </div>
+              </div>
+
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => {
+                  setVoidBattleStatus('idle');
+                  stopSfx('game_over');
+                }}
+                className="w-full py-5 lg:py-6 bg-red-600 text-white font-orbitron font-black text-lg lg:text-xl rounded-2xl shadow-[0_0_30px_rgba(220,38,38,0.3)] transition-all uppercase tracking-[0.3em]"
+              >
+                {t('backToRadar')}
+              </motion.button>
+            </motion.div>
+          </div>
+        </div>
+      </motion.div>
     );
   }
 
@@ -521,44 +609,49 @@ const VoidBattleTab = memo(({
           className="absolute inset-0 opacity-40 pointer-events-none"
         />
       )}
-      <motion.div 
-        initial={{ opacity: 0, x: -50 }}
-        animate={{ opacity: 1, x: 0 }}
-        className="w-full lg:w-1/4 aspect-square glass-panel border-2 border-red-500/30 rounded-[2rem] relative overflow-hidden bg-black shadow-[0_0_50px_rgba(239,68,68,0.15)] group"
-      >
-        <video 
-          src="/videos/bobby_blue/void_battle_preview.webm"
-          autoPlay 
-          loop 
-          muted 
-          playsInline
-          className="absolute inset-0 w-full h-full object-cover opacity-70 group-hover:opacity-90 transition-opacity duration-700"
-        />
-        <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-red-500/10" />
-        
-        <div className="absolute top-4 left-4 flex items-center gap-2">
-          <div className="w-2 h-2 bg-red-500 rounded-full animate-ping" />
-          <span className="text-[10px] font-mono text-red-500/80 tracking-widest uppercase">BATTLE_STATE • LIVE</span>
-        </div>
 
-        <div className="absolute bottom-4 left-4 right-4 text-center">
-          <div className={`font-orbitron font-black text-xs px-3 py-1.5 rounded-xl shadow-lg border transition-all duration-700 ${rStyle.badge}`}>
-            {t('battleReady')}
+      <div className="w-full lg:w-1/4 flex flex-col gap-4">
+        <motion.div
+          initial={{ opacity: 0, x: -50 }}
+          animate={{ opacity: 1, x: 0 }}
+          className="aspect-square glass-panel border-2 border-red-500/30 rounded-[2rem] relative overflow-hidden bg-black shadow-[0_0_50px_rgba(239,68,68,0.15)] group shrink-0"
+        >
+          <video
+            src="/videos/bobby_blue/void_battle_preview.webm"
+            autoPlay
+            loop
+            muted
+            playsInline
+            className="absolute inset-0 w-full h-full object-cover opacity-70 group-hover:opacity-90 transition-opacity duration-700"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-red-500/10" />
+
+          <div className="absolute top-4 left-4 flex items-center gap-2">
+            <div className="w-2 h-2 bg-red-500 rounded-full animate-ping" />
+            <span className="text-[10px] font-mono text-red-500/80 tracking-widest uppercase">BATTLE_STATE • LIVE</span>
           </div>
-        </div>
 
-        <div className="absolute top-0 left-0 w-8 h-8 border-t-2 border-l-2 border-red-500/40 rounded-tl-[2rem]" />
-        <div className="absolute top-0 right-0 w-8 h-8 border-t-2 border-r-2 border-red-500/40 rounded-tr-[2rem]" />
-        <div className="absolute bottom-0 left-0 w-8 h-8 border-b-2 border-l-2 border-red-500/40 rounded-bl-[2rem]" />
-        <div className="absolute bottom-0 right-0 w-8 h-8 border-b-2 border-r-2 border-red-500/40 rounded-br-[2rem]" />
-      </motion.div>
+          <div className="absolute bottom-4 left-4 right-4 text-center">
+            <div className={`font-orbitron font-black text-xs px-3 py-1.5 rounded-xl shadow-lg border transition-all duration-700 ${rStyle.badge}`}>
+              {t('battleReady')}
+            </div>
+          </div>
 
-      <motion.div 
+          <div className="absolute top-0 left-0 w-8 h-8 border-t-2 border-l-2 border-red-500/40 rounded-tl-[2rem]" />
+          <div className="absolute top-0 right-0 w-8 h-8 border-t-2 border-r-2 border-red-500/40 rounded-tr-[2rem]" />
+          <div className="absolute bottom-0 left-0 w-8 h-8 border-b-2 border-l-2 border-red-500/40 rounded-bl-[2rem]" />
+          <div className="absolute bottom-0 right-0 w-8 h-8 border-b-2 border-r-2 border-red-500/40 rounded-br-[2rem]" />
+        </motion.div>
+
+        {/* Action Buttons for Mobile/Small Screens moved here if needed, but for now we keep the layout */}
+      </div>
+
+      <motion.div
         initial={{ opacity: 0, x: 50 }}
         animate={{ opacity: 1, x: 0 }}
-        className="w-full lg:w-3/4 flex flex-col gap-4 overflow-hidden"
+        className="w-full lg:w-3/4 flex flex-col gap-4 overflow-y-auto pr-2 custom-scrollbar min-h-0"
       >
-        <div className="glass-panel border border-white/10 rounded-3xl p-6 space-y-4 bg-white/5 relative overflow-hidden">
+        <div className="glass-panel border border-white/10 rounded-3xl p-6 space-y-4 bg-white/5 relative overflow-hidden shrink-0">
           <div className="flex justify-between items-start gap-4">
             <div className="space-y-1">
               <div className="flex items-center gap-3">
@@ -577,7 +670,7 @@ const VoidBattleTab = memo(({
                     '(Comum)'
                   }
                 </h2>
-                
+
                 {isVoid && isRobotRepaired && (
                   <button
                     onClick={() => {
@@ -598,7 +691,7 @@ const VoidBattleTab = memo(({
                   >
                     <ArrowUpCircle className="w-4 h-4 group-hover:scale-125 transition-transform" />
                     <div className="flex flex-col items-start leading-none">
-                      <span className="text-[9px] font-orbitron font-black uppercase tracking-wider">UPGRADE RARITY</span>
+                      <span className="text-[9px] font-orbitron font-black uppercase tracking-wider">{t('upgradeRarity')}</span>
                       <span className="text-[8px] font-mono opacity-60">
                         {stats.rarity === 'common' ? '5k T/E' : stats.rarity === 'rare' ? '10k T/E' : stats.rarity === 'elite' ? '15k T/E' : '20k T/E'}
                       </span>
@@ -606,7 +699,7 @@ const VoidBattleTab = memo(({
                   </button>
                 )}
               </div>
-              <p className={`text-xs font-mono uppercase tracking-[0.3em] transition-all duration-700 opacity-60 ${rStyle.subtext}`}>{t('sovereignOfVoid')} • CLASSE DREADNOUGHT</p>
+              <p className={`text-xs font-mono uppercase tracking-[0.3em] transition-all duration-700 opacity-60 ${rStyle.subtext}`}>{t('sovereignOfVoid')}</p>
             </div>
 
             <div className="flex gap-8 text-right">
@@ -650,14 +743,14 @@ const VoidBattleTab = memo(({
 
           <div className="space-y-2 relative">
             <div className="h-2.5 bg-black/60 rounded-full border border-white/10 overflow-hidden">
-            <motion.div 
+            <motion.div
                 initial={{ width: 0 }}
                 animate={{ width: `${shieldPercent}%` }}
                 className="h-full bg-gradient-to-r from-cyan-600 to-blue-400 shadow-[0_0_15px_rgba(6,182,212,0.4)]"
               />
             </div>
             <div className="h-2.5 bg-black/60 rounded-full border border-white/10 overflow-hidden">
-              <motion.div 
+              <motion.div
                 initial={{ width: 0 }}
                 animate={{ width: `${hpPercent}%` }}
                 className={`h-full bg-gradient-to-r ${hpPercent > 50 ? 'from-emerald-600 to-emerald-400' : hpPercent > 20 ? 'from-yellow-600 to-yellow-400' : 'from-red-600 to-red-400'} shadow-[0_0_15px_rgba(239,68,68,0.4)]`}
@@ -666,10 +759,10 @@ const VoidBattleTab = memo(({
           </div>
         </div>
 
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 shrink-0">
           {[
             { id: 'damage', name: t('weaponSystem'), value: (effectiveStats.damage || 100).toFixed(0), icon: Sword, color: 'text-orange-400' },
-            { id: 'crit_dmg', name: t('criticalDamage'), value: ((effectiveStats.damage || 100) * 10).toFixed(0), icon: Zap, color: 'text-yellow-400' },
+            { id: 'crit_dmg', name: t('criticalDamage'), value: (effectiveStats.criticalDamage || ((effectiveStats.damage || 100) * (effectiveStats.critDamageMultiplier || 2))).toFixed(0), icon: Zap, color: 'text-yellow-400' },
             { id: 'crit', name: t('weaknessScanner'), value: `${((effectiveStats.critChance || 0.1) * 100).toFixed(0)}%`, icon: Target, color: 'text-red-400' },
             { id: 'loot', name: t('avarice'), value: `${((stats.lootEfficiency || 0.8) * 100).toFixed(0)}%`, icon: TrendingUp, color: 'text-emerald-400' }
           ].map(s => (
@@ -683,14 +776,14 @@ const VoidBattleTab = memo(({
           ))}
         </div>
 
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 flex-1 overflow-hidden">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 shrink-0">
           {[
             { id: 'damage', name: t('weaponSystem'), desc: `+10% ${t('dmgBonus')}`, icon: Sword, max: 5 },
             { id: 'shield', name: t('reinforcedShields'), desc: `+15% ${t('shield')}`, icon: Shield, max: 5 },
             { id: 'crit', name: t('weaknessScanner'), desc: `+10% ${t('criticalChance')}`, icon: Target, max: 5 },
             { id: 'loot', name: t('avarice'), desc: `+25% Loot QC`, icon: TrendingUp, max: 5 }
           ].map(upg => {
-            const maxLevel = upg.max + (battleShipUpgradeLevel * 10);
+            const maxLevel = upg.max;
             const level = stats.upgrades[upg.id as keyof typeof stats.upgrades];
             const isMax = level >= maxLevel;
             const getUpgradeCost = (lvl: number) => {
@@ -709,8 +802,8 @@ const VoidBattleTab = memo(({
                 onClick={() => upgradeVoidBattleShip(upg.id as any)}
                 disabled={isMax || !canAfford || isVoidWarActive || voidWarAlertActive}
                 className={`glass-panel border p-4 rounded-2xl flex flex-col justify-between transition-all relative overflow-hidden text-left ${
-                  isMax ? 'border-emerald-500/30 bg-emerald-500/5 opacity-80' : 
-                  (canAfford && !isVoidWarActive && !voidWarAlertActive) ? 'border-red-500/20 hover:border-red-500/50 hover:bg-white/5' : 
+                  isMax ? 'border-emerald-500/30 bg-emerald-500/5 opacity-80' :
+                  (canAfford && !isVoidWarActive && !voidWarAlertActive) ? 'border-red-500/20 hover:border-red-500/50 hover:bg-white/5' :
                   'border-white/5 opacity-40 grayscale pointer-events-none'
                 }`}
               >
@@ -737,13 +830,13 @@ const VoidBattleTab = memo(({
           })}
         </div>
 
-        <div className="flex gap-4 items-center mt-auto">
+        <div className="flex gap-4 items-center mt-auto pt-4 shrink-0">
           <button
             onClick={isVoidWarActive ? () => { playSfx('kill_enemys_botton'); setShowVoidWarMap(true); } : () => startVoidBattle()}
             disabled={stats.hp <= 0}
             className={`flex-[2] py-4 font-orbitron font-black rounded-2xl transition-all active:scale-95 uppercase tracking-[0.3em] flex items-center justify-center gap-4 disabled:opacity-50 disabled:cursor-not-allowed text-lg ${
-              isVoidWarActive 
-                ? 'bg-red-600 text-white shadow-[0_0_40px_rgba(220,38,38,0.6)] animate-pulse border-2 border-red-400' 
+              isVoidWarActive
+                ? 'bg-red-600 text-white shadow-[0_0_40px_rgba(220,38,38,0.6)] animate-pulse border-2 border-red-400'
                 : 'bg-gradient-to-r from-red-700 to-red-600 text-white shadow-[0_0_30px_rgba(239,68,68,0.4)] hover:shadow-[0_0_40px_rgba(239,68,68,0.6)]'
             }`}
           >

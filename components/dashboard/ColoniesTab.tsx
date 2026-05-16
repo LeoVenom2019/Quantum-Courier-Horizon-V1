@@ -21,8 +21,10 @@ const ColoniesTab = memo(({
   const { 
     language, 
     earth, 
+    missions,
     colonies, 
     setColonies,
+    playSfx,
     dispatch
   } = useDashboard();
 
@@ -44,6 +46,9 @@ const ColoniesTab = memo(({
         setEarthPopulation={(val) => dispatch({ type: 'UPDATE_EARTH_STATE', payload: { population: typeof val === 'function' ? val(earth.population) : val } })}
         colonies={colonies}
         setColonies={setColonies}
+        historyStats={missions.historyStats}
+        unlockedAchievements={missions.unlockedAchievements}
+        playSfx={playSfx}
       />
     </motion.div>
   );

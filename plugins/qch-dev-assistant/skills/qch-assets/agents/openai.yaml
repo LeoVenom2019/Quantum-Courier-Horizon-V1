@@ -1,0 +1,4 @@
+interface:
+  display_name: "QCH Assets"
+  short_description: "Inventory and wire QCH images, video, and audio assets."
+  default_prompt: "Use QCH Assets to add or audit assets."

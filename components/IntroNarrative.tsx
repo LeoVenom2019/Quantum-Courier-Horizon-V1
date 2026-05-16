@@ -18,20 +18,20 @@ const STORY_TEXT = [
     pt: "Comandante... Você finalmente acordou. Eu sou Bobby Blue, sua interface de inteligência quântica."
   },
   {
-    en: "The year is 2978. Earth... Ah, our old Earth. Now it's just a garden of memories protected by laws we cannot break.",
-    pt: "O ano é 2978. A Terra... Ah, a nossa velha Terra. Agora é apenas um jardim de memórias protegido por leis que não podemos quebrar."
+    en: "The year is 2978. Earth still exists, but it is no longer the living center of humanity. Too wounded to be home. Too important to be forgotten.",
+    pt: "O ano é 2978. A Terra ainda existe, mas já não é o centro vivo da humanidade. Ferida demais para ser lar. Importante demais para ser esquecida."
   },
   {
-    en: "But look out there... From Mercury to the frozen depths of Pluto, humanity has not just survived. We have flourished.",
-    pt: "Mas olhe lá fora... De Mercúrio às profundezas gélidas de Plutão, a humanidade não apenas sobreviveu. Nós florescemos."
+    en: "After the climate collapse, the orbital exodus and the resource wars, its surface was sealed under preservation protocols. Few are allowed to touch the old world.",
+    pt: "Após o colapso climático, o êxodo orbital e as guerras por recursos, sua superfície foi isolada por protocolos de preservação. Poucos têm permissão para tocar o velho mundo."
   },
   {
-    en: "A stellar empire is not made of weapons, Commander. It's made of flow. Of logistics. Of courage.",
-    pt: "Um império estelar não é feito de armas, Comandante. É feito de fluxo. De logística. De coragem."
+    en: "But look out there... From Mercury to the frozen edges of the Solar System, humanity learned to survive through routes, cargo and courage.",
+    pt: "Mas olhe lá fora... De Mercúrio às bordas geladas do Sistema Solar, a humanidade aprendeu a sobreviver por meio de rotas, carga e coragem."
   },
   {
-    en: "The quantum rift is open. The Quantum Courier Horizon awaits your orders for the first jump.",
-    pt: "A fenda quântica está aberta. O Quantum Courier Horizon aguarda suas ordens para o primeiro salto."
+    en: "Chapter 1 - The Solar Routes begins now. The Quantum Courier Horizon awaits your first command.",
+    pt: "Capítulo 1 - As Rotas Solares começa agora. O Quantum Courier Horizon aguarda seu primeiro comando."
   },
   {
     en: "Finalizing authority transfer... Show me who is in command this time.",

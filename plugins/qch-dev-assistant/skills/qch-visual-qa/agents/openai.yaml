@@ -1,0 +1,4 @@
+interface:
+  display_name: "QCH Visual QA"
+  short_description: "Verify QCH screens and interactions in the local browser."
+  default_prompt: "Use QCH Visual QA to inspect the app."

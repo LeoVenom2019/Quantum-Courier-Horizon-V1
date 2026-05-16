@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QCH | HB Sync Test (Exact Game Logic)</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;900&display=swap" rel="stylesheet">
+    <style>
+        body { margin: 0; background: #050505; color: #fff; font-family: 'Orbitron', sans-serif; overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; }
+        canvas { background: #000; border: 1px solid #333; box-shadow: 0 0 50px rgba(0,0,0,1); }
+        .controls { position: absolute; bottom: 30px; display: flex; gap: 20px; align-items: center; }
+        button { padding: 12px 30px; background: #f97316; border: none; color: #fff; font-family: 'Orbitron'; font-weight: 900; cursor: pointer; border-radius: 4px; text-transform: uppercase; }
+        .info { font-size: 10px; color: #666; letter-spacing: 2px; }
+    </style>
+</head>
+<body>
+
+<canvas id="canvas"></canvas>
+<div class="controls">
+    <button onclick="triggerHB()">Lançar HB (Teclado F)</button>
+    <div class="info">SINCRONIZADO COM VOIDBATTLEARENA.TSX</div>
+</div>
+
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+
+function resize() {
+    canvas.width = window.innerWidth * 0.9;
+    canvas.height = window.innerHeight * 0.8;
+}
+window.addEventListener('resize', resize);
+resize();
+
+// ─── EXACT REACT STATE REPLICATION ────────────────────────────
+let s = {
+    playerX: 10,
+    playerY: 50,
+    fireballs: [],
+    particles: [],
+    burnZones: [],
+    shake: { x: 0, y: 0, decay: 0.72 },
+    impactFlash: 0,
+    cinematicDarkness: 0,
+    enemies: [
+        { x: 80, y: 40, hp: 5000, size: 50 },
+        { x: 75, y: 70, hp: 5000, size: 50 }
+    ],
+    frameCount: 0
+};
+
+// ─── UTILS FROM REACT ────────────────────────────────────────
+const bezier = (p0, p1, p2, t) => {
+    const mt = 1 - t;
+    return mt * mt * p0 + 2 * mt * t * p1 + t * t * p2;
+};
+
+const pickFireColor = (p) => {
+    if (p < 0.2) return '#fff';
+    if (p < 0.5) return '#ffcc00';
+    if (p < 0.8) return '#ff6600';
+    return '#ff3300';
+};
+
+function triggerHB() {
+    const now = Date.now();
+    const count = 10 + Math.floor(Math.random() * 5);
+    const cWidth = canvas.width;
+    const cHeight = canvas.height;
+    const ox = (s.playerX / 100) * cWidth + 40;
+    const oy = (s.playerY / 100) * cHeight;
+
+    for(let i = 0; i < count; i++) {
+        let target = s.enemies[Math.floor(Math.random() * s.enemies.length)];
+        const tx = (target.x / 100) * cWidth;
+        const ty = (target.y / 100) * cHeight;
+        const dist = Math.hypot(tx - ox, ty - oy);
+        const speed = (14 + Math.random() * 8) / Math.max(100, dist);
+
+        s.fireballs.push({
+            id: `hb-${now}-${i}`,
+            ox, oy, tx, ty,
+            x: ox, y: oy,
+            t: 0,
+            speed,
+            arcBend: (Math.random() - 0.5) * (dist * 0.4),
+            size: 22 + Math.random() * 12,
+            startTime: now + (i * 120)
+        });
+    }
+}
+
+function spawnHBImpact(x, y) {
+    s.shake = { x: 26, y: 26, decay: 0.72 };
+    s.impactFlash = 1;
+    s.cinematicDarkness = 1;
+    const now = Date.now();
+
+    for (let i = 0; i < 180; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const spd = 2 + Math.random() * 12;
+        s.particles.push({
+            x, y,
+            vx: Math.cos(angle) * spd,
+            vy: Math.sin(angle) * spd - Math.random() * 4,
+            life: 1, 
+            size: Math.random() < 0.18 ? (16 + Math.random() * 28) : (2 + Math.random() * 10),
+            color: pickFireColor(Math.random()),
+            type: i > 110 ? 'smoke' : 'fire'
+        });
+    }
+    s.burnZones.push({ x, y, life: 1, startTime: now, duration: 3000, radius: 120 });
+}
+
+// ─── LOOP ─────────────────────────────────────────────────────
+let lastTime = performance.now();
+
+function loop(time) {
+    const deltaTime = Math.min(time - lastTime, 32);
+    lastTime = time;
+    const now = Date.now();
+    s.frameCount++;
+
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Shake
+    const sx = (Math.random() - 0.5) * s.shake.x;
+    const sy = (Math.random() - 0.5) * s.shake.y;
+    ctx.save();
+    ctx.translate(sx, sy);
+
+    const cWidth = canvas.width;
+    const cHeight = canvas.height;
+
+    // Draw Enemies
+    s.enemies.forEach(en => {
+        ctx.strokeStyle = '#f43f5e';
+        ctx.strokeRect((en.x/100)*cWidth - 25, (en.y/100)*cHeight - 25, 50, 50);
+    });
+
+    // Update & Render Fireballs (EXACT REACT CODE)
+    s.fireballs = s.fireballs.filter(fb => {
+        if (now < fb.startTime) return true;
+        fb.t += fb.speed * (deltaTime / 16) * 1.5;
+        if (fb.t >= 1) {
+            fb.t = 1;
+            spawnHBImpact(fb.tx, fb.ty);
+            return false;
+        }
+
+        const cx = (fb.ox + fb.tx) / 2;
+        const cy = (fb.oy + fb.ty) / 2 + fb.arcBend;
+        fb.x = bezier(fb.ox, cx, fb.tx, fb.t);
+        fb.y = bezier(fb.oy, cy, fb.ty, fb.t);
+
+        ctx.save(); ctx.globalCompositeOperation = 'lighter';
+        const pulse = 1 + Math.sin(now * 0.018 + fb.x) * 0.22 + Math.sin(now * 0.043) * 0.08;
+        const r = fb.size * pulse;
+
+        // Core
+        const cg = ctx.createRadialGradient(fb.x, fb.y, 0, fb.x, fb.y, r);
+        cg.addColorStop(0, 'rgba(255,255,255,1)');
+        cg.addColorStop(0.2, 'rgba(255,200,50,1)');
+        cg.addColorStop(0.5, 'rgba(255,80,0,1)');
+        cg.addColorStop(0.85, 'rgba(180,20,0,0.8)');
+        cg.addColorStop(1, 'transparent');
+        
+        ctx.globalAlpha = 1.0; 
+        ctx.shadowBlur = 40; 
+        ctx.shadowColor = '#ff6600'; 
+        ctx.fillStyle = cg;
+        ctx.beginPath(); ctx.arc(fb.x, fb.y, r, 0, Math.PI * 2); ctx.fill();
+        
+        ctx.shadowBlur = 60; ctx.shadowColor = '#fff'; ctx.fillStyle = '#fff';
+        ctx.beginPath(); ctx.arc(fb.x, fb.y, r * 0.25, 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
+        return true;
+    });
+
+    // Particles
+    s.particles.forEach(p => {
+        p.x += p.vx; p.y += p.vy;
+        p.life -= 0.02;
+        ctx.globalAlpha = p.life;
+        ctx.fillStyle = p.color;
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.size * p.life, 0, Math.PI*2); ctx.fill();
+    });
+    s.particles = s.particles.filter(p => p.life > 0);
+
+    // Burn Zones
+    s.burnZones = s.burnZones.filter(bz => {
+        const age = now - bz.startTime;
+        bz.life = 1 - age / bz.duration;
+        if (bz.life <= 0) return false;
+        const flicker = 0.8 + Math.sin(now * 0.02) * 0.2;
+        const g = ctx.createRadialGradient(bz.x, bz.y, 0, bz.x, bz.y, bz.radius * flicker);
+        g.addColorStop(0, `rgba(255,150,50,${bz.life * 0.6})`);
+        g.addColorStop(1, 'transparent');
+        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(bz.x, bz.y, bz.radius, 0, Math.PI*2); ctx.fill();
+        return true;
+    });
+
+    // Overlays
+    if (s.impactFlash > 0.01) {
+        ctx.save(); ctx.fillStyle = `rgba(255,140,20,${s.impactFlash*0.22})`; ctx.fillRect(0,0,cWidth,cHeight); ctx.restore();
+        s.impactFlash *= 0.82;
+    }
+    if (s.cinematicDarkness > 0.01) {
+        ctx.save(); ctx.fillStyle = `rgba(0,0,0,${s.cinematicDarkness*0.35})`; ctx.fillRect(0,0,cWidth,cHeight); ctx.restore();
+        s.cinematicDarkness *= 0.92;
+    }
+
+    s.shake.x *= s.shake.decay;
+    s.shake.y *= s.shake.decay;
+    ctx.restore();
+
+    requestAnimationFrame(loop);
+}
+
+window.addEventListener('keydown', (e) => { if(e.key.toLowerCase() === 'f') triggerHB(); });
+requestAnimationFrame(loop);
+
+</script>
+</body>
+</html>

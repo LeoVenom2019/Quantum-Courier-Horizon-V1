@@ -52,6 +52,7 @@ export interface VoidAircraft {
   name: string;
   capacity: number;
   efficiency: number;
+  maxEfficiency: number;
   rareChance: number;
   missionTime: number; // in milliseconds
   description: string;
@@ -574,18 +575,18 @@ export const ACHIEVEMENTS: Achievement[] = [
   { id: 'qc_millionaire', name: 'Magnata Espacial', description: 'Acumule um total de 1.000.000 de QC.', type: 'milestone', target: 1000000, icon: 'Coins' },
   { id: 'battle_warrior', name: 'Guerreiro das Estrelas', description: 'Vença 10 batalhas contra piratas.', type: 'accumulative', target: 10, icon: 'Sword' },
   { id: 'robot_owner', name: 'Minerador Experiente', description: 'Compre 5 robôs mineradores.', type: 'accumulative', target: 5, icon: 'Bot' },
-  { id: 'route_2_unlocked', name: 'Explorador de Rotas', description: 'Desbloqueie a Rota 2 (Interestelar).', type: 'milestone', target: 1, icon: 'Globe' },
+  { id: 'route_2_unlocked', name: 'Explorador Interestelar', description: 'Desbloqueie o Capítulo 2 - Rotas Interestelares.', type: 'milestone', target: 1, icon: 'Globe' },
   { id: 'tech_master', name: 'Mestre da Tecnologia', description: 'Desbloqueie 5 tecnologias diferentes.', type: 'accumulative', target: 5, icon: 'Cpu' },
-  { id: 'void_unlocked', name: 'Senhor do Vazio', description: 'Desbloqueie a Rota 3 (Vazio).', type: 'milestone', target: 1, icon: 'Skull' },
+  { id: 'void_unlocked', name: 'Senhor do Vazio', description: 'Desbloqueie o Capítulo 3 - Rotas do Vazio: Projeto Terra.', type: 'milestone', target: 1, icon: 'Skull' },
   { id: 'ship_collector', name: 'Colecionador de Naves', description: 'Possua 5 naves diferentes em sua frota.', type: 'accumulative', target: 5, icon: 'Rocket' },
   { id: 'max_upgrade', name: 'Eficiência Máxima', description: 'Alcance o nível 5 em qualquer melhoria de local.', type: 'milestone', target: 5, icon: 'TrendingUp' },
   { id: 'pirate_slayer', name: 'Dizimador de Piratas', description: 'Vença 50 batalhas contra piratas.', type: 'accumulative', target: 50, icon: 'Zap' },
   { id: 'qc_trillionaire', name: 'Trilionário', description: 'Acumule um total de 1.000.000.000.000 de QC.', type: 'milestone', target: 1000000000000, icon: 'HistoryIcon' },
   { id: 'earth_restorer', name: 'Restaurador da Terra', description: 'Complete 50% da reconstrução do Projeto Terra.', type: 'milestone', target: 50, icon: 'CheckCircle2' },
   { id: 'earth_restorer_100', name: 'Salvador da Humanidade', description: 'Complete 100% da reconstrução do Projeto Terra.', type: 'milestone', target: 100, icon: 'Globe' },
-  { id: 'total_deliveries_10k', name: 'Magnata Logístico', description: 'Faça 10.000 entregas em todas as Rotas.', type: 'accumulative', target: 10000, icon: 'TrendingUp' },
-  { id: 'all_ships_r1_r2', name: 'Colecionador de Frotas', description: 'Compre todas as naves da Rota 1 e Rota 2 (18 naves).', type: 'milestone', target: 18, icon: 'Rocket' },
-  { id: 'total_missions_1k', name: 'Herói das Galáxias', description: 'Faça 1000 Missões da aba "Missões" em ambas as Rotas.', type: 'accumulative', target: 1000, icon: 'Trophy' },
+  { id: 'total_deliveries_10k', name: 'Magnata Logístico', description: 'Faça 10.000 entregas ao longo da campanha.', type: 'accumulative', target: 10000, icon: 'TrendingUp' },
+  { id: 'all_ships_r1_r2', name: 'Colecionador de Frotas', description: 'Compre todas as naves dos Capítulos 1 e 2 (18 naves).', type: 'milestone', target: 18, icon: 'Rocket' },
+  { id: 'total_missions_1k', name: 'Herói das Galáxias', description: 'Faça 1000 Missões ao longo dos capítulos de entrega.', type: 'accumulative', target: 1000, icon: 'Trophy' },
   { id: 'battle_level_55', name: 'Lenda de Combate', description: 'Alcance o Nível de Batalha 55.', type: 'milestone', target: 55, icon: 'Sword' },
   { id: 'mining_tycoon', name: 'Magnata da Mineração', description: 'Venda 10.000 pacotes de minério.', type: 'accumulative', target: 10000, icon: 'Pickaxe' },
   { id: 'perfect_pilot', name: 'Piloto Perfeito', description: 'Alcance o bônus "PERFEITO" em 100 entregas.', type: 'accumulative', target: 100, icon: 'Zap' },
@@ -596,10 +597,11 @@ export const VOID_AIRCRAFT: VoidAircraft[] = [
     id: 'va-1',
     name: 'Seeker-Alpha',
     capacity: 12500,
-    efficiency: 35,
+    efficiency: 5,
+    maxEfficiency: 25,
     rareChance: 0.05,
     missionTime: 150000, // 2.5 min
-    description: 'Uma aeronave leve e ágil, ideal para incursões rápidas em zonas de baixa densidade.',
+    description: 'Uma aeronave leve e ágil, otimizada para identificar atalhos temporais após o primeiro minuto de voo.',
     image: '/images/ships/seeker-alpha.webp',
     video: '/videos/ships/seeker-alpha.webm'
   },
@@ -607,10 +609,11 @@ export const VOID_AIRCRAFT: VoidAircraft[] = [
     id: 'va-2',
     name: 'Collector-Beta',
     capacity: 25000,
-    efficiency: 45,
+    efficiency: 10,
+    maxEfficiency: 35,
     rareChance: 0.10,
     missionTime: 210000, // 3.5 min
-    description: 'Projetada para transporte de carga pesada, com sistemas de filtragem de recursos aprimorados.',
+    description: 'Aprimorada com sensores de vácuo que aumentam a chance de conclusão antecipada em missões prolongadas.',
     image: '/images/ships/collector-beta.webp',
     video: '/videos/ships/collector-beta.webm'
   },
@@ -618,10 +621,11 @@ export const VOID_AIRCRAFT: VoidAircraft[] = [
     id: 'va-3',
     name: 'Ghost-Gamma',
     capacity: 50000,
-    efficiency: 55,
+    efficiency: 15,
+    maxEfficiency: 50,
     rareChance: 0.25,
     missionTime: 270000, // 4.5 min
-    description: 'Equipada com sensores de longo alcance e tecnologia de ocultação para encontrar o que outros ignoram.',
+    description: 'Tecnologia de dobra quântica de ponta, permitindo saltos instantâneos para o destino sob condições ideais.',
     image: '/images/ships/ghost-gamma.webp',
     video: '/videos/ships/ghost-gamma.webm'
   }
@@ -634,7 +638,7 @@ export const VOID_POIS: VoidPOI[] = [
     lore: 'Uma antiga colônia de mineração que sobreviveu ao colapso, mas agora sofre com a falta de energia.',
     video: '/videos/pois/void-eridani.webm',
     need: 'Energia',
-    resourceRequired: 1000000,
+    resourceRequired: 100000,
     passiveGeneration: { resource: 'Energia', amount: 100 }
   },
   {
@@ -643,7 +647,7 @@ export const VOID_POIS: VoidPOI[] = [
     lore: 'Sobreviventes isolados em um cinturão de asteroides, buscando desesperadamente por suprimentos básicos.',
     video: '/videos/pois/void-vega.webm',
     need: 'Alimentos',
-    resourceRequired: 2500000,
+    resourceRequired: 100000,
     passiveGeneration: { resource: 'Alimentos', amount: 50 }
   },
   {
@@ -652,7 +656,7 @@ export const VOID_POIS: VoidPOI[] = [
     lore: 'Uma base científica oculta que guarda segredos da antiga Terra, mas precisa de tecnologia para reativar seus sistemas.',
     video: '/videos/pois/void-aurora.webm',
     need: 'Tecnologia',
-    resourceRequired: 5000000,
+    resourceRequired: 100000,
     passiveGeneration: { resource: 'Tecnologia', amount: 20 }
   },
   {
@@ -661,7 +665,7 @@ export const VOID_POIS: VoidPOI[] = [
     lore: 'Uma facção neutra que controla rotas comerciais, disposta a ajudar na reconstrução em troca de medicamentos.',
     video: '/videos/pois/void-sirius.webm',
     need: 'Medicamentos',
-    resourceRequired: 10000000,
+    resourceRequired: 100000,
     passiveGeneration: { resource: 'Medicamentos', amount: 10 }
   }
 ];
@@ -1036,17 +1040,6 @@ export const ROUTES: Route[] = [
   { id: 'luyten-726-8', name: 'Luyten 726-8', origin: 'Sistema Solar', destination: 'Luyten 726-8', distance: 8.73, risk: 0.50, reward: 80000000000, cargoType: 'Energia', tier: 'Interstellar', autoTravelCost: 100000000000, unlockCost: 312500000000, requiredShipLevel: 7, unlockCondition: { route2Unlocked: true } },
   { id: 'ross-154', name: 'Ross 154', origin: 'Sistema Solar', destination: 'Ross 154', distance: 9.68, risk: 0.55, reward: 300000000000, cargoType: 'Dados', tier: 'Interstellar', autoTravelCost: 400000000000, unlockCost: 1562500000000, requiredShipLevel: 8, unlockCondition: { route2Unlocked: true } },
   { id: 'epsilon-eridani', name: 'Epsilon Eridani', origin: 'Sistema Solar', destination: 'Epsilon Eridani', distance: 10.50, risk: 0.60, reward: 1000000000000, cargoType: 'Tecnologia', tier: 'Interstellar', autoTravelCost: 1500000000000, unlockCost: 7812500000000, requiredShipLevel: 9, unlockCondition: { route2Unlocked: true } },
-  
-  // ROTA 3: Void
-  { id: 'void-1', name: 'O Horizonte de Eventos', origin: 'Vazio Profundo', destination: 'Singularidade', distance: 5000, risk: 0.95, reward: 10000000, cargoType: 'Dados', tier: 'Void', autoTravelCost: 5000, requiredShipLevel: 1, unlockCondition: { route3Unlocked: true } },
-  { id: 'void-2', name: 'Fenda de Eventos', origin: 'Vazio Profundo', destination: 'Fenda de Eventos', distance: 12000, risk: 0.96, reward: 25000000, cargoType: 'Tecnologia', tier: 'Void', autoTravelCost: 10000, unlockCost: 1000000, requiredShipLevel: 2, unlockCondition: { route3Unlocked: true } },
-  { id: 'void-3', name: 'Abismo Branco', origin: 'Vazio Profundo', destination: 'Abismo Branco', distance: 25000, risk: 0.97, reward: 60000000, cargoType: 'Energia', tier: 'Void', autoTravelCost: 25000, unlockCost: 5000000, requiredShipLevel: 3, unlockCondition: { route3Unlocked: true } },
-  { id: 'void-4', name: 'Horizonte de Cauchy', origin: 'Vazio Profundo', destination: 'Horizonte de Cauchy', distance: 50000, risk: 0.98, reward: 150000000, cargoType: 'Dados', tier: 'Void', autoTravelCost: 50000, unlockCost: 20000000, requiredShipLevel: 4, unlockCondition: { route3Unlocked: true } },
-  { id: 'void-5', name: 'Ponto Zero', origin: 'Vazio Profundo', destination: 'Ponto Zero', distance: 100000, risk: 0.985, reward: 400000000, cargoType: 'Artefatos', tier: 'Void', autoTravelCost: 100000, unlockCost: 100000000, requiredShipLevel: 5, unlockCondition: { route3Unlocked: true } },
-  { id: 'void-6', name: 'Quasar Negro', origin: 'Vazio Profundo', destination: 'Quasar Negro', distance: 250000, risk: 0.99, reward: 1000000000, cargoType: 'Minerais', tier: 'Void', autoTravelCost: 250000, unlockCost: 500000000, requiredShipLevel: 6, unlockCondition: { route3Unlocked: true } },
-  { id: 'void-7', name: 'Muralha de Planck', origin: 'Vazio Profundo', destination: 'Muralha de Planck', distance: 500000, risk: 0.992, reward: 2500000000, cargoType: 'Tecnologia', tier: 'Void', autoTravelCost: 500000, unlockCost: 2000000000, requiredShipLevel: 7, unlockCondition: { route3Unlocked: true } },
-  { id: 'void-8', name: 'Além do Infinito', origin: 'Vazio Profundo', destination: 'Além do Infinito', distance: 1000000, risk: 0.995, reward: 7500000000, cargoType: 'Biológico', tier: 'Void', autoTravelCost: 1000000, unlockCost: 10000000000, requiredShipLevel: 8, unlockCondition: { route3Unlocked: true } },
-  { id: 'void-9', name: 'O Fim de Tudo', origin: 'Vazio Profundo', destination: 'O Fim de Tudo', distance: 5000000, risk: 0.999, reward: 25000000000, cargoType: 'Dados', tier: 'Void', autoTravelCost: 5000000, unlockCost: 50000000000, requiredShipLevel: 9, unlockCondition: { route3Unlocked: true } },
 ];
 
 export const UPGRADES: Upgrade[] = [

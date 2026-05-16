@@ -1,11 +1,12 @@
 'use client';
 
 import React, { memo } from 'react';
+import Image from 'next/image';
 import { motion, AnimatePresence } from 'motion/react';
 import { Download, Upload, Target, Activity, TrendingUp, LogOut, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useDashboard } from './DashboardProvider';
 
-const HistoryTab = memo(() => {
+const HistoryTab = memo(function HistoryTab() {
   const { 
     t, 
     language, 
@@ -172,7 +173,7 @@ const HistoryTab = memo(() => {
                   className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-orbitron font-bold uppercase tracking-widest transition-all bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border-2 border-emerald-500/40 shadow-[0_0_15px_rgba(16,185,129,0.15)]`}
                 >
                   <Target size={14} />
-                  {isVoid ? (language === 'pt' ? 'PROJETO TERRA' : 'PROJECT EARTH') : (isInterstellar || routeTier === 'Solar') ? (language === 'pt' ? `METAS ROTA ${isInterstellar ? '2' : '1'}` : `ROUTE ${isInterstellar ? '2' : '1'} GOALS`) : (language === 'pt' ? 'METAS' : 'GOALS')}
+                  {isVoid ? t('projectEarthGoals') : (isInterstellar || routeTier === 'Solar') ? (isInterstellar ? t('route3Goals') : t('route2Goals')) : t('goals')}
                 </button>
               )}
               <div className="h-8 w-px bg-white/10 mx-1" />
@@ -194,15 +195,25 @@ const HistoryTab = memo(() => {
           <div className="relative flex-1 flex flex-col">
             <AnimatePresence mode="wait">
               {(() => {
-                const tiers = Object.keys(historyStats || {});
-                if (tiers.length === 0) return null;
-                const tier = tiers[historyPage] || tiers[0];
+                const currentTier = routeTier as string;
+                const availableTiers = ['Solar'];
+                if (['Interstellar', 'Void', 'Earth'].includes(currentTier)) availableTiers.push('Interstellar');
+                if (['Void', 'Earth'].includes(currentTier)) availableTiers.push('Void');
+                if (currentTier === 'Earth') availableTiers.push('Earth');
+                
+                const tier = availableTiers[historyPage] || 'Solar';
                 const stats = historyStats[tier] || {};
                 
                 const tierColor = tier === 'Solar' ? 'text-cyan-400' : tier === 'Interstellar' ? 'text-orange-400' : tier === 'Void' ? 'text-purple-400' : 'text-emerald-400';
                 const tierBorder = tier === 'Solar' ? 'neon-border-cyan' : tier === 'Interstellar' ? 'neon-border-orange' : tier === 'Void' ? 'neon-border-purple' : 'neon-border-emerald';
                 const tierBg = tier === 'Solar' ? 'bg-cyan-500/5' : tier === 'Interstellar' ? 'bg-orange-500/5' : tier === 'Void' ? 'bg-purple-500/5' : 'bg-emerald-500/5';
-                const tierLabel = tier === 'Solar' ? t('routes1') : (tier === 'Interstellar' ? t('routes2') : tier === 'Void' ? 'Rota 3' : 'Rota 4');
+                const tierLabel = tier === 'Solar'
+                  ? t('routes1')
+                  : tier === 'Interstellar'
+                    ? t('routes2')
+                    : tier === 'Void'
+                      ? (language === 'pt' ? 'Capítulo 3 - Rotas do Vazio: Projeto Terra' : 'Chapter 3 - Void Routes: Project Earth')
+                      : (language === 'pt' ? 'Capítulo 4 - Nova Terra' : 'Chapter 4 - New Earth');
 
                 return (
                   <motion.div 
@@ -232,9 +243,9 @@ const HistoryTab = memo(() => {
                       </div>
 
                       <button 
-                        onClick={() => setHistoryPage(prev => Math.min(tiers.length - 1, prev + 1))}
-                        disabled={historyPage === tiers.length - 1 || (historyPage === 0 && !isRoute2Unlocked()) || (historyPage === 1 && !isRoute3Unlocked()) || (historyPage === 2 && !route4Unlocked)}
-                        className={`p-2 rounded-xl transition-all ${historyPage === tiers.length - 1 || (historyPage === 0 && !isRoute2Unlocked()) || (historyPage === 1 && !isRoute3Unlocked()) || (historyPage === 2 && !route4Unlocked) ? 'text-slate-800 cursor-not-allowed' : 'text-white hover:bg-white/10'}`}
+                        onClick={() => setHistoryPage(prev => Math.min(availableTiers.length - 1, prev + 1))}
+                        disabled={historyPage >= availableTiers.length - 1}
+                        className={`p-2 rounded-xl transition-all ${historyPage >= availableTiers.length - 1 ? 'text-slate-800 cursor-not-allowed' : 'text-white hover:bg-white/10'}`}
                       >
                         <ChevronRight size={24} />
                       </button>
@@ -255,9 +266,11 @@ const HistoryTab = memo(() => {
                           transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
                         >
                           <div className="absolute inset-0 bg-gradient-to-br from-purple-500/30 via-black to-black rounded-[3rem] border-4 border-purple-500/40 shadow-[0_0_60px_rgba(168,85,247,0.3)] overflow-hidden backdrop-blur-xl">
-                            <img 
+                            <Image
                               src="/images/bobby_blue/bobby_blue_sad.png" 
                               alt="Sad Bobby" 
+                              fill
+                              sizes="288px"
                               className="w-full h-full object-cover opacity-60 mix-blend-lighten scale-110"
                             />
                             <div className="absolute inset-0 bg-[linear-gradient(rgba(168,85,247,0)_50%,rgba(168,85,247,0.15)_50%)] bg-[length:100%_8px] pointer-events-none animate-scan" />

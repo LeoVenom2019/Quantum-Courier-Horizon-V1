@@ -1,0 +1,43 @@
+{
+  "name": "qch-dev-assistant",
+  "version": "0.1.0",
+  "description": "Project-specific Codex skills for developing, validating, balancing, and preparing the QCH game.",
+  "author": {
+    "name": "QCH Project",
+    "email": "local@example.com",
+    "url": "https://example.com/qch"
+  },
+  "homepage": "https://example.com/qch-dev-assistant",
+  "repository": "https://example.com/qch-dev-assistant",
+  "license": "UNLICENSED",
+  "keywords": [
+    "qch",
+    "game-dev",
+    "nextjs",
+    "assets",
+    "qa"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "QCH Dev Assistant",
+    "shortDescription": "Codex guidance for QCH code, assets, QA, balance, and release work.",
+    "longDescription": "A local project plugin that teaches Codex how to navigate the QCH Next.js game, audit media assets, verify visual changes, review gameplay balance, and prepare changes for GitHub.",
+    "developerName": "QCH Project",
+    "category": "Productivity",
+    "capabilities": [
+      "Code",
+      "Review",
+      "QA",
+      "Game Design"
+    ],
+    "websiteURL": "https://example.com/qch-dev-assistant",
+    "privacyPolicyURL": "https://example.com/privacy",
+    "termsOfServiceURL": "https://example.com/terms",
+    "defaultPrompt": [
+      "Use QCH Codebase to find where this feature belongs.",
+      "Use QCH Assets to audit the media library.",
+      "Use QCH Release before sending changes to GitHub."
+    ],
+    "brandColor": "#2563EB"
+  }
+}

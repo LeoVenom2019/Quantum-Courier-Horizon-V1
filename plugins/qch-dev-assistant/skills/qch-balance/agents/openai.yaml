@@ -1,0 +1,4 @@
+interface:
+  display_name: "QCH Balance"
+  short_description: "Analyze QCH economy, combat, and progression tuning."
+  default_prompt: "Use QCH Balance to review progression numbers."

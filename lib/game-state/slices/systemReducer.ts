@@ -55,6 +55,10 @@ export function systemReducer(state: SystemState = initialSystemState, action: G
       };
     }
 
+    case 'LOAD_SAVE': {
+      return action.payload.system;
+    }
+
     case 'RESET_GAME':
       return initialSystemState;
 

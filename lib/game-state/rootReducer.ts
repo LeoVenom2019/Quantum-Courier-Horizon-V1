@@ -30,7 +30,11 @@ export function rootReducer(state: GameState, action: GameAction): GameState {
       economy:     { ...initialEconomyState,     ...payload.economy },
       progression: { ...initialProgressionState, ...payload.progression },
       mining:      { ...initialMiningState,      ...payload.mining },
-      combat:      { ...initialCombatState,      ...payload.combat },
+      combat:      { 
+        ...initialCombatState, 
+        ...payload.combat,
+        voidResources: { ...initialCombatState.voidResources, ...(payload.combat?.voidResources || {}) }
+      },
       missions:    { 
         ...initialMissionsState,    
         ...payload.missions,

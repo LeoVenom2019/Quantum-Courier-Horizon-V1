@@ -7,6 +7,26 @@
  */
 
 export const GameStorage = {
+  isResetBlocked: (): boolean => {
+    try {
+      const resetUntil = Number(localStorage.getItem('qch_reset_until') || 0);
+      return resetUntil > Date.now();
+    } catch {
+      return false;
+    }
+  },
+
+  markReset: (durationMs: number = 5000): void => {
+    try {
+      localStorage.setItem('qch_reset_until', String(Date.now() + durationMs));
+    } catch {}
+  },
+
+  /**
+   * Saves data to storage (localStorage + AppData Background).
+   * @param data The data object to be saved.
+   * @param key The storage key (defaults to 'time_travel_save').
+   */
   /**
    * Saves data to storage (localStorage + AppData Background).
    * @param data The data object to be saved.
@@ -14,22 +34,31 @@ export const GameStorage = {
    */
   save: async (data: any, key: string = 'time_travel_save'): Promise<void> => {
     try {
+      if ((key === 'time_travel_save' || key === 'speed_run_save') && GameStorage.isResetBlocked()) {
+        return;
+      }
+
       // 1. Instant Save to LocalStorage
       const serializedData = JSON.stringify(data);
       localStorage.setItem(key, serializedData);
 
-      // 2. Background Save to AppData (via API)
-      // We don't 'await' this to keep the UI snappy, 
-      // but we log any errors if they happen.
-      fetch('/api/save', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: serializedData,
-      }).catch(err => console.error('Background Save failed:', err));
+      // 2. Background Sync to Server API (Cloud Save)
+      // Only for main gameplay saves
+      if (key === 'time_travel_save' || key === 'speed_run_save') {
+        fetch('/api/save', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: serializedData,
+          // Use 'keepalive' to ensure the request completes even if the page is closing
+          keepalive: true 
+        }).catch(err => {
+          // Silent fail for background sync to not disrupt gameplay
+          console.debug('GameStorage: Cloud sync deferred/failed', err);
+        });
+      }
 
     } catch (error) {
-      console.error('GameStorage: Error saving data', error);
-      throw error;
+      console.warn('GameStorage: local save failed', error);
     }
   },
 
@@ -40,9 +69,13 @@ export const GameStorage = {
    */
   load: async (key: string = 'time_travel_save'): Promise<any | null> => {
     try {
+      if ((key === 'time_travel_save' || key === 'speed_run_save') && GameStorage.isResetBlocked()) {
+        return null;
+      }
+
       // 1. Try LocalStorage first
       const serializedData = localStorage.getItem(key);
-      
+
       if (serializedData) {
         return JSON.parse(serializedData);
       }
@@ -64,7 +97,7 @@ export const GameStorage = {
 
       return null;
     } catch (error) {
-      console.error('GameStorage: Error loading data', error);
+      console.warn('GameStorage: fallback load failed', error);
       return null;
     }
   },
@@ -77,7 +110,7 @@ export const GameStorage = {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ event, details, playerName, isCrash }),
-    }).catch(() => {}); // Silent fail for logs
+    }).catch(() => { }); // Silent fail for logs
   },
 
 
@@ -93,7 +126,7 @@ export const GameStorage = {
         body: JSON.stringify(settings),
       });
     } catch (error) {
-      console.error('GameStorage: Error saving settings', error);
+      console.warn('GameStorage: settings save failed', error);
     }
   },
 
@@ -128,11 +161,10 @@ export const GameStorage = {
         await fetch(`/api/save?t=${Date.now()}`, {
           method: 'DELETE',
           cache: 'no-store'
-        }).catch(err => console.error('Background Delete failed:', err));
+        }).catch(() => {});
       }
     } catch (error) {
-      console.error('GameStorage: Error removing data', error);
-      throw error;
+      console.warn('GameStorage: remove failed', error);
     }
   }
 };

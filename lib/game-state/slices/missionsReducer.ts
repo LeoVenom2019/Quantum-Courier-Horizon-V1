@@ -139,6 +139,10 @@ export function missionsReducer(state: MissionsState = initialMissionsState, act
     case 'SET_LAST_SCAN_TIME':
       return { ...state, lastScanTime: action.payload.time };
 
+    case 'LOAD_SAVE': {
+      return action.payload.missions;
+    }
+
     case 'RESET_GAME':
       return initialMissionsState;
 

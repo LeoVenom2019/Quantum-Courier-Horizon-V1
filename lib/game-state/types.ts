@@ -147,6 +147,8 @@ export interface ProgressionState {
     startTime: number;
     endTime: number;
   } | null;
+  totalDeliveries: number;
+  deliveriesByLocation: Record<string, number>;
 }
 
 // ── Domínio: Mining ───────────────────────────────────────────────
@@ -201,7 +203,19 @@ export interface CombatState {
   voidWarProgress: { currentSector: number; currentBattle: number };
   robotRepairProgress: number;
   isRobotRepaired: boolean;
+  voidPOIQCDonations: Record<string, number>;
   underAttackBattle: Battle | null;
+  // Aircraft System
+  unlockedVoidAircraft: string[];
+  voidAircraftMissions: Record<string, any>;
+  voidAircraftUpgrades: Record<string, any>;
+  voidAircraftConstruction: Record<string, any>;
+  voidAircraftAutoToggles: Record<string, boolean>;
+  voidDonationModes: Record<string, '1x' | '10x' | 'max'>;
+  hasWonEliminateEnemiesRoute3: boolean;
+  terraPassiveProgress: number;
+  terraDirectProgress: number;
+  lastPassiveContributionTimes: Record<string, number>;
 }
 
 // ── Domínio: Missions ─────────────────────────────────────────────
@@ -240,6 +254,11 @@ export interface EarthState {
   couples: number;
   birthRegistry: Record<string, number>;
   projectBoostCount: number;
+  // Visual Restoration
+  atmosphere: number;
+  temperature: number;
+  hydrosphere: number;
+  biosphere: number;
 }
 
 // ── Domínio: Sistema ──────────────────────────────────────────────
@@ -345,6 +364,7 @@ export type GameAction =
   | { type: 'TOGGLE_VOID_AUTO_SHIPMENT' }
   | { type: 'SET_VOID_AUTO_SHIPMENT_UNLOCKED'; payload: { unlocked: boolean } }
   | { type: 'SET_EXTRACTION_PROGRESS';   payload: { progress: Record<string, number> } }
+  | { type: 'SET_MINING_DATA';           payload: Partial<MiningState> }
 
   // ── Combat ────────────────────────────────────────────────────────
   | { type: 'START_BATTLE';         payload: { battle: Battle } }
@@ -364,6 +384,7 @@ export type GameAction =
   | { type: 'START_VOID_WAR' }
   | { type: 'TOGGLE_VOID_WAR';      payload: { active: boolean } }
   | { type: 'ADVANCE_VOID_WAR';     payload: { sector: number; battle: number } }
+  | { type: 'SET_PROGRESSION_DATA'; payload: Partial<ProgressionState> }
   | { type: 'EARN_VOID_RESOURCES';  payload: Partial<CombatState['voidResources']> }
   | { type: 'COMPACT_VOID_RESOURCES'; payload: { key: string; amount: number } }
   | { type: 'SET_VOID_POI_INSPIRATION'; payload: { inspiration: CombatState['voidPOIsInspiration'] } }
@@ -372,7 +393,18 @@ export type GameAction =
   | { type: 'SET_COMBAT_DATA'; payload: Partial<CombatState> }
   | { type: 'SPEND_VOID_RESOURCES'; payload: Partial<CombatState['voidResources']> }
   | { type: 'UPDATE_VOID_COMPACTED'; payload: { key: string; delta: number } }
+  | { type: 'APPLY_TERRA_PASSIVE_PROGRESS'; payload: { amount: number; poiId: string; nextTime: number } }
+  | { type: 'DONATE_TO_TERRA_PROJECT'; payload: { resourceKey: string; amount: number; progressDelta: number } }
   | { type: 'APPLY_VOID_SHIPMENT'; payload: { resourceKey: string } }
+  | { type: 'DONATE_VOID_RESOURCES'; payload: { poiId: string; resourceKey: string; amount: number } }
+  | { type: 'DONATE_VOID_QC'; payload: { poiId: string; amount: number } }
+  | { type: 'SET_COMBAT_DATA'; payload: Partial<CombatState> }
+  | { type: 'SET_UNLOCKED_VOID_AIRCRAFT'; payload: { aircraftIds: string[] } }
+  | { type: 'SET_VOID_AIRCRAFT_MISSION'; payload: { aircraftId: string; mission: any } }
+  | { type: 'SET_VOID_AIRCRAFT_UPGRADE'; payload: { aircraftId: string; upgrades: any } }
+  | { type: 'SET_VOID_AIRCRAFT_CONSTRUCTION'; payload: { aircraftId: string; construction: any } }
+  | { type: 'SET_VOID_AIRCRAFT_AUTO_TOGGLE'; payload: { aircraftId: string; active: boolean } }
+  | { type: 'SET_AIRCRAFT_DATA'; payload: Partial<CombatState> }
 
   // ── Missions ──────────────────────────────────────────────────────
   | { type: 'ADD_MISSION';        payload: { mission: Mission } }
@@ -398,6 +430,7 @@ export type GameAction =
   | { type: 'EARTH_SEND_RESOURCES'; payload: Record<string, number> }
   | { type: 'SET_EARTH_DATA';     payload: Partial<EarthState> }
   | { type: 'UPDATE_EARTH_STATE';  payload: Partial<EarthState> }
+  | { type: 'UPDATE_EARTH_RESTORATION'; payload: { statId: string; progress: number } }
 
   // ── Sistema ───────────────────────────────────────────────────────
   | { type: 'LOAD_SAVE';    payload: GameState }

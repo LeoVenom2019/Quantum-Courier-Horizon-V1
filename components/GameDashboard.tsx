@@ -2,21 +2,21 @@
 
 import React, { useState, useEffect, useCallback, useRef, useMemo, memo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { 
-  Rocket, 
-  TrendingUp, 
-  Shield, 
+import {
+  Rocket,
+  TrendingUp,
+  Shield,
   ShieldCheck,
-  Zap, 
-  Settings, 
-  Music, 
-  Volume2, 
+  Zap,
+  Settings,
+  Music,
+  Volume2,
   Globe,
   MapPin,
   Heart,
-  Database, 
-  ArrowRight, 
-  CheckCircle2, 
+  Database,
+  ArrowRight,
+  CheckCircle2,
   AlertTriangle,
   Clock,
   Cpu,
@@ -69,20 +69,20 @@ import {
   Play,
   Pause
 } from 'lucide-react';
-import { 
-  ROUTES, 
-  UPGRADES, 
-  SHIPS, 
-  ORES, 
-  ROBOT_UPGRADES, 
+import {
+  ROUTES,
+  UPGRADES,
+  SHIPS,
+  ORES,
+  ROBOT_UPGRADES,
   TECHNOLOGIES,
   ACHIEVEMENTS,
   EXTRACTION_POINTS,
   VOID_AIRCRAFT,
   VOID_POIS,
-  Route, 
-  Upgrade, 
-  CargoType, 
+  Route,
+  Upgrade,
+  CargoType,
   Ship,
   Ore,
   MiningRobotUpgrade,
@@ -98,12 +98,12 @@ import { useSFX } from '@/hooks/useSFX';
 import { GameStorage } from '@/lib/game-storage';
 import { SaveManager } from '@/lib/save-manager';
 import { useEconomy, useDispatch, useProgression, useMining, useCombat, useMissions, useEarth, useGame, useSystem } from '@/lib/game-state/index';
-import { 
-  EarthState, 
-  CombatState, 
-  EconomyState, 
-  ProgressionState, 
-  MiningState, 
+import {
+  EarthState,
+  CombatState,
+  EconomyState,
+  ProgressionState,
+  MiningState,
   MissionsState as MissionState,
   Battle as ReduxBattle
 } from '@/lib/game-state/types';
@@ -126,6 +126,7 @@ import RoutesTab from './dashboard/RoutesTab';
 import AutoTab from './dashboard/AutoTab';
 import HistoryTab from './dashboard/HistoryTab';
 import ColoniesTab from './dashboard/ColoniesTab';
+import CardsTab from './dashboard/CardsTab';
 import VoidAircraftTab from './dashboard/void/VoidAircraftTab';
 import VoidBattleTab from './dashboard/void/VoidBattleTab';
 import VoidMapTab from './dashboard/void/VoidMapTab';
@@ -136,23 +137,22 @@ import TechnologyTab from './dashboard/TechnologyTab';
 import UpgradesTab from './dashboard/UpgradesTab';
 import BattleOverlay from './dashboard/BattleOverlay';
 import BattleLevelTab from './dashboard/BattleLevelTab';
-import VoidBattleArena, { 
-  VoidBattleEnemy, 
-  VoidBattleProjectile, 
-  VoidBattleParticle, 
-  VoidBattleDamageNumber, 
-  VoidBattleState 
+import VoidBattleArena, {
+  VoidBattleEnemy,
+  VoidBattleProjectile,
+  VoidBattleParticle,
+  VoidBattleDamageNumber,
+  VoidBattleState
 } from './VoidBattleArena';
 import ShipVisual from './ShipVisual';
 import { dashboardTranslations as translations } from '@/lib/i18n/dashboard-translations';
 import { DashboardProvider, useDashboard } from './dashboard/DashboardProvider';
-import { 
-  EXTRACTION_PRODUCTION_VALUES, 
-  EXTRACTION_PRODUCTION_COSTS, 
-  ROUTE_3_END_STEPS, 
-  VOID_WAR_START_LORE, 
-  SHIPS_ROUTE_3_STEPS, 
-  MISSION_RARITY_UPGRADE_COSTS, 
+import {
+  EXTRACTION_PRODUCTION_VALUES,
+  EXTRACTION_PRODUCTION_COSTS,
+  VOID_WAR_START_LORE,
+  SHIPS_ROUTE_3_STEPS,
+  MISSION_RARITY_UPGRADE_COSTS,
   PRIVATE_POLICE_COSTS,
   getDoubleRouteMultiplier,
   getPoliceBonus,
@@ -168,11 +168,11 @@ import {
   EXTRACTION_POINTS_MAP,
   TECHNOLOGIES_MAP
 } from '@/lib/game-constants';
-import { 
-  RouteStats, 
-  Mission, 
-  BattleLogEntry, 
-  ActiveDelivery, 
+import {
+  RouteStats,
+  Mission,
+  BattleLogEntry,
+  ActiveDelivery,
   Battle,
   Language
 } from '@/lib/game-state/types';
@@ -185,7 +185,7 @@ const ColonyVideo = ({ src, isActive, color }: { src: string; isActive: boolean;
   useEffect(() => {
     if (videoRef.current) {
       if (isActive) {
-        videoRef.current.play().catch(() => {});
+        videoRef.current.play().catch(() => { });
       } else {
         videoRef.current.pause();
       }
@@ -193,11 +193,11 @@ const ColonyVideo = ({ src, isActive, color }: { src: string; isActive: boolean;
   }, [isActive]);
 
   return (
-    <video 
+    <video
       ref={videoRef}
       src={src}
-      loop 
-      muted 
+      loop
+      muted
       playsInline
       className="absolute inset-0 w-full h-full object-cover z-0 opacity-80"
     />
@@ -277,12 +277,12 @@ const GlitchText = ({ text, delay = 50, className = "" }: { text: string, delay?
 
 
 
-const DashboardContent = memo(({ 
-  language, 
-  musicOn, 
-  sfxOn, 
-  setLanguage, 
-  setMusicOn, 
+const DashboardContent = memo(({
+  language,
+  musicOn,
+  sfxOn,
+  setLanguage,
+  setMusicOn,
   setSfxOn,
   playerName,
   localRecords = [],
@@ -294,18 +294,18 @@ const DashboardContent = memo(({
   const isSpeedRun = false;
   const dispatch = useDispatch();
   const progressionState = useProgression();
-  const { 
-    routeTier, 
-    route4Unlocked, 
+  const {
+    routeTier,
+    route4Unlocked,
     gameTimeSeconds,
-    doubleRouteLevel, 
-    doomPLevel, 
-    captureLevel, 
-    battleLevel, 
-    radarLevel, 
+    doubleRouteLevel,
+    doomPLevel,
+    captureLevel,
+    battleLevel,
+    radarLevel,
     privatePoliceLevel,
     warCoreLevel,
-    unlockedTechLevels, 
+    unlockedTechLevels,
     techLevels,
     autoTravelSlots,
     researchingTech,
@@ -319,18 +319,18 @@ const DashboardContent = memo(({
   } = progressionState;
 
   const economyState = useEconomy();
-  const { 
-    qc, 
-    aetherion, 
-    miningWaste, 
-    solarEnergy, 
-    aetherionTubes, 
-    totalExtractionProfit 
+  const {
+    qc,
+    aetherion,
+    miningWaste,
+    solarEnergy,
+    aetherionTubes,
+    totalExtractionProfit
   } = economyState;
 
   const missionsState = useMissions();
-  const { 
-    unlockedAchievements, 
+  const {
+    unlockedAchievements,
     achievementProgress,
     historyStats,
     autoClaimMissions,
@@ -349,12 +349,12 @@ const DashboardContent = memo(({
   } = missionsState;
 
   const miningState = useMining();
-  const { 
-    miningRobots, 
-    miningRobotLevels, 
-    oresCollected, 
-    autoSellByOre, 
-    autoSellUnlockedByOre, 
+  const {
+    miningRobots,
+    miningRobotLevels,
+    oresCollected,
+    autoSellByOre,
+    autoSellUnlockedByOre,
     miningCompressionLevels,
     extractionPacks,
     extractionRobotLevels,
@@ -365,30 +365,30 @@ const DashboardContent = memo(({
     extractionCompressionLevels,
     researchingExtractionPoint,
     voidAutoShipmentUnlocked,
-    voidAutoShipmentActive
+    voidAutoShipmentActive,
+    extractionCycleProgress
   } = miningState;
 
   const combatState = useCombat();
-  const { 
-    activeBattle, 
-    foundBattle, 
-    isRetributionActive, 
+  const {
+    activeBattle,
+    foundBattle,
+    isRetributionActive,
     isFatigueActive,
     voidResources,
     voidCompactedResources,
     voidBattleShipStats,
     isVoidWarActive,
     voidWarProgress,
-    voidPOIsInspiration,
+    underAttackBattle,
     robotRepairProgress,
-    isRobotRepaired,
-    underAttackBattle
+    isRobotRepaired
   } = combatState;
 
   const voidLocations = useMemo(() => ROUTES.filter(r => r.tier === 'Void'), []);
   const currentLocationId = useMemo(() => voidLocations[voidWarProgress.currentSector]?.id || voidLocations[0]?.id, [voidLocations, voidWarProgress.currentSector]);
 
-  const { 
+  const {
     population: earthPopulation,
     maleRatio: earthMaleRatio,
     biodiversity: earthBiodiversity,
@@ -401,13 +401,17 @@ const DashboardContent = memo(({
     birthRegistry: earthBirthRegistry,
     reconstructionProgress: earthReconstructionProgress,
     projectBoostCount: earthProjectBoostCount,
-    season: earthSeason
+    season: earthSeason,
+    atmosphere,
+    temperature,
+    hydrosphere,
+    biosphere
   } = useEarth();
-  
+
   const [formatNumbers, setFormatNumbers] = useState(false);
   const [arcadeScores, setArcadeScores] = useState<Record<string, number>>({});
   const [currentVoidLocationId, setCurrentVoidLocationId] = useState<number>(0);
-  const { 
+  const {
     activeTab, setActiveTab,
     autoTravelActive, setAutoTravelActive,
     autoTravelProgress, setAutoTravelProgress,
@@ -424,6 +428,10 @@ const DashboardContent = memo(({
     voidBattleOptions, setVoidBattleOptions,
     activeVoidBattle, setActiveVoidBattle,
     voidBattleResult, setVoidBattleResult,
+    voidPOIsInspiration,
+    voidPOIQCDonations, setVoidPOIQCDonations,
+    voidDonationModes, setVoidDonationModes,
+    hasWonEliminateEnemiesRoute3, setHasWonEliminateEnemiesRoute3,
     aircraftSubTab, setAircraftSubTab,
     techSubTab, setTechSubTab,
     extractionPageIndex, setExtractionPageIndex,
@@ -446,6 +454,7 @@ const DashboardContent = memo(({
     compactVoidResource, sendCompactedToEarth, buyVoidAutoShipment,
     battleNotification, setBattleNotification,
     findBattle, upgradeRadar, upgradeBattleLevel,
+    toggleRetribution, toggleFatigue,
     exportGameData, importGameData,
     addLog, gameLogs,
     seenTutorials, completeTutorial,
@@ -493,6 +502,10 @@ const DashboardContent = memo(({
   const isInterstellar = useMemo(() => routeTier === 'Interstellar', [routeTier]);
   const isVoid = useMemo(() => routeTier === 'Void', [routeTier]);
   const isEarth = useMemo(() => routeTier === 'Earth', [routeTier]);
+  const showWorldSidebar = useMemo(
+    () => !isVoid && !activeBattle && !['fighting', 'won', 'lost'].includes(voidBattleStatus),
+    [isVoid, activeBattle, voidBattleStatus]
+  );
 
   const [selectedReward, setSelectedReward] = useState<{
     level: number;
@@ -534,7 +547,14 @@ const DashboardContent = memo(({
   const earthSecurityRef = React.useRef(earthSecurity);
   const earthQualityOfLifeRef = React.useRef(earthQualityOfLife);
   const earthEventsRef = React.useRef(earthEvents);
+  const earthCouplesRef = React.useRef(earthCouples);
+  const earthBirthRegistryRef = React.useRef(earthBirthRegistry);
   const earthProjectBoostCountRef = React.useRef(earthProjectBoostCount);
+  const earthSeasonRef = React.useRef(earthSeason);
+  const atmosphereRef = React.useRef(atmosphere);
+  const temperatureRef = React.useRef(temperature);
+  const hydrosphereRef = React.useRef(hydrosphere);
+  const biosphereRef = React.useRef(biosphere);
   const activeMiniGameIdRef = React.useRef<string | null>(null);
   const voidAutoShipmentActiveRef = React.useRef(voidAutoShipmentActive);
   const voidAutoShipmentUnlockedRef = React.useRef(voidAutoShipmentUnlocked);
@@ -562,6 +582,7 @@ const DashboardContent = memo(({
   const solarEnergyRef = React.useRef(solarEnergy);
   const aetherionTubesRef = React.useRef(aetherionTubes);
   const qcRef = React.useRef(qc);
+  const isInitialTickRef = React.useRef(true);
   const isResettingRef = React.useRef(false);
   const pendingHistoryRef = React.useRef(false);
   const lastScanTimeRef = React.useRef(lastScanTime);
@@ -589,7 +610,8 @@ const DashboardContent = memo(({
   const voidAircraftUpgradesRef = React.useRef(voidAircraftUpgrades);
   const voidAircraftAutoTogglesRef = React.useRef(voidAircraftAutoToggles);
   const voidPOIsInspirationRef = React.useRef(voidPOIsInspiration);
-  const voidPOIQCDonationsRef = React.useRef<any>(null);
+  const voidPOIQCDonationsRef = React.useRef(voidPOIQCDonations);
+  const voidDonationModesRef = React.useRef(voidDonationModes);
   const languageRef = React.useRef(language);
   const hasTriggeredVoidWarRef = React.useRef(false);
   const lastPregnancyYearRef = React.useRef(0);
@@ -600,11 +622,15 @@ const DashboardContent = memo(({
   const robotRepairProgressRef = React.useRef(robotRepairProgress);
   const isRobotRepairedRef = React.useRef(isRobotRepaired);
   const underAttackBattleRef = React.useRef(underAttackBattle);
+  const researchingExtractionPointRef = React.useRef(researchingExtractionPoint);
+  const voidWarProgressRef = React.useRef(voidWarProgress);
+  const isVoidWarActiveRef = React.useRef(isVoidWarActive);
   const battleShipUpgradeLevelRef = React.useRef(battleShipUpgradeLevel);
   const isRetributionActiveRef = React.useRef(isRetributionActive);
   const isFatigueActiveRef = React.useRef(isFatigueActive);
   const unlockedVoidAircraftRef = React.useRef<string[]>([]);
   const voidAircraftConstructionRef = React.useRef<any>(null);
+  const autoSkipRandomBattlesRef = React.useRef(autoSkipRandomBattles);
   const lastProcessedYearRef = React.useRef(-1);
   const autoClaimMissionsRef = React.useRef(autoClaimMissions);
   // Last-flushed baselines for the 500ms flush loop.
@@ -617,6 +643,17 @@ const DashboardContent = memo(({
 
   // Optimization Refs
   const isLoadedRef = React.useRef(isLoaded);
+
+  // Reset initial tick flag after mount/load
+  useEffect(() => {
+    if (isLoaded) {
+      const timer = setTimeout(() => {
+        isInitialTickRef.current = false;
+      }, 2000); // 2 second grace period
+      return () => clearTimeout(timer);
+    }
+  }, [isLoaded]);
+
   const pendingMissionProgressRef = React.useRef<Record<string, number>>({});
   const missionFlushCounterRef = React.useRef(0);
   const isTransitioningRef = React.useRef(isTransitioning);
@@ -669,12 +706,17 @@ const DashboardContent = memo(({
     gameTimeSecondsRef.current = gameTimeSeconds;
     researchingTechRef.current = researchingTech;
   }, [
-    routeTier, unlockedRouteIds, ownedShips, techLevels, unlockedTechLevels, 
-    autoTravelSlots, shipLevel, shipXP, battleLevel, radarLevel, 
-    privatePoliceLevel, doubleRouteLevel, doomPLevel, captureLevel, 
-    extractionTechLevel, solarMappingLevel, warCoreLevel, battleShipUpgradeLevel, 
-    route4Unlocked, gameTimeSeconds, researchingTech
+    routeTier, unlockedRouteIds, ownedShips, techLevels, unlockedTechLevels,
+    autoTravelSlots, shipLevel, shipXP, battleLevel, radarLevel,
+    privatePoliceLevel, doubleRouteLevel, doomPLevel, captureLevel,
+    extractionTechLevel, solarMappingLevel, warCoreLevel, battleShipUpgradeLevel,
+    route4Unlocked, gameTimeSeconds, researchingTech, autoSkipRandomBattles
   ]);
+
+  useEffect(() => {
+    autoSkipRandomBattlesRef.current = autoSkipRandomBattles;
+  }, [autoSkipRandomBattles]);
+
 
   // 3. Missions, Achievements & History
   useEffect(() => {
@@ -695,12 +737,15 @@ const DashboardContent = memo(({
     unlockedAchievementsRef.current = unlockedAchievements;
     achievementProgressRef.current = achievementProgress;
     autoClaimMissionsRef.current = autoClaimMissions;
+    totalDeliveriesRef.current = totalDeliveries;
+    deliveriesByLocationRef.current = deliveriesByLocation;
   }, [
-    activeDeliveries, missions, completedInitialMissions, missionMythicBonus, 
-    missionAlienBonus, missionLegendaryBonus, missionRewardLevel, 
-    skillLendariaLevel, skillMiticaLevel, skillAlienLevel, 
+    activeDeliveries, missions, completedInitialMissions, missionMythicBonus,
+    missionAlienBonus, missionLegendaryBonus, missionRewardLevel,
+    skillLendariaLevel, skillMiticaLevel, skillAlienLevel,
     skillTempoDinheiroLevel, skillRobosOlimpicosLevel, historyStats, lastScanTime,
-    unlockedAchievements, achievementProgress, autoClaimMissions
+    unlockedAchievements, achievementProgress, autoClaimMissions,
+    totalDeliveries, deliveriesByLocation
   ]);
 
   // 4. Mining, Earth & Combat
@@ -727,26 +772,46 @@ const DashboardContent = memo(({
     earthSecurityRef.current = earthSecurity;
     earthQualityOfLifeRef.current = earthQualityOfLife;
     earthEventsRef.current = earthEvents;
+    earthCouplesRef.current = earthCouples;
+    earthBirthRegistryRef.current = earthBirthRegistry;
     earthProjectBoostCountRef.current = earthProjectBoostCount;
+    earthSeasonRef.current = earthSeason;
+    atmosphereRef.current = atmosphere;
+    temperatureRef.current = temperature;
+    hydrosphereRef.current = hydrosphere;
+    biosphereRef.current = biosphere;
     earthReconstructionProgressRef.current = earthReconstructionProgress;
     voidPOIsInspirationRef.current = voidPOIsInspiration;
+    voidPOIQCDonationsRef.current = voidPOIQCDonations;
+    voidDonationModesRef.current = voidDonationModes;
+    hasWonEliminateEnemiesRoute3Ref.current = hasWonEliminateEnemiesRoute3;
     robotRepairProgressRef.current = robotRepairProgress;
     isRobotRepairedRef.current = isRobotRepaired;
     activeBattleRef.current = activeBattle;
     isRetributionActiveRef.current = isRetributionActive;
     isFatigueActiveRef.current = isFatigueActive;
     underAttackBattleRef.current = underAttackBattle;
+    unlockedExtractionPointsRef.current = unlockedExtractionPoints;
+    extractionCycleProgressRef.current = extractionCycleProgress;
+    researchingExtractionPointRef.current = researchingExtractionPoint;
+    voidWarProgressRef.current = voidWarProgress;
+    isVoidWarActiveRef.current = isVoidWarActive;
   }, [
-    miningRobots, miningRobotLevels, oresCollected, autoSellByOre, 
-    autoSellUnlockedByOre, miningCompressionLevels, extractionPacks, 
-    extractionRobotLevels, extractionProductionLevels, extractionAutoSell, 
-    extractionAutoSellUnlocked, extractionCompressionLevels, 
+    miningRobots, miningRobotLevels, oresCollected, autoSellByOre,
+    autoSellUnlockedByOre, miningCompressionLevels, extractionPacks,
+    extractionRobotLevels, extractionProductionLevels, extractionAutoSell,
+    extractionAutoSellUnlocked, extractionCompressionLevels,
     voidAutoShipmentActive, voidAutoShipmentUnlocked,
-    earthPopulation, earthMaleRatio, earthBiodiversity, earthHealth, 
-    earthHappiness, earthSecurity, earthQualityOfLife, earthEvents, 
-    earthProjectBoostCount, earthReconstructionProgress,
-    voidPOIsInspiration, robotRepairProgress, isRobotRepaired, activeBattle,
-    isRetributionActive, isFatigueActive, underAttackBattle
+    earthPopulation, earthMaleRatio, earthBiodiversity, earthHealth,
+    earthHappiness, earthSecurity, earthQualityOfLife, earthEvents,
+    earthProjectBoostCount, earthSeason, earthReconstructionProgress,
+    atmosphere, temperature, hydrosphere, biosphere,
+    voidPOIsInspiration, voidPOIQCDonations, voidDonationModes, hasWonEliminateEnemiesRoute3,
+    robotRepairProgress, isRobotRepaired, activeBattle,
+    isRetributionActive, isFatigueActive, underAttackBattle,
+    unlockedExtractionPoints, extractionCycleProgress,
+    researchingExtractionPoint, voidWarProgress,
+    isVoidWarActive
   ]);
 
   // 5. Misc & Global
@@ -760,7 +825,12 @@ const DashboardContent = memo(({
     voidAircraftUpgradesRef.current = voidAircraftUpgrades;
     voidAircraftAutoTogglesRef.current = voidAircraftAutoToggles;
     voidBattleShipStatsRef.current = voidBattleShipStats;
-  }, [voidAircraftMissions, voidAircraftUpgrades, voidAircraftAutoToggles, voidBattleShipStats]);
+    unlockedVoidAircraftRef.current = unlockedVoidAircraft;
+    voidAircraftConstructionRef.current = voidAircraftConstruction;
+  }, [
+    voidAircraftMissions, voidAircraftUpgrades, voidAircraftAutoToggles,
+    voidBattleShipStats, unlockedVoidAircraft, voidAircraftConstruction
+  ]);
 
   useEffect(() => {
     isSpeedRunRef.current = isSpeedRun;
@@ -781,6 +851,7 @@ const DashboardContent = memo(({
   }, []);
 
 
+
   const gameTime = useMemo(() => {
     const totalDays = Math.floor(gameTimeSeconds * 0.75);
     const years = Math.floor(totalDays / 360);
@@ -788,7 +859,7 @@ const DashboardContent = memo(({
     const days = totalDays % 30;
     return { years, months, days };
   }, [gameTimeSeconds]);
-  
+
   const setRouteTier = useCallback((tier: 'Solar' | 'Interstellar' | 'Void' | 'Earth') => {
     dispatch({ type: 'ADVANCE_ROUTE_TIER', payload: { tier } });
   }, [dispatch]);
@@ -804,43 +875,43 @@ const DashboardContent = memo(({
 
   const isArcadeUnlocked = routeTier === 'Earth';
   const isNeon = false;
-  
+
   const currentTheme = typeof currentThemeIndex === 'number' ? GAME_THEMES[currentThemeIndex] : null;
-  
+
   const themeColor = isNeon ? 'pink' : (currentTheme ? currentTheme.color : (isEarth ? 'emerald' : (isVoid ? 'purple' : (isInterstellar ? 'orange' : 'cyan'))));
-  
-  const themeText = themeColor === 'pink' ? 'text-pink-500' : 
-                   themeColor === 'purple' ? 'text-purple-300' : 
-                   themeColor === 'orange' ? 'text-orange-500' : 
-                   themeColor === 'blue' ? 'text-blue-400' :
-                   themeColor === 'neila' ? 'text-emerald-400' :
-                   themeColor === 'violet' ? 'text-violet-400' :
-                   themeColor === 'amber' ? 'text-amber-400' :
-                   themeColor === 'emerald' ? 'text-emerald-400' :
-                   themeColor === 'rose' ? 'text-rose-400' :
-                   'text-cyan-400';
 
-  const themeBorder = themeColor === 'pink' ? 'border-pink-500' : 
-                     themeColor === 'purple' ? 'border-purple-500' : 
-                     themeColor === 'orange' ? 'border-orange-600' : 
-                     themeColor === 'blue' ? 'border-blue-500' :
-                     themeColor === 'neila' ? 'border-emerald-500' :
-                     themeColor === 'violet' ? 'border-violet-500' :
-                     themeColor === 'amber' ? 'border-amber-500' :
-                     themeColor === 'emerald' ? 'border-emerald-500' :
-                     themeColor === 'rose' ? 'border-rose-500' :
-                     'border-cyan-500';
+  const themeText = themeColor === 'pink' ? 'text-pink-500' :
+    themeColor === 'purple' ? 'text-purple-300' :
+      themeColor === 'orange' ? 'text-orange-500' :
+        themeColor === 'blue' ? 'text-blue-400' :
+          themeColor === 'neila' ? 'text-emerald-400' :
+            themeColor === 'violet' ? 'text-violet-400' :
+              themeColor === 'amber' ? 'text-amber-400' :
+                themeColor === 'emerald' ? 'text-emerald-400' :
+                  themeColor === 'rose' ? 'text-rose-400' :
+                    'text-cyan-400';
 
-  const themeBg = themeColor === 'pink' ? 'bg-pink-600/10' : 
-                 themeColor === 'purple' ? 'bg-purple-600/10' : 
-                 themeColor === 'orange' ? 'bg-orange-600/10' : 
-                 themeColor === 'blue' ? 'bg-blue-600/10' :
-                 themeColor === 'neila' ? 'bg-emerald-600/10' :
-                 themeColor === 'violet' ? 'bg-violet-600/10' :
-                 themeColor === 'amber' ? 'bg-amber-600/10' :
-                 themeColor === 'emerald' ? 'bg-emerald-600/10' :
-                 themeColor === 'rose' ? 'bg-rose-600/10' :
-                 'bg-cyan-500/5';
+  const themeBorder = themeColor === 'pink' ? 'border-pink-500' :
+    themeColor === 'purple' ? 'border-purple-500' :
+      themeColor === 'orange' ? 'border-orange-600' :
+        themeColor === 'blue' ? 'border-blue-500' :
+          themeColor === 'neila' ? 'border-emerald-500' :
+            themeColor === 'violet' ? 'border-violet-500' :
+              themeColor === 'amber' ? 'border-amber-500' :
+                themeColor === 'emerald' ? 'border-emerald-500' :
+                  themeColor === 'rose' ? 'border-rose-500' :
+                    'border-cyan-500';
+
+  const themeBg = themeColor === 'pink' ? 'bg-pink-600/10' :
+    themeColor === 'purple' ? 'bg-purple-600/10' :
+      themeColor === 'orange' ? 'bg-orange-600/10' :
+        themeColor === 'blue' ? 'bg-blue-600/10' :
+          themeColor === 'neila' ? 'bg-emerald-600/10' :
+            themeColor === 'violet' ? 'bg-violet-600/10' :
+              themeColor === 'amber' ? 'bg-amber-600/10' :
+                themeColor === 'emerald' ? 'bg-emerald-600/10' :
+                  themeColor === 'rose' ? 'bg-rose-600/10' :
+                    'bg-cyan-500/5';
   const themeGlow = isNeon ? 'shadow-[0_0_20px_rgba(219,39,119,0.6)]' : (isVoid ? 'shadow-[0_0_20px_rgba(168,85,247,0.6)]' : (isInterstellar ? 'shadow-[0_0_20px_rgba(234,88,12,0.6)]' : 'shadow-[0_0_15px_rgba(6,182,212,0.4)]'));
   const themeAccent = isNeon ? 'from-pink-600 to-purple-400' : (isVoid ? 'from-purple-600 to-fuchsia-400' : (isInterstellar ? 'from-red-600 via-orange-500 to-yellow-400' : 'from-cyan-600 to-cyan-400'));
 
@@ -883,19 +954,21 @@ const DashboardContent = memo(({
     dispatch({ type: 'SET_RESOURCES', payload: { aetherionTubes: nextVal } });
   }, [dispatch]);
 
-  
+
   // Grouped Deliveries Memoization for the new UI
   const groupedDeliveries = useMemo(() => {
-    const groups: { [routeId: string]: {
-      routeId: string;
-      manualCount: number;
-      autoActive: boolean;
-      totalCount: number;
-      avgProgress: number;
-      status: string;
-      tier: string;
-      shipLevel: number;
-    }} = {};
+    const groups: {
+      [routeId: string]: {
+        routeId: string;
+        manualCount: number;
+        autoActive: boolean;
+        totalCount: number;
+        avgProgress: number;
+        status: string;
+        tier: string;
+        shipLevel: number;
+      }
+    } = {};
 
     // Process Manual Deliveries
     activeDeliveries.forEach(d => {
@@ -936,17 +1009,27 @@ const DashboardContent = memo(({
 
 
   const updateAchievementProgress = useCallback((id: string, amount: number, isSet: boolean = false) => {
-    dispatch({ type: 'UPDATE_ACHIEVEMENT_PROGRESS', payload: { achievementId: id, progress: amount, isAbsolute: isSet } });
-
-    // Read from refs so this callback has a stable identity (no re-creation on every Redux update)
     const achievement = ACHIEVEMENTS.find(a => a.id === id);
+    if (!achievement) return;
+
     const currentProgress = achievementProgressRef.current[id] || 0;
     const nextProgress = isSet ? amount : currentProgress + amount;
 
-    if (achievement && nextProgress >= achievement.target && !unlockedAchievementsRef.current.includes(id)) {
+    // PERFORMANCE FIX: Only dispatch if progress actually changed
+    if (nextProgress !== currentProgress) {
+      dispatch({ type: 'UPDATE_ACHIEVEMENT_PROGRESS', payload: { achievementId: id, progress: amount, isAbsolute: isSet } });
+      achievementProgressRef.current[id] = nextProgress;
+    }
+
+    // UNLOCK LOGIC: Only check if not already unlocked in ref
+    if (nextProgress >= achievement.target && !unlockedAchievementsRef.current.includes(id)) {
       dispatch({ type: 'UNLOCK_ACHIEVEMENT', payload: { id } });
       setAchievementNotification(achievement);
       playSfx('success');
+
+      // Update ref immediately to prevent multiple unlocks before state update
+      unlockedAchievementsRef.current = [...unlockedAchievementsRef.current, id];
+
       setTimeout(() => setAchievementNotification(null), 5000);
     }
   }, [dispatch, playSfx]);
@@ -956,7 +1039,8 @@ const DashboardContent = memo(({
     // Only run when loaded and music is ON
     if (!isLoaded || !musicOn) {
       if (isLoaded && !musicOn) {
-        console.log('[MusicEngine] Music is OFF, skipping route playlist');
+        console.log('[MusicEngine] Music is OFF, stopping playback');
+        jukebox.stop();
       }
       return;
     }
@@ -967,7 +1051,7 @@ const DashboardContent = memo(({
       if (arcadeTheme && arcadeTheme.playlist.length > 0) {
         const currentUrl = jukebox.currentTrack?.url;
         const isArcadeTrack = currentUrl && arcadeTheme.playlist.some((t: any) => t.url === currentUrl);
-        
+
         if (!isArcadeTrack) {
           console.log(`[MusicEngine] Arcade detected: ${activeMiniGameId}. Switching to arcade playlist...`);
           jukebox.playPlaylist(arcadeTheme.playlist);
@@ -980,7 +1064,7 @@ const DashboardContent = memo(({
     if (theme && theme.playlist.length > 0) {
       const currentUrl = jukebox.currentTrack?.url;
       const isThemeTrack = currentUrl && theme.playlist.some((t: any) => t.url === currentUrl);
-      
+
       if (!isThemeTrack) {
         console.log(`[MusicEngine] Route detected: ${routeTier}. Switching to theme playlist...`);
         jukebox.playPlaylist(theme.playlist);
@@ -989,6 +1073,7 @@ const DashboardContent = memo(({
       console.warn(`[MusicEngine] No playlist found for route: ${routeTier}. Stopping playback.`);
       jukebox.stop();
     }
+
   }, [activeMiniGameId || routeTier, isLoaded, musicOn, jukebox.playPlaylist, jukebox.currentTrack?.url]);
   const setOresCollected = useCallback((val: Record<string, number> | ((prev: Record<string, number>) => Record<string, number>)) => {
     const nextVal = typeof val === 'function' ? val(oresCollectedRef.current) : val;
@@ -1131,49 +1216,70 @@ const DashboardContent = memo(({
     dispatch({ type: 'SET_RESEARCHING_TECH', payload: { researchingTech: nextVal } });
   }, [dispatch]);
 
-  const setIsRetributionActive = useCallback((val: boolean | ((prev: boolean) => boolean)) => dispatch({ type: 'TOGGLE_RETRIBUTION' }), [dispatch]);
-  const setIsFatigueActive = useCallback((val: boolean | ((prev: boolean) => boolean)) => dispatch({ type: 'TOGGLE_FATIGUE' }), [dispatch]);
-  
+
 
   const setEarthPopulation = useCallback((val: number | ((prev: number) => number)) => {
-    const nextVal = typeof val === 'function' ? val(earthPopulation) : val;
+    const nextVal = typeof val === 'function' ? val(earthPopulationRef.current) : val;
+    earthPopulationRef.current = nextVal;
     dispatch({ type: 'UPDATE_EARTH_STATE', payload: { population: nextVal } });
-  }, [earthPopulation, dispatch]);
+  }, [dispatch]);
 
   const setEarthMaleRatio = useCallback((val: number | ((prev: number) => number)) => {
-    const nextVal = typeof val === 'function' ? val(earthMaleRatio) : val;
+    const nextVal = typeof val === 'function' ? val(earthMaleRatioRef.current) : val;
+    earthMaleRatioRef.current = nextVal;
     dispatch({ type: 'UPDATE_EARTH_STATE', payload: { maleRatio: nextVal } });
-  }, [earthMaleRatio, dispatch]);
+  }, [dispatch]);
 
   const setEarthBiodiversity = useCallback((val: number | ((prev: number) => number)) => {
-    const nextVal = typeof val === 'function' ? val(earthBiodiversity) : val;
+    const nextVal = typeof val === 'function' ? val(earthBiodiversityRef.current) : val;
+    earthBiodiversityRef.current = nextVal;
     dispatch({ type: 'UPDATE_EARTH_STATE', payload: { biodiversity: nextVal } });
-  }, [earthBiodiversity, dispatch]);
+  }, [dispatch]);
 
   const setEarthHealth = useCallback((val: number | ((prev: number) => number)) => {
-    const nextVal = typeof val === 'function' ? val(earthHealth) : val;
+    const nextVal = typeof val === 'function' ? val(earthHealthRef.current) : val;
+    earthHealthRef.current = nextVal;
     dispatch({ type: 'UPDATE_EARTH_STATE', payload: { health: nextVal } });
-  }, [earthHealth, dispatch]);
+  }, [dispatch]);
 
   const setEarthHappiness = useCallback((val: number | ((prev: number) => number)) => {
-    const nextVal = typeof val === 'function' ? val(earthHappiness) : val;
+    const nextVal = typeof val === 'function' ? val(earthHappinessRef.current) : val;
+    earthHappinessRef.current = nextVal;
     dispatch({ type: 'UPDATE_EARTH_STATE', payload: { happiness: nextVal } });
-  }, [earthHappiness, dispatch]);
+  }, [dispatch]);
 
   const setEarthSecurity = useCallback((val: number | ((prev: number) => number)) => {
-    const nextVal = typeof val === 'function' ? val(earthSecurity) : val;
+    const nextVal = typeof val === 'function' ? val(earthSecurityRef.current) : val;
+    earthSecurityRef.current = nextVal;
     dispatch({ type: 'UPDATE_EARTH_STATE', payload: { security: nextVal } });
-  }, [earthSecurity, dispatch]);
+  }, [dispatch]);
 
   const setEarthQualityOfLife = useCallback((val: number | ((prev: number) => number)) => {
-    const nextVal = typeof val === 'function' ? val(earthQualityOfLife) : val;
+    const nextVal = typeof val === 'function' ? val(earthQualityOfLifeRef.current) : val;
+    earthQualityOfLifeRef.current = nextVal;
     dispatch({ type: 'UPDATE_EARTH_STATE', payload: { qualityOfLife: nextVal } });
-  }, [earthQualityOfLife, dispatch]);
+  }, [dispatch]);
 
   const setEarthEvents = useCallback((val: any[] | ((prev: any[]) => any[])) => {
-    const nextVal = typeof val === 'function' ? val(earthEvents) : val;
+    const rawVal = typeof val === 'function' ? val(earthEventsRef.current) : val;
+    
+    // Safety check: ensure rawVal is an array
+    if (!Array.isArray(rawVal)) {
+      console.warn("[Earth] Attempted to set earthEvents to a non-array value:", rawVal);
+      return;
+    }
+
+    // Filter unique IDs and ensure item is a valid object with an ID
+    const nextVal = Array.from(
+      new Map(
+        rawVal
+          .filter((item: any) => item && typeof item === 'object' && item.id && typeof item.id === 'string')
+          .map((item: any) => [item.id, item])
+      ).values()
+    ).slice(0, 50);
+
     dispatch({ type: 'UPDATE_EARTH_STATE', payload: { events: nextVal } });
-  }, [earthEvents, dispatch]);
+  }, []);
 
   const setActiveBattle = useCallback((val: Battle | null | ((prev: Battle | null) => Battle | null)) => {
     const nextVal = typeof val === 'function' ? val(activeBattle) : val;
@@ -1185,24 +1291,28 @@ const DashboardContent = memo(({
   }, [activeBattle, dispatch]);
 
   const setEarthCouples = useCallback((val: number | ((prev: number) => number)) => {
-    const nextVal = typeof val === 'function' ? val(earthCouples) : val;
+    const nextVal = typeof val === 'function' ? val(earthCouplesRef.current) : val;
+    earthCouplesRef.current = nextVal;
     dispatch({ type: 'UPDATE_EARTH_STATE', payload: { couples: nextVal } });
-  }, [earthCouples, dispatch]);
+  }, [dispatch]);
 
   const setEarthBirthRegistry = useCallback((val: Record<string, number> | ((prev: Record<string, number>) => Record<string, number>)) => {
-    const nextVal = typeof val === 'function' ? val(earthBirthRegistry) : val;
+    const nextVal = typeof val === 'function' ? val(earthBirthRegistryRef.current) : val;
+    earthBirthRegistryRef.current = nextVal;
     dispatch({ type: 'UPDATE_EARTH_STATE', payload: { birthRegistry: nextVal } });
-  }, [earthBirthRegistry, dispatch]);
+  }, [dispatch]);
 
   const setEarthReconstructionProgress = useCallback((val: Record<string, number> | ((prev: Record<string, number>) => Record<string, number>)) => {
-    const nextVal = typeof val === 'function' ? val(earthReconstructionProgress) : val;
+    const nextVal = typeof val === 'function' ? val(earthReconstructionProgressRef.current) : val;
+    earthReconstructionProgressRef.current = nextVal;
     dispatch({ type: 'UPDATE_EARTH_STATE', payload: { reconstructionProgress: nextVal } });
-  }, [earthReconstructionProgress, dispatch]);
+  }, [dispatch]);
 
   const setEarthProjectBoostCount = useCallback((val: number | ((prev: number) => number)) => {
-    const nextVal = typeof val === 'function' ? val(earthProjectBoostCount) : val;
+    const nextVal = typeof val === 'function' ? val(earthProjectBoostCountRef.current) : val;
+    earthProjectBoostCountRef.current = nextVal;
     dispatch({ type: 'UPDATE_EARTH_STATE', payload: { projectBoostCount: nextVal } });
-  }, [earthProjectBoostCount, dispatch]);
+  }, [dispatch]);
 
   const setRobotRepairProgress = useCallback((val: number | ((prev: number) => number)) => {
     const nextVal = typeof val === 'function' ? val(robotRepairProgressRef.current) : val;
@@ -1273,9 +1383,6 @@ const DashboardContent = memo(({
     dispatch({ type: 'SET_VOID_POI_INSPIRATION', payload: { inspiration: nextVal } });
   }, [voidPOIsInspiration, dispatch]);
 
-  const [voidPOIQCDonations, setVoidPOIQCDonations] = useState<{ [poiId: string]: number }>({});
-  const [voidDonationModes, setVoidDonationModes] = useState<{ [poiId: string]: '1x' | '10x' | 'max' }>({});
-
   const setIsVoidWarActive = useCallback((val: boolean) => dispatch({ type: 'TOGGLE_VOID_WAR', payload: { active: val } }), [dispatch]);
   const setVoidWarProgress = useCallback((val: CombatState['voidWarProgress'] | ((prev: CombatState['voidWarProgress']) => CombatState['voidWarProgress'])) => {
     const nextVal = typeof val === 'function' ? val(voidWarProgress) : val;
@@ -1283,9 +1390,11 @@ const DashboardContent = memo(({
   }, [voidWarProgress, dispatch]);
 
   const setVoidResources = useCallback((val: CombatState['voidResources'] | ((prev: CombatState['voidResources']) => CombatState['voidResources'])) => {
-    const nextVal = typeof val === 'function' ? val(voidResources) : val;
+    const current = voidResourcesRef.current;
+    const nextVal = typeof val === 'function' ? val(current) : val;
+    voidResourcesRef.current = nextVal;
     dispatch({ type: 'SET_COMBAT_DATA', payload: { voidResources: nextVal } });
-  }, [voidResources, dispatch]);
+  }, [dispatch]);
 
   const setVoidCompactedResources = useCallback((val: Record<string, number> | ((prev: Record<string, number>) => Record<string, number>)) => {
     const nextVal = typeof val === 'function' ? val(voidCompactedResources) : val;
@@ -1297,9 +1406,8 @@ const DashboardContent = memo(({
     dispatch({ type: 'SET_UNLOCKED_EXTRACTION_POINTS', payload: { pointIds: nextVal } });
   }, [unlockedExtractionPoints, dispatch]);
 
-  
+
   // Robot Event States
-  const [hasWonEliminateEnemiesRoute3, setHasWonEliminateEnemiesRoute3] = useState(false);
   const [isRepairingRobot, setIsRepairingRobot] = useState(false);
 
   const setResearchingExtractionPoint = useCallback((val: any) => {
@@ -1307,12 +1415,11 @@ const DashboardContent = memo(({
   }, [dispatch]);
 
 
-  const [extractionCycleProgress, setExtractionCycleProgress] = useState<{ [id: string]: number }>({});
-  
 
-  
+
+
   const [isColoniesUnlocked, setIsColoniesUnlocked] = useState(true);
-  
+
   const totalHumanPopulation = useMemo(() => {
     const colonyPop = (colonies || []).reduce((sum, c) => sum + (c.population || 0), 0);
     return earthPopulation + colonyPop;
@@ -1323,75 +1430,75 @@ const DashboardContent = memo(({
   const generateEarthEvent = useCallback(() => {
     const totalDays = Math.floor(gameTimeSecondsRef.current * 0.75);
     const year = Math.floor(totalDays / 360);
-    
+
     // Fixed Comic Events
     const fixedEvents = [
-      { 
-        year: 520, 
-        name: { pt: 'ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒâ€šÃ‚Â® Profecia do PÃƒÂ£o', en: 'ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒâ€šÃ‚Â® Bread Prophecy' }, 
-        desc: { 
-          pt: '"Houve uma profecia dizendo que o mundo acabaria em 1524... SerÃƒÂ¡ que agora vai? Tem gente jÃƒÂ¡ vendendo tudo e comprando pÃƒÂ£o. Humanidade em leve desespero!"', 
-          en: '"There was a prophecy saying the world would end in 1524... Could it be now? People are already selling everything and buying bread. Humanity in mild despair!"' 
+      {
+        year: 520,
+        name: { pt: 'ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â Ãƒâ€šÃ‚Â® Profecia do PÃƒÂ£o', en: 'ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â Ãƒâ€šÃ‚Â® Bread Prophecy' },
+        desc: {
+          pt: '"Houve uma profecia dizendo que o mundo acabaria em 1524... SerÃƒÂ¡ que agora vai? Tem gente jÃƒÂ¡ vendendo tudo e comprando pÃƒÂ£o. Humanidade em leve desespero!"',
+          en: '"There was a prophecy saying the world would end in 1524... Could it be now? People are already selling everything and buying bread. Humanity in mild despair!"'
         },
         isFixed: true,
         specialColor: 'text-purple-400',
         specialBg: 'bg-purple-500/10',
         specialBorder: 'border-purple-500/30'
       },
-      { 
-        year: 662, 
-        name: { pt: 'ÃƒÂ¢Ãƒâ€¦Ã‚Â¡Ãƒâ€šÃ‚Â ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¸Ãƒâ€šÃ‚Â O NÃƒÂºmero da Besta?', en: 'ÃƒÂ¢Ãƒâ€¦Ã‚Â¡Ãƒâ€šÃ‚Â ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¸Ãƒâ€šÃ‚Â The Beast Number?' }, 
-        desc: { 
-          pt: '"Corre o boato de que o ano 1666 será o fim de tudo! Mas por quê 666? Alguém claramente levou esse nÃºmero a sério demais... clima de pÃ¢nico e teorias estranhas no ar."', 
-          en: '"Rumor has it that the year 1666 will be the end of it all! But why 666? Someone clearly took that number too seriously... panic and strange theories in the air."' 
+      {
+        year: 662,
+        name: { pt: 'ÃƒÂ¢Ãƒâ€¦Ã‚Â¡Ãƒâ€šÃ‚Â ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¸Ãƒâ€šÃ‚Â  O NÃƒÂºmero da Besta?', en: 'ÃƒÂ¢Ãƒâ€¦Ã‚Â¡Ãƒâ€šÃ‚Â ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¸Ãƒâ€šÃ‚Â  The Beast Number?' },
+        desc: {
+          pt: '"Corre o boato de que o ano 1666 será o fim de tudo! Mas por quê 666? Alguém claramente levou esse nÃºmero a sério demais... clima de pÃ¢nico e teorias estranhas no ar."',
+          en: '"Rumor has it that the year 1666 will be the end of it all! But why 666? Someone clearly took that number too seriously... panic and strange theories in the air."'
         },
         isFixed: true,
         specialColor: 'text-red-500',
         specialBg: 'bg-red-500/10',
         specialBorder: 'border-red-500/30'
       },
-      { 
-        year: 840, 
-        name: { pt: 'ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒâ€šÃ‚Â® O Sinal nas Nuvens', en: 'ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒâ€šÃ‚Â® Cloud Signal' }, 
-        desc: { 
-          pt: '"Um grupo garante que em 1844 tudo acaba! Já tem gente olhando pro céu esperando algum sinal... até agora só nuvem mesmo."', 
-          en: '"A group guarantees that in 1844 everything ends! People are already looking at the sky waiting for some sign... so far just clouds."' 
+      {
+        year: 840,
+        name: { pt: 'ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â Ãƒâ€šÃ‚Â® O Sinal nas Nuvens', en: 'ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â Ãƒâ€šÃ‚Â® Cloud Signal' },
+        desc: {
+          pt: '"Um grupo garante que em 1844 tudo acaba! Já tem gente olhando pro céu esperando algum sinal... até agora só nuvem mesmo."',
+          en: '"A group guarantees that in 1844 everything ends! People are already looking at the sky waiting for some sign... so far just clouds."'
         },
         isFixed: true,
         specialColor: 'text-amber-400',
         specialBg: 'bg-amber-500/10',
         specialBorder: 'border-amber-500/30'
       },
-      { 
-        year: 906, 
-        name: { pt: 'ÃƒÂ¢Ãƒâ€¦Ã‚Â¡Ãƒâ€šÃ‚Â ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¸Ãƒâ€šÃ‚Â MÃƒÂ¡scaras Anti-Cometa', en: 'ÃƒÂ¢Ãƒâ€¦Ã‚Â¡Ãƒâ€šÃ‚Â ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¸Ãƒâ€šÃ‚Â Anti-Comet Masks' }, 
-        desc: { 
-          pt: "Descobriram que um cometa vai passar em 1910! Tem gente achando que é o fim... outros estão vendendo 'máscaras anti-cometa'. Negócio lucrativo!", 
-          en: "They discovered that a comet will pass in 1910! Some people think it's the end... others are selling 'anti-comet masks'. Lucrative business!" 
+      {
+        year: 906,
+        name: { pt: 'ÃƒÂ¢Ãƒâ€¦Ã‚Â¡Ãƒâ€šÃ‚Â ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¸Ãƒâ€šÃ‚Â  MÃƒÂ¡scaras Anti-Cometa', en: 'ÃƒÂ¢Ãƒâ€¦Ã‚Â¡Ãƒâ€šÃ‚Â ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¸Ãƒâ€šÃ‚Â  Anti-Comet Masks' },
+        desc: {
+          pt: "Descobriram que um cometa vai passar em 1910! Tem gente achando que é o fim... outros estão vendendo 'máscaras anti-cometa'. Negócio lucrativo!",
+          en: "They discovered that a comet will pass in 1910! Some people think it's the end... others are selling 'anti-comet masks'. Lucrative business!"
         },
         isFixed: true,
         specialColor: 'text-red-400',
         specialBg: 'bg-red-400/10',
         specialBorder: 'border-red-400/30'
       },
-      { 
-        year: 995, 
-        name: { pt: 'ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒâ€šÃ‚Â® Bug do MilÃƒÂªnio Antecipado', en: 'ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒâ€šÃ‚Â® Early Millennium Bug' }, 
-        desc: { 
-          pt: '"Segundo um tal de profeta antigo, 1999 será o fim do mundo! Enquanto isso, a humanidade segue normalmente... alguns já desistiram de fazer planos de longo prazo Ã°Å¸Ëœâ€¦"', 
-          en: '"According to an old prophet, 1999 will be the end of the world! Meanwhile, humanity goes on normally... some have already given up on making long-term plans Ã°Å¸Ëœâ€¦"' 
+      {
+        year: 995,
+        name: { pt: 'ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â Ãƒâ€šÃ‚Â® Bug do MilÃƒÂªnio Antecipado', en: 'ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â Ãƒâ€šÃ‚Â® Early Millennium Bug' },
+        desc: {
+          pt: '"Segundo um tal de profeta antigo, 1999 será o fim do mundo! Enquanto isso, a humanidade segue normalmente... alguns já desistiram de fazer planos de longo prazo Ã°Å¸Ëœâ€¦"',
+          en: '"According to an old prophet, 1999 will be the end of the world! Meanwhile, humanity goes on normally... some have already given up on making long-term plans Ã°Å¸Ëœâ€¦"'
         },
         isFixed: true,
         specialColor: 'text-purple-400',
         specialBg: 'bg-purple-400/10',
         specialBorder: 'border-purple-400/30'
       },
-      { 
-        year: 1008, 
-        name: { pt: 'ÃƒÂ¢Ãƒâ€¦Ã‚Â¡Ãƒâ€šÃ‚Â ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¸Ãƒâ€šÃ‚Â CalendÃƒÂ¡rio Maia?', en: 'ÃƒÂ¢Ãƒâ€¦Ã‚Â¡Ãƒâ€šÃ‚Â ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¸Ãƒâ€šÃ‚Â Mayan Calendar?' }, 
-        desc: { 
-          pt: '"Boatos dizem que 2012 será o fim de tudo! Uns estão preocupados... outros só querem saber se ainda dá tempo de terminar aquela série."', 
-          en: '"Rumors say that 2012 will be the end of it all! Some are worried... others just want to know if there\'s still time to finish that series."' 
+      {
+        year: 1008,
+        name: { pt: 'ÃƒÂ¢Ãƒâ€¦Ã‚Â¡Ãƒâ€šÃ‚Â ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¸Ãƒâ€šÃ‚Â  CalendÃƒÂ¡rio Maia?', en: 'ÃƒÂ¢Ãƒâ€¦Ã‚Â¡Ãƒâ€šÃ‚Â ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¸Ãƒâ€šÃ‚Â  Mayan Calendar?' },
+        desc: {
+          pt: '"Boatos dizem que 2012 será o fim de tudo! Uns estão preocupados... outros só querem saber se ainda dá tempo de terminar aquela série."',
+          en: '"Rumors say that 2012 will be the end of it all! Some are worried... others just want to know if there\'s still time to finish that series."'
         },
         isFixed: true,
         specialColor: 'text-amber-500',
@@ -1433,27 +1540,27 @@ const DashboardContent = memo(({
       ];
       eventSource = eventPoolSource[Math.floor(Math.random() * eventPoolSource.length)];
     }
-    
+
     const source = eventSource as any;
     const newEvent = {
-        id: `ev-${Date.now()}`,
-        year: isFixed ? source.year : year,
-        name: language === 'pt' ? source.name.pt : source.name.en,
-        description: language === 'pt' ? source.desc.pt : source.desc.en,
-        type: isFixed ? 'fixed' : source.impactType,
-        isFixed,
-        specialStyles,
-        timestamp: Date.now()
+      id: `ev-v2-${Date.now()}-${Math.floor(Math.random() * 1000000)}`,
+      year: isFixed ? source.year : year,
+      name: language === 'pt' ? source.name.pt : source.name.en,
+      description: language === 'pt' ? source.desc.pt : source.desc.en,
+      type: isFixed ? 'fixed' : source.impactType,
+      isFixed,
+      specialStyles,
+      timestamp: Date.now()
     };
 
     setEarthEvents(prev => [newEvent, ...prev].slice(0, 50));
-    dispatch({ type: 'UPDATE_EARTH_STATE', payload: { events: [newEvent, ...earthEventsRef.current].slice(0, 50) } });
-    
+
+
     // Apply impacts if not fixed (or add minor boost if fixed)
     if (!isFixed) {
       const impact = source.impact;
       const updates: Partial<EarthState> = {};
-      switch(source.impactType) {
+      switch (source.impactType) {
         case 'biodiversity': updates.biodiversity = Math.min(100, Math.max(0, earthBiodiversityRef.current + impact)); break;
         case 'health': updates.health = Math.min(100, Math.max(0, earthHealthRef.current + impact)); break;
         case 'happiness': updates.happiness = Math.min(100, Math.max(0, earthHappinessRef.current + impact)); break;
@@ -1472,7 +1579,7 @@ const DashboardContent = memo(({
     if (!isLoaded) return;
 
     const BASE_YEAR_SECONDS = 1200; // 20 minutes = 1200 seconds (Reduced speed by 60%)
-    
+
     const interval = setInterval(() => {
       // 0. Time Acceleration Factor
       // If player is playing a mini-game, time passes 2x faster
@@ -1482,7 +1589,7 @@ const DashboardContent = memo(({
 
       // 1. Time Progression (Global - Only in Route 4)
       if (routeTierRef.current === 'Earth') {
-        setGameTimeSeconds(prev => prev + (timeFactor * 1)); 
+        setGameTimeSeconds(prev => prev + (timeFactor * 1));
       }
 
       // 2. Earth Specific Logic (Route 4)
@@ -1490,10 +1597,10 @@ const DashboardContent = memo(({
         const nextYear = gameTimeSecondsRef.current / BASE_YEAR_SECONDS;
         // Calculate season (0-3)
         const seasonProgress = (nextYear % 1) * 4;
-        
+
         const updates: Partial<EarthState> = {};
         updates.season = Math.floor(seasonProgress);
-      
+
         // Population Growth (UI Update only)
         const currentPop = earthPopulationRef.current;
         const currentCouples = Math.floor(currentPop * 0.8 / 2);
@@ -1507,9 +1614,9 @@ const DashboardContent = memo(({
         const yearFraction = timeFactor / BASE_YEAR_SECONDS;
         const boostPerYear = earthProjectBoostCountRef.current * 0.05; // 0.05% boost per year per 10k allocation
         const boostFraction = (boostPerYear * yearFraction) / 100;
-        
+
         updates.biodiversity = Math.min(100, earthBiodiversityRef.current + (0.01 * (1 - (earthBiodiversityRef.current / 100)) * yearFraction + boostFraction));
-        
+
         const healthBonus = isPlaying ? (0.01 * yearFraction) : 0;
         updates.health = Math.min(100, earthHealthRef.current + (0.005 * (1 - (earthHealthRef.current / 100)) * yearFraction + healthBonus + boostFraction));
 
@@ -1540,13 +1647,13 @@ const DashboardContent = memo(({
   useEffect(() => {
     if (!isLoaded || gameTime.years === 0 || lastProcessedYearRef.current === gameTime.years) return;
     lastProcessedYearRef.current = gameTime.years;
-    
+
     // 1. Calculate Growth Rate based on current year
     // User asked for slower growth targeting 1M in 20 years from 500k.
     // Factor 2 over 20 years = ~3.5% annual growth.
     let minRate = 0.03;
     let maxRate = 0.04;
-    
+
     if (gameTime.years > 15) {
       minRate = 0.025; // Slow down slightly
       maxRate = 0.035;
@@ -1554,19 +1661,19 @@ const DashboardContent = memo(({
       minRate = 0.032;
       maxRate = 0.038;
     }
-    
+
     const rate = minRate + Math.random() * (maxRate - minRate);
     const colonyPop = (colonies || []).reduce((sum, c) => sum + (c.population || 0), 0);
     const totalPop = earthPopulationRef.current + colonyPop;
     const baseGrowth = totalPop * rate;
-    
+
     // 2. Random Demographic Events
     let eventBonus = 0;
     if (Math.random() < 0.15) { // 15% chance of discovery
       eventBonus += 250;
       addLog(language === 'pt' ? 'Novas tribos foram descobertas e querem se filiar. +250 de população.' : 'New tribes were discovered and want to join. +250 population.', 'success');
     }
-    
+
     // Migration Logic (above 10k/15k)
     let migrationPenalty = 0;
     if (totalPop > 10000 && Math.random() < 0.2) {
@@ -1576,12 +1683,12 @@ const DashboardContent = memo(({
 
     // 3. Update Population (Must be Integer, Round UP)
     setEarthPopulation(prev => Math.ceil(prev + baseGrowth + eventBonus - migrationPenalty));
-    
+
     // Log the annual summary
     if (baseGrowth > 0) {
       addLog(`${language === 'pt' ? 'Ano' : 'Year'} ${gameTime.years}: +${Math.ceil(baseGrowth)} ${language === 'pt' ? 'novos habitantes' : 'new inhabitants'} (${(rate * 100).toFixed(1)}%)`, 'info');
     }
-    
+
   }, [gameTime.years, isLoaded, language, colonies]);
 
   const [selectedUpgradePoint, setSelectedUpgradePoint] = useState<number | null>(null);
@@ -1602,17 +1709,77 @@ const DashboardContent = memo(({
 
 
 
-  // Void War Trigger Sequence
-  useEffect(() => {
-    const totalProgress = Object.values(earthReconstructionProgress).reduce((a, b) => a + (b as number), 0) / 5;
-    const isComplete = totalProgress >= 100;
+  // Project Terra Global Progression & Passive Contributions
+  const getPOIProgress = useCallback((poiId: string) => {
+    const poi = VOID_POIS.find(p => p.id === poiId);
+    if (!poi) return 0;
 
-    if (routeTier === 'Void' && isComplete && !isVoidWarActive && !voidWarRobotSpeaking && !voidWarAlertActive && !hasTriggeredVoidWarRef.current) {
+    const resourceKeyMap: Record<string, string> = {
+      'Energia': 'energy',
+      'Alimentos': 'food',
+      'Tecnologia': 'tech',
+      'Medicamentos': 'meds',
+      'Minerais': 'minerals'
+    };
+    const targetKey = resourceKeyMap[poi.need] || 'energy';
+    const poiProgress = combatState.voidPOIsInspiration[poiId] || {};
+    const qcDonation = combatState.voidPOIQCDonations?.[poiId] || 0;
+
+    const progressValue = Object.entries(poiProgress).reduce((acc, [key, val]) => {
+      const weight = key === targetKey ? 2 : 1;
+      return acc + (val as number * weight);
+    }, qcDonation / 1000);
+
+    return Math.min(100, (progressValue / (poi.resourceRequired || 100000)) * 100);
+  }, [combatState.voidPOIsInspiration, combatState.voidPOIQCDonations]);
+
+  const totalProjectTerra = useMemo(() => {
+    const poiSum = VOID_POIS.reduce((acc, poi) => acc + getPOIProgress(poi.id), 0);
+    const locationContribution = poiSum / 8; // Max 50%
+    return Math.min(100, locationContribution + combatState.terraPassiveProgress + combatState.terraDirectProgress);
+  }, [getPOIProgress, combatState.terraPassiveProgress, combatState.terraDirectProgress]);
+
+  // Passive Contribution Loop
+  useEffect(() => {
+    if (routeTier !== 'Void') return;
+
+    const timer = setInterval(() => {
+      const currentTime = Date.now();
+
+      VOID_POIS.forEach(poi => {
+        const progress = getPOIProgress(poi.id);
+        if (progress >= 100) {
+          const lastTime = combatState.lastPassiveContributionTimes[poi.id] || 0;
+          if (currentTime >= lastTime) {
+            const amount = 0.01 + Math.random() * 0.01; // 0.01 to 0.02
+            const nextInterval = (20 + Math.random() * 100) * 1000; // 20s to 120s
+            dispatch({
+              type: 'APPLY_TERRA_PASSIVE_PROGRESS',
+              payload: {
+                amount,
+                poiId: poi.id,
+                nextTime: currentTime + nextInterval
+              }
+            });
+          }
+        }
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [routeTier, combatState.lastPassiveContributionTimes, getPOIProgress, dispatch]);
+
+  // Invasion Trigger
+  useEffect(() => {
+    if (routeTier === 'Void' && totalProjectTerra >= 100 && !voidWarAlertActive && !hasTriggeredVoidWarRef.current) {
       hasTriggeredVoidWarRef.current = true;
+      setVoidWarAlertActive(true);
       setVoidWarRobotSpeaking(true);
-      setLoreLineIndex(0); // Reset lore index for the new sequence
+      setLoreLineIndex(0);
+      addLog(language === 'pt' ? 'ALERTA: Invasão detectada! O Projeto Terra está sob ataque!' : 'ALERT: Invasion detected! Project Terra is under attack!', 'error');
+      playSfx('alarm_loop');
     }
-  }, [earthReconstructionProgress, isVoidWarActive, voidWarRobotSpeaking, voidWarAlertActive, routeTier, playSfx]);
+  }, [totalProjectTerra, voidWarAlertActive, routeTier, language, addLog, playSfx]);
 
 
 
@@ -1640,7 +1807,7 @@ const DashboardContent = memo(({
       if (event.data.type === 'CLOSE_MINI_GAME') {
         const wasMiniGameActive = !!activeMiniGameIdRef.current;
         setActiveMiniGameId(null);
-        
+
         // Boost Earth stats on game play/finish (Route 4 only)
         if (routeTierRef.current === 'Earth' && wasMiniGameActive) {
           const arcadeBoost = 0.15; // Immediate small boost
@@ -1672,16 +1839,16 @@ const DashboardContent = memo(({
 
 
   const updateHistoryStats = useCallback((
-    type: 'acquired' | 'spent' | 'mission_complete' | 'battle_win' | 'manual_mining' | 'auto_mining' | 'manual_extraction' | 'auto_extraction' | 'perfect_delivery' | 'random_battle_found', 
-    amount: number, 
+    type: 'acquired' | 'spent' | 'mission_complete' | 'battle_win' | 'manual_mining' | 'auto_mining' | 'manual_extraction' | 'auto_extraction' | 'perfect_delivery' | 'random_battle_found',
+    amount: number,
     tier: string,
     source?: 'delivery' | 'mining' | 'battle' | 'mission' | 'extraction' | 'tutorial'
   ) => {
     const current = historyStatsRef.current[tier];
     if (!current) return;
-    
+
     const next = { ...current };
-    
+
     if (type === 'acquired') {
       next.qcTotalAcquired += amount;
       if (source === 'delivery') next.qcFromDeliveries += amount;
@@ -1709,7 +1876,7 @@ const DashboardContent = memo(({
     } else if (type === 'random_battle_found') {
       next.randomBattlesFound = (next.randomBattlesFound || 0) + amount;
     }
-    
+
     historyStatsRef.current = { ...historyStatsRef.current, [tier]: next };
     pendingHistoryRef.current = true;
   }, []);
@@ -1732,12 +1899,12 @@ const DashboardContent = memo(({
       setter(level + 1);
       playSfx('level_up');
       addLog(`${t('upgraded')} ${name} ${t('toLevel')} ${level + 1}`, 'success');
-      
+
       // Background Log
       GameStorage.log('SKILL_UPGRADE', { skill: name, newLevel: level + 1, cost }, playerName);
-      
+
       updateHistoryStats('spent', cost, routeTier);
-      performSave();
+      performSave().catch(e => console.error("[Save] Failed:", e));
     }
   };
 
@@ -1746,8 +1913,8 @@ const DashboardContent = memo(({
   // Log Game Start
   useEffect(() => {
     if (isLoaded) {
-      GameStorage.log('GAME_START', { 
-        qc: qcRef.current, 
+      GameStorage.log('GAME_START', {
+        qc: qcRef.current,
         tier: routeTierRef.current,
         platform: typeof window !== 'undefined' ? window.navigator.userAgent : 'unknown'
       }, playerName);
@@ -1758,7 +1925,7 @@ const DashboardContent = memo(({
   // Centralized Save Function
   const performSave = useCallback(async () => {
     if (isSpeedRun || !isLoaded || isResettingRef.current) return;
-    
+
     const saveData = {
       qc: qcRef.current,
       unlockedRouteIds: unlockedRouteIdsRef.current,
@@ -1821,20 +1988,20 @@ const DashboardContent = memo(({
       warCoreLevel: warCoreLevelRef.current,
       fleetPower: fleetPowerRef.current,
       earthReconstructionProgress: earthReconstructionProgressRef.current,
-      isVoidWarActive: isVoidWarActive,
-      voidWarProgress: voidWarProgress,
+      isVoidWarActive: isVoidWarActiveRef.current,
+      voidWarProgress: voidWarProgressRef.current,
       voidResources: voidResourcesRef.current,
-      voidCompactedResources: voidCompactedResources,
-      voidDonationModes: voidDonationModes,
+      voidCompactedResources: voidCompactedResourcesRef.current,
+      voidDonationModes: voidDonationModesRef.current,
       voidAircraftMissions: voidAircraftMissionsRef.current,
       voidAircraftUpgrades: voidAircraftUpgradesRef.current,
       voidAircraftAutoToggles: voidAircraftAutoTogglesRef.current,
       voidBattleShipStats: voidBattleShipStatsRef.current,
       voidPOIsInspiration: voidPOIsInspirationRef.current,
       voidPOIQCDonations: voidPOIQCDonationsRef.current,
-      route4Unlocked: route4Unlocked,
-      unlockedAchievements,
-      achievementProgress,
+      route4Unlocked: route4UnlockedRef.current,
+      unlockedAchievements: unlockedAchievementsRef.current,
+      achievementProgress: achievementProgressRef.current,
       hasWonEliminateEnemiesRoute3: hasWonEliminateEnemiesRoute3Ref.current,
       robotRepairProgress: robotRepairProgressRef.current,
       isRobotRepaired: isRobotRepairedRef.current,
@@ -1843,7 +2010,19 @@ const DashboardContent = memo(({
       earthPopulation: earthPopulationRef.current,
       earthMaleRatio: earthMaleRatioRef.current,
       earthBiodiversity: earthBiodiversityRef.current,
+      earthHealth: earthHealthRef.current,
+      earthHappiness: earthHappinessRef.current,
+      earthSecurity: earthSecurityRef.current,
+      earthQualityOfLife: earthQualityOfLifeRef.current,
+      earthCouples: earthCouplesRef.current,
+      earthBirthRegistry: earthBirthRegistryRef.current,
+      earthProjectBoostCount: earthProjectBoostCountRef.current,
+      earthSeason: earthSeasonRef.current,
       earthEvents: earthEventsRef.current,
+      atmosphere: atmosphereRef.current,
+      temperature: temperatureRef.current,
+      hydrosphere: hydrosphereRef.current,
+      biosphere: biosphereRef.current,
       unlockedVoidAircraft: unlockedVoidAircraftRef.current,
       voidAircraftConstruction: voidAircraftConstructionRef.current,
       voidAutoShipmentUnlocked: voidAutoShipmentUnlockedRef.current,
@@ -1854,17 +2033,36 @@ const DashboardContent = memo(({
     await GameStorage.save(modularSave, 'time_travel_save');
   }, [isSpeedRun, isLoaded, playerName, seenTutorials, autoClaimMissions, isVoidWarActive, voidWarProgress, voidCompactedResources, voidDonationModes, route4Unlocked, unlockedAchievements, achievementProgress]);
 
+  // --- AUTOMATED SAVING ---
+
+  // 1. Periodic Auto-save (every 60 seconds)
+  useEffect(() => {
+    const saveInterval = setInterval(() => {
+      performSave().catch(e => console.error("[Save] Failed:", e));
+    }, 60000);
+
+    return () => clearInterval(saveInterval);
+  }, [performSave]);
+
+  // 2. Navigation / Unmount safety save
+  useEffect(() => {
+    return () => {
+      // Trigger a final save on unmount
+      performSave().catch(e => console.error("[Save] Failed:", e));
+    };
+  }, [performSave]);
+
   const t = useCallback((key: string) => {
     try {
       // Special case for Route 4 mini games name in PT
       if (key === 'mini_games' && routeTier === 'Earth' && language === 'pt') {
         return 'Fliperamas';
       }
-      
+
       const langData = (translations as any)[language] || translations.en;
       const val = langData[key] || (translations.en as any)[key] || key;
       const text = Array.isArray(val) ? val[0] : val;
-      
+
       return typeof text === 'string' ? text : String(text);
     } catch (e) {
       console.warn(`Translation error for key: ${key}`, e);
@@ -1881,7 +2079,7 @@ const DashboardContent = memo(({
   const handleBuildingComplete = useCallback((type: string, level: number) => {
     // Permanent boost when building levels up
     const unit = 0.3; // 0.3% boost
-    
+
     if (type === 'forest') {
       setEarthHealth(prev => Math.min(100, prev + unit));
       setEarthBiodiversity(prev => Math.min(100, prev + unit * 1.5));
@@ -1901,26 +2099,23 @@ const DashboardContent = memo(({
   }, []);
 
   const getEconomicMultipliers = useCallback(() => {
-    const isEasy = false;
-    const isHard = false;
     let costMult = 1;
     let profitMult = 1;
+    let battleProfitMult = 1;
 
     if (routeTierRef.current === 'Interstellar') {
-      costMult = 5;
-      profitMult = 5;
+      const lvl = battleLevelRef.current || 1;
+      // Lucro Geral: Reduzido em 75% conforme plano Ninja
+      profitMult = (2.5 + (Math.min(lvl, 55) / 55) * 3.5) * 0.25;
+      // Lucro de Batalha: Foco principal, mantendo o multiplicador original alto
+      battleProfitMult = (2.5 + (Math.min(lvl, 55) / 55) * 3.5);
+      // Custo: Mantido para manter o desafio
+      costMult = 3 + (Math.min(lvl, 55) / 55) * 5;
+
+      return { profit: profitMult, battleProfit: battleProfitMult, cost: costMult };
     }
 
-    if (isEasy) {
-      costMult *= 0.5;
-      profitMult *= 1.5;
-    }
-
-    if (isHard) {
-      profitMult *= 0.5;
-    }
-
-    return { cost: costMult, profit: profitMult };
+    return { profit: profitMult, battleProfit: 1, cost: costMult };
   }, []);
 
   const getMissionUpgradeCost = useCallback((level: number, tier: string) => {
@@ -1936,15 +2131,15 @@ const DashboardContent = memo(({
   const formatValue = useCallback((value: number) => {
     if (value === undefined || value === null) return '0';
     if (!formatNumbers) return Math.floor(value).toLocaleString();
-    
+
     const absValue = Math.abs(value);
     const sign = value < 0 ? '-' : '';
-    
+
     if (absValue >= 1000000000000) return sign + (absValue / 1000000000000).toFixed(1).replace(/\.0$/, '') + 'T';
     if (absValue >= 1000000000) return sign + (absValue / 1000000000).toFixed(1).replace(/\.0$/, '') + 'B';
     if (absValue >= 1000000) return sign + (absValue / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
     if (absValue >= 1000) return sign + (absValue / 1000).toFixed(1).replace(/\.0$/, '') + 'K';
-    
+
     return value.toString();
   }, [formatNumbers]);
 
@@ -1975,17 +2170,17 @@ const DashboardContent = memo(({
 
           const lastTime = extractionTimersRef.current[id];
           const elapsed = now - lastTime;
-          
+
           // Calculate progress for UI
           newProgress[id] = Math.min(100, (elapsed / cycleTime) * 100);
 
           if (elapsed >= cycleTime) {
             const prodLevel = extractionProductionLevelsRef.current[id] || 0;
             const productionPerCycle = EXTRACTION_PRODUCTION_VALUES[prodLevel] || 10;
-            
+
             const currentPacks = next[id] || 0;
             const maxStock = 2000;
-            
+
             if (currentPacks < maxStock) {
               const cycles = Math.floor(elapsed / cycleTime);
               const addedPacks = productionPerCycle * cycles;
@@ -2002,7 +2197,7 @@ const DashboardContent = memo(({
           }
         }
       });
-      
+
       if (localHasChanged) {
         extractionPacksRef.current = next;
       }
@@ -2012,7 +2207,6 @@ const DashboardContent = memo(({
     }, 100);
 
     const throttleInterval = setInterval(() => {
-      setExtractionCycleProgress(extractionCycleProgressRef.current);
       dispatch({ type: 'SET_EXTRACTION_PROGRESS', payload: { progress: extractionCycleProgressRef.current } });
       dispatch({ type: 'SET_EXTRACTION_DATA', payload: { packs: extractionPacksRef.current } });
     }, 500);
@@ -2023,11 +2217,11 @@ const DashboardContent = memo(({
     };
   }, [unlockedExtractionPoints, routeTier]);
 
-  // Automatic Sales Logic (RobÃƒÂ´s de Entrega)
+  // Automatic Sales Logic (Robôs de Entrega)
   useEffect(() => {
     const interval = setInterval(() => {
       if (routeTierRef.current !== 'Interstellar') return;
-      
+
       const unlockedPoints = unlockedExtractionPointsRef.current;
       if (unlockedPoints.length === 0) return;
 
@@ -2042,22 +2236,26 @@ const DashboardContent = memo(({
         if (!point) return;
 
         const currentPacks = next[id] || 0;
-        
-        // Sell if auto-sell is active and 1000 or more packs accumulated
-        if (extractionAutoSellRef.current[id] && currentPacks >= 1000) {
-          let saleValue = point.valuePerPack * currentPacks;
-          
-          // Apply Level 40 reward: 10x mining value
+
+        // Sell if auto-sell is active and 100 or more packs accumulated
+        if (extractionAutoSellRef.current[id] && currentPacks >= 100) {
+          let saleValue = point.valuePerPack * currentPacks * getEconomicMultipliers().profit;
+
+          // Apply Level 40 reward: 5x mining value
           if (battleLevelRef.current >= 40 && routeTier === 'Interstellar') {
-            saleValue *= 10;
+            saleValue *= 5;
           }
 
-          // Apply Compactação multiplier (2x per level, max 20x at level 10)
+          // Apply Compactação multiplier (max 5x at level 10)
           const compressionLevel = extractionCompressionLevelsRef.current[id] || 0;
           if (compressionLevel > 0) {
-            const multiplier = compressionLevel * 2;
+            const multiplier = 1 + (compressionLevel * 0.4);
             saleValue *= multiplier;
           }
+
+          // Update mission progress
+          const sellKey = `sell-${id}`;
+          pendingMissionProgressRef.current[sellKey] = (pendingMissionProgressRef.current[sellKey] || 0) + currentPacks;
 
           totalQcGained += saleValue;
           totalPacksSold += currentPacks;
@@ -2070,10 +2268,11 @@ const DashboardContent = memo(({
       if (hasSold) {
         extractionPacksRef.current = next;
         dispatch({ type: 'SET_EXTRACTION_DATA', payload: { packs: next } });
-        
+
         dispatch({ type: 'EARN_QC', payload: { amount: totalQcGained, source: 'extraction' } });
+        qcRef.current += totalQcGained;
         setTotalExtractionProfit(prev => prev + totalQcGained);
-        
+
         // Update history stats
         dispatch({ type: 'UPDATE_HISTORY', payload: { tier: 'Interstellar', field: 'qcFromExtraction', amount: totalQcGained } });
         dispatch({ type: 'UPDATE_HISTORY', payload: { tier: 'Interstellar', field: 'qcTotalAcquired', amount: totalQcGained } });
@@ -2084,7 +2283,7 @@ const DashboardContent = memo(({
     }, 500); // Check every 500ms for more responsive automatic sales
 
     return () => clearInterval(interval);
-  }, [setQc, playSfx, routeTier]);
+  }, [playSfx, routeTier]);
 
   useEffect(() => {
     if (!researchingExtractionPoint) return;
@@ -2127,12 +2326,12 @@ const DashboardContent = memo(({
 
   const resolveBattleVictory = useCallback((battle: Battle) => {
     const multipliers = getEconomicMultipliers();
-    
+
     // Calculate total win probability for bonus (ONLY FOR AUTO-SKIPPED BATTLES)
     const policeBonus = getPoliceBonus(privatePoliceLevelRef.current);
     const doomPBonus = getDoomPBonus(doomPLevelRef.current);
     const totalWinProb = (battle.winProbability || 50) + policeBonus + doomPBonus;
-    
+
     let bonusMultiplier = 1;
     // According to user request, Doom Protocol only makes sense for automatic/skipped battles
     if (battle.isAutoSkipped && totalWinProb > 100) {
@@ -2161,15 +2360,30 @@ const DashboardContent = memo(({
     const shipMult = shipLevelRef.current >= 10 ? 1 : (shipLevelRef.current * 0.1);
     const randomMult = (shipLevelRef.current >= 10 && isRandomBattle) ? 1 : 0;
     const encrenMult = (battleLevelRef.current >= 35 && routeTierRef.current === 'Interstellar') ? 1 : 0;
-    
+
     const totalMult = baseMult + winMult + lvlMult + shipMult + randomMult + encrenMult;
-    
-    const captureMultipliers = [1, 2, 4, 8, 12, 16, 20, 25, 30, 40, 50];
+
+    const captureMultipliers = [1, 1.5, 2, 3, 4, 5, 6, 7, 8, 9, 10];
     const captureMultiplier = routeTierRef.current === 'Interstellar' ? (captureMultipliers[captureLevelRef.current] || 1) : 1;
-    
-    let qcReward = Math.floor(battle.reward * totalMult * captureMultiplier); 
+
+    let qcReward = Math.floor(battle.reward * totalMult * captureMultiplier);
+
+    // Apply Level 30 reward: 25% extra QC
+    if (isRetributionActiveRef.current && battleLevelRef.current >= 30 && routeTierRef.current === 'Interstellar') {
+      qcReward = Math.floor(qcReward * 1.25);
+    }
+
+    // CAP REWARDS: Limit QC to prevent Trillions
+    if (routeTierRef.current === 'Interstellar') {
+      const maxRegular = 1000000000; // 1 Billion
+      const maxBoss = 5000000000;    // 5 Billion
+      const cap = battle.isBoss ? maxBoss : maxRegular;
+      if (qcReward > cap) {
+        qcReward = cap;
+      }
+    }
     const xpReward = (routeTierRef.current === 'Solar' ? shipLevelRef.current >= 10 : shipLevelRef.current >= 20) ? 0 : Math.floor((100 + (shipLevelRef.current * 50)) * bonusMultiplier);
-    
+
     let baseAetherion = 40;
     if (routeTierRef.current !== 'Void') {
       baseAetherion = Math.floor(Math.random() * (125 - 75 + 1)) + 75;
@@ -2184,9 +2398,14 @@ const DashboardContent = memo(({
         qcReward = Math.floor(qcReward * 1.5);
       }
     }
-    
+
     let aetherionReward = Math.floor(baseAetherion * bonusMultiplier * shipAetherionBonus);
-    
+
+    // Apply Level 55 reward: No Aetherion rewards
+    if (battleLevelRef.current >= 55 && routeTierRef.current === 'Interstellar') {
+      aetherionReward = 0;
+    }
+
     // Assign rewards directly to the battle object so callers see them
     battle.reward = qcReward;
     battle.xpReward = xpReward;
@@ -2209,9 +2428,9 @@ const DashboardContent = memo(({
     const xpText = xpReward > 0 ? `, +${formatValue(xpReward)} XP` : '';
     const bonusText = bonusMultiplier > 1 ? ` (+${Math.round((bonusMultiplier - 1) * 100)}% BONUS)` : '';
 
-    addLog(language === 'pt' 
-      ? `VITÃ“RIA: Inimigo destruído! +${formatValue(qcReward)} QC${xpText}, +${formatValue(aetherionReward)} Aetherion${bonusText}` 
-      : `VICTORY: Enemy destroyed! +${formatValue(qcReward)} QC${xpText}, +${formatValue(aetherionReward)} Aetherion${bonusText}`, 
+    addLog(language === 'pt'
+      ? `VITÃ“RIA: Inimigo destruído! +${formatValue(qcReward)} QC${xpText}, +${formatValue(aetherionReward)} Aetherion${bonusText}`
+      : `VICTORY: Enemy destroyed! +${formatValue(qcReward)} QC${xpText}, +${formatValue(aetherionReward)} Aetherion${bonusText}`,
       'success'
     );
 
@@ -2219,14 +2438,36 @@ const DashboardContent = memo(({
   }, [language, formatValue, addXP, updateHistoryStats, addLog, getEconomicMultipliers, updateAchievementProgress, t, performSave]);
   const resolveBattleDefeat = useCallback((battle: Battle) => {
     addLog(t('defeatShipDestroyed'), 'error');
-  }, [language, addLog]);
+  }, [addLog, t]);
+
+  const autoSkipBattle = useCallback((battle: Battle, skipCost: number = 10) => {
+    if (aetherionRef.current < skipCost) return false;
+
+    setAetherion(prev => {
+      const next = Math.max(0, prev - skipCost);
+      aetherionRef.current = next;
+      return next;
+    });
+
+    battle.isAutoSkipped = true;
+    const isVictory = battle.predeterminedResult === 'victory';
+
+    if (isVictory) {
+      resolveBattleVictory(battle);
+      return true; // Victory
+    } else {
+      resolveBattleDefeat(battle);
+      return false; // Defeat
+    }
+  }, [resolveBattleVictory, resolveBattleDefeat, setAetherion]);
+
 
 
   const playerAttack = useCallback((type: 'laser' | 'plasma' | 'special' | 'shield') => {
     if (!activeBattleRef.current || activeBattleRef.current.isVictory || activeBattleRef.current.isDefeat) return;
     const now = Date.now();
     const battle = { ...activeBattleRef.current };
-    
+
     // Cooldowns (fixed)
     const cooldowns = {
       laser: 1000,
@@ -2234,15 +2475,15 @@ const DashboardContent = memo(({
       special: 3000,
       shield: 3000
     };
-    
+
     if (now - (battle.lastPlayerAttack[type] || 0) < cooldowns[type]) return;
-    
+
     if (type === 'shield') {
       battle.shieldActive = true;
       battle.lastShieldTime = now;
       battle.lastPlayerAttack = { ...battle.lastPlayerAttack, [type]: now };
       playSfx('shield');
-      
+
       const shieldDuration = 2000; // Fixed 2 seconds
       const shieldDurationSec = shieldDuration / 1000;
 
@@ -2250,14 +2491,14 @@ const DashboardContent = memo(({
       setActiveBattle(battle);
       return;
     }
-    
+
     // Damage - Exclusively based on battleLevel
     const baseDamage = 10 + (battleLevelRef.current * 10);
     let damage = 0;
     if (type === 'laser') damage = baseDamage;
     if (type === 'plasma') damage = baseDamage * 2;
     if (type === 'special') damage = baseDamage * 4;
-    
+
     // Level 20 bonus: +50% damage
     if (battleLevelRef.current >= 20) {
       damage *= 1.5;
@@ -2269,16 +2510,16 @@ const DashboardContent = memo(({
     }
 
     damage = Math.floor(damage * (0.9 + Math.random() * 0.2));
-    
+
     battle.enemyHp = Math.max(0, battle.enemyHp - damage);
     battle.lastPlayerAttack = { ...battle.lastPlayerAttack, [type]: now };
-    playSfx('shoot_player'); 
-    
+    playSfx('shoot_player');
+
     if (battle.enemyHp <= 0) {
       battle.isVictory = true;
       resolveBattleVictory(battle);
     }
-    
+
     setActiveBattle(battle);
   }, [language, playSfx, addLog, resolveBattleVictory]);
 
@@ -2286,7 +2527,7 @@ const DashboardContent = memo(({
     if (!activeBattleRef.current) return;
     const deliveryId = activeBattleRef.current.deliveryId;
     const isVictory = activeBattleRef.current.isVictory;
-    
+
     if (deliveryId.startsWith('auto-')) {
       const routeId = deliveryId.replace('auto-', '');
       if (!isVictory) {
@@ -2309,7 +2550,7 @@ const DashboardContent = memo(({
       }
       return d;
     }).filter(d => d !== null) as ActiveDelivery[]);
-    
+
     setActiveBattle(null);
   }, [language, addLog]);
 
@@ -2344,7 +2585,7 @@ const DashboardContent = memo(({
       if (manualShips.length > 0 || autoRoutes.length > 0) {
         const totalTargets = manualShips.length + autoRoutes.length;
         const targetIndex = Math.floor(Math.random() * totalTargets);
-        
+
         if (targetIndex < manualShips.length) {
           const target = manualShips[targetIndex];
           targetId = target.id;
@@ -2367,29 +2608,34 @@ const DashboardContent = memo(({
         const minLvl = Math.max(1, Math.floor(battleLevel * 0.9));
         const maxLvl = Math.max(1, Math.ceil(battleLevel * 1.1));
         const enemyTier = Math.min(20, Math.floor(Math.random() * (maxLvl - minLvl + 1)) + minLvl);
-        
+
         let bossChance = 0.10 + (battleLevel >= 15 ? 0.10 : 0);
         if (battleLevel >= 45 && routeTier === 'Interstellar') bossChance += 0.25;
-        
+
         const isBoss = Math.random() < bossChance;
         const isElite = !isBoss && enemyTier > 10;
         const enemyType = isBoss ? 'Boss' : (isElite ? 'Elite' : (enemyTier > 5 ? 'Alien' : (Math.random() > 0.5 ? 'Pirate' : 'Alien')));
-        
+
         const enemyHp = (50 + (enemyTier * 60) + Math.floor(Math.random() * 50)) * (isBoss ? 10 : (isElite ? 5 : 1));
         let playerHp = 100 + (battleLevel * 150);
-        if (battleLevel >= 25) playerHp += 500;
+        if (battleLevel >= 25) playerHp = Math.floor(playerHp * 1.25);
 
-        const playerDps = (10 + battleLevel * 10) / 2;
+        let playerDps = (10 + battleLevel * 10) / 2;
+        if (battleLevel >= 20) playerDps *= 1.5;
+        if (battleLevel >= 25) playerDps *= 1.5;
+
         const enemyDps = ((8 + enemyTier * 6) / 2.5) * (isBoss ? 4 : (isElite ? 2 : 1));
         const playerTimeToKill = enemyHp / playerDps;
         const enemyTimeToKill = playerHp / enemyDps;
         let winProb = Math.min(100, Math.max(0, Math.floor((enemyTimeToKill / (playerTimeToKill + enemyTimeToKill)) * 100)));
 
+        if (isBoss && battleLevel >= 45 && routeTier === 'Interstellar') winProb = Math.min(100, winProb + 25);
+
         const totalWinProb = winProb + getDoomPBonus(doomPLevel) + getPoliceBonus(privatePoliceLevel);
         const multipliers = getEconomicMultipliers();
         const rewardMultiplier = isBoss ? 6 : (isElite ? 3 : 1);
         const result = (Math.random() * 100 < totalWinProb) ? 'victory' : 'defeat';
-        
+
         const battle: Battle = {
           id: Math.random().toString(36).substr(2, 9),
           routeId: routeId,
@@ -2401,10 +2647,10 @@ const DashboardContent = memo(({
           enemyHp: enemyHp,
           playerMaxHp: playerHp,
           playerHp: playerHp,
-          reward: Math.floor(route.reward * (0.5 + enemyTier * 0.1) * (isBoss ? 5 : (isElite ? 2 : 1)) * multipliers.profit * rewardMultiplier),
+          reward: Math.floor(route.reward * (0.5 + enemyTier * 0.1) * (isBoss ? 5 : (isElite ? 2 : 1)) * multipliers.battleProfit * rewardMultiplier),
           startTime: Date.now(),
           lastPlayerAttack: { laser: 0, plasma: 0, special: 0, shield: 0 },
-          lastEnemyAttack: Date.now() + 1000, 
+          lastEnemyAttack: Date.now() + 1000,
           shieldActive: false,
           lastShieldTime: 0,
           winProbability: winProb,
@@ -2412,7 +2658,7 @@ const DashboardContent = memo(({
           predeterminedResult: result,
           isCinematicFinished: false,
           playerImage: battleLevel >= 25 ? '/images/battle/skyring.webp' : '/images/battle/standard_ship.webp',
-          enemyImage: isBoss ? '/images/battle/enemy_boss.webp' : (isElite ? '/images/battle/enemy_elite.webp' : enemyTier > 15 ? '/images/battle/enemy_raider.webp' : enemyTier > 5 ? '/images/battle/enemy_alien.webp' : '/images/battle/enemy_scout.webp'),
+          enemyImage: isBoss ? '/images/battle/enemy_boss.webp' : (isElite ? '/images/battle/enemy_elite.webp' : (enemyTier > 5 ? '/images/battle/enemy_alien.webp' : '/images/battle/enemy_raider.webp')),
           playerDps: playerDps,
           enemyDps: (10 + enemyTier * 5) / 2,
           isBoss: isBoss
@@ -2426,7 +2672,7 @@ const DashboardContent = memo(({
     }
   }, [scanResult, activeBattle, activeDeliveries, autoTravelActive, autoTravelProgress, routeTier, battleLevel, doomPLevel, privatePoliceLevel, language, setFoundBattle, setScanResult, getEconomicMultipliers, getDoomPBonus, getPoliceBonus, playSfx, aetherion]);
 
-const completeInitialMission = useCallback((missionId: string) => {
+  const completeInitialMission = useCallback((missionId: string) => {
     setMissions(prev => prev.map(m => {
       if (m.id === missionId && !m.completed) {
         addLog(`${t('missionReward' as any)}: ${m.title}`, 'success');
@@ -2440,9 +2686,9 @@ const completeInitialMission = useCallback((missionId: string) => {
   const generateMissions = useCallback(() => {
     const currentTier = routeTierRef.current;
     if (isSpeedRunRef.current) return;
-    
+
     let currentMissions = [...missionsRef.current];
-    
+
     if (currentMissions.length >= 6) return;
 
     const getMissionBaseValue = (level: number) => {
@@ -2450,7 +2696,7 @@ const completeInitialMission = useCallback((missionId: string) => {
       return values[Math.min(level - 1, 9)] || 15000;
     };
 
-    const baseRewardValue = getMissionBaseValue(missionRewardLevelRef.current[currentTier] || 1) * (currentTier === 'Interstellar' ? 10 : 1);
+    const baseRewardValue = getMissionBaseValue(missionRewardLevelRef.current[currentTier] || 1) * (currentTier === 'Interstellar' ? 2.5 : 1) * getEconomicMultipliers().profit;
 
 
     // Initial Missions for Route 1 Campaign only - Prioritized
@@ -2467,7 +2713,7 @@ const completeInitialMission = useCallback((missionId: string) => {
       for (const initMission of initialMissions) {
         // Se a missão já foi completada/resgatada anteriormente, ignora para sempre
         if (completedInitialMissionsRef.current.includes(initMission.id)) continue;
-        
+
         // Se a missão já está na lista atual, ignora
         if (currentMissions.some(m => m.id === initMission.id)) continue;
 
@@ -2520,13 +2766,13 @@ const completeInitialMission = useCallback((missionId: string) => {
 
     while (currentMissions.length < 6 && attempts < maxAttempts) {
       attempts++;
-      
+
       // Determine Rarity
       const roll = Math.random() * 100;
-      
+
       let rarity: Mission['rarity'] = 'common';
       let multiplier = 1;
-      
+
       // Probabilities based on upgrades (1% to 15% each)
       const mythicChance = missionMythicBonusRef.current + skillMiticaLevelRef.current[currentTier];
       const alienChance = missionAlienBonusRef.current + skillAlienLevelRef.current[currentTier];
@@ -2557,24 +2803,24 @@ const completeInitialMission = useCallback((missionId: string) => {
         const unlockedShips = SHIPS.filter(s => s.tier === currentTier && (ownedShipsRef.current[`${currentTier}-${s.level}`] || 0) > 0)
           .sort((a, b) => b.level - a.level)
           .slice(0, 3);
-        
+
         if (unlockedShips.length > 0) {
           const ship = unlockedShips[Math.floor(Math.random() * unlockedShips.length)];
           const exists = currentMissions.some(m => m.type === 'delivery' && m.shipLevel === ship.level && !m.completed);
-          
+
           if (!exists) {
             const reward = Math.floor(baseRewardValue * multiplier * (0.8 + Math.random() * 0.4));
-            
+
             // Rebalanced XP rewards based on rarity
             const rewardXP = rarity === 'mythic' ? (Math.floor(Math.random() * (40 - 20 + 1)) + 20) : 0;
 
 
 
-            // Increased targets to ensure missions don't complete too fast
-            const baseTarget = isSpeedRunRef.current ? (10 + Math.floor(Math.random() * 10)) : (currentTier === 'Interstellar' ? 100 : 40);
+            // Reduced targets by 50% for faster progression
+            const baseTarget = isSpeedRunRef.current ? (10 + Math.floor(Math.random() * 10)) : (currentTier === 'Interstellar' ? 20 : 20);
             const reduction = isSpeedRunRef.current ? 0 : skillTempoDinheiroLevelRef.current[routeTier];
-            const target = Math.max(10, baseTarget - reduction);
-            
+            const target = Math.max(5, baseTarget - reduction);
+
             let rewardAetherion = 0;
             if (rarity === 'mythic') {
               rewardAetherion = Math.floor(Math.random() * (400 - 200 + 1)) + 200;
@@ -2599,36 +2845,46 @@ const completeInitialMission = useCallback((missionId: string) => {
           }
         }
       } else {
-        const unlockedOres = ORES.filter(o => o.tier === currentTier && (miningRobotsRef.current[o.id] || 0) > 0)
-          .sort((a, b) => (b.baseValue * b.rarity) - (a.baseValue * a.rarity))
+        const unlockedOres = ORES.filter(o => o.tier === currentTier && (miningRobotsRef.current[o.id] || 0) > 0);
+        const unlockedPoints = EXTRACTION_POINTS.filter(p => p.tier === currentTier && unlockedExtractionPointsRef.current.includes(p.id));
+
+        const unlockedPool = [...unlockedOres, ...unlockedPoints]
+          .sort((a, b) => {
+            const valA = (a as any).baseValue ? (a as any).baseValue * (a as any).rarity : (a as any).valuePerPack;
+            const valB = (b as any).baseValue ? (b as any).baseValue * (b as any).rarity : (b as any).valuePerPack;
+            return valB - valA;
+          })
           .slice(0, 3);
 
-        if (unlockedOres.length > 0) {
-          const ore = unlockedOres[Math.floor(Math.random() * unlockedOres.length)];
-          const exists = currentMissions.some(m => m.type === 'sell' && m.oreId === ore.id && !m.completed);
-          
+        if (unlockedPool.length > 0) {
+          const item = unlockedPool[Math.floor(Math.random() * unlockedPool.length)];
+          const isExtraction = (item as any).resourceName !== undefined;
+          const exists = currentMissions.some(m => m.type === 'sell' && m.oreId === item.id && !m.completed);
+
           if (!exists) {
             const reward = Math.floor(baseRewardValue * multiplier * (0.8 + Math.random() * 0.4));
-            
+
             // Rebalanced XP rewards based on rarity
             const rewardXP = rarity === 'mythic' ? (Math.floor(Math.random() * (40 - 20 + 1)) + 20) : 0;
 
+            // Reduced targets by 50% for faster progression
+            let baseTarget = isSpeedRunRef.current ? (10 + Math.floor(Math.random() * 5)) : (currentTier === 'Interstellar' ? 15 : 10);
+            if (isExtraction) baseTarget = 500; // Extraction points sell in chunks of 100
 
-
-            // Increased targets to ensure missions don't complete too fast
-            const baseTarget = isSpeedRunRef.current ? (10 + Math.floor(Math.random() * 5)) : (currentTier === 'Interstellar' ? 60 : 20);
             const reduction = isSpeedRunRef.current ? 0 : skillRobosOlimpicosLevelRef.current[routeTier];
-            const target = Math.max(10, baseTarget - reduction);
-            
+            const target = Math.max(isExtraction ? 100 : 5, baseTarget - (isExtraction ? reduction * 20 : reduction));
+
             let rewardAetherion = 0;
             if (rarity === 'mythic') {
               rewardAetherion = Math.floor(Math.random() * (400 - 200 + 1)) + 200;
             }
 
+            const itemName = isExtraction ? (item as any).resourceName : item.name;
+
             currentMissions.push({
-              id: `sell_${ore.id}_${Date.now()}_${currentMissions.length}`,
-              title: languageRef.current === 'pt' ? `Venda de ${ore.name}` : `Sell ${ore.name}`,
-              description: languageRef.current === 'pt' ? `Venda ${target} PACKS de ${ore.name}.` : `Sell ${target} packs of ${ore.name}.`,
+              id: `sell_${item.id}_${Date.now()}_${currentMissions.length}`,
+              title: languageRef.current === 'pt' ? `Venda de ${itemName}` : `Sell ${itemName}`,
+              description: languageRef.current === 'pt' ? `Venda ${target} PACKS de ${itemName}.` : `Sell ${target} packs of ${itemName}.`,
               reward,
               rewardXP,
               rewardAetherion: rewardAetherion > 0 ? rewardAetherion : undefined,
@@ -2637,7 +2893,7 @@ const completeInitialMission = useCallback((missionId: string) => {
               current: 0,
               completed: false,
               claimed: false,
-              oreId: ore.id,
+              oreId: item.id,
               tier: currentTier,
               rarity
             });
@@ -2649,23 +2905,32 @@ const completeInitialMission = useCallback((missionId: string) => {
     if (currentMissions.length !== missionsRef.current.length) {
       setMissions(currentMissions);
     }
-  }, [t, routeTier]);
-  
+  }, [t, routeTier, missionRewardLevel, skillMiticaLevel, skillAlienLevel, skillLendariaLevel, missionMythicBonus, missionAlienBonus, missionLegendaryBonus, getEconomicMultipliers]);
+
+  // Auto-Shipment stops once Project Terra is complete.
+  useEffect(() => {
+    if (voidAutoShipmentActive && routeTier === 'Void' && totalProjectTerra >= 100) {
+      dispatch({ type: 'SET_MINING_DATA', payload: { voidAutoShipmentActive: false } });
+      voidAutoShipmentActiveRef.current = false;
+      addLog(language === 'pt' ? 'Projeto Terra atingiu 100%. Drones de Auto Envio desligados.' : 'Project Terra reached 100%. Auto-Shipment Drones disabled.', 'success');
+    }
+  }, [voidAutoShipmentActive, routeTier, totalProjectTerra, dispatch, addLog, language]);
+
   // Auto-Shipment Logic
   useEffect(() => {
-    if (!voidAutoShipmentActive || routeTier !== 'Void') return;
+    if (!voidAutoShipmentActive || routeTier !== 'Void' || totalProjectTerra >= 100) return;
 
     const interval = setInterval(() => {
       const resources = ['energy', 'minerals', 'food', 'meds', 'tech'] as const;
       const progress = earthReconstructionProgressRef.current;
       const vRes = voidResourcesRef.current;
-      const vComp = voidCompactedResources; // This one is not in Ref yet, but changes less often
+      const vComp = voidCompactedResourcesRef.current;
 
       resources.forEach(res => {
         if ((progress[res] || 0) < 100) {
           if ((vComp[res] || 0) > 0) {
             sendCompactedToEarth(res);
-          } 
+          }
           else if ((vRes[res] || 0) >= 50000) {
             compactVoidResource(res);
           }
@@ -2674,7 +2939,7 @@ const completeInitialMission = useCallback((missionId: string) => {
     }, 2000);
 
     return () => clearInterval(interval);
-  }, [voidAutoShipmentActive, routeTier]);
+  }, [voidAutoShipmentActive, routeTier, totalProjectTerra, compactVoidResource, sendCompactedToEarth]);
 
   const claimMission = useCallback((missionId: string, event?: React.MouseEvent, isAuto: boolean = false) => {
     const mission = missionsRef.current.find(m => m.id === missionId);
@@ -2694,7 +2959,7 @@ const completeInitialMission = useCallback((missionId: string) => {
     if (event || activeTabRef.current === 'missions') {
       let x = window.innerWidth / 2;
       let y = window.innerHeight / 2;
-      
+
       if (event) {
         const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
         x = rect.left + rect.width / 2;
@@ -2715,7 +2980,7 @@ const completeInitialMission = useCallback((missionId: string) => {
         y
       };
       setFloatingRewards(prev => [...prev, newFloatingReward]);
-      
+
       setTimeout(() => {
         setFloatingRewards(prev => prev.filter(r => r.id !== newFloatingReward.id));
       }, 1000);
@@ -2740,11 +3005,11 @@ const completeInitialMission = useCallback((missionId: string) => {
     dispatch({ type: 'UPDATE_HISTORY', payload: { tier: mission.tier, field: 'qcTotalAcquired', amount: mission.reward } });
 
     dispatch({ type: 'CLAIM_MISSION', payload: { id: missionId } });
-    
+
     if (!isAuto) {
       playSfx('cash_register');
     }
-    
+
     const xpText = mission.rewardXP ? `, +${mission.rewardXP} XP` : '';
     const aetherionText = mission.rewardAetherion ? `, +${mission.rewardAetherion} Aetherion` : '';
     addLog(`${t('missionReward')}: +${formatValue(mission.reward)} QC${xpText}${aetherionText}`, 'success');
@@ -2756,7 +3021,7 @@ const completeInitialMission = useCallback((missionId: string) => {
 
   useEffect(() => {
     if (!isLoaded || !autoClaimMissions) return;
-    
+
     const completedMission = missions.find(m => m.completed && !m.claimed);
     if (completedMission) {
       claimMission(completedMission.id, undefined, true);
@@ -2833,20 +3098,20 @@ const completeInitialMission = useCallback((missionId: string) => {
       if (checkWin()) {
         setIsSpeedRunFinished(true);
         setShowSpeedRunWinModal(true);
-        
+
         // Save record
         const newRecord = {
           name: playerName || 'Unknown Pilot',
           time: Date.now() - startTime,
           date: new Date().toLocaleDateString()
         };
-        
+
         const saveRecord = async () => {
           try {
             const saved = await GameStorage.load('speed_run_records');
             let records = saved || [];
             if (!Array.isArray(records)) records = [];
-            
+
             records.push(newRecord);
             records.sort((a: any, b: any) => a.time - b.time);
             records = records.slice(0, 10);
@@ -2888,10 +3153,10 @@ const completeInitialMission = useCallback((missionId: string) => {
 
   const getSpeedRunProgress = () => {
     if (!isSpeedRun) return null;
-    
+
     const ships = [1, 2, 3, 4, 5, 6, 7, 8, 9].filter(level => (ownedShips[`Solar-${level}`] || 0) >= 5).length;
     const tech = (unlockedTechLevels['Solar'] || 0);
-    
+
     const solarRoutes = ROUTES.filter(r => r.tier === 'Solar');
     const upgrades = solarRoutes.filter(route => {
       const routeTech = techLevels[route.id] || { engine: 0, ai: 0, value: 0, rare: 0 };
@@ -2900,9 +3165,9 @@ const completeInitialMission = useCallback((missionId: string) => {
         return currentLevel >= upgrade.tiers.length;
       });
     }).length;
-    
+
     const slots = solarRoutes.filter(route => (autoTravelSlots[route.id] || 0) >= 5 && autoTravelActive[route.id]).length;
-    
+
     const solarOres = ORES.filter(o => o.tier === 'Solar');
     const robots = solarOres.filter(ore => (miningRobots[ore.id] || 0) > 0 && (miningRobotLevels[ore.id] || 0) >= 5 && autoSellByOre[ore.id]).length;
 
@@ -2946,7 +3211,7 @@ const completeInitialMission = useCallback((missionId: string) => {
     solarEnergyRef.current = Math.min(7500, solarEnergyRef.current + energyToAdd);
   }, [routeTier, solarMappingLevel]);
 
-  
+
   // RHSE Tube Generation Logic: 2500 Waste + 2500 Solar = 1 Tube
   useEffect(() => {
     if (miningWasteRef.current >= 2500 && solarEnergyRef.current >= 2500) {
@@ -3048,9 +3313,11 @@ const completeInitialMission = useCallback((missionId: string) => {
     });
     if (!allSlotsMaxed) return false;
 
-    // 6. Fortuna acumulada de 999 TrilhÃµes de QC (Total Acquired)
-    const currentQC = historyStats['Interstellar']?.qcTotalAcquired || 0;
-    if (currentQC < 999000000000000) return false;
+    // 6. Fortuna acumulada de 999 Trilhões de QC (Total Acquired - Aggregated)
+    const solarStats = historyStats['Solar'] || {};
+    const interstellarStats = historyStats['Interstellar'] || {};
+    const aggregatedQC = (solarStats.qcTotalAcquired || 0) + (interstellarStats.qcTotalAcquired || 0);
+    if (aggregatedQC < 999000000000000) return false;
 
     // 7. CompressÃ£o Refinada do primeiro minÃ©rio ao mÃ¡ximo (10)
     const firstOre = interstellarOres[0];
@@ -3059,67 +3326,70 @@ const completeInitialMission = useCallback((missionId: string) => {
     // 8. Total de entregas (9999)
     if (totalDeliveries < 9999) return false;
 
-    // 9. 1000 missÃµes concluídas
-    if ((historyStats['Interstellar']?.missionsCompleted || 0) < 1000) return false;
+    // 9. 1000 missões concluídas (Aggregated)
+    const aggregatedMissions = (solarStats.missionsCompleted || 0) + (interstellarStats.missionsCompleted || 0);
+    if (aggregatedMissions < 1000) return false;
 
     return true;
   }, [isSpeedRun, routeTier, unlockedTechLevels, ownedShips, techLevels, miningRobots, miningRobotLevels, autoTravelSlots, autoTravelActive, historyStats, miningCompressionLevels, totalDeliveries]);
 
   const syncAchievements = useCallback(() => {
     // 1. First Delivery
-    if (totalDeliveries >= 1) updateAchievementProgress('first_delivery', 1, true);
+    updateAchievementProgress('first_delivery', totalDeliveries >= 1 ? 1 : 0, true);
 
     // 2. QC Millionaire & Trillionaire
     const totalQC = Object.values(historyStats).reduce((acc, curr) => acc + (curr.qcTotalAcquired || 0), 0);
-    if (totalQC >= 1000000) updateAchievementProgress('qc_millionaire', totalQC, true);
-    if (totalQC >= 1000000000000) updateAchievementProgress('qc_trillionaire', totalQC, true);
+    updateAchievementProgress('qc_millionaire', totalQC, true);
+    updateAchievementProgress('qc_trillionaire', totalQC, true);
 
     // 3. Battle Warrior & Pirate Slayer
     const totalBattlesWon = Object.values(historyStats).reduce((acc, curr) => acc + (curr.battlesWon || 0), 0);
     updateAchievementProgress('battle_warrior', totalBattlesWon, true);
     updateAchievementProgress('pirate_slayer', totalBattlesWon, true);
 
-    // 4. Robot Owner (Total robots)
+    // 4. Robot Owner
     const totalRobots = Object.values(miningRobots).reduce((a, b) => a + b, 0);
     updateAchievementProgress('robot_owner', totalRobots, true);
 
     // 5. Route Unlocks
-    if (isRoute2Unlocked()) updateAchievementProgress('route_2_unlocked', 1, true);
-    if (isRoute3Unlocked()) updateAchievementProgress('void_unlocked', 1, true);
+    updateAchievementProgress('route_2_unlocked', isRoute2Unlocked() ? 1 : 0, true);
+    updateAchievementProgress('void_unlocked', isRoute3Unlocked() ? 1 : 0, true);
 
-    // 6. Tech Master (Sum of technology levels)
-    const totalTechs = Object.values(unlockedTechLevels).reduce((a, b) => a + b, 0);
+    // 6. Tech Master
+    const totalTechs = Object.values(unlockedTechLevels).reduce((a, b) => a + (b || 0), 0);
     updateAchievementProgress('tech_master', totalTechs, true);
 
-    // 7. Ship Collector (Unique ships)
+    // 7. Ship Collector
     const totalShips = Object.keys(ownedShips).length;
     updateAchievementProgress('ship_collector', totalShips, true);
 
-    // 8. Max Upgrade
-    const hasMaxUpgrade = Object.values(techLevels).some(loc => Object.values(loc).some(lvl => lvl >= 5));
-    if (hasMaxUpgrade) updateAchievementProgress('max_upgrade', 5, true);
+    // 8. Max Upgrade - IMPROVED
+    // Flatten all upgrade levels across all locations and find the maximum
+    const allUpgradeLevels = Object.values(techLevels).flatMap(loc => Object.values(loc as any) as number[]);
+    const maxLvlReached = allUpgradeLevels.length > 0 ? Math.max(...allUpgradeLevels) : 0;
+    updateAchievementProgress('max_upgrade', maxLvlReached, true);
 
-    // 9. Earth Restorer
-    const earthProgress = Object.values(earthReconstructionProgress).reduce((a, b) => a + b, 0) / 5;
-    if (earthProgress >= 50) updateAchievementProgress('earth_restorer', earthProgress, true);
-    if (earthProgress >= 100) updateAchievementProgress('earth_restorer_100', earthProgress, true);
+    // 9. Earth Restorer - IMPROVED
+    const earthProgress = Object.values(earthReconstructionProgress).reduce((a, b) => a + (b || 0), 0) / 5;
+    updateAchievementProgress('earth_restorer', earthProgress, true);
+    updateAchievementProgress('earth_restorer_100', earthProgress, true);
 
     // 10. Total Deliveries
-    if (totalDeliveries >= 10000) updateAchievementProgress('total_deliveries_10k', totalDeliveries, true);
+    updateAchievementProgress('total_deliveries_10k', totalDeliveries, true);
 
     // 11. All Ships R1 & R2
     const shipsR1R2 = Object.keys(ownedShips).filter(key => key.startsWith('Solar-') || key.startsWith('Interstellar-')).length;
-    if (shipsR1R2 >= 18) updateAchievementProgress('all_ships_r1_r2', shipsR1R2, true);
+    updateAchievementProgress('all_ships_r1_r2', shipsR1R2, true);
 
     // 12. Total Missions
     const totalMissions = Object.values(historyStats).reduce((acc, curr) => acc + (curr.missionsCompleted || 0), 0);
-    if (totalMissions >= 1000) updateAchievementProgress('total_missions_1k', totalMissions, true);
+    updateAchievementProgress('total_missions_1k', totalMissions, true);
 
     // 13. Battle Level
-    if (battleLevel >= 55) updateAchievementProgress('battle_level_55', battleLevel, true);
+    updateAchievementProgress('battle_level_55', battleLevel, true);
 
     // 14. Mining Tycoon
-    const totalPacksSold = Object.values(historyStats).reduce((acc, curr) => 
+    const totalPacksSold = Object.values(historyStats).reduce((acc, curr) =>
       acc + (curr.manualMiningPacksSold || 0) + (curr.autoMiningPacksSold || 0), 0);
     updateAchievementProgress('mining_tycoon', totalPacksSold, true);
 
@@ -3127,18 +3397,30 @@ const completeInitialMission = useCallback((missionId: string) => {
     const totalPerfects = Object.values(historyStats).reduce((acc, curr) => acc + (curr.perfectDeliveries || 0), 0);
     updateAchievementProgress('perfect_pilot', totalPerfects, true);
 
-  }, [updateAchievementProgress]);
+  }, [
+    updateAchievementProgress,
+    totalDeliveries,
+    historyStats,
+    miningRobots,
+    isRoute2Unlocked,
+    isRoute3Unlocked,
+    unlockedTechLevels,
+    ownedShips,
+    techLevels,
+    earthReconstructionProgress,
+    battleLevel
+  ]);
 
   useEffect(() => {
     if (!isLoaded) return;
     syncAchievements();
-  // Deliberate: run once after load, then on key progression milestones only.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Deliberate: run once after load, then on key progression milestones only.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoaded, totalDeliveries, historyStats, battleLevel, earthReconstructionProgress]);
 
   const startVoidTransition = () => {
-    if (isSpeedRun) return; 
-    
+    if (isSpeedRun) return;
+
     // Reset progress for Route 3
     setQc(0);
     setAetherion(0);
@@ -3152,10 +3434,10 @@ const completeInitialMission = useCallback((missionId: string) => {
     dispatch({ type: 'SET_MINING_ROBOT_LEVELS', payload: { levels: {} } });
     dispatch({ type: 'SET_AUTO_SELL_BY_ORE', payload: { autoSell: {} } });
 
-    dispatch({ type: 'SET_TECH_LEVELS',     payload: { techLevels: { 'void-1': { engine: 0, ai: 0, value: 0, rare: 0 } } } });
+    dispatch({ type: 'SET_TECH_LEVELS', payload: { techLevels: { 'void-1': { engine: 0, ai: 0, value: 0, rare: 0 } } } });
     dispatch({ type: 'SET_UNLOCKED_ROUTES', payload: { routeIds: ['void-1'] } });
-    dispatch({ type: 'SET_OWNED_SHIPS',     payload: { ownedShips: { 'Void-1': 1 } } });
-    dispatch({ type: 'UNLOCK_TECH_LEVEL',   payload: { tier: 'Void', level: 1 } });
+    dispatch({ type: 'SET_OWNED_SHIPS', payload: { ownedShips: { 'Void-1': 1 } } });
+    dispatch({ type: 'UNLOCK_TECH_LEVEL', payload: { tier: 'Void', level: 1 } });
     dispatch({ type: 'SET_AUTO_TRAVEL_SLOTS', payload: { slots: {} } });
 
     setRouteTier('Void');
@@ -3222,24 +3504,23 @@ const completeInitialMission = useCallback((missionId: string) => {
     setShowVoidLore(false);
     setLoreLineIndex(0);
     addLog(t('route3UnlockedMessage'), 'success');
-    playSfx('success');
   };
 
   const startRoute2Transition = () => {
-    if (isSpeedRun) return; 
-    
+    if (isSpeedRun) return;
+
     setIsTransitioning(true);
     playSfx('charging');
     addLog(t('route2TransitionMessage'), 'warning');
-    
+
     setTimeout(() => {
       playSfx('warp');
       setRouteTier('Interstellar');
       setQc(0); // Ensure QC starts at 0 for Route 2
-      dispatch({ type: 'SET_TECH_LEVELS',     payload: { techLevels: { 'alpha-centauri': { engine: 0, ai: 0, value: 0, rare: 0 } } } });
+      dispatch({ type: 'SET_TECH_LEVELS', payload: { techLevels: { 'alpha-centauri': { engine: 0, ai: 0, value: 0, rare: 0 } } } });
       dispatch({ type: 'SET_UNLOCKED_ROUTES', payload: { routeIds: ['alpha-centauri'] } });
       dispatch({ type: 'SET_AUTO_TRAVEL_SLOTS', payload: { slots: {} } });
-      dispatch({ type: 'UNLOCK_TECH_LEVEL',   payload: { tier: 'Interstellar', level: 1 } });
+      dispatch({ type: 'UNLOCK_TECH_LEVEL', payload: { tier: 'Interstellar', level: 1 } });
       setAutoTravelActive({});
       setAutoTravelProgress({});
       setActiveDeliveries([]);
@@ -3260,7 +3541,7 @@ const completeInitialMission = useCallback((missionId: string) => {
       setMiningCompressionLevels({});
       setAutoClaimMissions(false);
       setAutoSellUnlockedByOre({});
-      dispatch({ type: 'SET_OWNED_SHIPS',      payload: { ownedShips: { 'Interstellar-1': 1 } } });
+      dispatch({ type: 'SET_OWNED_SHIPS', payload: { ownedShips: { 'Interstellar-1': 1 } } });
       setActiveTab('routes2');
       setIsTransitioning(false);
       dispatch({ type: 'SET_HAS_SEEN_ROUTE2_MESSAGE', payload: { hasSeen: true } });
@@ -3271,7 +3552,7 @@ const completeInitialMission = useCallback((missionId: string) => {
 
   const boostResearch = () => {
     if (!researchingTech || isSpeedRun) return;
-    
+
     const tech = TECHNOLOGIES_MAP.get(`${researchingTech.tier}-${researchingTech.level}`);
     if (!tech) return;
 
@@ -3284,10 +3565,10 @@ const completeInitialMission = useCallback((missionId: string) => {
     } else {
       let researchTime = tech.researchTime;
       // No more conditional for Interstellar here because it's handled in the if block above
-      
+
       const elapsed = Date.now() - researchingTech.startTime;
       const remainingTime = Math.max(0, researchTime - elapsed);
-      
+
       const boostRate = 500;
       boostCost = Math.floor((remainingTime / 1000) * boostRate);
     }
@@ -3300,11 +3581,11 @@ const completeInitialMission = useCallback((missionId: string) => {
     dispatch({ type: 'SPEND_QC', payload: { amount: boostCost } });
     updateHistoryStats('spent', boostCost, routeTier);
     dispatch({ type: 'UNLOCK_TECH_LEVEL', payload: { tier: researchingTech.tier, level: researchingTech.level } });
-    
+
     if (isSpeedRun) {
       dispatch({ type: 'BUY_SHIP', payload: { shipKey: `${tech.tier}-${tech.unlocksShipLevel}` } });
     }
-    
+
     setResearchingTech(null);
     playSfx('ask_window');
     if (researchingTech.tier === 'Solar' || researchingTech.tier === 'Interstellar') {
@@ -3313,18 +3594,18 @@ const completeInitialMission = useCallback((missionId: string) => {
       playSfx('success');
     }
     addLog(language === 'pt' ? `Pesquisa concluída com boost! (-${formatValue(boostCost)} QC)` : `Research completed with boost! (-${formatValue(boostCost)} QC)`, 'success');
-    performSave();
+    performSave().catch(e => console.error("[Save] Failed:", e));
   };
 
   // Effect to show Route 2 unlock message
   useEffect(() => {
-    if (isTransitioning || showRoute2Lore || showVoidLore) return;
+    if (!isLoaded || isTransitioning || showRoute2Lore || showVoidLore) return;
     if (isRoute2Unlocked() && !hasSeenRoute2UnlockMessage) {
       addLog(t('route2UnlockedMessage'), 'success');
       dispatch({ type: 'SET_HAS_SEEN_ROUTE2_MESSAGE', payload: { hasSeen: true } });
       playSfx('success');
     }
-  }, [isRoute2Unlocked, hasSeenRoute2UnlockMessage, addLog, t, playSfx, isTransitioning, showRoute2Lore, showVoidLore]);
+  }, [isLoaded, isRoute2Unlocked, hasSeenRoute2UnlockMessage, addLog, t, playSfx, isTransitioning, showRoute2Lore, showVoidLore]);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -3340,11 +3621,11 @@ const completeInitialMission = useCallback((missionId: string) => {
   // Auto-save logic
   useEffect(() => {
     if (isSpeedRun || !isLoaded) return;
-    
+
     const saveInterval = setInterval(() => {
-      performSave();
+      performSave().catch(e => console.error("[Save] Failed:", e));
     }, 10000); // Auto-save every 10 seconds
-    
+
     return () => clearInterval(saveInterval);
   }, [isSpeedRun, isLoaded, performSave]);
 
@@ -3389,7 +3670,7 @@ const completeInitialMission = useCallback((missionId: string) => {
               localStorage.setItem(key, String(score));
             });
           }
-          
+
           if (data.speedRunRecords && setLocalRecords) {
             setLocalRecords(data.speedRunRecords);
           }
@@ -3442,7 +3723,7 @@ const completeInitialMission = useCallback((missionId: string) => {
       addLog(`Insufficient QC for fuel to ${route.name}`, 'error');
       return false;
     }
-    
+
     // Earth-Earth random distance
     let distance = route.distance;
     if (route.id === 'terra') {
@@ -3452,10 +3733,10 @@ const completeInitialMission = useCallback((missionId: string) => {
     // Check ship availability
     const requiredLevel = route.requiredShipLevel;
     const totalOwned = ownedShipsRef.current[`${route.tier}-${requiredLevel}`] || 0;
-    
+
     // Count ships in use by manual deliveries
     let currentlyInUse = activeDeliveriesRef.current.filter(d => d.shipLevel === requiredLevel && d.tier === route.tier && d.status === 'delivering').length;
-    
+
     // Count ships in use by auto-travel
     Object.keys(autoTravelActiveRef.current).forEach(routeId => {
       if (autoTravelActiveRef.current[routeId]) {
@@ -3465,7 +3746,7 @@ const completeInitialMission = useCallback((missionId: string) => {
         }
       }
     });
-    
+
     if (currentlyInUse >= totalOwned) {
       addLog(t('noShips'), 'error');
       return false;
@@ -3475,7 +3756,7 @@ const completeInitialMission = useCallback((missionId: string) => {
 
     setQc(c => c - fuelCost);
     updateHistoryStats('spent', fuelCost, route.tier);
-    performSave();
+    performSave().catch(e => console.error("[Save] Failed:", e));
     completeInitialMission('init_4');
     setActiveDeliveries(prev => [
       ...prev,
@@ -3500,18 +3781,18 @@ const completeInitialMission = useCallback((missionId: string) => {
   const handleExit = async () => {
     setIsSaving(true);
     setSaveProgress(0);
-    
+
     // Simulate real saving time (2.5 seconds)
     const duration = 2500;
     const interval = 50;
     const steps = duration / interval;
     const increment = 100 / steps;
-    
+
     for (let i = 0; i <= steps; i++) {
       await new Promise(resolve => setTimeout(resolve, interval));
       setSaveProgress(Math.min(Math.round(i * increment), 100));
     }
-    
+
     // Final check to ensure 100%
     setSaveProgress(100);
     await new Promise(resolve => setTimeout(resolve, 300));
@@ -3568,6 +3849,8 @@ const completeInitialMission = useCallback((missionId: string) => {
       extractionAutoSellUnlocked: extractionAutoSellUnlockedRef.current,
       route4Unlocked,
       totalExtractionProfit: totalExtractionProfitRef.current,
+      isVoidWarActive: isVoidWarActiveRef.current,
+      voidWarProgress: voidWarProgressRef.current,
       lastScanTime: lastScanTimeRef.current,
       hasSeenRoute2UnlockMessage,
       speedRunTime,
@@ -3600,6 +3883,14 @@ const completeInitialMission = useCallback((missionId: string) => {
       earthPopulation: earthPopulationRef.current,
       earthMaleRatio: earthMaleRatioRef.current,
       earthBiodiversity: earthBiodiversityRef.current,
+      earthHealth: earthHealthRef.current,
+      earthHappiness: earthHappinessRef.current,
+      earthSecurity: earthSecurityRef.current,
+      earthQualityOfLife: earthQualityOfLifeRef.current,
+      earthCouples: earthCouplesRef.current,
+      earthBirthRegistry: earthBirthRegistryRef.current,
+      earthProjectBoostCount: earthProjectBoostCountRef.current,
+      earthSeason: earthSeasonRef.current,
       earthEvents: earthEventsRef.current,
       unlockedAchievements,
       achievementProgress,
@@ -3612,7 +3903,6 @@ const completeInitialMission = useCallback((missionId: string) => {
     try {
       const modularSave = SaveManager.createSave(saveData);
       await GameStorage.save(modularSave, 'time_travel_save');
-      playSfx('success');
       onReturnToMenu();
     } catch (error) {
       console.error("Failed to save game", error);
@@ -3649,7 +3939,7 @@ const completeInitialMission = useCallback((missionId: string) => {
       const prev = activeDeliveriesRef.current;
       const manualCompletions: { routeId: string, count: number }[] = [];
       let deliveriesStateChanged = false;
-      
+
       let updatedDeliveries = [...prev];
 
       const shipsInUse: { [level: number]: number } = {};
@@ -3691,18 +3981,21 @@ const completeInitialMission = useCallback((missionId: string) => {
         const locationTech = techLevelsRef.current[route.id] || { engine: 0, ai: 0, value: 0, rare: 0 };
         const engineUpgrade = UPGRADES_MAP.get('engine')!;
         const engineTier = engineUpgrade.tiers.find(t => t.level === locationTech.engine);
-        
+        const ship = SHIPS.find(s => s.tier === route.tier && s.level === d.shipLevel);
+        const distancePenalty = Math.min(3, 1 + Math.log10(Math.max(d.distance, 5000) / 5000) * 0.35);
+        const shipSpeedFactor = ship ? Math.min(2.2, Math.max(0.75, Math.sqrt(ship.maxSpeed / 100))) : 1;
+
         let progressIncrement = 0;
         if (engineTier?.level === 5) {
-          progressIncrement = 3;
+          progressIncrement = 3 / distancePenalty;
         } else {
           const speedMultiplier = engineTier ? 1 + engineTier.value : 1;
-          progressIncrement = speedMultiplier / 4;
+          progressIncrement = (speedMultiplier * shipSpeedFactor) / (4 * distancePenalty);
         }
-        
+
         let newProgress = d.progress + progressIncrement;
         deliveriesStateChanged = true;
-        
+
         if (newProgress >= 100) {
           manualCompletions.push({ routeId: d.routeId, count: 1 });
           return null;
@@ -3717,8 +4010,22 @@ const completeInitialMission = useCallback((missionId: string) => {
       const timeSinceLastBattle = Date.now() - lastRandomBattleTimeRef.current;
       const forcedBattle = timeSinceLastBattle > 180000;
       const battleFreqMultiplier = (battleLevelRef.current >= 35 && routeTierRef.current === 'Interstellar') ? 1.5 : 1;
-      
-      if (routeTierRef.current !== 'Void' && !activeBattleRef.current && !isSpeedRunRef.current && (Math.random() < (0.002 * battleFreqMultiplier) || forcedBattle)) {
+      const candidateRouteIds = [
+        ...nextManual.filter(d => d.status === 'delivering').map(d => d.routeId),
+        ...Object.keys(autoTravelActiveRef.current).filter(rid => autoTravelActiveRef.current[rid] && (autoTravelProgressRef.current[rid] || 0) > 0)
+      ];
+      const candidateRisks = candidateRouteIds
+        .map(routeId => ROUTES_MAP.get(routeId))
+        .filter((route): route is Route => !!route && route.tier === routeTierRef.current)
+        .map(route => route.risk);
+      const averageRisk = candidateRisks.length > 0
+        ? candidateRisks.reduce((sum, risk) => sum + risk, 0) / candidateRisks.length
+        : 0;
+      const randomBattleChance = candidateRisks.length > 0
+        ? Math.min(0.0015, (0.00002 + averageRisk * 0.0025) * battleFreqMultiplier)
+        : 0;
+
+      if (routeTierRef.current !== 'Void' && !activeBattleRef.current && !isSpeedRunRef.current && (Math.random() < randomBattleChance || (forcedBattle && candidateRisks.length > 0))) {
         const manualShips = nextManual.filter(d => {
           const r = ROUTES_MAP.get(d.routeId);
           return d.status === 'delivering' && r?.tier === routeTierRef.current;
@@ -3731,11 +4038,11 @@ const completeInitialMission = useCallback((missionId: string) => {
         if (manualShips.length > 0 || autoRoutes.length > 0) {
           const totalTargets = manualShips.length + autoRoutes.length;
           const targetIndex = Math.floor(Math.random() * totalTargets);
-          
+
           let targetId: string;
           let routeId: string;
           let isAuto = false;
-          
+
           if (targetIndex < manualShips.length) {
             const target = manualShips[targetIndex];
             targetId = target.id;
@@ -3754,17 +4061,17 @@ const completeInitialMission = useCallback((missionId: string) => {
             const minLvl = Math.max(1, Math.floor(battleLevelRef.current * 0.9));
             const maxLvl = Math.max(1, Math.ceil(battleLevelRef.current * 1.1));
             const enemyTier = Math.min(20, Math.floor(Math.random() * (maxLvl - minLvl + 1)) + minLvl);
-            
+
             let bossChance = 0.10 + (battleLevelRef.current >= 15 ? 0.10 : 0);
             if (battleLevelRef.current >= 45 && routeTierRef.current === 'Interstellar') bossChance += 0.25;
-            
+
             const isBoss = Math.random() < bossChance;
             const isElite = !isBoss && enemyTier > 10;
             const enemyType = isBoss ? 'Boss' : (isElite ? 'Elite' : (enemyTier > 5 ? 'Alien' : (Math.random() > 0.5 ? 'Pirate' : 'Alien')));
-            
+
             const enemyHp = (50 + (enemyTier * 60) + Math.floor(Math.random() * 50)) * (isBoss ? 10 : (isElite ? 5 : 1));
             let playerHp = 100 + (battleLevelRef.current * 150);
-            if (battleLevelRef.current >= 25) playerHp += 500;
+            if (battleLevelRef.current >= 25) playerHp = Math.floor(playerHp * 1.25);
 
             let playerDps = (10 + battleLevelRef.current * 10) / 2;
             if (battleLevelRef.current >= 20) playerDps *= 1.5;
@@ -3781,22 +4088,22 @@ const completeInitialMission = useCallback((missionId: string) => {
             const multipliers = getEconomicMultipliers();
             const rewardMultiplier = isBoss ? 6 : (isElite ? 3 : 1);
             const result = (Math.random() * 100 < totalWinProb) ? 'victory' : 'defeat';
-            
+
             const battle: Battle = {
               id: Math.random().toString(36).substr(2, 9),
               routeId: routeId,
               deliveryId: targetId,
-              enemyName: isBoss ? (languageRef.current === 'pt' ? 'Nave MÃƒÆ’E (BOSS)' : 'MOTHER SHIP (BOSS)') : (isElite ? (languageRef.current === 'pt' ? 'Cruzador de Elite' : 'Elite Cruiser') : enemyTier > 5 ? (languageRef.current === 'pt' ? 'Cruzador AlienÃƒÂ­gena' : 'Alien Cruiser') : (enemyType === 'Pirate' ? (languageRef.current === 'pt' ? 'Pirata Espacial' : 'Space Pirate') : (languageRef.current === 'pt' ? 'Batedor AlienÃƒÂ­gena' : 'Alien Scout'))),
+              enemyName: isBoss ? (languageRef.current === 'pt' ? 'Nave Mãe (BOSS)' : 'MOTHER SHIP (BOSS)') : (isElite ? (languageRef.current === 'pt' ? 'Cruzador de Elite' : 'Elite Cruiser') : enemyTier > 5 ? (languageRef.current === 'pt' ? 'Cruzador Alienígena' : 'Alien Cruiser') : (enemyType === 'Pirate' ? (languageRef.current === 'pt' ? 'Pirata Espacial' : 'Space Pirate') : (languageRef.current === 'pt' ? 'Batedor Alienígena' : 'Alien Scout'))),
               enemyType: enemyType,
               enemyColor: isBoss ? '#ff0000' : (isElite ? '#f59e0b' : enemyTier > 5 ? '#a855f7' : enemyColors[Math.floor(Math.random() * enemyColors.length)]),
               enemyMaxHp: enemyHp,
               enemyHp: enemyHp,
               playerMaxHp: playerHp,
               playerHp: playerHp,
-              reward: Math.floor(route.reward * (0.5 + enemyTier * 0.1) * (isBoss ? 5 : (isElite ? 2 : 1)) * multipliers.profit * rewardMultiplier),
+              reward: Math.floor(route.reward * (0.5 + enemyTier * 0.1) * (isBoss ? 5 : (isElite ? 2 : 1)) * multipliers.battleProfit * rewardMultiplier),
               startTime: Date.now(),
               lastPlayerAttack: { laser: 0, plasma: 0, special: 0, shield: 0 },
-              lastEnemyAttack: Date.now() + 1000, 
+              lastEnemyAttack: Date.now() + 1000,
               shieldActive: false,
               lastShieldTime: 0,
               winProbability: winProb,
@@ -3804,7 +4111,7 @@ const completeInitialMission = useCallback((missionId: string) => {
               predeterminedResult: result,
               isCinematicFinished: false,
               playerImage: battleLevelRef.current >= 25 ? '/images/battle/skyring.webp' : '/images/battle/standard_ship.webp',
-              enemyImage: isBoss ? '/images/battle/enemy_boss.webp' : (isElite ? '/images/battle/enemy_elite.webp' : enemyTier > 15 ? '/images/battle/enemy_raider.webp' : enemyTier > 5 ? '/images/battle/enemy_alien.webp' : '/images/battle/enemy_scout.webp'),
+              enemyImage: isBoss ? '/images/battle/enemy_boss.webp' : (isElite ? '/images/battle/enemy_elite.webp' : (enemyTier > 5 ? '/images/battle/enemy_alien.webp' : '/images/battle/enemy_raider.webp')),
               playerDps: playerDps,
               enemyDps: (10 + enemyTier * 5) / 2,
               isBoss: isBoss
@@ -3812,7 +4119,7 @@ const completeInitialMission = useCallback((missionId: string) => {
 
             lastRandomBattleTimeRef.current = Date.now();
             updateHistoryStats('random_battle_found', 1, routeTierRef.current);
-            
+
             if (battleLevelRef.current >= 30 && routeTierRef.current === 'Interstellar') {
               const isVictory = Math.random() * 100 < winProb;
               if (isVictory) {
@@ -3836,7 +4143,7 @@ const completeInitialMission = useCallback((missionId: string) => {
                 }
                 playSfx('open_window');
               }
-              
+
               if (!isAuto) {
                 const shipIndex = nextManual.findIndex(d => d.id === targetId);
                 if (shipIndex !== -1) {
@@ -3846,13 +4153,27 @@ const completeInitialMission = useCallback((missionId: string) => {
               }
               if (isRetributionActiveRef.current) setTimeout(() => setBattleNotification(null), 2000);
             } else {
-              if (routeTierRef.current === 'Solar' || routeTierRef.current === 'Interstellar') {
-                setUnderAttackBattle(battle);
+              // Auto-Skip Logic
+              const skipCost = routeTierRef.current === 'Interstellar' ? 40 : 10;
+              if (autoSkipRandomBattlesRef.current && aetherionRef.current >= skipCost) {
+                const victory = autoSkipBattle(battle, skipCost);
+                playSfx(victory ? 'success' : 'error');
+
+                // Add log for the skip
+                if (victory) {
+                  addLog(languageRef.current === 'pt' ? `Batalha pulada com sucesso! (-${skipCost} Éteríon)` : `Battle skipped successfully! (-${skipCost} Aetherion)`, 'success');
+                } else {
+                  addLog(languageRef.current === 'pt' ? `Batalha pulada: Derrota! (-${skipCost} Éteríon)` : `Battle skipped: Defeat! (-${skipCost} Aetherion)`, 'error');
+                }
               } else {
-                setFoundBattle(battle);
+                if (routeTierRef.current === 'Solar' || routeTierRef.current === 'Interstellar') {
+                  setUnderAttackBattle(battle);
+                } else {
+                  setFoundBattle(battle);
+                }
+                addLog(`${t('deliveryUnderAttack')} ${route.destination} ${t('underAttack')}`, 'error');
+                playSfx('error');
               }
-              addLog(`${t('deliveryUnderAttack')} ${route.destination} ${t('underAttack')}`, 'error');
-              playSfx('error');
             }
           }
         }
@@ -3862,7 +4183,10 @@ const completeInitialMission = useCallback((missionId: string) => {
       }
 
       if (battleLevelRef.current >= 50 && isFatigueActiveRef.current && routeTierRef.current === 'Interstellar' && aetherionRef.current < 1000 && aetherionTubesRef.current > 0) {
-        synthesizeAetherion();
+        // Use local setters to update refs immediately and prevent sound looping/multiple triggers
+        setAetherion(prev => Math.min(10000, prev + 1000));
+        setAetherionTubes(prev => Math.max(0, prev - 1));
+        addLog(`${t('aetherionSynthesized')} (Fadiga)`, 'success');
       }
 
       Object.keys(autoTravelDesiredRef.current).forEach(routeId => {
@@ -3918,7 +4242,7 @@ const completeInitialMission = useCallback((missionId: string) => {
                 qcRef.current -= attemptCost;
                 aetherionRef.current = Math.max(0, aetherionRef.current - aetherionTripCost);
                 updateHistoryStats('spent', attemptCost, routeTierRef.current);
-                nextAutoProgress[routeId] = 0.01; 
+                nextAutoProgress[routeId] = 0.01;
               } else {
                 if (!shipsAvailable && canAfford) return;
                 setAutoTravelActive(prev => ({ ...prev, [routeId]: false }));
@@ -3928,7 +4252,10 @@ const completeInitialMission = useCallback((missionId: string) => {
             } else {
               const engineUpgrade = UPGRADES_MAP.get('engine')!;
               const engineTier = engineUpgrade.tiers.find(t => t.level === locationTech.engine);
-              let progressIncrement = (engineTier?.level === 5 ? 3 : (engineTier ? 1 + engineTier.value : 1) / 4);
+              const ship = SHIPS.find(s => s.tier === route.tier && s.level === route.requiredShipLevel);
+              const distancePenalty = Math.min(3, 1 + Math.log10(Math.max(route.distance, 5000) / 5000) * 0.35);
+              const shipSpeedFactor = ship ? Math.min(2.2, Math.max(0.75, Math.sqrt(ship.maxSpeed / 100))) : 1;
+              let progressIncrement = (engineTier?.level === 5 ? 3 / distancePenalty : ((engineTier ? 1 + engineTier.value : 1) * shipSpeedFactor) / (4 * distancePenalty));
               let newProgress = currentProgress + progressIncrement;
               if (newProgress >= 100) {
                 const aiUpgrade = UPGRADES_MAP.get('ai')!;
@@ -3936,7 +4263,7 @@ const completeInitialMission = useCallback((missionId: string) => {
                 let succeeded = 0;
                 for (let i = 0; i < numSlots; i++) { if (Math.random() < aiTier.value) succeeded++; }
                 if (succeeded > 0) autoCompletedRoutes.push({ routeId, count: succeeded });
-                newProgress = 0; 
+                newProgress = 0;
               }
               nextAutoProgress[routeId] = newProgress;
             }
@@ -3953,13 +4280,13 @@ const completeInitialMission = useCallback((missionId: string) => {
         let totalRewardBatch = 0;
         const locationUpdates: { [key: string]: number } = {};
         let totalCompletedCount = 0;
-        
+
         completions.forEach(comp => {
           const route = ROUTES_MAP.get(comp.routeId)!;
           const locationTech = techLevelsRef.current[route.id] || { engine: 0, ai: 0, value: 0, rare: 0 };
           for (let i = 0; i < comp.count; i++) {
             const aiTier = UPGRADES_MAP.get('ai')!.tiers.find(t => t.level === locationTech.ai);
-            const isPerfect = Math.random() < (aiTier?.level === 6 ? 0.5 : 0.1); 
+            const isPerfect = Math.random() < (aiTier?.level === 6 ? 0.5 : 0.1);
             const valueTier = UPGRADES_MAP.get('value')!.tiers.find(t => t.level === locationTech.value);
             const rareTier = UPGRADES_MAP.get('rare')!.tiers.find(t => t.level === locationTech.rare);
             const isRare = Math.random() < (rareTier ? rareTier.value : 0.05);
@@ -4022,7 +4349,14 @@ const completeInitialMission = useCallback((missionId: string) => {
               const compressionBonus = 1 + (miningCompressionLevelsRef.current[ore.id] || 0) * 0.5;
               let value = Math.floor(ore.baseValue * ore.rarity * ore.packSize * getEconomicMultipliers().profit * compressionBonus);
               if (routeTierRef.current === 'Interstellar') {
-                const miningScale = 15 + Math.min(battleLevelRef.current, 55) * 0.4;
+                // Sincronizado com DashboardProvider (base 3.75 + Level * 0.1)
+                let miningScale = 3.75 + Math.min(battleLevelRef.current, 55) * 0.1;
+
+                // Aplica bônus de nível 40 (Why, so?)
+                if (battleLevelRef.current >= 40) {
+                  miningScale *= 5;
+                }
+
                 value *= miningScale;
               }
               miningQcBonus += value * packs;
@@ -4036,7 +4370,7 @@ const completeInitialMission = useCallback((missionId: string) => {
                 const rewardId = Math.random().toString(36).substr(2, 9);
                 setFloatingRewards(prev => [...prev, { id: rewardId, amount: value * packs, x: window.innerWidth / 2, y: window.innerHeight / 2 }]);
                 setTimeout(() => {
-                   setFloatingRewards(p => p.filter(r => r.id !== rewardId));
+                  setFloatingRewards(p => p.filter(r => r.id !== rewardId));
                 }, 1000);
               }
               const sellKey = `sell-${ore.id}`;
@@ -4113,7 +4447,7 @@ const completeInitialMission = useCallback((missionId: string) => {
   // Tutorial Trigger
   useEffect(() => {
     if (!isLoaded) return;
-    
+
     // Small delay to ensure seenTutorials state is fully updated from localStorage
     const timeout = setTimeout(() => {
       if (['mining', 'aircraft', 'upgrades', 'auto', 'routes2', 'technology', 'missions', 'history'].includes(activeTab)) {
@@ -4123,7 +4457,7 @@ const completeInitialMission = useCallback((missionId: string) => {
         }
       }
     }, 100);
-    
+
     return () => clearTimeout(timeout);
   }, [activeTab, seenTutorials, isLoaded]);
 
@@ -4162,10 +4496,10 @@ const completeInitialMission = useCallback((missionId: string) => {
 
   const buyRoute = (route: Route) => {
     if (unlockedRouteIds.includes(route.id)) return;
-    
+
     const conditionsMet = isRouteUnlocked(route);
     if (!conditionsMet) {
-      addLog(`Route ${route.name} is still locked`, 'warning');
+      addLog(`Delivery route ${route.name} is still locked`, 'warning');
       return;
     }
 
@@ -4174,12 +4508,12 @@ const completeInitialMission = useCallback((missionId: string) => {
       dispatch({ type: 'SPEND_QC', payload: { amount: cost } });
       dispatch({ type: 'UNLOCK_ROUTE', payload: { routeId: route.id } });
       updateHistoryStats('spent', cost, route.tier);
-      
+
       if (route.tier === 'Solar') playSfx('start_engine_1');
       else if (route.tier === 'Interstellar') playSfx('start_engine_2');
       else playSfx('buy');
 
-      addLog(`Route ${route.name} unlocked!`, 'success');
+      addLog(`Delivery route ${route.name} unlocked!`, 'success');
     } else {
       addLog(`Not enough QC to unlock ${route.name}`, 'error');
     }
@@ -4205,7 +4539,7 @@ const completeInitialMission = useCallback((missionId: string) => {
     const multipliers = getEconomicMultipliers();
     let cost = Math.floor(nextTier.cost * multiplier * multipliers.cost);
     if (routeTier === 'Interstellar') cost = Math.floor(cost * 1.5);
-    
+
     if (qc >= cost) {
       dispatch({ type: 'SPEND_QC', payload: { amount: cost } });
       dispatch({ type: 'UPGRADE_TECH', payload: { locationId, category: upgrade.id.toLowerCase() } });
@@ -4227,11 +4561,11 @@ const completeInitialMission = useCallback((missionId: string) => {
   const toggleAutoTravel = (routeId: string) => {
     const isActivating = !autoTravelDesired[routeId];
     const slots = autoTravelSlots[routeId] || 0;
-    
+
     if (isActivating && slots === 0) {
       return;
     }
-    
+
     setAutoTravelDesired(prev => ({ ...prev, [routeId]: isActivating }));
     setAutoTravelActive(prev => ({ ...prev, [routeId]: isActivating }));
     playSfx(isActivating ? 'open_window' : 'close_window');
@@ -4265,7 +4599,7 @@ const completeInitialMission = useCallback((missionId: string) => {
     }
 
     // TransaÃƒÂ§ÃƒÂ£o atÃƒÂ´mica: gasta QC e adiciona slot
-    dispatch({ type: 'SPEND_QC',    payload: { amount: cost } });
+    dispatch({ type: 'SPEND_QC', payload: { amount: cost } });
     dispatch({ type: 'BUY_AUTO_SLOT', payload: { routeId } });
     updateHistoryStats('spent', cost, routeTier);
 
@@ -4273,7 +4607,7 @@ const completeInitialMission = useCallback((missionId: string) => {
     playSfx('buying_iten');
     addLog(`Auto-travel slot ${currentSlots + 1} purchased for ${route.name}`, 'success');
   }, [dispatch, qc, aetherion, autoTravelSlots,
-      playSfx, addLog, getEconomicMultipliers, updateHistoryStats, routeTier, completeInitialMission]);
+    playSfx, addLog, getEconomicMultipliers, updateHistoryStats, routeTier, completeInitialMission]);
 
   const getAutoTravelColor = (level: number) => {
     switch (level) {
@@ -4292,86 +4626,121 @@ const completeInitialMission = useCallback((missionId: string) => {
 
     const interval = setInterval(() => {
       const now = Date.now();
-      setVoidAircraftMissions(prev => {
-        let changed = false;
-        const next = { ...prev };
+      const currentMissions = voidAircraftMissionsRef.current;
+      const nextMissions = { ...currentMissions };
+      let anyMissionChanged = false;
+      let totalRewards: Record<string, number> = {};
+      let logsToDisplay: { message: string, type: any }[] = [];
+      let playSuccess = false;
 
-        Object.entries(next).forEach(([id, mission]) => {
-          if (mission.status === 'mission' && mission.endTime && now >= mission.endTime) {
-            // Mission complete
-            const upgrades = voidAircraftUpgrades[id];
-            next[id] = { 
-              status: 'idle', 
-              endTime: null, 
-              rareFound: mission.rareFound,
-              restartAt: (upgrades.auto === 1 && voidAircraftAutoToggles[id]) ? Date.now() + 2000 : null
-            };
-            changed = true;
+      Object.entries(nextMissions).forEach(([id, mission]) => {
+        if (mission && mission.status === 'mission' && mission.endTime && now >= mission.endTime) {
+          const upgrades = voidAircraftUpgrades[id] || { storage: 0, quality: 0, time: 0, auto: 0 };
+          nextMissions[id] = {
+            status: 'idle',
+            endTime: null,
+            rareFound: mission.rareFound,
+            restartAt: (upgrades.auto === 1 && voidAircraftAutoToggles[id]) ? Date.now() + 2000 : null
+          };
+          anyMissionChanged = true;
+          playSuccess = true;
 
-            const aircraft = VOID_AIRCRAFT.find(a => a.id === id)!;
-            // Calculate rewards
-            const baseCapacity = aircraft.capacity * (1 + upgrades.storage * 0.2); // 20% per level
-            let amount = Math.floor(baseCapacity);
+          const aircraft = VOID_AIRCRAFT.find(a => a.id === id);
+          if (aircraft) {
+            const storageLevel = upgrades?.storage || 0;
+            const aircraftCapacity = aircraft.capacity || 10000;
+            const baseCapacity = aircraftCapacity * (1 + storageLevel * 0.15);
+            const isRare = Math.random() < 0.05;
+            const rareMult = isRare ? 2.5 : 1;
 
-            // Aproveitamento (Quality) Logic: 35% base + 10% chance per level
-            // If triggered, increases total resources by 20% to 80%
-            const aproveitamentoChance = 0.35 + (upgrades.quality * 0.10);
-            if (Math.random() < aproveitamentoChance) {
-              const bonusPercent = 0.2 + (Math.random() * 0.6); // 20% to 80%
-              amount = Math.floor(amount * (1 + bonusPercent));
-              addLog(`${t('efficiencyCaps')}: ${aircraft.name} ${t('extraResourcesFound')} (+${Math.round(bonusPercent * 100)}%)!`, 'success');
+            const amountPerResource = Math.floor((baseCapacity / 5) * rareMult);
+            const totalAmount = amountPerResource * 5;
+
+            const resourceTypes = ['minerals', 'energy', 'food', 'tech', 'meds'];
+            resourceTypes.forEach((type) => {
+              totalRewards[type] = (totalRewards[type] || 0) + amountPerResource;
+            });
+
+            if (isRare) {
+              logsToDisplay.push({
+                message: `${t('efficiencyCaps')}: ${aircraft.name} ${t('extraResourcesFound')} (2.5x)!`,
+                type: 'success'
+              });
             }
 
-            // Distribute resources equally but with variation
-            // Resources: minerals, energy, food, tech, meds
-            const resourceTypes = ['minerals', 'energy', 'food', 'tech', 'meds'];
-            let remainingAmount = amount;
-            const rewards: { [key: string]: number } = {};
-
-            resourceTypes.forEach((type, index) => {
-              if (index === resourceTypes.length - 1) {
-                rewards[type] = remainingAmount;
-              } else {
-                // Random portion of remaining, but trying to keep it somewhat balanced
-                const average = amount / resourceTypes.length;
-                const variation = average * 0.4; // 40% variation
-                const portion = Math.max(1, Math.floor(average + (Math.random() * variation * 2 - variation)));
-                const finalPortion = Math.min(remainingAmount - (resourceTypes.length - 1 - index), portion);
-                rewards[type] = finalPortion;
-                remainingAmount -= finalPortion;
-              }
+            logsToDisplay.push({
+              message: `${t('missionCompletedBy')} ${aircraft.name}: +${totalAmount} ${t('totalResources')}`,
+              type: 'success'
             });
-
-            setVoidResources(prevRes => {
-              const nextRes = { ...prevRes };
-              Object.entries(rewards).forEach(([type, val]) => {
-                nextRes[type as keyof typeof nextRes] = (nextRes[type as keyof typeof nextRes] || 0) + val;
-              });
-              return nextRes;
-            });
-
-            addLog(`${t('missionCompletedBy')} ${aircraft.name}: +${amount} ${t('totalResources')}`, 'success');
-            playSfx('success');
-          } else if (mission.status === 'idle' && mission.restartAt && now >= mission.restartAt) {
-            // Auto-restart
-            const aircraft = VOID_AIRCRAFT.find(a => a.id === id)!;
-            const upgrades = voidAircraftUpgrades[id];
-            const timeReduction = upgrades.time * 0.1;
-            const actualTime = aircraft.missionTime * (1 - timeReduction);
-            
-            next[id] = {
-              ...mission,
-              status: 'mission',
-              endTime: Date.now() + actualTime,
-              restartAt: null
-            };
-            changed = true;
-            addLog(`${t('autoRestarting')} ${aircraft.name}...`, 'info');
           }
-        });
+        } else if (mission.status === 'mission' && !mission.earlyCheckDone) {
+          const elapsedTime = now - mission.startTime;
+          if (elapsedTime >= 60000) { // 1 minute mark
+            const aircraft = VOID_AIRCRAFT.find(a => a.id === id)!;
+            const upgrades = voidAircraftUpgrades[id] || { storage: 0, quality: 0, time: 0, auto: 0 };
+            const currentEfficiency = aircraft.efficiency + (upgrades.quality * 5);
 
-        return changed ? next : prev;
+            if (Math.random() < (currentEfficiency / 100)) {
+              nextMissions[id] = {
+                ...mission,
+                endTime: now, // Force completion on next block or tick
+                earlyCheckDone: true
+              };
+              anyMissionChanged = true;
+              logsToDisplay.push({
+                message: language === 'pt' ? `${aircraft.name} encontrou um atalho e retornará imediatamente!` : `${aircraft.name} found a shortcut and will return immediately!`,
+                type: 'success'
+              });
+              playSfx('warp');
+            } else {
+              // Mark as checked even if failed to avoid rolling every second
+              nextMissions[id] = {
+                ...mission,
+                earlyCheckDone: true
+              };
+              anyMissionChanged = true;
+            }
+          }
+        } else if (mission.status === 'idle' && mission.restartAt && now >= mission.restartAt) {
+          const aircraft = VOID_AIRCRAFT.find(a => a.id === id)!;
+          const upgrades = voidAircraftUpgrades[id] || { storage: 0, quality: 0, time: 0, auto: 0 };
+          const actualTime = aircraft.missionTime * (1 - (upgrades.time || 0) * 0.1);
+
+          nextMissions[id] = {
+            ...mission,
+            status: 'mission',
+            startTime: Date.now(),
+            endTime: Date.now() + actualTime,
+            restartAt: null,
+            earlyCheckDone: false
+          };
+          anyMissionChanged = true;
+          logsToDisplay.push({ message: `${t('autoRestarting')} ${aircraft.name}...`, type: 'info' });
+        }
       });
+
+      if (anyMissionChanged) {
+        setVoidAircraftMissions(nextMissions);
+      }
+
+      if (Object.keys(totalRewards).length > 0) {
+        dispatch({
+          type: 'EARN_VOID_RESOURCES',
+          payload: totalRewards
+        });
+      }
+
+      logsToDisplay.forEach(log => addLog(log.message, log.type));
+
+      // Play heal_ship only if at least one mission finished manually (not auto-restart)
+      const playedManualFinish = Object.entries(nextMissions).some(([id, m]) => {
+        const prevM = currentMissions[id];
+        return prevM?.status === 'mission' && m.status === 'idle' && !m.restartAt;
+      });
+
+      if (playedManualFinish && !isInitialTickRef.current) {
+        playSfx('heal_ship');
+      }
     }, 1000);
 
     return () => clearInterval(interval);
@@ -4389,13 +4758,13 @@ const completeInitialMission = useCallback((missionId: string) => {
     const interval = setInterval(() => {
       const now = Date.now();
       let changed = false;
-      
+
       setVoidAircraftConstruction(prev => {
         if (Object.keys(prev).length === 0) return prev;
-        
+
         const next = { ...prev };
         Object.entries(next).forEach(([id, construction]) => {
-          if (now >= construction.endTime) {
+          if (construction && now >= construction.endTime) {
             delete next[id];
             setUnlockedVoidAircraft(prevUnlocked => {
               if (prevUnlocked.includes(id)) return prevUnlocked;
@@ -4425,14 +4794,18 @@ const completeInitialMission = useCallback((missionId: string) => {
 
     const shipUpgradeDmgMult = 1 + (battleShipUpgradeLevelRef.current * 0.2); // +20% per level
     const shipUpgradeCritBonus = battleShipUpgradeLevelRef.current * 200; // +200 crit damage per level
+    const damage = stats.damage * (1 + rarityBonus) * shipUpgradeDmgMult;
+    const criticalDamage = (damage * 2) + shipUpgradeCritBonus;
 
     return {
       ...stats,
-      damage: stats.damage * (1 + rarityBonus) * shipUpgradeDmgMult,
+      damage,
       maxHp: stats.maxHp * (1 + rarityBonus),
       maxShield: stats.maxShield * (1 + rarityBonus),
-      critChance: stats.critChance * (1 + rarityBonus),
-      critDamageBonus: shipUpgradeCritBonus
+      critChance: Math.min(1, stats.critChance * (1 + rarityBonus)),
+      critDamageBonus: shipUpgradeCritBonus,
+      critDamageMultiplier: criticalDamage / Math.max(1, damage),
+      criticalDamage
     };
   };
 
@@ -4440,7 +4813,7 @@ const completeInitialMission = useCallback((missionId: string) => {
     const effectiveStats = getEffectiveVoidStats(voidBattleShipStats);
     const missingHp = effectiveStats.maxHp - voidBattleShipStats.hp;
     const missingShield = effectiveStats.maxShield - voidBattleShipStats.shield;
-    
+
     if (missingHp <= 0 && missingShield <= 0) return;
 
     // Base cost for shield repair: 1000 energy and 1000 tech
@@ -4497,7 +4870,7 @@ const completeInitialMission = useCallback((missionId: string) => {
     };
 
     const currentLevel = voidBattleShipStats.upgrades[type];
-    const maxLevel = 5 + (battleShipUpgradeLevelRef.current * 10);
+    const maxLevel = 5;
 
     if (isVoidWarActive || voidWarAlertActive) {
       addLog(t('cannotUpgradeDuringAttack' as any), 'error');
@@ -4512,7 +4885,7 @@ const completeInitialMission = useCallback((missionId: string) => {
 
     const cost = getUpgradeCost(currentLevel);
     if (!cost) return;
-    
+
     if ((voidResources?.tech || 0) >= cost.tech && (voidResources?.energy || 0) >= cost.energy && (voidResources?.minerals || 0) >= cost.minerals) {
       setVoidResources(prev => ({
         ...prev,
@@ -4524,7 +4897,7 @@ const completeInitialMission = useCallback((missionId: string) => {
       setVoidBattleShipStats(prev => {
         const next = { ...prev };
         next.upgrades[type] = currentLevel + 1;
-        
+
         if (type === 'damage') next.damage = 100 * (1 + next.upgrades.damage * 0.10);
         if (type === 'shield') {
           next.maxShield = 1000 * (1 + next.upgrades.shield * 0.15);
@@ -4532,7 +4905,7 @@ const completeInitialMission = useCallback((missionId: string) => {
         }
         if (type === 'crit') next.critChance = 0.10 + (next.upgrades.crit * 0.10);
         if (type === 'loot') next.lootEfficiency = 0.8 + (next.upgrades.loot * 0.25);
-        
+
         return next;
       });
 
@@ -4561,31 +4934,31 @@ const completeInitialMission = useCallback((missionId: string) => {
 
     const energyCost = 2500;
     const techCost = 2500;
-    
+
     if (voidResources.energy < energyCost || voidResources.tech < techCost) {
       addLog(t('insufficientResourcesForRepair'), 'error');
       playSfx('error');
       return;
     }
-    
+
     setVoidResources(prev => ({
       ...prev,
       energy: prev.energy - energyCost,
       tech: prev.tech - techCost
     }));
-    
+
     setIsRepairingRobot(true);
     setRobotRepairProgress(0);
     playSfx('saving_robot_event');
-    
+
     const duration = 21000; // 21 seconds
     const startTime = Date.now();
-    
+
     const interval = setInterval(() => {
       const elapsed = Date.now() - startTime;
       const progress = Math.min(100, (elapsed / duration) * 100);
       setRobotRepairProgress(progress);
-      
+
       if (progress >= 100) {
         setIsRobotRepaired(true);
         setIsRepairingRobot(false);
@@ -4600,19 +4973,19 @@ const completeInitialMission = useCallback((missionId: string) => {
     const level = battleShipUpgradeLevel;
     const energyCost = 1000 * (level + 1) * (level + 1);
     const techCost = 500 * (level + 1) * (level + 1);
-    
+
     if (voidResources.energy < energyCost || voidResources.tech < techCost) {
       addLog(t('insufficientResourcesForCombatUpgrade'), 'error');
       playSfx('low_to_upgrade');
       return;
     }
-    
+
     setVoidResources(prev => ({
       ...prev,
       energy: prev.energy - energyCost,
       tech: prev.tech - techCost
     }));
-    
+
     setBattleShipUpgradeLevel(prev => prev + 1);
     playSfx('level_up');
     addLog(`${t('shipUpgradedTo')} Level ${level + 1}!`, 'success');
@@ -4622,7 +4995,7 @@ const completeInitialMission = useCallback((missionId: string) => {
     const rarities: ('common' | 'rare' | 'elite' | 'legendary' | 'mythic')[] = ['common', 'rare', 'elite', 'legendary', 'mythic'];
     const currentIndex = rarities.indexOf(voidBattleShipStats.rarity);
     if (currentIndex >= rarities.length - 1) return;
-    
+
     const nextRarity = rarities[currentIndex + 1];
     const costs = {
       rare: { tech: 5000, energy: 5000 },
@@ -4630,7 +5003,7 @@ const completeInitialMission = useCallback((missionId: string) => {
       legendary: { tech: 15000, energy: 15000 },
       mythic: { tech: 20000, energy: 20000 }
     };
-    
+
     const cost = costs[nextRarity as keyof typeof costs];
     if (!cost) return;
 
@@ -4638,18 +5011,18 @@ const completeInitialMission = useCallback((missionId: string) => {
       addLog(t('insufficientResourcesForCombatUpgrade'), 'error');
       return;
     }
-    
+
     setVoidResources(prev => ({
       ...prev,
       tech: (prev?.tech || 0) - cost.tech,
       energy: (prev?.energy || 0) - cost.energy
     }));
-    
+
     setVoidBattleShipStats(prev => ({
       ...prev,
       rarity: nextRarity
     }));
-    
+
     playSfx('epic_battle_ship');
     addLog(`${t('shipUpgradedTo')} ${nextRarity.toUpperCase()}!`, 'success');
   };
@@ -4660,10 +5033,22 @@ const completeInitialMission = useCallback((missionId: string) => {
       return;
     }
 
-    const locId = forcedLocationId !== undefined 
-      ? forcedLocationId 
+    const locId = forcedLocationId !== undefined
+      ? forcedLocationId
       : (voidWarAlertActive ? (1 + Math.floor(Math.random() * 9)) : 0);
     const locKey = locId === 0 ? 'zero' : locId;
+    const sectorBossNames = [
+      'Devorador Alpha',
+      'Sanguessuga Estelar',
+      'Colosso Amalgamado',
+      'Kraken do Vazio',
+      'Besta-Titã de Ferro',
+      'Horror Mutante',
+      'Verme-Rei do Vazio',
+      'Predador Abissal',
+      'O Deus-Monstro do Vazio'
+    ];
+    const sectorBossName = locId > 0 ? sectorBossNames[locId - 1] : undefined;
     setCurrentVoidLocationId(locId);
 
     if (warType || voidWarAlertActive) {
@@ -4677,61 +5062,55 @@ const completeInitialMission = useCallback((missionId: string) => {
       const actualWarType = isFirstInvasionBattle ? 'boss' : warType;
       if (isFirstInvasionBattle) setIsFirstInvasionBattle(false);
 
-      const waveEnemies: VoidBattleEnemy[] = [];
-      const numWaves = 5;
+      let type: 'Padrão' | 'Elite' | 'Boss';
+      let stats;
 
-      for (let i = 0; i < numWaves; i++) {
-        let type: 'Padrão' | 'Elite' | 'Boss';
-        let stats;
-        
-        if (actualWarType === 'boss') {
-          type = i < 4 ? 'Elite' : 'Boss';
-        } else {
-          type = i < 4 ? 'Padrão' : 'Elite';
-        }
-
-        if (type === 'Padrão') {
-          const hp = 90000 * 0.375;
-          stats = { hp: hp, maxHp: hp, shield: hp, maxShield: hp, damage: (30 + Math.random() * 20) * 2, qc: 50000 };
-        } else if (type === 'Elite') {
-          const hp = 225000 * 0.375;
-          stats = { hp: hp, maxHp: hp, shield: hp, maxShield: hp, damage: (60 + Math.random() * 20) * 2, qc: 150000 };
-        } else {
-          let hp = 390000 * 0.375;
-          let shield = hp;
-          stats = { hp: hp, maxHp: hp, shield: shield, maxShield: shield, damage: (100 + Math.random() * 20) * 2, qc: 500000 };
-        }
-
-        const enemy: VoidBattleEnemy = {
-          id: `war-enemy-${Date.now()}-${i}`,
-          type,
-          name: type === 'Padrão' ? 'Aberração' : type === 'Elite' ? 'Horror Dimensional' : 'Devorador de Estrelas',
-          ...stats,
-          x: 80,
-          y: 50,
-          image: routeTier === 'Void' 
-            ? (type === 'Padrão' 
-                ? `/assets/rota3/void/${locKey}/monster-common-${Math.floor(Math.random() * 4) + 1}_neutral.webp` 
-                : type === 'Elite' 
-                  ? `/assets/rota3/void/${locKey}/monster-elite_neutral.webp` 
-                  : `/assets/rota3/void/${locKey}/boss_neutral.webp`)
-            : (type === 'Padrão' 
-                ? `/images/ships/battle/enemy-common-${Math.floor(Math.random() * 4) + 1}.webp` 
-                : type === 'Elite' 
-                  ? '/images/ships/battle/enemy-elite.webp' 
-                  : '/images/ships/battle/enemy-boss.webp')
-        };
-        waveEnemies.push(enemy);
+      if (actualWarType === 'boss') {
+        type = 'Boss';
+      } else if (actualWarType === 'elite') {
+        type = 'Elite';
+      } else {
+        type = 'Padrão';
       }
 
-      const initialEnemy = waveEnemies.shift();
-      if (!initialEnemy) return;
+      if (type === 'Padrão') {
+        const hp = 90000 * 0.375;
+        stats = { hp: hp, maxHp: hp, shield: hp, maxShield: hp, damage: (30 + Math.random() * 20) * 2, qc: 50000 };
+      } else if (type === 'Elite') {
+        const hp = 225000 * 0.375;
+        stats = { hp: hp, maxHp: hp, shield: hp, maxShield: hp, damage: (60 + Math.random() * 20) * 2, qc: 150000 };
+      } else {
+        const hp = 390000 * 0.375;
+        const shield = hp;
+        stats = { hp: hp, maxHp: hp, shield: shield, maxShield: shield, damage: (100 + Math.random() * 20) * 2, qc: 500000 };
+      }
 
-      setVoidBattleOptions([initialEnemy]);
+      const enemy: VoidBattleEnemy = {
+        id: `war-enemy-${Date.now()}`,
+        type,
+        name: type === 'Padrão' ? 'Aberração' : type === 'Elite' ? 'Horror Dimensional' : (sectorBossName || 'Devorador de Estrelas'),
+        ...stats,
+        x: 80,
+        y: 50,
+        assetBaseName: routeTier === 'Void' && type === 'Boss' ? 'boss' : undefined,
+        image: routeTier === 'Void'
+          ? (type === 'Padrão'
+              ? `/assets/rota3/void/${locKey}/monster-common-${Math.floor(Math.random() * 4) + 1}_neutral.webp`
+              : type === 'Elite'
+                ? '/assets/rota3/void/zero/monster-elite_neutral.webp'
+                : `/assets/rota3/void/${locKey}/boss_neutral.webp`)
+          : (type === 'Padrão'
+            ? `/images/ships/battle/enemy-common-${Math.floor(Math.random() * 4) + 1}.webp`
+            : type === 'Elite'
+              ? '/images/ships/battle/enemy-elite.webp'
+              : '/images/ships/battle/enemy-boss.webp')
+      };
+
+      setVoidBattleOptions([enemy]);
       setVoidBattleStatus('fighting');
       setActiveVoidBattle({
-        enemies: [initialEnemy],
-        enemyQueue: waveEnemies,
+        enemies: [enemy],
+        enemyQueue: [],
         projectiles: [],
         particles: [],
         damageNumbers: [],
@@ -4760,11 +5139,11 @@ const completeInitialMission = useCallback((missionId: string) => {
         zoomTarget: { x: 50, y: 50 },
         isSlowMo: false
       });
-      
+
       const engagementMsg = language === 'pt'
-        ? `Iniciando incursão no setor. Enfrente as 5 ondas de inimigos!`
-        : `Starting sector incursion. Face all 5 enemy waves!`;
-        
+        ? `Iniciando missão de defesa do setor. Elimine o alvo hostil!`
+        : `Starting sector defense mission. Eliminate the hostile target!`;
+
       addLog(engagementMsg, 'warning');
       return;
     }
@@ -4829,10 +5208,10 @@ const completeInitialMission = useCallback((missionId: string) => {
 
         if (isVoid) {
           monsterName = type === 'Padrão' ? 'Aberração' : type === 'Elite' ? 'Horror Dimensional' : 'Devorador de Estrelas';
-          imagePath = type === 'Padrão' 
-            ? `/assets/rota3/void/${locKey}/monster-common-${Math.floor(Math.random() * 4) + 1}_neutral.webp` 
-            : type === 'Elite' 
-              ? `/assets/rota3/void/${locKey}/monster-elite_neutral.webp` 
+          imagePath = type === 'Padrão'
+            ? `/assets/rota3/void/${locKey}/monster-common-${Math.floor(Math.random() * 4) + 1}_neutral.webp`
+            : type === 'Elite'
+              ? '/assets/rota3/void/zero/monster-elite_neutral.webp'
               : `/assets/rota3/void/${locKey}/boss_neutral.webp`;
         } else {
           imagePath = type === 'Padrão' ? `/images/ships/battle/enemy-common-${Math.floor(Math.random() * 4) + 1}.webp` : type === 'Elite' ? '/images/ships/battle/enemy-elite.webp' : '/images/ships/battle/enemy-boss.webp';
@@ -4859,7 +5238,7 @@ const completeInitialMission = useCallback((missionId: string) => {
     // Bosses always appear alone. Only Standard and Elite can be in groups.
     const isGroup = enemy.type !== 'Boss' && Math.random() < 0.15;
     const enemies: VoidBattleEnemy[] = [{ ...enemy, vx: 0, vy: 0 }];
-    
+
     if (isGroup) {
       const extraCount = 1 + Math.floor(Math.random() * 2); // 1 or 2 extra (total 2 or 3)
       for (let i = 0; i < extraCount; i++) {
@@ -4900,11 +5279,11 @@ const completeInitialMission = useCallback((missionId: string) => {
       zoomTarget: { x: 50, y: 50 },
       isSlowMo: false
     });
-    
-    const engagementMsg = routeTier === 'Void' 
+
+    const engagementMsg = routeTier === 'Void'
       ? `Engajando Criatura: ${enemy.name}. Prepare-se!`
       : `${t('engagingShip')} ${enemy.type}. ${t('prepareForCombat')}`;
-      
+
     addLog(isGroup ? (routeTier === 'Void' ? 'Emboscada detectada! Múltiplas criaturas!' : t('ambushDetected')) : engagementMsg, 'warning');
     playSfx('click');
   };
@@ -4917,49 +5296,26 @@ const completeInitialMission = useCallback((missionId: string) => {
     if (routeTier !== 'Void') return;
 
     const interval = setInterval(() => {
-      // 1. Resource Generation for Player
-      setVoidResources(prev => {
-        const next = { ...prev };
-        let changed = false;
-        
-        VOID_POIS.forEach(poi => {
-          // Standard Inspiration Generation
-          const poiStats = voidPOIsInspiration[poi.id] || { minerals: 0, energy: 0, food: 0, tech: 0, meds: 0 };
-          const totalProgress = Object.values(poiStats).reduce((a, b) => a + b, 0);
-          if (totalProgress >= 100) {
-            const gen = poi.passiveGeneration;
-            const resourceKey = gen.resource === 'Energia' ? 'energy' : 
-                               gen.resource === 'Alimentos' ? 'food' :
-                               gen.resource === 'Tecnologia' ? 'tech' : 
-                               gen.resource === 'Medicamentos' ? 'meds' : 'minerals';
-            
-            next[resourceKey] += gen.amount;
-            changed = true;
-          }
+      // 1. Contribution to Earth Project (Player generation removed as it was autonomous/unintended)
+      VOID_POIS.forEach(poi => {
+        const poiStats = voidPOIsInspiration[poi.id] || { minerals: 0, energy: 0, food: 0, tech: 0, meds: 0 };
+        const totalProgress = Object.values(poiStats).reduce((total: number, value: unknown) => total + (typeof value === 'number' ? value : 0), 0);
 
-          // QC Donation Generation: 5 units per second per level (100k QC)
-          // Interval is 5s, so 25 units per level every 5s
-          const qcLevel = voidPOIQCDonations[poi.id] || 0;
-          if (qcLevel > 0) {
-            const resourceTypes: (keyof typeof voidResources)[] = ['minerals', 'energy', 'food', 'tech', 'meds'];
-            const randomRes = resourceTypes[Math.floor(Math.random() * resourceTypes.length)];
-            const bonusAmount = qcLevel * 25;
-            next[randomRes] += bonusAmount;
-            changed = true;
-          }
-        });
-        
-        return changed ? next : prev;
+        // Only keep the Earth reconstruction contribution if the POI is sufficiently inspired
+        if (totalProgress >= 100) {
+          // You could add logic here for Earth restoration if needed,
+          // but for now we are just cleaning up the autonomous player gains.
+        }
       });
 
       // 2. Contribution to Earth Project
       setEarthReconstructionProgress(prev => {
         const next = { ...prev };
         let changed = false;
-        
+
         VOID_POIS.forEach(poi => {
           const poiStats = voidPOIsInspiration[poi.id] || { minerals: 0, energy: 0, food: 0, tech: 0, meds: 0 };
-          const totalProgress = Object.values(poiStats).reduce((a, b) => a + b, 0);
+          const totalProgress = Object.values(poiStats).reduce((total: number, value: unknown) => total + (typeof value === 'number' ? value : 0), 0);
           if (totalProgress >= 100) {
             // Each inspired POI adds 0.1% to all Earth categories every 5s
             Object.keys(next).forEach(cat => {
@@ -4970,7 +5326,7 @@ const completeInitialMission = useCallback((missionId: string) => {
             });
           }
         });
-        
+
         return changed ? next : prev;
       });
     }, 5000); // Every 5 seconds
@@ -4994,7 +5350,7 @@ const completeInitialMission = useCallback((missionId: string) => {
     }
 
     setQc(prev => prev - cost);
-    setVoidPOIQCDonations(prev => ({
+    setVoidPOIQCDonations((prev: Record<string, number>) => ({
       ...prev,
       [poiId]: currentDonations + 1
     }));
@@ -5005,7 +5361,7 @@ const completeInitialMission = useCallback((missionId: string) => {
 
   const donateToPOI = (poiId: string, resourceName: string) => {
     const resourceMap: { [key: string]: keyof typeof voidResources } = {
-      'MinÃƒÂ©rios': 'minerals',
+      'Minérios': 'minerals',
       'Energia': 'energy',
       'Alimentos': 'food',
       'Tecnologia': 'tech',
@@ -5013,11 +5369,11 @@ const completeInitialMission = useCallback((missionId: string) => {
     };
     const resourceKey = resourceMap[resourceName];
     const amountToDonate = 10;
-    
+
     const mode = voidDonationModes[poiId] || '1x';
     let multiplier = 1;
     if (mode === '10x') multiplier = 10;
-    
+
     const poi = VOID_POIS.find(p => p.id === poiId)!;
     const incrementPerDonation = resourceName === poi.need ? 0.2 : 0.1;
 
@@ -5060,16 +5416,16 @@ const completeInitialMission = useCallback((missionId: string) => {
     setVoidPOIsInspiration(prev => {
       const poiStats = prev[poiId] || { minerals: 0, energy: 0, food: 0, tech: 0, meds: 0 };
       const currentRes = poiStats[resourceKey] || 0;
-      
+
       // Calculate total before update
       const totalBefore = Object.values(poiStats).reduce((a, b) => a + b, 0);
-      
+
       const increment = incrementPerDonation * multiplier;
       const nextRes = Math.min(20, currentRes + increment);
-      
+
       const nextPOIStats = { ...poiStats, [resourceKey]: nextRes };
       const totalAfter = Object.values(nextPOIStats).reduce((a, b) => a + b, 0);
-      
+
       if (totalAfter >= 100 && totalBefore < 100) {
         addLog(`${poi.name} ${t('poiInspired')}`, 'success');
         playSfx('success');
@@ -5077,7 +5433,7 @@ const completeInitialMission = useCallback((missionId: string) => {
         addLog(`${t('donationSuccess')} ${resourceName} (+${increment.toFixed(1)}%)`, 'success');
         playSfx('click');
       }
-      
+
       return { ...prev, [poiId]: nextPOIStats };
     });
   };
@@ -5085,11 +5441,16 @@ const completeInitialMission = useCallback((missionId: string) => {
 
 
   const Route3EndingNarrativeModal = () => {
-    const step = ROUTE_3_END_STEPS[route3EndingStep];
+    const steps = SHIPS_ROUTE_3_STEPS;
+    const step = steps[route3EndingStep];
     if (!step) return null;
+    const rawStepText: any = step.text;
+    const stepText = typeof rawStepText === 'string'
+      ? t(rawStepText)
+      : rawStepText?.[language as 'pt' | 'en'] || rawStepText?.en || '';
 
     const handleNext = () => {
-      if (route3EndingStep < ROUTE_3_END_STEPS.length - 1) {
+      if (route3EndingStep < steps.length - 1) {
         setRoute3EndingStep(prev => prev + 1);
         playSfx('click');
       } else {
@@ -5103,14 +5464,14 @@ const completeInitialMission = useCallback((missionId: string) => {
     };
 
     return (
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         className="fixed inset-0 z-[10000] bg-black flex flex-col items-center justify-center p-8 overflow-hidden text-center"
       >
         <AnimatePresence mode="wait">
-          <motion.div 
+          <motion.div
             key={route3EndingStep}
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
@@ -5119,22 +5480,31 @@ const completeInitialMission = useCallback((missionId: string) => {
             className="max-w-2xl w-full space-y-12"
           >
             {step.type === 'robot' && (
-              <div className="flex flex-col items-center gap-6">
-                <div className="relative">
-                  <motion.div 
+              <div className="mx-auto flex w-full max-w-md items-center gap-5 rounded-2xl border border-purple-400/30 bg-purple-950/20 p-4 text-left shadow-[0_0_40px_rgba(168,85,247,0.18)]">
+                <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-2xl border border-purple-400/40 bg-black">
+                  <motion.div
                     animate={{ scale: [1, 1.1, 1], opacity: [0.2, 0.4, 0.2] }}
                     transition={{ duration: 3, repeat: Infinity }}
-                    className="absolute inset-x-0 inset-y-0 bg-purple-500 rounded-full blur-3xl -m-8"
+                    className="absolute inset-0 bg-purple-500 blur-2xl"
                   />
-                  <RobotVisual theme="purple" />
+                  <img
+                    src="/images/bobby_blue/bobby_blue_in_love.webp"
+                    alt="Bobby Blue"
+                    className="relative h-full w-full object-cover"
+                  />
                 </div>
-                <div className="text-base font-orbitron text-purple-400 tracking-[0.4em] uppercase font-bold animate-pulse">Robot Restoration Complete</div>
+                <div>
+                  <p className="font-orbitron text-[10px] font-black uppercase tracking-[0.35em] text-purple-300/70">Bobby Blue</p>
+                  <p className="mt-2 font-mono text-xs uppercase tracking-[0.25em] text-purple-200/60">
+                    {language === 'pt' ? 'sinal restaurado' : 'signal restored'}
+                  </p>
+                </div>
               </div>
             )}
 
             {step.type === 'danger' && (
               <div className="relative py-8">
-                <motion.div 
+                <motion.div
                   animate={{ scale: [1, 1.2, 1], opacity: [0, 0.2, 0] }}
                   transition={{ duration: 1.5, repeat: Infinity }}
                   className="absolute inset-0 bg-red-600 rounded-full blur-[100px]"
@@ -5146,23 +5516,21 @@ const completeInitialMission = useCallback((missionId: string) => {
             )}
 
             <div className="space-y-8">
-              <h2 className={`font-orbitron font-black uppercase tracking-[0.3em] leading-relaxed px-4 ${
-                step.type === 'danger' ? 'text-red-500 text-3xl md:text-4xl drop-shadow-[0_0_15px_rgba(239,68,68,0.5)]' : 
-                step.type === 'success' ? 'text-emerald-400 text-3xl md:text-3xl' :
-                step.type === 'robot' ? 'text-purple-300 text-2xl italic' :
-                'text-purple-100 text-2xl md:text-3xl'
-              }`}>
-                {t(step.text as any)}
+              <h2 className={`font-orbitron font-black uppercase tracking-[0.3em] leading-relaxed px-4 ${step.type === 'danger' ? 'text-red-500 text-3xl md:text-4xl drop-shadow-[0_0_15px_rgba(239,68,68,0.5)]' :
+                  step.type === 'success' ? 'text-emerald-400 text-3xl md:text-3xl' :
+                    step.type === 'robot' ? 'text-purple-300 text-2xl italic' :
+                      'text-purple-100 text-2xl md:text-3xl'
+                }`}>
+                {stepText}
               </h2>
             </div>
 
             <button
               onClick={handleNext}
-              className={`px-16 py-5 rounded-2xl font-orbitron font-black text-base tracking-[0.5em] transition-all hover:scale-105 active:scale-95 border-2 ${
-                step.type === 'danger' ? 'bg-red-600 border-red-400 text-black shadow-[0_0_40px_rgba(239,68,68,0.5)]' :
-                step.type === 'success' ? 'bg-emerald-600 border-emerald-400 text-black shadow-[0_0_40px_rgba(16,185,129,0.5)]' :
-                'bg-purple-600 border-purple-400 text-white shadow-[0_0_40px_rgba(168,85,247,0.4)]'
-              }`}
+              className={`px-16 py-5 rounded-2xl font-orbitron font-black text-base tracking-[0.5em] transition-all hover:scale-105 active:scale-95 border-2 ${step.type === 'danger' ? 'bg-red-600 border-red-400 text-black shadow-[0_0_40px_rgba(239,68,68,0.5)]' :
+                  step.type === 'success' ? 'bg-emerald-600 border-emerald-400 text-black shadow-[0_0_40px_rgba(16,185,129,0.5)]' :
+                    'bg-purple-600 border-purple-400 text-white shadow-[0_0_40px_rgba(168,85,247,0.4)]'
+                }`}
             >
               {language === 'pt' ? 'CONTINUAR' : 'CONTINUE'}
             </button>
@@ -5209,13 +5577,13 @@ const completeInitialMission = useCallback((missionId: string) => {
             {/* Animated Background Elements */}
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(16,185,129,0.15),transparent_70%)]" />
             <div className="absolute inset-0 bg-[linear-gradient(rgba(16,185,129,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(16,185,129,0.02)_1px,transparent_1px)] bg-[size:40px_40px]" />
-            
+
             <div className="relative p-8 space-y-8">
               <div className="flex flex-col items-center text-center space-y-4">
                 <div className="w-20 h-20 rounded-2xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center shadow-[0_0_20px_rgba(16,185,129,0.4)] animate-pulse">
                   <Gamepad2 className="w-10 h-10 text-emerald-400" />
                 </div>
-                
+
                 <div className="space-y-2">
                   <h2 className="text-3xl font-orbitron font-black text-white uppercase tracking-[0.1em] italic">
                     {language === 'pt' ? 'FLIPERAMAS' : 'ARCADES'}
@@ -5227,9 +5595,9 @@ const completeInitialMission = useCallback((missionId: string) => {
               <div className="bg-black/40 border border-white/5 rounded-2xl p-6 relative group overflow-hidden">
                 <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 to-transparent pointer-events-none" />
                 <p className="text-slate-200 text-lg leading-relaxed font-orbitron text-center italic tracking-tight">
-                  &quot;OlÃƒÂ¡, esse ÃƒÂ© seu ponto de diversÃƒÂ£o, relembre clÃƒÂ¡ssicos com uma pitada de novidades. Ganhe conquistas, melhore suas pontuaÃƒÂ§ÃƒÂµes, aqui a diversÃƒÂ£o nÃƒÂ£o tem limites.&quot;
+                  &quot;Olá, esse é seu ponto de diversão, relembre clássicos com uma pitada de novidades. Ganhe conquistas, melhore suas pontuações, aqui a diversão não tem limites.&quot;
                 </p>
-                
+
                 {/* Visual accents */}
                 <div className="absolute -top-1 -right-1 w-4 h-4 border-t-2 border-r-2 border-emerald-500/30" />
                 <div className="absolute -bottom-1 -left-1 w-4 h-4 border-b-2 border-l-2 border-emerald-500/30" />
@@ -5267,7 +5635,7 @@ const completeInitialMission = useCallback((missionId: string) => {
       <AnimatePresence>
         {showRestorationModal && (
           <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-            <motion.div 
+            <motion.div
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
@@ -5283,7 +5651,7 @@ const completeInitialMission = useCallback((missionId: string) => {
                     <p className="text-[14px] text-emerald-400/60 font-mono uppercase tracking-widest">{t('projectEarthGoals')}</p>
                   </div>
                 </div>
-                <button 
+                <button
                   onClick={() => {
                     setShowRestorationModal(false);
                     playSfx('close_window');
@@ -5327,7 +5695,7 @@ const completeInitialMission = useCallback((missionId: string) => {
                           </span>
                         </div>
                         <div className="h-3 bg-black/60 rounded-full border border-white/10 overflow-hidden p-0.5">
-                          <motion.div 
+                          <motion.div
                             initial={{ width: 0 }}
                             animate={{ width: `${progress}%` }}
                             className={`h-full rounded-full bg-gradient-to-r ${progress >= 100 ? 'from-emerald-600 to-emerald-400' : 'from-white/10 to-white/40 shadow-[0_0_10px_rgba(255,255,255,0.2)]'}`}
@@ -5345,7 +5713,7 @@ const completeInitialMission = useCallback((missionId: string) => {
                     <span className="text-3xl font-orbitron font-black text-white">{totalProgress.toFixed(1)}%</span>
                   </div>
                   <div className="h-4 bg-black/60 rounded-full border-2 border-emerald-500/20 overflow-hidden p-1">
-                    <motion.div 
+                    <motion.div
                       initial={{ width: 0 }}
                       animate={{ width: `${totalProgress}%` }}
                       className="h-full bg-gradient-to-r from-emerald-600 via-emerald-400 to-white shadow-[0_0_30px_rgba(16,185,129,0.4)] rounded-full"
@@ -5372,7 +5740,7 @@ const completeInitialMission = useCallback((missionId: string) => {
               className="absolute inset-0 bg-black/90 backdrop-blur-md"
               onClick={() => !isRepairingRobot && setShowRobotModal(false)}
             />
-            
+
             <motion.div
               initial={{ scale: 0.9, opacity: 0, y: 20 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
@@ -5382,34 +5750,34 @@ const completeInitialMission = useCallback((missionId: string) => {
               <div className="flex flex-col lg:flex-row h-full min-h-[500px]">
                 {/* Left Side: Bobby Blue Video/Visual */}
                 <div className="w-full lg:w-[450px] aspect-square lg:aspect-auto relative bg-black border-r border-white/10 overflow-hidden">
-                   <video 
-                     src={isRepairingRobot ? "/videos/bobby_blue/bobby_blue_in_trouble.webm" : "/videos/bobby_blue/bobby_blue_in_trouble.webm"}
-                     autoPlay 
-                     loop 
-                     muted 
-                     playsInline
-                     className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-1000 ${isRobotRepaired ? 'opacity-40 grayscale' : 'opacity-100'}`}
-                   />
-                   
-                   <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-black/40" />
-                   
-                   {/* Diagnostic Overlay */}
-                   <div className="absolute top-8 left-8 space-y-2">
-                     <div className="flex items-center gap-2">
-                       <div className={`w-3 h-3 rounded-full animate-ping ${isRobotRepaired ? 'bg-emerald-500' : 'bg-red-500'}`} />
-                       <span className="text-[10px] font-mono text-white/60 tracking-widest uppercase">DIAGNOSTIC_CAM_{isRobotRepaired ? '01' : 'ERR'}</span>
-                     </div>
-                     <div className="text-[10px] font-mono text-white/40 uppercase tracking-widest leading-tight">
-                       MODEL: B.B. UNIT-01<br/>
-                       ID: RD-2024-X
-                     </div>
-                   </div>
+                  <video
+                    src={isRepairingRobot ? "/videos/bobby_blue/bobby_blue_in_trouble.webm" : "/videos/bobby_blue/bobby_blue_in_trouble.webm"}
+                    autoPlay
+                    loop
+                    muted
+                    playsInline
+                    className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-1000 ${isRobotRepaired ? 'opacity-40 grayscale' : 'opacity-100'}`}
+                  />
 
-                   {!isRobotRepaired && (
-                     <div className="absolute inset-0 pointer-events-none overflow-hidden opacity-30">
-                        <div className="absolute inset-0 bg-[repeating-linear-gradient(0deg,transparent,transparent_2px,rgba(255,0,0,0.1)_3px,transparent_4px)] animate-scanline" />
-                     </div>
-                   )}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-black/40" />
+
+                  {/* Diagnostic Overlay */}
+                  <div className="absolute top-8 left-8 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <div className={`w-3 h-3 rounded-full animate-ping ${isRobotRepaired ? 'bg-emerald-500' : 'bg-red-500'}`} />
+                      <span className="text-[10px] font-mono text-white/60 tracking-widest uppercase">DIAGNOSTIC_CAM_{isRobotRepaired ? '01' : 'ERR'}</span>
+                    </div>
+                    <div className="text-[10px] font-mono text-white/40 uppercase tracking-widest leading-tight">
+                      MODEL: B.B. UNIT-01<br />
+                      ID: RD-2024-X
+                    </div>
+                  </div>
+
+                  {!isRobotRepaired && (
+                    <div className="absolute inset-0 pointer-events-none overflow-hidden opacity-30">
+                      <div className="absolute inset-0 bg-[repeating-linear-gradient(0deg,transparent,transparent_2px,rgba(255,0,0,0.1)_3px,transparent_4px)] animate-scanline" />
+                    </div>
+                  )}
                 </div>
 
                 {/* Right Side: Dialogue and Controls */}
@@ -5424,7 +5792,7 @@ const completeInitialMission = useCallback((missionId: string) => {
                           </span>
                         </div>
                       </div>
-                      <button 
+                      <button
                         onClick={() => !isRepairingRobot && setShowRobotModal(false)}
                         disabled={isRepairingRobot}
                         className={`p-3 hover:bg-white/10 rounded-full transition-all ${isRepairingRobot ? 'opacity-0 cursor-default' : ''}`}
@@ -5435,16 +5803,16 @@ const completeInitialMission = useCallback((missionId: string) => {
 
                     <div className={`p-8 rounded-[2rem] border min-h-[160px] flex items-center ${isRobotRepaired ? 'bg-emerald-500/5 border-emerald-500/20' : 'bg-red-500/5 border-red-500/20'}`}>
                       {!isRobotRepaired ? (
-                        <GlitchText 
+                        <GlitchText
                           key="glitch"
-                          text={t('robotGlitchedDialogue')} 
+                          text={t('robotGlitchedDialogue')}
                           className="text-red-200/90 font-mono text-lg lg:text-xl leading-relaxed italic"
                           delay={40}
                         />
                       ) : (
-                        <GlitchText 
+                        <GlitchText
                           key="clean"
-                          text={t('robotRepairedDialogue')} 
+                          text={t('robotRepairedDialogue')}
                           className="text-emerald-200/90 font-mono text-lg lg:text-xl leading-relaxed"
                           delay={20}
                         />
@@ -5457,23 +5825,23 @@ const completeInitialMission = useCallback((missionId: string) => {
                       <div className="space-y-6">
                         <div className="flex justify-between items-end">
                           <div className="space-y-1">
-                             <span className="text-xs font-orbitron text-white/40 uppercase tracking-widest block">{isRepairingRobot ? (language === 'pt' ? 'RESTAURANDO MEMÃƒâ€œRIA...' : 'RESTORING MEMORY...') : (language === 'pt' ? 'PROGRESSO DO REPARO' : 'REPAIR PROGRESS')}</span>
-                             <div className="text-2xl font-orbitron font-black text-white tracking-widest">{Math.floor(robotRepairProgress)}%</div>
+                            <span className="text-xs font-orbitron text-white/40 uppercase tracking-widest block">{isRepairingRobot ? (language === 'pt' ? 'RESTAURANDO MEMÓRIA...' : 'RESTORING MEMORY...') : (language === 'pt' ? 'PROGRESSO DO REPARO' : 'REPAIR PROGRESS')}</span>
+                            <div className="text-2xl font-orbitron font-black text-white tracking-widest">{Math.floor(robotRepairProgress)}%</div>
                           </div>
                           <div className="flex gap-4">
-                             <div className="px-4 py-2 bg-white/5 border border-white/10 rounded-xl flex items-center gap-3">
-                               <Zap className={`w-4 h-4 ${voidResources.energy >= 2500 ? 'text-yellow-400' : 'text-red-400'}`} />
-                               <span className="text-sm font-mono font-bold text-white/80">2.5K</span>
-                             </div>
-                             <div className="px-4 py-2 bg-white/5 border border-white/10 rounded-xl flex items-center gap-3">
-                               <Cpu className={`w-4 h-4 ${voidResources.tech >= 2500 ? 'text-cyan-400' : 'text-red-400'}`} />
-                               <span className="text-sm font-mono font-bold text-white/80">2.5K</span>
-                             </div>
+                            <div className="px-4 py-2 bg-white/5 border border-white/10 rounded-xl flex items-center gap-3">
+                              <Zap className={`w-4 h-4 ${voidResources.energy >= 2500 ? 'text-yellow-400' : 'text-red-400'}`} />
+                              <span className="text-sm font-mono font-bold text-white/80">2.5K</span>
+                            </div>
+                            <div className="px-4 py-2 bg-white/5 border border-white/10 rounded-xl flex items-center gap-3">
+                              <Cpu className={`w-4 h-4 ${voidResources.tech >= 2500 ? 'text-cyan-400' : 'text-red-400'}`} />
+                              <span className="text-sm font-mono font-bold text-white/80">2.5K</span>
+                            </div>
                           </div>
                         </div>
 
                         <div className="h-4 bg-black/60 rounded-full border border-white/10 overflow-hidden relative shadow-inner">
-                          <motion.div 
+                          <motion.div
                             animate={{ width: `${robotRepairProgress}%` }}
                             className={`h-full bg-gradient-to-r ${isRepairingRobot ? 'from-orange-600 via-yellow-500 to-white animate-pulse' : 'from-red-600 to-red-400'}`}
                           />
@@ -5482,11 +5850,10 @@ const completeInitialMission = useCallback((missionId: string) => {
                         <button
                           onClick={handleRepairRobot}
                           disabled={isRobotRepaired || isRepairingRobot || voidResources.energy < 2500 || voidResources.tech < 2500}
-                          className={`w-full py-6 text-white font-orbitron font-black text-xl rounded-2xl transition-all uppercase tracking-[0.3em] flex items-center justify-center gap-4 ${
-                            isRepairingRobot 
-                              ? 'bg-orange-600/50 cursor-not-allowed border border-orange-500/50' 
+                          className={`w-full py-6 text-white font-orbitron font-black text-xl rounded-2xl transition-all uppercase tracking-[0.3em] flex items-center justify-center gap-4 ${isRepairingRobot
+                              ? 'bg-orange-600/50 cursor-not-allowed border border-orange-500/50'
                               : 'bg-red-600 shadow-[0_0_40px_rgba(220,38,38,0.4)] hover:shadow-[0_0_50px_rgba(220,38,38,0.6)] active:scale-95 border-b-4 border-red-800'
-                          }`}
+                            }`}
                         >
                           {isRepairingRobot ? <Loader2 className="w-6 h-6 animate-spin" /> : <Wrench className="w-6 h-6" />}
                           {isRepairingRobot ? (language === 'pt' ? 'REPARANDO...' : 'REPAIRING...') : (language === 'pt' ? 'CONSERTAR' : 'REPAIR')}
@@ -5566,7 +5933,7 @@ const completeInitialMission = useCallback((missionId: string) => {
                 playSfx('close_window');
               }}
             />
-            
+
             <motion.div
               initial={{ scale: 0.9, opacity: 0, y: 20 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
@@ -5586,11 +5953,11 @@ const completeInitialMission = useCallback((missionId: string) => {
                     </p>
                   </div>
                 </div>
-                <button 
+                <button
                   onClick={() => {
-                 setShowBattleShipUpgradeModal(false);
-                 playSfx('close_window');
-               }}
+                    setShowBattleShipUpgradeModal(false);
+                    playSfx('close_window');
+                  }}
                   className="p-2 hover:bg-white/10 rounded-full transition-all"
                 >
                   <X className="w-6 h-6 text-white/40" />
@@ -5601,14 +5968,13 @@ const completeInitialMission = useCallback((missionId: string) => {
                 <div className="space-y-6">
                   <div className="bg-white/5 border border-white/10 rounded-2xl p-6 space-y-4">
                     <h3 className="text-base font-orbitron font-bold text-white tracking-widest uppercase flex items-center gap-2">
-                       <TrendingUp className="w-4 h-4 text-emerald-400" />
-                       {t('status')} Lvl {level}
+                      <TrendingUp className="w-4 h-4 text-emerald-400" />
+                      {t('status')} Lvl {level}
                     </h3>
                     <div className="space-y-3">
                       {[
                         { label: t('baseDamage'), value: `+${(level * 20)}%`, bonus: t('baseDamageBonus') },
-                        { label: t('criticalDamage'), value: `+${(level * 200)}`, bonus: t('critDamageBonus') },
-                        { label: t('level'), value: `+${(level * 10)}`, bonus: t('upgradeLimitBonus') }
+                        { label: t('criticalDamage'), value: `+${(level * 200)}`, bonus: t('critDamageBonus') }
                       ].map(s => (
                         <div key={s.label} className="flex justify-between items-center py-2 border-b border-white/5 last:border-0">
                           <span className="text-base uppercase tracking-widest text-white/40">{s.label}</span>
@@ -5619,7 +5985,7 @@ const completeInitialMission = useCallback((missionId: string) => {
                   </div>
 
                   <div className="p-4 bg-emerald-500/5 border border-emerald-500/20 rounded-xl italic text-[14px] text-emerald-200/60 leading-relaxed font-mono">
-                    &quot;O Projeto Terra comeÃƒÂ§a com a purificaÃƒÂ§ÃƒÂ£o do Vazio. Sua nave agora ÃƒÂ© um instrumento de justiÃƒÂ§a galÃƒÂ¡ctica.&quot;
+                    &quot;O Projeto Terra começa com a purificação do Vazio. Sua nave agora é um instrumento de justiça galáctica.&quot;
                   </div>
                 </div>
 
@@ -5645,7 +6011,10 @@ const completeInitialMission = useCallback((missionId: string) => {
                   </div>
 
                   <button
-                    onClick={handleUpgradeRoute3BattleShip}
+                    onClick={() => {
+                      addLog(language === 'pt' ? 'GUERRA DO VAZIO INICIADA! O destino da Terra está em suas mãos.' : 'VOID WAR STARTED! The fate of Earth is in your hands.', 'error');
+                      handleUpgradeRoute3BattleShip();
+                    }}
                     className="w-full py-5 bg-emerald-600 text-white font-orbitron font-black rounded-2xl shadow-[0_0_30px_rgba(16,185,129,0.3)] hover:shadow-[0_0_40px_rgba(16,185,129,0.5)] active:scale-95 transition-all uppercase tracking-[0.3em] flex items-center justify-center gap-3 group"
                   >
                     <ArrowUpCircle className="w-6 h-6 group-hover:rotate-12 transition-transform" />
@@ -5656,18 +6025,18 @@ const completeInitialMission = useCallback((missionId: string) => {
 
               {!isVoidWarActive && isRobotRepaired && (
                 <div className="mt-8 pt-8 border-t border-red-500/20 relative z-10">
-                   <button
-                      onClick={() => {
-                        setIsVoidWarActive(true);
-                        setShowBattleShipUpgradeModal(false);
-                        addLog(language === 'pt' ? 'GUERRA DO VAZIO INICIADA! O destino da Terra está em suas mãos.' : 'VOID WAR STARTED! The fate of Earth is in your hands.', 'error');
-                        playSfx('warning');
-                      }}
-                      className="w-full py-5 bg-gradient-to-r from-red-700 to-red-500 text-white font-orbitron font-black text-xl rounded-2xl shadow-[0_0_50px_rgba(220,38,38,0.3)] hover:shadow-[0_0_60px_rgba(220,38,38,0.5)] active:scale-95 transition-all uppercase tracking-[0.3em] flex items-center justify-center gap-4 animate-pulse-glow"
-                   >
-                      <Skull className="w-6 h-6 text-white" />
-                      {language === 'pt' ? 'INICIAR GUERRA DO VAZIO' : 'START VOID WAR'}
-                   </button>
+                  <button
+                    onClick={() => {
+                      setIsVoidWarActive(true);
+                      setShowBattleShipUpgradeModal(false);
+                      addLog(language === 'pt' ? 'GUERRA DO VAZIO INICIADA! O destino da Terra está em suas mãos.' : 'VOID WAR STARTED! The fate of Earth is in your hands.', 'error');
+                      playSfx('warning');
+                    }}
+                    className="w-full py-5 bg-gradient-to-r from-red-700 to-red-500 text-white font-orbitron font-black text-xl rounded-2xl shadow-[0_0_50px_rgba(220,38,38,0.3)] hover:shadow-[0_0_60px_rgba(220,38,38,0.5)] active:scale-95 transition-all uppercase tracking-[0.3em] flex items-center justify-center gap-4 animate-pulse-glow"
+                  >
+                    <Skull className="w-6 h-6 text-white" />
+                    {language === 'pt' ? 'INICIAR GUERRA DO VAZIO' : 'START VOID WAR'}
+                  </button>
                 </div>
               )}
 
@@ -5683,15 +6052,15 @@ const completeInitialMission = useCallback((missionId: string) => {
 
   const VoidWarMap = () => {
     const VOID_SECTORS_DATA = [
-      { name: { en: 'Epsilon Asteroid Belt', pt: 'CinturÃƒÂ£o de Asteroides de Ãƒâ€°psilon' }, zone: { en: 'Nursery of Horrors', pt: 'BerÃƒÂ§ÃƒÂ¡rio de Horrores' }, boss: 'Devorador Alpha' },
-      { name: { en: 'Blood Nebula', pt: 'Nebulosa de Sangue' }, zone: { en: 'Haunted Gaseous Area', pt: 'ÃƒÂ­Ã‚Ârea Gasosa Assombrada' }, boss: 'Sanguessuga Estelar' },
-      { name: { en: 'Debris Belt', pt: 'CinturÃƒÂ£o de DestroÃƒÂ§os' }, zone: { en: 'Organic Scrap Yard', pt: 'CemitÃƒÂ©rio OrgÃƒÂ¢nico' }, boss: 'Colosso Amalgamado' },
+      { name: { en: 'Epsilon Asteroid Belt', pt: 'Cinturão de Asteroides de Épsilon' }, zone: { en: 'Nursery of Horrors', pt: 'Berçário de Horrores' }, boss: 'Devorador Alpha' },
+      { name: { en: 'Blood Nebula', pt: 'Nebulosa de Sangue' }, zone: { en: 'Haunted Gaseous Area', pt: 'Área Gasosa Assombrada' }, boss: 'Sanguessuga Estelar' },
+      { name: { en: 'Debris Belt', pt: 'Cinturão de Destroços' }, zone: { en: 'Organic Scrap Yard', pt: 'Cemitério Orgânico' }, boss: 'Colosso Amalgamado' },
       { name: { en: 'Gravitational Abyss', pt: 'Abismo Gravitacional' }, zone: { en: 'Shadow Abyss', pt: 'Abismo das Sombras' }, boss: 'Kraken do Vazio' },
-      { name: { en: 'Star Fortress', pt: 'Fortaleza Estelar' }, zone: { en: 'Ancient Nest', pt: 'Ninho Ancestral' }, boss: 'Besta-TitÃƒÂ­de Ferro' },
-      { name: { en: 'Quantum Rift', pt: 'Fenda QuÃƒÂ¢ntica' }, zone: { en: 'Dimensional Mutation', pt: 'MutaÃƒÂ§ÃƒÂ£o Dimensional' }, boss: 'Horror Mutante' },
+      { name: { en: 'Star Fortress', pt: 'Fortaleza Estelar' }, zone: { en: 'Ancient Nest', pt: 'Ninho Ancestral' }, boss: 'Besta-Titã de Ferro' },
+      { name: { en: 'Quantum Rift', pt: 'Fenda Quântica' }, zone: { en: 'Dimensional Mutation', pt: 'Mutação Dimensional' }, boss: 'Horror Mutante' },
       { name: { en: 'Event Horizon', pt: 'Horizonte de Eventos' }, zone: { en: 'The Mouth of Terror', pt: 'A Boca do Terror' }, boss: 'Verme-Rei do Vazio' },
       { name: { en: 'Deep Void', pt: 'Vazio Profundo' }, zone: { en: 'Eternal Nightmare', pt: 'Pesadelo Eterno' }, boss: 'Predador Abissal' },
-      { name: { en: 'The Heart of Darkness', pt: 'O CoraÃƒÂ§ÃƒÂ£o da EscuridÃƒÂ£o' }, zone: { en: 'The Eye of Singularity', pt: 'O Olho da Singularidade' }, boss: 'O Deus-Monstro do Vazio' },
+      { name: { en: 'The Heart of Darkness', pt: 'O Coração da Escuridão' }, zone: { en: 'The Eye of Singularity', pt: 'O Olho da Singularidade' }, boss: 'O Deus-Monstro do Vazio' },
     ];
 
     const sectors = VOID_SECTORS_DATA.map((data, i) => ({
@@ -5704,7 +6073,7 @@ const completeInitialMission = useCallback((missionId: string) => {
 
     const startWarBattle = (sectorId: number) => {
       if (sectorId !== voidWarProgress.currentSector) return;
-      
+
       // Determine battle type based on currentBattle in sector
       // 0-1: Normal, 2-3: Elite, 4: Boss (5 battles total)
       let type: 'normal' | 'elite' | 'boss' = 'normal';
@@ -5720,7 +6089,7 @@ const completeInitialMission = useCallback((missionId: string) => {
       <AnimatePresence>
         {showVoidWarMap && (
           <div className="fixed inset-0 z-[150] flex items-center justify-center p-2 bg-black/90 backdrop-blur-xl">
-            <motion.div 
+            <motion.div
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
@@ -5736,7 +6105,7 @@ const completeInitialMission = useCallback((missionId: string) => {
                     <p className="text-[14px] text-red-500/60 font-mono uppercase tracking-widest mt-0.5">{t('voidWarAlert')}</p>
                   </div>
                 </div>
-                <button 
+                <button
                   onClick={() => setShowVoidWarMap(false)}
                   className="p-1.5 hover:bg-white/10 rounded-full transition-colors text-slate-400 hover:text-white"
                 >
@@ -5748,7 +6117,7 @@ const completeInitialMission = useCallback((missionId: string) => {
                 {voidWarProgress.currentSector < sectors.length ? (() => {
                   const sector = sectors[voidWarProgress.currentSector];
                   const progress = (voidWarProgress.currentBattle / 5) * 100;
-                  
+
                   return (
                     <div className="flex flex-col gap-8">
                       {/* Top Info: Sector Index & Status */}
@@ -5759,9 +6128,9 @@ const completeInitialMission = useCallback((missionId: string) => {
                           </span>
                           <div className="flex gap-1">
                             {[...Array(sectors.length)].map((_, i) => (
-                              <div 
-                                key={i} 
-                                className={`w-2 h-2 rounded-full ${i < voidWarProgress.currentSector ? 'bg-emerald-500' : i === voidWarProgress.currentSector ? 'bg-red-500 animate-pulse' : 'bg-white/10'}`} 
+                              <div
+                                key={i}
+                                className={`w-2 h-2 rounded-full ${i < voidWarProgress.currentSector ? 'bg-emerald-500' : i === voidWarProgress.currentSector ? 'bg-red-500 animate-pulse' : 'bg-white/10'}`}
                               />
                             ))}
                           </div>
@@ -5779,12 +6148,12 @@ const completeInitialMission = useCallback((missionId: string) => {
                           {/* Background Decoration */}
                           <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(220,38,38,0.15),transparent_70%)] pointer-events-none" />
                           <div className="absolute inset-0 opacity-10  pointer-events-none" />
-                          
+
                           <div className="p-8 flex flex-col md:flex-row gap-8 items-center">
                             {/* Visual Indicator */}
                             <div className="relative shrink-0">
                               <div className="w-32 h-32 rounded-full border-4 border-red-500/20 flex items-center justify-center relative">
-                                <motion.div 
+                                <motion.div
                                   animate={{ rotate: 360 }}
                                   transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
                                   className="absolute inset-0 border-t-4 border-red-500 rounded-full"
@@ -5813,8 +6182,8 @@ const completeInitialMission = useCallback((missionId: string) => {
                               </div>
 
                               <p className="text-white/60 text-base font-mono leading-relaxed max-w-xl">
-                                {language === 'pt' 
-                                  ? `Uma atividade biolÃƒÂ³gica hostil de nÃƒÂ­vel ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Âmega foi detectada em ${sector.zone}. A criatura ${sector.boss} estÃƒÂ¡ consumindo a realidade local. NeutralizaÃƒÂ§ÃƒÂ£o imediata ÃƒÂ© mandatÃƒÂ³ria para evitar o colapso da reconstruÃƒÂ§ÃƒÂ£o da Terra.`
+                                {language === 'pt'
+                                  ? `Uma atividade biológica hostil de nível mega foi detectada em ${sector.zone}. A criatura ${sector.boss} está consumindo a realidade local. Neutralização imediata é mandatória para evitar o colapso da reconstrução da Terra.`
                                   : `Hostile biological activity of Omega level detected in ${sector.zone}. The creature ${sector.boss} is consuming local reality. Immediate neutralization is mandatory to prevent the collapse of Earth's reconstruction.`}
                               </p>
 
@@ -5825,7 +6194,7 @@ const completeInitialMission = useCallback((missionId: string) => {
                                   <span className="text-red-500">{Math.floor(progress)}%</span>
                                 </div>
                                 <div className="h-3 bg-white/5 rounded-full border border-white/10 overflow-hidden">
-                                  <motion.div 
+                                  <motion.div
                                     initial={{ width: 0 }}
                                     animate={{ width: `${progress}%` }}
                                     className="h-full bg-gradient-to-r from-red-600 via-red-500 to-rose-400 shadow-[0_0_15px_rgba(239,68,68,0.3)]"
@@ -5858,7 +6227,7 @@ const completeInitialMission = useCallback((missionId: string) => {
                       <h3 className="text-3xl font-orbitron font-black text-white uppercase tracking-widest">{t('voidPacified')}</h3>
                       <p className="text-emerald-400/60 font-mono uppercase tracking-widest mt-2">{t('allThreatsNeutralized')}</p>
                     </div>
-                    <button 
+                    <button
                       onClick={() => setShowVoidWarMap(false)}
                       className="px-12 py-4 bg-emerald-600 text-white font-orbitron font-black rounded-xl hover:bg-emerald-500 transition-all uppercase tracking-widest"
                     >
@@ -5945,8 +6314,8 @@ const completeInitialMission = useCallback((missionId: string) => {
           <motion.div
             key={reward.id}
             initial={{ opacity: 0, scale: 0.5, x: reward.x - 20, y: reward.y }}
-            animate={{ 
-              opacity: [0, 1, 1, 0], 
+            animate={{
+              opacity: [0, 1, 1, 0],
               scale: [0.5, 1.2, 1, 0.8],
               x: [reward.x - 20, reward.x - 20, typeof window !== 'undefined' ? window.innerWidth - 100 : 1000],
               y: [reward.y, reward.y - 100, 40]
@@ -5970,7 +6339,7 @@ const completeInitialMission = useCallback((missionId: string) => {
       </AnimatePresence>
 
       <SpaceAmbience isPlaying={musicOn} volume={0.2} />
-      
+
       {/* Background Grid & Stars */}
       <div className="absolute inset-0 z-0 pointer-events-none">
         <div className="absolute inset-0  opacity-20" />
@@ -5978,10 +6347,10 @@ const completeInitialMission = useCallback((missionId: string) => {
         <div className={`absolute inset-0 ${isInterstellar ? 'bg-[linear-gradient(to_right,rgba(249,115,22,0.02)_1px,transparent_1px),linear-gradient(to_bottom,rgba(249,115,22,0.02)_1px,transparent_1px)]' : 'bg-[linear-gradient(to_right,rgba(6,182,212,0.02)_1px,transparent_1px),linear-gradient(to_bottom,rgba(6,182,212,0.02)_1px,transparent_1px)]'} bg-[size:40px_40px]`} />
       </div>
 
-      {/* Background Particles for Route 2 Ã¢â‚¬â€ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â Canvas-based for high FPS */}
+      {/* Background Particles for Route 2 — Canvas-based for high FPS */}
       {isInterstellar && (
         <>
-          {/* Nebula gradient overlay Ã¢â‚¬â€ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â pure CSS, zero JS cost */}
+          {/* Nebula gradient overlay — pure CSS, zero JS cost */}
           <div className="fixed inset-0 pointer-events-none z-0" style={{
             background: 'radial-gradient(ellipse 80% 60% at 20% 50%, rgba(249,115,22,0.04) 0%, transparent 70%), radial-gradient(ellipse 60% 80% at 80% 30%, rgba(239,68,68,0.03) 0%, transparent 70%)'
           }} />
@@ -5996,14 +6365,14 @@ const completeInitialMission = useCallback((missionId: string) => {
       {/* Transition Screen */}
       <AnimatePresence>
         {isTransitioning && (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-[200] bg-black flex flex-col items-center justify-center p-8 text-center"
           >
-            <motion.div 
-              animate={{ 
+            <motion.div
+              animate={{
                 scale: [1, 1.5, 1],
                 rotate: [0, 360],
                 opacity: [0.3, 1, 0.3]
@@ -6053,20 +6422,20 @@ const completeInitialMission = useCallback((missionId: string) => {
         </div>
       )}
 
-      <motion.div 
+      <motion.div
         animate={isShaking ? { x: [-5, 5, -5, 5, 0], y: [-2, 2, -2, 2, 0] } : {}}
         transition={isShaking ? { duration: 0.1, repeat: Infinity } : {}}
         className={`relative z-10 w-full h-screen flex flex-col p-0 gap-4 ${isFlashingRed ? 'bg-red-900/20' : ''}`}
       >
         {isFlashingRed && (
-          <motion.div 
+          <motion.div
             animate={{ opacity: [0, 0.4, 0] }}
             transition={{ duration: 0.5, repeat: Infinity }}
             className="fixed inset-0 z-[160] bg-red-600 pointer-events-none"
           />
         )}
         {showInvasionAlertOverlay && (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 1.1 }}
@@ -6078,17 +6447,17 @@ const completeInitialMission = useCallback((missionId: string) => {
           </motion.div>
         )}
         {/* Header */}
-        <header className={`glass-panel ${isInterstellar ? 'neon-border-orange' : 'neon-border-cyan'} p-4 flex justify-between items-center rounded-xl shrink-0`}>
+        <header className={`glass-panel ${isInterstellar ? 'neon-border-orange' : 'neon-border-cyan'} p-4 justify-between items-center rounded-xl shrink-0 ${(activeBattle || ['fighting', 'won', 'lost'].includes(voidBattleStatus)) ? 'hidden' : 'flex'}`}>
           <div className="flex items-center gap-4">
             <div className={`w-12 h-12 rounded-lg ${isInterstellar ? 'bg-orange-500/10 border-orange-500/30' : 'bg-cyan-500/10 border-cyan-500/30'} flex items-center justify-center border animate-pulse-glow`}>
               <Rocket className={`w-6 h-6 ${themeText}`} />
             </div>
             <div className="flex items-center gap-6">
               <div>
-                <h1 className={`text-xl font-orbitron font-bold tracking-tighter ${isInterstellar ? 'neon-text-orange' : 'neon-text-cyan'} leading-none`}>
+                <h1 className={`text-2xl font-title tracking-[0.4em] ${isInterstellar ? 'neon-text-orange' : 'neon-text-cyan'} leading-none`}>
                   {translateData('QUANTUM COURIER HORIZON')}
                 </h1>
-                
+
                 <div className="flex items-center gap-2 mt-1">
                   <div className={`w-2 h-2 rounded-full ${isInterstellar ? 'bg-orange-500' : 'bg-emerald-500'} animate-pulse`} />
                   <span className={`text-base font-mono ${isInterstellar ? 'text-orange-500/60' : 'text-cyan-500/60'} uppercase tracking-widest`}>
@@ -6149,11 +6518,10 @@ const completeInitialMission = useCallback((missionId: string) => {
                   initial={{ opacity: 0, x: 50 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: 50 }}
-                  className={`fixed right-4 top-24 z-[100] whitespace-nowrap px-6 py-3 rounded-xl border shadow-2xl font-orbitron text-[14px] font-bold flex items-center gap-4 backdrop-blur-md ${
-                    battleNotification.type === 'success' 
-                      ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-400 shadow-emerald-500/20' 
+                  className={`fixed right-4 top-24 z-[100] whitespace-nowrap px-6 py-3 rounded-xl border shadow-2xl font-orbitron text-[14px] font-bold flex items-center gap-4 backdrop-blur-md ${battleNotification.type === 'success'
+                      ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-400 shadow-emerald-500/20'
                       : 'bg-red-500/20 border-red-500/40 text-red-400 shadow-red-500/20'
-                  }`}
+                    }`}
                 >
                   <div className={`w-3 h-3 rounded-full ${battleNotification.type === 'success' ? 'bg-emerald-400 animate-pulse' : 'bg-red-400'}`} />
                   <div className="flex flex-col">
@@ -6176,7 +6544,7 @@ const completeInitialMission = useCallback((missionId: string) => {
                   const percent = Math.floor((current / total) * 100);
                   return (
                     <>
-                      <motion.div 
+                      <motion.div
                         initial={{ width: 0 }}
                         animate={{ width: `${percent}%` }}
                         className="absolute inset-y-0 left-0 bg-gradient-to-r from-cyan-600 via-cyan-400 to-white shadow-[0_0_20px_rgba(6,182,212,0.8)]"
@@ -6187,7 +6555,7 @@ const completeInitialMission = useCallback((missionId: string) => {
                         </span>
                       </div>
                       {/* Shiny effect */}
-                      <motion.div 
+                      <motion.div
                         animate={{ x: ['-100%', '200%'] }}
                         transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
                         className="absolute inset-y-0 w-20 bg-gradient-to-r from-transparent via-white/30 to-transparent skew-x-12"
@@ -6210,51 +6578,47 @@ const completeInitialMission = useCallback((missionId: string) => {
                     </span>
                   </div>
                 )}
-                <button 
+                <button
                   onClick={() => {
                     jukebox.togglePlay();
                     playSfx(jukebox.isPlaying ? 'close_window' : 'open_window');
                   }}
-                  className={`relative px-4 py-1.5 rounded-full border text-base font-orbitron font-bold transition-all uppercase tracking-widest flex items-center gap-2 overflow-hidden group ${
-                    jukebox.isPlaying 
-                    ? (isInterstellar 
-                        ? 'bg-orange-500/20 border-orange-500/50 text-orange-400 shadow-[0_0_15px_rgba(249,115,22,0.4)]' 
-                        : 'bg-cyan-500/20 border-cyan-500/50 text-cyan-400 shadow-[0_0_15px_rgba(6,182,212,0.4)]') 
-                    : 'bg-white/5 border-white/10 text-slate-500'
-                  }`}
+                  className={`relative px-4 py-1.5 rounded-full border text-base font-orbitron font-bold transition-all uppercase tracking-widest flex items-center gap-2 overflow-hidden group ${jukebox.isPlaying
+                      ? (isInterstellar
+                        ? 'bg-orange-500/20 border-orange-500/50 text-orange-400 shadow-[0_0_15px_rgba(249,115,22,0.4)]'
+                        : 'bg-cyan-500/20 border-cyan-500/50 text-cyan-400 shadow-[0_0_15px_rgba(6,182,212,0.4)]')
+                      : 'bg-white/5 border-white/10 text-slate-500'
+                    }`}
                   title={jukebox.isPlaying ? t('pauseMusic') : t('playMusic')}
                 >
-                  <div className={`w-1.5 h-1.5 rounded-full ${
-                    jukebox.isPlaying 
-                    ? (isInterstellar ? 'bg-orange-400 animate-pulse shadow-[0_0_8px_rgba(249,115,22,0.8)]' : 'bg-cyan-400 animate-pulse shadow-[0_0_8px_rgba(6,182,212,0.8)]') 
-                    : 'bg-slate-600'
-                  }`} />
+                  <div className={`w-1.5 h-1.5 rounded-full ${jukebox.isPlaying
+                      ? (isInterstellar ? 'bg-orange-400 animate-pulse shadow-[0_0_8px_rgba(249,115,22,0.8)]' : 'bg-cyan-400 animate-pulse shadow-[0_0_8px_rgba(6,182,212,0.8)]')
+                      : 'bg-slate-600'
+                    }`} />
                   {jukebox.isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
                   <span>{jukebox.isPlaying ? 'MUSIC ON' : 'MUSIC OFF'}</span>
                 </button>
 
-                <button 
+                <button
                   onClick={() => {
                     const next = !formatNumbers;
                     setFormatNumbers(next);
                     playSfx(next ? 'open_window' : 'close_window');
                   }}
-                  className={`relative px-4 py-1.5 rounded-full border text-base font-orbitron font-bold transition-all uppercase tracking-widest flex items-center gap-2 overflow-hidden group ${
-                    formatNumbers 
-                    ? (isInterstellar 
-                        ? 'bg-orange-500/20 border-orange-500/50 text-orange-400 shadow-[0_0_15px_rgba(249,115,22,0.4)]' 
-                        : 'bg-cyan-500/20 border-cyan-500/50 text-cyan-400 shadow-[0_0_15px_rgba(6,182,212,0.4)]') 
-                    : 'bg-white/5 border-white/10 text-slate-500'
-                  }`}
+                  className={`relative px-4 py-1.5 rounded-full border text-base font-orbitron font-bold transition-all uppercase tracking-widest flex items-center gap-2 overflow-hidden group ${formatNumbers
+                      ? (isInterstellar
+                        ? 'bg-orange-500/20 border-orange-500/50 text-orange-400 shadow-[0_0_15px_rgba(249,115,22,0.4)]'
+                        : 'bg-cyan-500/20 border-cyan-500/50 text-cyan-400 shadow-[0_0_15px_rgba(6,182,212,0.4)]')
+                      : 'bg-white/5 border-white/10 text-slate-500'
+                    }`}
                 >
-                  <div className={`w-1.5 h-1.5 rounded-full ${
-                    formatNumbers 
-                    ? (isInterstellar ? 'bg-orange-400 animate-pulse shadow-[0_0_8px_rgba(249,115,22,0.8)]' : 'bg-cyan-400 animate-pulse shadow-[0_0_8px_rgba(6,182,212,0.8)]') 
-                    : 'bg-slate-600'
-                  }`} />
+                  <div className={`w-1.5 h-1.5 rounded-full ${formatNumbers
+                      ? (isInterstellar ? 'bg-orange-400 animate-pulse shadow-[0_0_8px_rgba(249,115,22,0.8)]' : 'bg-cyan-400 animate-pulse shadow-[0_0_8px_rgba(6,182,212,0.8)]')
+                      : 'bg-slate-600'
+                    }`} />
                   <span>{formatNumbers ? 'NUM COMPACT' : 'NUM FULL'}</span>
                   {formatNumbers && (
-                    <motion.div 
+                    <motion.div
                       className={`absolute inset-0 opacity-20 bg-gradient-to-r ${isInterstellar ? 'from-orange-500 to-transparent' : 'from-cyan-500 to-transparent'}`}
                       animate={{ x: ['-100%', '100%'] }}
                       transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
@@ -6295,8 +6659,8 @@ const completeInitialMission = useCallback((missionId: string) => {
         <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-4 h-full min-h-0">
           {/* Sidebar - Active Deliveries / Project Earth */}
           <AnimatePresence mode="wait">
-            {!isVoid && (
-              <motion.aside 
+            {showWorldSidebar && (
+              <motion.aside
                 key={isEarth ? "sidebar-earth" : "sidebar-deliveries"}
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
@@ -6305,7 +6669,7 @@ const completeInitialMission = useCallback((missionId: string) => {
                 className="lg:col-span-4 flex flex-col gap-4 h-full min-h-0"
               >
                 {isEarth ? (
-                  <EarthSidebar 
+                  <EarthSidebar
                     earthReconstructionProgress={earthReconstructionProgress}
                     language={language}
                     t={t}
@@ -6326,121 +6690,121 @@ const completeInitialMission = useCallback((missionId: string) => {
                         {groupedDeliveries.length} LOC / {activeDeliveries.filter(d => !d.id.startsWith('auto-')).length}/25 HANGARS
                       </span>
                     </div>
-                  
+
                     <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
-                    {groupedDeliveries.length === 0 ? (
-                      <div className="h-full flex flex-col items-center justify-center text-center opacity-40">
-                        <div className="w-12 h-12 rounded-full border border-dashed border-cyan-500/30 flex items-center justify-center mb-4">
-                          <Database className="w-6 h-6" />
+                      {groupedDeliveries.length === 0 ? (
+                        <div className="h-full flex flex-col items-center justify-center text-center opacity-40">
+                          <div className="w-12 h-12 rounded-full border border-dashed border-cyan-500/30 flex items-center justify-center mb-4">
+                            <Database className="w-6 h-6" />
+                          </div>
+                          <p className="text-[14px] font-orbitron uppercase tracking-widest">{t('noShips')}</p>
                         </div>
-                        <p className="text-[14px] font-orbitron uppercase tracking-widest">{t('noShips')}</p>
-                      </div>
-                    ) : (
-                      <div className="flex flex-col gap-4">
-                        <div className="grid grid-cols-1 gap-3 content-start">
-                        {/* Coffee Message when fully automated */}
-                        {activeDeliveries.length === 0 && Object.values(autoTravelActive).some(v => v) && (
-                          <motion.div 
-                            initial={{ opacity: 0, y: 10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            className="flex flex-col items-center justify-center text-center p-6 bg-cyan-500/5 rounded-xl border border-cyan-500/10 mb-2"
-                          >
-                            <div className="w-12 h-12 rounded-xl bg-cyan-500/10 flex items-center justify-center mb-4 border border-cyan-500/20 animate-float">
-                              <Coffee className="w-6 h-6 text-cyan-400" />
-                            </div>
-                            <AnimatePresence mode="wait">
-                              <motion.p 
-                                key={coffeePhraseIndex}
-                                initial={{ opacity: 0, y: 5 }}
+                      ) : (
+                        <div className="flex flex-col gap-4">
+                          <div className="grid grid-cols-1 gap-3 content-start">
+                            {/* Coffee Message when fully automated */}
+                            {activeDeliveries.length === 0 && Object.values(autoTravelActive).some(v => v) && (
+                              <motion.div
+                                initial={{ opacity: 0, y: 10 }}
                                 animate={{ opacity: 1, y: 0 }}
-                                exit={{ opacity: 0, y: -5 }}
-                                className="text-base font-orbitron text-cyan-300/80 leading-relaxed italic"
+                                className="flex flex-col items-center justify-center text-center p-6 bg-cyan-500/5 rounded-xl border border-cyan-500/10 mb-2"
                               >
-                                {translateData(translations[language].coffeeMessage[coffeePhraseIndex])}
-                              </motion.p>
-                            </AnimatePresence>
-                          </motion.div>
-                        )}
+                                <div className="w-12 h-12 rounded-xl bg-cyan-500/10 flex items-center justify-center mb-4 border border-cyan-500/20 animate-float">
+                                  <Coffee className="w-6 h-6 text-cyan-400" />
+                                </div>
+                                <AnimatePresence mode="wait">
+                                  <motion.p
+                                    key={coffeePhraseIndex}
+                                    initial={{ opacity: 0, y: 5 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    exit={{ opacity: 0, y: -5 }}
+                                    className="text-base font-orbitron text-cyan-300/80 leading-relaxed italic"
+                                  >
+                                    {translateData(translations[language].coffeeMessage[coffeePhraseIndex])}
+                                  </motion.p>
+                                </AnimatePresence>
+                              </motion.div>
+                            )}
 
-                          {groupedDeliveries.map((group) => {
-                            const route = ROUTES_MAP.get(group.routeId);
-                            if (!route) return null;
-                            
-                            const ship = SHIPS.find(s => s.level === group.shipLevel && s.tier === (group.tier as any || route.tier));
-                            if (!ship) return null;
+                            {groupedDeliveries.map((group) => {
+                              const route = ROUTES_MAP.get(group.routeId);
+                              if (!route) return null;
 
-                            const locationTech = techLevels[route.id] || { engine: 0, ai: 0, value: 0, rare: 0 };
-                            const engineUpgrade = UPGRADES_MAP.get('engine')!;
-                            const engineTier = engineUpgrade.tiers.find(t => t.level === locationTech.engine);
-                            const isJumping = engineTier?.level === 5;
-                            const isCombat = group.status === 'combat';
+                              const ship = SHIPS.find(s => s.level === group.shipLevel && s.tier === (group.tier as any || route.tier));
+                              if (!ship) return null;
 
-                            return (
-                              <div key={group.routeId} className={`glass-panel border rounded-lg p-3 transition-all relative overflow-hidden group ${isCombat ? 'neon-border-red bg-red-500/5' : isInterstellar ? 'neon-border-orange hover:bg-white/5' : 'neon-border-cyan hover:bg-white/5'}`}>
-                                <div className="flex gap-4 relative z-10">
-                                  {/* Left Side: Ship PNG */}
-                                  <div className="relative w-24 h-24 flex-shrink-0 bg-black/40 rounded-lg border border-white/5 overflow-hidden flex items-center justify-center p-2">
-                                    <ShipVisual ship={ship} className="w-full h-full" />
-                                    {group.totalCount > 1 && (
-                                      <div className="absolute bottom-1 right-1 bg-black/80 px-1.5 py-0.5 rounded text-[10px] font-orbitron font-bold text-white border border-white/10">
-                                        x{group.totalCount}
-                                      </div>
-                                    )}
-                                  </div>
+                              const locationTech = techLevels[route.id] || { engine: 0, ai: 0, value: 0, rare: 0 };
+                              const engineUpgrade = UPGRADES_MAP.get('engine')!;
+                              const engineTier = engineUpgrade.tiers.find(t => t.level === locationTech.engine);
+                              const isJumping = engineTier?.level === 5;
+                              const isCombat = group.status === 'combat';
 
-                                  {/* Center: Info */}
-                                  <div className="flex-1 min-w-0 flex flex-col justify-between py-1">
-                                    <div>
-                                      <div className="flex items-center justify-between">
-                                        <div className="text-[14px] font-orbitron font-bold text-white truncate leading-tight uppercase tracking-wider">{translateData(route.name)}</div>
-                                        <div className={`text-[13px] font-orbitron ${isCombat ? 'text-red-400' : isJumping ? 'text-pink-400 animate-pulse' : isInterstellar ? 'text-orange-400' : 'text-cyan-400'}`}>
-                                          {isCombat ? 'COMBAT' : isJumping ? t('jump') : `${Math.floor(group.avgProgress)}%`}
+                              return (
+                                <div key={group.routeId} className={`glass-panel border rounded-lg p-3 transition-all relative overflow-hidden group ${isCombat ? 'neon-border-red bg-red-500/5' : isInterstellar ? 'neon-border-orange hover:bg-white/5' : 'neon-border-cyan hover:bg-white/5'}`}>
+                                  <div className="flex gap-4 relative z-10">
+                                    {/* Left Side: Ship PNG */}
+                                    <div className="relative w-24 h-24 flex-shrink-0 bg-black/40 rounded-lg border border-white/5 overflow-hidden flex items-center justify-center p-2">
+                                      <ShipVisual ship={ship} className="w-full h-full" />
+                                      {group.totalCount > 1 && (
+                                        <div className="absolute bottom-1 right-1 bg-black/80 px-1.5 py-0.5 rounded text-[10px] font-orbitron font-bold text-white border border-white/10">
+                                          x{group.totalCount}
+                                        </div>
+                                      )}
+                                    </div>
+
+                                    {/* Center: Info */}
+                                    <div className="flex-1 min-w-0 flex flex-col justify-between py-1">
+                                      <div>
+                                        <div className="flex items-center justify-between">
+                                          <div className="text-[14px] font-orbitron font-bold text-white truncate leading-tight uppercase tracking-wider">{translateData(route.name)}</div>
+                                          <div className={`text-[13px] font-orbitron ${isCombat ? 'text-red-400' : isJumping ? 'text-pink-400 animate-pulse' : isInterstellar ? 'text-orange-400' : 'text-cyan-400'}`}>
+                                            {isCombat ? 'COMBAT' : isJumping ? t('jump') : `${Math.floor(group.avgProgress)}%`}
+                                          </div>
+                                        </div>
+                                        <div className="flex items-center gap-2 mt-1">
+                                          <span className={`text-[12px] font-mono truncate ${ship.color}`}>{ship.name}</span>
+                                          {group.autoActive && (
+                                            <div className="flex items-center gap-1 bg-cyan-500/10 px-1.5 rounded border border-cyan-500/20">
+                                              <div className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
+                                              <span className="text-[9px] font-orbitron font-bold text-cyan-400">AUTO</span>
+                                            </div>
+                                          )}
                                         </div>
                                       </div>
-                                      <div className="flex items-center gap-2 mt-1">
-                                        <span className={`text-[12px] font-mono truncate ${ship.color}`}>{ship.name}</span>
-                                        {group.autoActive && (
-                                          <div className="flex items-center gap-1 bg-cyan-500/10 px-1.5 rounded border border-cyan-500/20">
-                                            <div className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
-                                            <span className="text-[9px] font-orbitron font-bold text-cyan-400">AUTO</span>
-                                          </div>
-                                        )}
-                                      </div>
-                                    </div>
 
-                                    {/* Aggregated Progress Bar */}
-                                    <div className="space-y-1.5">
-                                      <div className="relative h-1.5 bg-white/5 rounded-full overflow-hidden">
-                                        <motion.div 
-                                          className={`h-full rounded-full ${isCombat ? 'bg-red-500' : isJumping ? 'bg-gradient-to-r from-pink-600 to-pink-400' : isInterstellar ? 'bg-gradient-to-r from-orange-600 to-yellow-400' : 'bg-gradient-to-r from-cyan-600 to-cyan-400'}`}
-                                          initial={{ width: 0 }}
-                                          animate={{ width: `${group.avgProgress}%` }}
-                                          transition={{ type: 'spring', bounce: 0, duration: 0.5 }}
-                                        />
-                                        {isJumping && (
-                                          <motion.div 
-                                            className="absolute inset-0 bg-white/20"
-                                            animate={{ x: ['-100%', '100%'] }}
-                                            transition={{ repeat: Infinity, duration: 1, ease: 'linear' }}
+                                      {/* Aggregated Progress Bar */}
+                                      <div className="space-y-1.5">
+                                        <div className="relative h-1.5 bg-white/5 rounded-full overflow-hidden">
+                                          <motion.div
+                                            className={`h-full rounded-full ${isCombat ? 'bg-red-500' : isJumping ? 'bg-gradient-to-r from-pink-600 to-pink-400' : isInterstellar ? 'bg-gradient-to-r from-orange-600 to-yellow-400' : 'bg-gradient-to-r from-cyan-600 to-cyan-400'}`}
+                                            initial={{ width: 0 }}
+                                            animate={{ width: `${group.avgProgress}%` }}
+                                            transition={{ type: 'spring', bounce: 0, duration: 0.5 }}
                                           />
-                                        )}
-                                      </div>
-                                      <div className="flex justify-between items-center text-[10px] font-mono uppercase tracking-tighter opacity-40">
-                                        <span>{isCombat ? 'Action Required' : isJumping ? 'Warping...' : 'In Transit'}</span>
-                                        <span>{route.reward} QC / Trip</span>
+                                          {isJumping && (
+                                            <motion.div
+                                              className="absolute inset-0 bg-white/20"
+                                              animate={{ x: ['-100%', '100%'] }}
+                                              transition={{ repeat: Infinity, duration: 1, ease: 'linear' }}
+                                            />
+                                          )}
+                                        </div>
+                                        <div className="flex justify-between items-center text-[10px] font-mono uppercase tracking-tighter opacity-40">
+                                          <span>{isCombat ? 'Action Required' : isJumping ? 'Warping...' : 'In Transit'}</span>
+                                          <span>{route.reward} QC / Trip</span>
+                                        </div>
                                       </div>
                                     </div>
                                   </div>
+
+                                  {/* Decorative Background Glow */}
+                                  <div className={`absolute inset-0 transition-colors ${isCombat ? 'bg-red-500/5' : isInterstellar ? 'bg-orange-500/0 group-hover:bg-orange-500/5' : 'bg-cyan-500/0 group-hover:bg-cyan-500/5'}`} />
                                 </div>
-                                
-                                {/* Decorative Background Glow */}
-                                <div className={`absolute inset-0 transition-colors ${isCombat ? 'bg-red-500/5' : isInterstellar ? 'bg-orange-500/0 group-hover:bg-orange-500/5' : 'bg-cyan-500/0 group-hover:bg-cyan-500/5'}`} />
-                              </div>
-                            );
-                          })}
+                              );
+                            })}
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      )}
                     </div>
 
                     {/* Battle Alert Button */}
@@ -6464,7 +6828,7 @@ const completeInitialMission = useCallback((missionId: string) => {
                               </div>
                               <div className="text-left">
                                 <div className="text-[14px] font-orbitron font-black text-red-100 uppercase tracking-tighter leading-none">NAVE ATACADA</div>
-                                <div className="text-[10px] font-mono text-red-400/80 uppercase mt-1">IntercepÃƒÂ§ÃƒÂ£o Hostil</div>
+                                <div className="text-[10px] font-mono text-red-400/80 uppercase mt-1">Intercepção Hostil</div>
                               </div>
                             </div>
                             <Sword className="w-5 h-5 text-red-400 group-hover:rotate-12 transition-transform" />
@@ -6478,390 +6842,410 @@ const completeInitialMission = useCallback((missionId: string) => {
             )}
           </AnimatePresence>
 
-        {/* Main Content */}
-        <main className={`${isVoid ? 'lg:col-span-12' : 'lg:col-span-8'} flex flex-col gap-4 h-full min-h-0`}>
-          {/* Tabs - Desktop Only */}
-          <div className="hidden lg:flex gap-1 w-full border-b border-white/5 mb-1">
-            {(() => {
-              const baseTabs = (isVoid || isEarth)
-                ? ['void_aircraft', 'void_battle', 'void_map', 'void_war', 'colonies', 'void_earth', 'mini_games', 'history', 'exit']
-                : ['routes', 'routes2', 'missions', 'aircraft', 'technology', 'upgrades', 'auto', 'mining', 'history', 'exit'];
-              
-              return baseTabs.map(tab => {
-                if (tab === 'routes' && isInterstellar) return null;
-                if (tab === 'routes2' && !isInterstellar) return null;
+          {/* Main Content */}
+          <main className={`${showWorldSidebar ? 'lg:col-span-8' : 'lg:col-span-12'} flex flex-col gap-4 h-full min-h-0`}>
+            {/* Tabs - Desktop Only */}
+            <div className="hidden lg:flex gap-1 w-full border-b border-white/5 mb-1">
+              {(() => {
+                const baseTabs = isEarth
+                  ? ['colonies', 'cards', 'void_earth', 'mini_games', 'history', 'exit']
+                  : isVoid
+                    ? ['void_aircraft', 'void_battle', 'void_map', 'void_war', 'void_earth', 'history', 'exit']
+                    : ['routes', 'routes2', 'missions', 'aircraft', 'technology', 'upgrades', 'auto', 'mining', 'history', 'exit'];
 
-                if (tab === 'routes2' && isSpeedRun) return null;
-                if (tab === 'missions' && isSpeedRun) return null;
-                if (tab === 'history' && isSpeedRun) return null;
-                
-                // Route 4 (Earth) specific restrictions
-                if (isEarth && !['colonies', 'void_earth', 'void_aircraft', 'void_map', 'mini_games', 'history', 'exit'].includes(tab)) return null;
-                
-                // Route 3 (Void) specific restrictions
-                if (isVoid && tab === 'colonies') return null;
-                if (isVoid && tab === 'mini_games') return null;
+                return baseTabs.map(tab => {
+                  if (tab === 'routes' && isInterstellar) return null;
+                  if (tab === 'routes2' && !isInterstellar) return null;
 
-                const isActive = activeTab === tab;
+                  if (tab === 'routes2' && isSpeedRun) return null;
+                  if (tab === 'missions' && isSpeedRun) return null;
+                  if (tab === 'history' && isSpeedRun) return null;
 
-                return (
-                  <button
-                    key={tab}
-                    onClick={() => {
-                      playSfx('aba_click');
-                      setActiveTab(tab as any);
-                    }}
-                    className={`flex-1 px-2 py-2.5 font-orbitron text-[15px] tracking-widest uppercase transition-all border-b-2 whitespace-nowrap relative ${
-                      isActive 
-                        ? `${themeBorder} ${isVoid ? 'text-purple-100 drop-shadow-[0_0_15px_rgba(192,132,252,1)]' : themeText} ${themeBg} ${isVoid ? 'neon-text-purple' : ''}` 
-                        : `border-transparent ${isInterstellar ? 'text-orange-500/40 hover:text-orange-500/80' : isVoid ? 'text-purple-400/60 hover:text-purple-100 hover:drop-shadow-[0_0_12px_rgba(192,132,252,0.8)]' : 'text-cyan-500/40 hover:text-cyan-500/80'}`
-                    } ${tab === 'void_battle' && (typeof isVoidWarActive !== 'undefined' && isVoidWarActive) ? 'animate-pulse bg-red-600/20 border-red-500 text-red-400' : ''}`}
-                  >
-                    {t(tab)}
-                    {tab === 'void_battle' && (typeof isVoidWarActive !== 'undefined' && isVoidWarActive) && (
-                      <span className="absolute top-1 right-1 w-1.5 h-1.5 bg-red-500 rounded-full animate-ping" />
-                    )}
-                    {tab === 'missions' && missions.some(m => m.completed && !m.claimed) && (
-                      <span className="absolute top-1 right-1 w-1.5 h-1.5 bg-green-500 rounded-full animate-ping" />
-                    )}
-                  </button>
-                );
-              });
-            })()}
-          </div>
+                  // Route 4 (Earth) specific restrictions
+                  if (isEarth && !['colonies', 'cards', 'void_earth', 'mini_games', 'history', 'exit'].includes(tab)) return null;
 
-          <div className={`flex-1 h-full min-h-0 overflow-y-auto pr-2 custom-scrollbar flex flex-col ${(activeTab === 'routes' || activeTab === 'routes2' || activeTab === 'aircraft' || activeTab === 'technology' || activeTab === 'upgrades' || activeTab === 'auto' || activeTab === 'battleLevel' || activeTab === 'mining' || activeTab === 'missions' || activeTab === 'void_aircraft' || activeTab === 'void_battle' || activeTab === 'void_map' || activeTab === 'void_war' || activeTab === 'colonies' || activeTab === 'void_earth' || activeTab === 'history') ? 'lg:overflow-hidden' : ''}`}>
-            {isVoid && (
-              <motion.div 
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="grid grid-cols-2 md:grid-cols-5 gap-2 mb-2"
-              >
-                {[
-                  { label: 'MinÃƒÂ©rios', value: voidResources.minerals, icon: Database, color: 'text-slate-400' },
-                  { label: 'Energia', value: voidResources.energy, icon: Zap, color: 'text-yellow-400' },
-                  { label: 'Alimentos', value: voidResources.food, icon: Heart, color: 'text-red-400' },
-                  { label: 'Tecnologia', value: voidResources.tech, icon: Cpu, color: 'text-cyan-400' },
-                  { label: 'Medicamentos', value: voidResources.meds, icon: Shield, color: 'text-emerald-400' }
-                ].map(res => (
-                  <div key={res.label} className="glass-panel border border-white/10 rounded-xl p-2.5 flex items-center justify-between bg-black/40">
-                    <div className="flex items-center gap-2">
-                      <res.icon className={`w-3 h-3 ${res.color}`} />
-                      <span className="text-[15px] text-white/40 uppercase tracking-widest">{res.label}</span>
-                    </div>
-                    <span className="text-base font-orbitron font-bold text-white">{formatValue(res.value || 0)}</span>
-                  </div>
-                ))}
-              </motion.div>
-            )}
-            <AnimatePresence mode="wait">
-              {activeTab === 'mini_games' && isArcadeUnlocked && (
+                  // Route 3 (Void) specific restrictions
+                  if (isVoid && !['void_aircraft', 'void_battle', 'void_map', 'void_war', 'void_earth', 'history', 'exit'].includes(tab)) return null;
+
+                  const isActive = activeTab === tab;
+
+                  return (
+                    <button
+                      key={tab}
+                      onClick={() => {
+                        if (tab === 'routes' || tab === 'routes2') {
+                          playSfx('laser_up');
+                        } else {
+                          playSfx('aba_click');
+                        }
+                        setActiveTab(tab as any);
+                      }}
+                      className={`flex-1 px-2 py-2.5 font-orbitron text-[15px] tracking-widest uppercase transition-all border-b-2 whitespace-nowrap relative ${isActive
+                          ? `${themeBorder} ${isVoid ? 'text-purple-100 drop-shadow-[0_0_15px_rgba(192,132,252,1)]' : themeText} ${themeBg} ${isVoid ? 'neon-text-purple' : ''}`
+                          : `border-transparent ${isInterstellar ? 'text-orange-500/40 hover:text-orange-500/80' : isVoid ? 'text-purple-400/60 hover:text-purple-100 hover:drop-shadow-[0_0_12px_rgba(192,132,252,0.8)]' : 'text-cyan-500/40 hover:text-cyan-500/80'}`
+                        } ${tab === 'void_battle' && (typeof isVoidWarActive !== 'undefined' && isVoidWarActive) ? 'animate-pulse bg-red-600/20 border-red-500 text-red-400' : ''}`}
+                    >
+                      {tab === 'void_earth' && isEarth ? (language === 'pt' ? 'Nova Terra' : 'New Earth') : t(tab)}
+                      {tab === 'void_battle' && (typeof isVoidWarActive !== 'undefined' && isVoidWarActive) && (
+                        <span className="absolute top-1 right-1 w-1.5 h-1.5 bg-red-500 rounded-full animate-ping" />
+                      )}
+                      {tab === 'missions' && missions.some(m => m.completed && !m.claimed) && (
+                        <span className="absolute top-1 right-1 w-1.5 h-1.5 bg-green-500 rounded-full animate-ping" />
+                      )}
+                    </button>
+                  );
+                });
+              })()}
+            </div>
+
+            <div className={`flex-1 h-full min-h-0 overflow-y-auto pr-2 custom-scrollbar flex flex-col ${(activeTab === 'routes' || activeTab === 'routes2' || activeTab === 'aircraft' || activeTab === 'technology' || activeTab === 'upgrades' || activeTab === 'auto' || activeTab === 'battleLevel' || activeTab === 'mining' || activeTab === 'missions' || activeTab === 'void_aircraft' || activeTab === 'void_battle' || activeTab === 'void_map' || activeTab === 'void_war' || activeTab === 'colonies' || activeTab === 'cards' || activeTab === 'void_earth' || activeTab === 'history') ? 'lg:overflow-hidden' : ''}`}>
+              {isVoid && (
                 <motion.div
-                  key="mini_games"
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -20 }}
-                  className="h-full"
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="grid grid-cols-2 md:grid-cols-5 gap-2 mb-2"
                 >
-                  {activeMiniGameId ? (
-                    <div className="relative w-full h-full flex flex-col">
-                      <div className="flex justify-between items-center mb-4 p-2 bg-white/5 border border-white/10 rounded-lg">
-                        <div className="flex items-center gap-3">
-                          <Gamepad2 size={20} className="text-cyan-400" />
-                          <span className="font-orbitron font-bold text-white tracking-widest uppercase">
-                            {MINI_GAMES_CONFIG.find(g => g.id === activeMiniGameId)?.name[language as 'pt' | 'en']}
-                          </span>
+                  {[
+                    { label: 'Minérios', value: voidResources.minerals, icon: Database, color: 'text-slate-400' },
+                    { label: 'Energia', value: voidResources.energy, icon: Zap, color: 'text-yellow-400' },
+                    { label: 'Alimentos', value: voidResources.food, icon: Heart, color: 'text-red-400' },
+                    { label: 'Tecnologia', value: voidResources.tech, icon: Cpu, color: 'text-cyan-400' },
+                    { label: 'Medicamentos', value: voidResources.meds, icon: Shield, color: 'text-emerald-400' }
+                  ].map(res => (
+                    <div key={res.label} className="glass-panel border border-white/10 rounded-xl p-2.5 flex items-center justify-between bg-black/40">
+                      <div className="flex items-center gap-2">
+                        <res.icon className={`w-3 h-3 ${res.color}`} />
+                        <span className="text-[15px] text-white/40 uppercase tracking-widest">{res.label}</span>
+                      </div>
+                      <span className="text-base font-orbitron font-bold text-white">{formatValue(res.value || 0)}</span>
+                    </div>
+                  ))}
+                </motion.div>
+              )}
+              <AnimatePresence mode="wait">
+                {activeTab === 'mini_games' && isArcadeUnlocked && (
+                  <motion.div
+                    key="mini_games"
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -20 }}
+                    className="h-full"
+                  >
+                    {activeMiniGameId ? (
+                      <div className="relative w-full h-full flex flex-col">
+                        <div className="flex justify-between items-center mb-4 p-2 bg-white/5 border border-white/10 rounded-lg">
+                          <div className="flex items-center gap-3">
+                            <Gamepad2 size={20} className="text-cyan-400" />
+                            <span className="font-orbitron font-bold text-white tracking-widest uppercase">
+                              {MINI_GAMES_CONFIG.find(g => g.id === activeMiniGameId)?.name[language as 'pt' | 'en']}
+                            </span>
+                          </div>
+                          <button
+                            onClick={() => setActiveMiniGameId(null)}
+                            className="px-4 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 rounded font-orbitron text-base tracking-widest transition-all"
+                          >
+                            {language === 'pt' ? 'SAIR' : 'EXIT'}
+                          </button>
                         </div>
+                        <div className="flex-1 bg-black rounded-xl overflow-hidden border border-white/10 shadow-2xl relative">
+                          <iframe
+                            src={MINI_GAMES_CONFIG.find(g => g.id === activeMiniGameId)?.path}
+                            className="w-full h-full border-none"
+                            title="Mini Game Player"
+                          />
+                        </div>
+                      </div>
+                    ) : (
+                      <MiniGames
+                        onGameSelect={(id) => {
+                          if (!isArcadeUnlocked) return;
+                          setActiveMiniGameId(id);
+                          addLog(`${language === 'pt' ? 'Iniciando' : 'Starting'} ${id}...`, 'info');
+                        }}
+                        language={language as 'pt' | 'en'}
+                      />
+                    )}
+                  </motion.div>
+                )}
+
+                {(activeTab === 'routes' || activeTab === 'routes2') && !isVoid && !isEarth && (
+                  <RoutesTab />
+                )}
+
+                {activeTab === 'missions' && (
+                  <MissionsTab />
+                )}
+
+                {activeTab === 'auto' && (
+                  <AutoTab />
+                )}
+
+                {activeTab === 'mining' && (
+                  <MiningTab />
+                )}
+
+                {activeTab === 'aircraft' && (
+                  <AircraftTab
+                    renderBattleLevelTab={() => (
+                      <BattleLevelTab
+                        setSelectedReward={setSelectedReward}
+                        setShowDoomProtocolInfo={setShowDoomProtocolInfo}
+                        setShowCaptureInfo={setShowCaptureInfo}
+                        themeBorder={themeBorder}
+                        themeBg={themeBg}
+                        themeText={themeText}
+                        themeGlow={themeGlow}
+                        autoSkipRandomBattles={autoSkipRandomBattles}
+                        toggleAutoSkipRandomBattles={toggleAutoSkipRandomBattles}
+                      />
+                    )}
+                  />
+                )}
+
+                {activeTab === 'technology' && (
+                  <TechnologyTab />
+                )}
+
+                {activeTab === 'upgrades' && (
+                  <UpgradesTab />
+                )}
+
+                {activeTab === 'exit' && (
+                  <motion.div
+                    key="exit"
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.95 }}
+                    className="max-w-md mx-auto space-y-4"
+                  >
+                    <div className={`glass-panel ${isInterstellar ? 'neon-border-orange' : 'neon-border-cyan'} rounded-xl p-8 space-y-8 text-center`}>
+                      <div className="flex flex-col items-center gap-4">
+                        <div className={`w-16 h-16 rounded-full flex items-center justify-center ${isInterstellar ? 'bg-orange-500/20 text-orange-400 border-orange-500/30' : 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30'} border-2`}>
+                          <LogOut className="w-8 h-8" />
+                        </div>
+                        <h2 className={`text-xl font-orbitron font-bold ${isInterstellar ? 'text-orange-400' : 'text-cyan-400'} uppercase tracking-widest`}>
+                          {language === 'pt' ? 'Sair do jogo' : 'Exit Game'}
+                        </h2>
+                        <p className="text-[14px] font-orbitron text-white/60 uppercase tracking-wider leading-relaxed">
+                          {language === 'pt'
+                            ? 'Isso te levará ao menu inicial e salvará seu progresso automaticamente. Todo o modo automático será desabilitado, descansando e esfriando os motores.'
+                            : 'This will take you to the home menu and save your progress automatically. All automatic modes will be disabled, resting and cooling the engines.'}
+                        </p>
+                      </div>
+
+                      <div className="flex flex-col gap-4">
                         <button
-                          onClick={() => setActiveMiniGameId(null)}
-                          className="px-4 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 rounded font-orbitron text-base tracking-widest transition-all"
+                          onClick={handleExit}
+                          className={`w-full py-4 ${isInterstellar ? 'bg-orange-500 hover:bg-orange-400 shadow-[0_0_20px_rgba(249,115,22,0.3)]' : 'bg-cyan-500 hover:bg-cyan-400 shadow-[0_0_20px_rgba(6,182,212,0.3)]'} text-black font-orbitron font-bold text-base tracking-widest rounded-lg transition-all uppercase`}
                         >
-                          {language === 'pt' ? 'SAIR' : 'EXIT'}
+                          {language === 'pt' ? 'CONFIRMAR E SAIR' : 'CONFIRM AND EXIT'}
+                        </button>
+                        <button
+                          onClick={() => {
+                            playSfx('aba_click');
+                            setActiveTab(isEarth ? 'colonies' : isVoid ? 'void_aircraft' : isInterstellar ? 'routes2' : 'routes');
+                          }}
+                          className="w-full py-2 text-base font-orbitron text-slate-500 hover:text-white transition-colors uppercase tracking-widest"
+                        >
+                          {language === 'pt' ? 'VOLTAR' : 'BACK'}
                         </button>
                       </div>
-                      <div className="flex-1 bg-black rounded-xl overflow-hidden border border-white/10 shadow-2xl relative">
-                        <iframe
-                          src={MINI_GAMES_CONFIG.find(g => g.id === activeMiniGameId)?.path}
-                          className="w-full h-full border-none"
-                          title="Mini Game Player"
-                        />
-                      </div>
                     </div>
-                  ) : (
-                    <MiniGames 
-                      onGameSelect={(id) => {
-                        if (!isArcadeUnlocked) return;
-                        setActiveMiniGameId(id);
-                        addLog(`${language === 'pt' ? 'Iniciando' : 'Starting'} ${id}...`, 'info');
-                      }} 
-                      language={language as 'pt' | 'en'}
-                    />
-                  )}
-                </motion.div>
-              )}
+                  </motion.div>
+                )}
 
-              {(activeTab === 'routes' || activeTab === 'routes2') && (
-                <RoutesTab />
-              )}
+                {activeTab === 'void_aircraft' && (
+                  <VoidAircraftTab />
+                )}
 
-              {activeTab === 'missions' && (
-                <MissionsTab />
-              )}
+                {activeTab === 'void_battle' && (
+                  <VoidBattleTab
+                    isVoid={isVoid}
+                    isRobotRepaired={isRobotRepaired}
+                    setShowBattleShipUpgradeModal={setShowBattleShipUpgradeModal}
+                    setShowRobotModal={setShowRobotModal}
+                    isVoidWarActive={isVoidWarActive}
+                    voidWarAlertActive={voidWarAlertActive}
+                    setHasWonEliminateEnemiesRoute3={setHasWonEliminateEnemiesRoute3}
+                    setVoidWarAlertActive={setVoidWarAlertActive}
+                    setIsShaking={setIsShaking}
+                    setIsFlashingRed={setIsFlashingRed}
+                    setVoidWarRobotSpeaking={setVoidWarRobotSpeaking}
+                    setShowRoute3Ending={setShowRoute3Ending}
+                    setVoidAircraftAutoToggles={setVoidAircraftAutoToggles}
+                    setVoidWarProgress={setVoidWarProgress}
+                    voidWarProgress={voidWarProgress}
+                    setShowVoidWarMap={setShowVoidWarMap}
+                  />
+                )}
 
-              {activeTab === 'auto' && (
-                <AutoTab />
-              )}
+                {activeTab === 'void_war' && (
+                  <motion.div
+                    key="void_war"
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -20 }}
+                    className="h-full flex flex-col"
+                  >
+                    <VoidWarCore />
+                  </motion.div>
+                )}
 
-              {activeTab === 'mining' && (
-                <MiningTab />
-              )}
+                {activeTab === 'colonies' && (
+                  <ColoniesTab
+                    addEarthYears={addEarthYears}
+                    isColoniesOpenRef={isColoniesOpenRef}
+                    handleBuildingComplete={handleBuildingComplete}
+                    setEarthProjectBoostCount={setEarthProjectBoostCount}
+                  />
+                )}
 
-              {activeTab === 'aircraft' && (
-                <AircraftTab 
-                  renderBattleLevelTab={() => (
-                    <BattleLevelTab
-                      setSelectedReward={setSelectedReward}
-                      setShowDoomProtocolInfo={setShowDoomProtocolInfo}
-                      setShowCaptureInfo={setShowCaptureInfo}
-                      themeBorder={themeBorder}
-                      themeBg={themeBg}
-                      themeText={themeText}
-                      themeGlow={themeGlow}
-                      autoSkipRandomBattles={autoSkipRandomBattles}
-                      toggleAutoSkipRandomBattles={toggleAutoSkipRandomBattles}
-                    />
-                  )}
-                />
-              )}
+                {activeTab === 'cards' && (
+                  <CardsTab />
+                )}
 
-              {activeTab === 'technology' && (
-                <TechnologyTab />
-              )}
+                {activeTab === 'void_earth' && (
+                  <VoidEarth
+                    earthReconstructionProgress={earthReconstructionProgress}
+                    language={language}
+                    t={t}
+                    setShowRestorationModal={setShowRestorationModal}
+                    playSfx={playSfx}
+                  />
+                )}
 
-              {activeTab === 'upgrades' && (
-                <UpgradesTab />
-              )}
+                {activeTab === 'history' && (
+                  <HistoryTab />
+                )}
 
-              {activeTab === 'exit' && (
-                <motion.div 
-                  key="exit"
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.95 }}
-                  className="max-w-md mx-auto space-y-4"
-                >
-                  <div className={`glass-panel ${isInterstellar ? 'neon-border-orange' : 'neon-border-cyan'} rounded-xl p-8 space-y-8 text-center`}>
-                    <div className="flex flex-col items-center gap-4">
-                      <div className={`w-16 h-16 rounded-full flex items-center justify-center ${isInterstellar ? 'bg-orange-500/20 text-orange-400 border-orange-500/30' : 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30'} border-2`}>
-                        <LogOut className="w-8 h-8" />
-                      </div>
-                      <h2 className={`text-xl font-orbitron font-bold ${isInterstellar ? 'text-orange-400' : 'text-cyan-400'} uppercase tracking-widest`}>
-                        {language === 'pt' ? 'Sair do jogo' : 'Exit Game'}
-                      </h2>
-                      <p className="text-[14px] font-orbitron text-white/60 uppercase tracking-wider leading-relaxed">
-                        {language === 'pt' 
-                          ? 'Isso te levará ao menu inicial e salvará seu progresso automaticamente. Todo o modo automático será desabilitado, descansando e esfriando os motores.' 
-                          : 'This will take you to the home menu and save your progress automatically. All automatic modes will be disabled, resting and cooling the engines.'}
-                      </p>
-                    </div>
+              </AnimatePresence>
 
-                    <div className="flex flex-col gap-4">
-                      <button
-                        onClick={handleExit}
-                        className={`w-full py-4 ${isInterstellar ? 'bg-orange-500 hover:bg-orange-400 shadow-[0_0_20px_rgba(249,115,22,0.3)]' : 'bg-cyan-500 hover:bg-cyan-400 shadow-[0_0_20px_rgba(6,182,212,0.3)]'} text-black font-orbitron font-bold text-base tracking-widest rounded-lg transition-all uppercase`}
-                      >
-                        {language === 'pt' ? 'CONFIRMAR E SAIR' : 'CONFIRM AND EXIT'}
-                      </button>
-                      <button
-                        onClick={() => {
-                          playSfx('aba_click');
-                          setActiveTab(isEarth ? 'colonies' : isVoid ? 'void_aircraft' : isInterstellar ? 'routes2' : 'routes');
-                        }}
-                        className="w-full py-2 text-base font-orbitron text-slate-500 hover:text-white transition-colors uppercase tracking-widest"
-                      >
-                        {language === 'pt' ? 'VOLTAR' : 'BACK'}
-                      </button>
-                    </div>
-                  </div>
-                </motion.div>
-              )}
-
-              {activeTab === 'void_aircraft' && (
-                <VoidAircraftTab />
-              )}
-
-              {activeTab === 'void_battle' && (
-                <VoidBattleTab
-                  isVoid={isVoid}
-                  isRobotRepaired={isRobotRepaired}
-                  setShowBattleShipUpgradeModal={setShowBattleShipUpgradeModal}
-                  setShowRobotModal={setShowRobotModal}
-                  isVoidWarActive={isVoidWarActive}
-                  voidWarAlertActive={voidWarAlertActive}
-                  setHasWonEliminateEnemiesRoute3={setHasWonEliminateEnemiesRoute3}
-                  setVoidWarAlertActive={setVoidWarAlertActive}
-                  setIsShaking={setIsShaking}
-                  setIsFlashingRed={setIsFlashingRed}
-                  setVoidWarRobotSpeaking={setVoidWarRobotSpeaking}
-                  setShowRoute3Ending={setShowRoute3Ending}
-                  setVoidAircraftAutoToggles={setVoidAircraftAutoToggles}
-                  setVoidWarProgress={setVoidWarProgress}
-                  voidWarProgress={voidWarProgress}
-                  setShowVoidWarMap={setShowVoidWarMap}
-                />
-              )}
-
-              {activeTab === 'void_war' && (
+              {/* Void Map - Smart Standby (Always mounted to prevent video reload flicker) */}
+              <div className={activeTab === 'void_map' ? 'h-full flex flex-col overflow-hidden' : 'hidden'}>
                 <motion.div
-                  key="void_war"
+                  key="void_map_persistent"
                   initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -20 }}
-                  className="h-full flex flex-col"
+                  animate={{ opacity: activeTab === 'void_map' ? 1 : 0, x: activeTab === 'void_map' ? 0 : 20 }}
+                  transition={{ duration: 0.3 }}
+                  className="h-full flex flex-col overflow-hidden"
                 >
-                  <VoidWarCore />
+                  <VoidMapTab />
                 </motion.div>
-              )}
-
-              {activeTab === 'colonies' && (
-                <ColoniesTab 
-                  addEarthYears={addEarthYears}
-                  isColoniesOpenRef={isColoniesOpenRef}
-                  handleBuildingComplete={handleBuildingComplete}
-                  setEarthProjectBoostCount={setEarthProjectBoostCount}
-                />
-              )}
-
-              {activeTab === 'void_earth' && (
-                <VoidEarthTab />
-              )}
-
-              {activeTab === 'history' && (
-                <HistoryTab />
-              )}
-
-            </AnimatePresence>
-
-            {/* Void Map - Smart Standby (Always mounted to prevent video reload flicker) */}
-            <div className={activeTab === 'void_map' ? 'h-full flex flex-col overflow-hidden' : 'hidden'}>
-              <motion.div
-                key="void_map_persistent"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: activeTab === 'void_map' ? 1 : 0, x: activeTab === 'void_map' ? 0 : 20 }}
-                transition={{ duration: 0.3 }}
-                className="h-full flex flex-col overflow-hidden"
-              >
-                <VoidMapTab />
-              </motion.div>
+              </div>
             </div>
-          </div>
 
-          {/* Bottom Navigation for Mobile/Tablet */}
-          <div className={`lg:hidden shrink-0 glass-panel ${isInterstellar ? 'neon-border-orange' : isVoid ? 'neon-border-purple' : 'neon-border-cyan'} rounded-xl flex justify-around items-center p-2 mb-2`}>
-            {(isVoid || isEarth
-              ? [
-                  { id: 'void_aircraft', icon: Rocket, label: t('void_aircraft') },
-                  { id: 'void_battle', icon: Crosshair, label: t('battle'), alert: isVoidWarActive, hide: isEarth },
-                  { id: 'void_map', icon: MapIcon, label: t('void_map') },
-                  { id: 'void_war', icon: Home, label: t('void_war'), hide: isEarth },
-                  { id: 'colonies', icon: Building2, label: t('colonies'), hide: !isEarth },
-                  { id: 'void_earth', icon: Globe, label: t('void_earth') },
+            {/* Bottom Navigation for Mobile/Tablet */}
+            <div className={`lg:hidden shrink-0 glass-panel ${isInterstellar ? 'neon-border-orange' : isVoid ? 'neon-border-purple' : 'neon-border-cyan'} rounded-xl flex justify-around items-center p-2 mb-2`}>
+              {(isEarth
+                ? [
+                  { id: 'colonies', icon: Building2, label: t('colonies') },
+                  { id: 'cards', icon: Package, label: t('cards') },
+                  { id: 'void_earth', icon: Globe, label: language === 'pt' ? 'Nova Terra' : 'New Earth' },
                   { id: 'mini_games', icon: Gamepad2, label: t('mini_games'), hide: !isArcadeUnlocked },
                   { id: 'history', icon: HistoryIcon, label: t('history'), hide: isSpeedRun },
                   { id: 'exit', icon: LogOut, label: t('exit') }
                 ]
-              : [
-                  { id: 'routes', icon: MapIcon, label: t('routes1' as any), hide: isInterstellar },
-                  { id: 'routes2', icon: Globe, label: t('routes2' as any), hide: !isInterstellar || isSpeedRun },
+                : isVoid
+                  ? [
+                    { id: 'void_aircraft', icon: Rocket, label: t('void_aircraft') },
+                    { id: 'void_battle', icon: Crosshair, label: t('battle'), alert: isVoidWarActive },
+                    { id: 'void_map', icon: MapIcon, label: t('void_map') },
+                    { id: 'void_war', icon: Home, label: t('void_war') },
+                    { id: 'void_earth', icon: Globe, label: t('void_earth') },
+                    { id: 'history', icon: HistoryIcon, label: t('history'), hide: isSpeedRun },
+                    { id: 'exit', icon: LogOut, label: t('exit') }
+                  ]
+                  : [
+                    { id: 'routes', icon: MapIcon, label: t('routes1' as any), hide: isInterstellar },
+                    { id: 'routes2', icon: Globe, label: t('routes2' as any), hide: !isInterstellar || isSpeedRun },
 
-                  { id: 'missions', icon: Trophy, label: t('missions' as any), hide: isSpeedRun },
-                  { id: 'aircraft', icon: Rocket, label: t('aircraft' as any) },
-                  { id: 'technology', icon: Cpu, label: t('technology' as any) },
-                  { id: 'upgrades', icon: TrendingUp, label: t('upgrades' as any) },
-                  { id: 'auto', icon: Cpu, label: t('autoTravel' as any) },
-                  { id: 'mining', icon: Pickaxe, label: t('mining' as any) },
-                  { id: 'mini_games', icon: Gamepad2, label: t('mini_games'), hide: !isArcadeUnlocked },
-                  { id: 'history', icon: HistoryIcon, label: t('history' as any), hide: isSpeedRun },
-                  { id: 'exit', icon: LogOut, label: t('exit' as any) }
-                ]
-            ).map(item => {
-              if (item.hide) return null;
-              const Icon = item.icon;
-              const isActive = activeTab === item.id;
-              return (
-                <button
-                  key={item.id}
-                  onClick={() => {
-                    playSfx('aba_click');
-                    setActiveTab(item.id as any);
-                  }}
-                  className={`flex flex-col items-center gap-1 p-2 transition-all rounded-lg relative ${
-                    isActive 
-                    ? (isInterstellar ? 'bg-orange-500/20 text-orange-400' : isVoid ? 'bg-purple-500/20 text-purple-100 drop-shadow-[0_0_15px_rgba(192,132,252,1)] neon-text-purple' : 'bg-cyan-500/20 text-cyan-400') 
-                    : (isInterstellar ? 'text-orange-500/40' : isVoid ? 'text-purple-400/50' : 'text-cyan-500/40')
-                  }`}
-                >
-                  <Icon className={`w-5 h-5 ${isActive ? 'animate-pulse-glow' : ''}`} />
-                  <span className="text-[15px] font-orbitron uppercase tracking-tighter">{item.label}</span>
-                  {(item.id === 'missions' && missions.some(m => m.completed && !m.claimed)) || (item.id === 'void_battle' && isVoidWarActive) && (
-                    <span className={`absolute top-1 right-1 w-1.5 h-1.5 ${item.id === 'void_battle' ? 'bg-red-500' : 'bg-green-500'} rounded-full animate-ping`} />
-                  )}
-                </button>
-              );
-            })}
-          </div>
-        </main>
-      </div>
-
-      {/* Saving Overlay */}
-      <AnimatePresence>
-        {isSaving && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[1000] flex flex-col items-center justify-center bg-black/90 backdrop-blur-md"
-          >
-            <div className="max-w-md w-full px-8 space-y-8 text-center">
-              <div className="relative w-24 h-24 mx-auto">
-                <motion.div 
-                  animate={{ rotate: 360 }}
-                  transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-                  className={`absolute inset-0 rounded-full border-t-2 border-r-2 ${isInterstellar ? 'border-orange-500' : 'border-cyan-500'}`}
-                />
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <Save className={`w-10 h-10 ${isInterstellar ? 'text-orange-500' : 'text-cyan-500'} animate-pulse`} />
-                </div>
-              </div>
-              
-              <div className="space-y-2">
-                <h2 className="text-2xl font-orbitron font-black text-white tracking-tighter uppercase">
-                  {language === 'pt' ? 'Salvando Progresso' : 'Saving Progress'}
-                </h2>
-                <p className="text-[14px] font-orbitron text-slate-400 uppercase tracking-widest">
-                  {language === 'pt' ? 'Sincronizando dados com a rede neural...' : 'Syncing data with neural network...'}
-                </p>
-              </div>
-
-              <div className="space-y-4">
-                <div className="h-2 w-full bg-white/5 rounded-full overflow-hidden border border-white/10">
-                  <motion.div 
-                    initial={{ width: 0 }}
-                    animate={{ width: `${saveProgress}%` }}
-                    className={`h-full ${isInterstellar ? 'bg-gradient-to-r from-orange-600 to-red-600' : 'bg-gradient-to-r from-cyan-600 to-blue-600'}`}
-                  />
-                </div>
-                <div className="flex justify-between text-base font-orbitron text-slate-500 uppercase tracking-widest">
-                  <span>{saveProgress}%</span>
-                  <span>{saveProgress === 100 ? (language === 'pt' ? 'Concluído' : 'Completed') : (language === 'pt' ? 'Processando...' : 'Processing...')}</span>
-                </div>
-              </div>
+                    { id: 'missions', icon: Trophy, label: t('missions' as any), hide: isSpeedRun },
+                    { id: 'aircraft', icon: Rocket, label: t('aircraft' as any) },
+                    { id: 'technology', icon: Cpu, label: t('technology' as any) },
+                    { id: 'upgrades', icon: TrendingUp, label: t('upgrades' as any) },
+                    { id: 'auto', icon: Cpu, label: t('autoTravel' as any) },
+                    { id: 'mining', icon: Pickaxe, label: t('mining' as any) },
+                    { id: 'mini_games', icon: Gamepad2, label: t('mini_games'), hide: !isArcadeUnlocked },
+                    { id: 'history', icon: HistoryIcon, label: t('history' as any), hide: isSpeedRun },
+                    { id: 'exit', icon: LogOut, label: t('exit' as any) }
+                  ]
+              ).map(item => {
+                if (item.hide) return null;
+                const Icon = item.icon;
+                const isActive = activeTab === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => {
+                      playSfx('aba_click');
+                      setActiveTab(item.id as any);
+                    }}
+                    className={`flex flex-col items-center gap-1 p-2 transition-all rounded-lg relative ${isActive
+                        ? (isInterstellar ? 'bg-orange-500/20 text-orange-400' : isVoid ? 'bg-purple-500/20 text-purple-100 drop-shadow-[0_0_15px_rgba(192,132,252,1)] neon-text-purple' : 'bg-cyan-500/20 text-cyan-400')
+                        : (isInterstellar ? 'text-orange-500/40' : isVoid ? 'text-purple-400/50' : 'text-cyan-500/40')
+                      }`}
+                  >
+                    <Icon className={`w-5 h-5 ${isActive ? 'animate-pulse-glow' : ''}`} />
+                    <span className="text-[15px] font-orbitron uppercase tracking-tighter">{item.label}</span>
+                    {(item.id === 'missions' && missions.some(m => m.completed && !m.claimed)) || (item.id === 'void_battle' && isVoidWarActive) && (
+                      <span className={`absolute top-1 right-1 w-1.5 h-1.5 ${item.id === 'void_battle' ? 'bg-red-500' : 'bg-green-500'} rounded-full animate-ping`} />
+                    )}
+                  </button>
+                );
+              })}
             </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          </main>
+        </div>
 
-      <style jsx global>{`
+        {/* Saving Overlay */}
+        <AnimatePresence>
+          {isSaving && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[1000] flex flex-col items-center justify-center bg-black/90 backdrop-blur-md"
+            >
+              <div className="max-w-md w-full px-8 space-y-8 text-center">
+                <div className="relative w-24 h-24 mx-auto">
+                  <motion.div
+                    animate={{ rotate: 360 }}
+                    transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                    className={`absolute inset-0 rounded-full border-t-2 border-r-2 ${isInterstellar ? 'border-orange-500' : 'border-cyan-500'}`}
+                  />
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <Save className={`w-10 h-10 ${isInterstellar ? 'text-orange-500' : 'text-cyan-500'} animate-pulse`} />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <h2 className="text-2xl font-orbitron font-black text-white tracking-tighter uppercase">
+                    {language === 'pt' ? 'Salvando Progresso' : 'Saving Progress'}
+                  </h2>
+                  <p className="text-[14px] font-orbitron text-slate-400 uppercase tracking-widest">
+                    {language === 'pt' ? 'Sincronizando dados com a rede neural...' : 'Syncing data with neural network...'}
+                  </p>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="h-2 w-full bg-white/5 rounded-full overflow-hidden border border-white/10">
+                    <motion.div
+                      initial={{ width: 0 }}
+                      animate={{ width: `${saveProgress}%` }}
+                      className={`h-full ${isInterstellar ? 'bg-gradient-to-r from-orange-600 to-red-600' : 'bg-gradient-to-r from-cyan-600 to-blue-600'}`}
+                    />
+                  </div>
+                  <div className="flex justify-between text-base font-orbitron text-slate-500 uppercase tracking-widest">
+                    <span>{saveProgress}%</span>
+                    <span>{saveProgress === 100 ? (language === 'pt' ? 'Concluído' : 'Completed') : (language === 'pt' ? 'Processando...' : 'Processing...')}</span>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <style jsx global>{`
         .custom-scrollbar::-webkit-scrollbar {
           width: 4px;
         }
@@ -6877,78 +7261,78 @@ const completeInitialMission = useCallback((missionId: string) => {
         }
       `}</style>
 
-      {/* Route 2 Info Modal */}
-      <AnimatePresence>
-        {showRoute2Info && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md"
-          >
+        {/* Route 2 Info Modal */}
+        <AnimatePresence>
+          {showRoute2Info && (
             <motion.div
-              initial={{ scale: 0.9, opacity: 0, y: 20 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.9, opacity: 0, y: 20 }}
-              className="relative w-full max-w-4xl overflow-hidden glass-panel border-2 border-orange-500/50 p-10 rounded-3xl bg-gradient-to-br from-orange-500/20 via-black/90 to-orange-900/40 shadow-[0_0_100px_rgba(249,115,22,0.2)]"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md"
             >
-              <button 
-                onClick={() => setShowRoute2Info(false)}
-                className="absolute top-6 right-6 w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-white/40 hover:text-white hover:bg-white/10 transition-all z-20"
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0, y: 20 }}
+                animate={{ scale: 1, opacity: 1, y: 0 }}
+                exit={{ scale: 0.9, opacity: 0, y: 20 }}
+                className="relative w-full max-w-4xl overflow-hidden glass-panel border-2 border-orange-500/50 p-10 rounded-3xl bg-gradient-to-br from-orange-500/20 via-black/90 to-orange-900/40 shadow-[0_0_100px_rgba(249,115,22,0.2)]"
               >
-                <X className="w-6 h-6" />
-              </button>
-
-              {/* Decorative Elements */}
-              <div className="absolute -top-24 -left-24 w-64 h-64 bg-orange-500/10 rounded-full blur-3xl pointer-events-none" />
-              <div className="absolute -bottom-24 -right-24 w-64 h-64 bg-orange-500/10 rounded-full blur-3xl pointer-events-none" />
-
-              <div className="relative z-10 flex flex-col items-center text-center gap-10">
-                <div className="relative">
-                  <div className="w-24 h-24 rounded-full bg-orange-500/20 flex items-center justify-center border-2 border-orange-500 shadow-[0_0_30px_rgba(249,115,22,0.5)] animate-pulse-glow">
-                    <Globe className="w-12 h-12 text-orange-400" />
-                  </div>
-                  <div className="absolute -top-1 -right-1 w-8 h-8 bg-orange-500 rounded-full flex items-center justify-center animate-bounce shadow-lg">
-                    <ArrowRight className="w-5 h-5 text-black" />
-                  </div>
-                </div>
-
-                <div className="space-y-4">
-                  <h3 className="text-4xl font-orbitron font-black text-orange-400 uppercase tracking-[0.4em] drop-shadow-[0_0_15px_rgba(249,115,22,0.6)]">
-                    {t('routes2')}
-                  </h3>
-                  <div className="h-1 w-32 bg-orange-500/50 mx-auto rounded-full" />
-                  <p className="text-xl text-orange-100 font-mono uppercase tracking-[0.2em] max-w-2xl leading-relaxed">
-                    {t('route2UnlockDesc')}
-                  </p>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full max-w-2xl">
-                  <div className="bg-white/5 border border-white/10 p-4 rounded-xl text-left">
-                    <div className="text-orange-400 font-orbitron text-xs tracking-widest uppercase mb-1">Status</div>
-                    <div className="text-white font-mono">{t('unlocked').toUpperCase()}</div>
-                  </div>
-                  <div className="bg-white/5 border border-white/10 p-4 rounded-xl text-left">
-                    <div className="text-orange-400 font-orbitron text-xs tracking-widest uppercase mb-1">Fase</div>
-                    <div className="text-white font-mono">PROTOCOLO INTERESTELAR</div>
-                  </div>
-                </div>
-
                 <button
-                  onClick={() => {
-                    setShowRoute2Info(false);
-                    setShowRoute2Confirm(true);
-                  }}
-                  className="group relative px-16 py-6 bg-orange-500 text-black font-orbitron font-black text-2xl rounded-2xl hover:bg-orange-400 transition-all shadow-[0_0_40px_rgba(249,115,22,0.6)] hover:scale-105 active:scale-95 uppercase tracking-[0.3em] border-b-4 border-orange-700 active:border-b-0 active:translate-y-1 flex items-center justify-center gap-4"
+                  onClick={() => setShowRoute2Info(false)}
+                  className="absolute top-6 right-6 w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-white/40 hover:text-white hover:bg-white/10 transition-all z-20"
                 >
-                  <Rocket className="w-8 h-8" />
-                  {t('startInterstellarProtocol')}
+                  <X className="w-6 h-6" />
                 </button>
-              </div>
+
+                {/* Decorative Elements */}
+                <div className="absolute -top-24 -left-24 w-64 h-64 bg-orange-500/10 rounded-full blur-3xl pointer-events-none" />
+                <div className="absolute -bottom-24 -right-24 w-64 h-64 bg-orange-500/10 rounded-full blur-3xl pointer-events-none" />
+
+                <div className="relative z-10 flex flex-col items-center text-center gap-10">
+                  <div className="relative">
+                    <div className="w-24 h-24 rounded-full bg-orange-500/20 flex items-center justify-center border-2 border-orange-500 shadow-[0_0_30px_rgba(249,115,22,0.5)] animate-pulse-glow">
+                      <Globe className="w-12 h-12 text-orange-400" />
+                    </div>
+                    <div className="absolute -top-1 -right-1 w-8 h-8 bg-orange-500 rounded-full flex items-center justify-center animate-bounce shadow-lg">
+                      <ArrowRight className="w-5 h-5 text-black" />
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <h3 className="text-4xl font-orbitron font-black text-orange-400 uppercase tracking-[0.4em] drop-shadow-[0_0_15px_rgba(249,115,22,0.6)]">
+                      {t('routes2')}
+                    </h3>
+                    <div className="h-1 w-32 bg-orange-500/50 mx-auto rounded-full" />
+                    <p className="text-xl text-orange-100 font-mono uppercase tracking-[0.2em] max-w-2xl leading-relaxed">
+                      {t('route2UnlockDesc')}
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full max-w-2xl">
+                    <div className="bg-white/5 border border-white/10 p-4 rounded-xl text-left">
+                      <div className="text-orange-400 font-orbitron text-xs tracking-widest uppercase mb-1">Status</div>
+                      <div className="text-white font-mono">{t('unlocked').toUpperCase()}</div>
+                    </div>
+                    <div className="bg-white/5 border border-white/10 p-4 rounded-xl text-left">
+                      <div className="text-orange-400 font-orbitron text-xs tracking-widest uppercase mb-1">Fase</div>
+                      <div className="text-white font-mono">PROTOCOLO INTERESTELAR</div>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => {
+                      setShowRoute2Info(false);
+                      setShowRoute2Confirm(true);
+                    }}
+                    className="group relative px-16 py-6 bg-orange-500 text-black font-orbitron font-black text-2xl rounded-2xl hover:bg-orange-400 transition-all shadow-[0_0_40px_rgba(249,115,22,0.6)] hover:scale-105 active:scale-95 uppercase tracking-[0.3em] border-b-4 border-orange-700 active:border-b-0 active:translate-y-1 flex items-center justify-center gap-4"
+                  >
+                    <Rocket className="w-8 h-8" />
+                    {t('startInterstellarProtocol')}
+                  </button>
+                </div>
+              </motion.div>
             </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          )}
+        </AnimatePresence>
 
         {showRoute3Info && (
           <motion.div
@@ -6963,7 +7347,7 @@ const completeInitialMission = useCallback((missionId: string) => {
               exit={{ scale: 0.9, opacity: 0, y: 20 }}
               className="relative w-full max-w-4xl overflow-hidden glass-panel border-2 border-purple-500/50 p-10 rounded-3xl bg-gradient-to-br from-purple-500/20 via-black/90 to-purple-900/40 shadow-[0_0_100px_rgba(168,85,247,0.2)]"
             >
-              <button 
+              <button
                 onClick={() => setShowRoute3Info(false)}
                 className="absolute top-6 right-6 w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-white/40 hover:text-white hover:bg-white/10 transition-all z-20"
               >
@@ -7020,254 +7404,258 @@ const completeInitialMission = useCallback((missionId: string) => {
           </motion.div>
         )}
 
-      {/* Epic Route 2 Confirmation Screen */}
+        {/* Epic Route 2 Confirmation Screen */}
 
-      <AnimatePresence>
-        {showRoute2Confirm && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[250] flex items-center justify-center bg-black overflow-hidden"
-          >
-            {/* Background Particles */}
-            <div className="absolute inset-0 pointer-events-none">
-              {[...Array(50)].map((_, i) => (
-                <motion.div
-                  key={i}
-                  initial={{ 
-                    x: Math.random() * 100 + '%', 
-                    y: Math.random() * 100 + '%',
-                    opacity: Math.random() * 0.5,
-                    scale: Math.random() * 0.5 + 0.5
-                  }}
-                  animate={{ 
-                    y: [null, '110%'],
-                    opacity: [null, 0]
-                  }}
-                  transition={{ 
-                    duration: Math.random() * 10 + 5, 
-                    repeat: Infinity, 
-                    ease: "linear",
-                    delay: Math.random() * 5
-                  }}
-                  className="absolute w-1 h-1 bg-white rounded-full"
-                />
-              ))}
-              {/* Warp Lines */}
-              {[...Array(20)].map((_, i) => (
-                <motion.div
-                  key={`warp-${i}`}
-                  initial={{ 
-                    x: Math.random() * 100 + '%', 
-                    y: -100,
-                    opacity: 0,
-                    height: 0
-                  }}
-                  animate={{ 
-                    y: '110%',
-                    opacity: [0, 0.5, 0],
-                    height: [0, 200, 0]
-                  }}
-                  transition={{ 
-                    duration: 0.5, 
-                    repeat: Infinity, 
-                    ease: "linear",
-                    delay: Math.random() * 2
-                  }}
-                  className="absolute w-0.5 bg-orange-500/30 blur-[1px]"
-                />
-              ))}
-            </div>
-
+        <AnimatePresence>
+          {showRoute2Confirm && (
             <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              className="relative z-10 w-full max-w-xl p-4 flex flex-col items-center"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[250] flex items-center justify-center bg-black overflow-hidden"
             >
-              {/* Energy Ring - Compact version */}
-              <div className="relative w-24 h-24 mb-4">
-                <motion.div
-                  animate={{ rotate: 360 }}
-                  transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
-                  className="absolute inset-0 rounded-full border-2 border-dashed border-orange-500/20"
-                />
-                <motion.div
-                  animate={{ 
-                    scale: [1, 1.15, 1],
-                    opacity: [0.4, 0.8, 0.4],
-                    rotate: -360
-                  }}
-                  transition={{ 
-                    scale: { duration: 2, repeat: Infinity, ease: "easeInOut" },
-                    opacity: { duration: 2, repeat: Infinity, ease: "easeInOut" },
-                    rotate: { duration: 4, repeat: Infinity, ease: "linear" }
-                  }}
-                  className="absolute inset-0 rounded-full border-4 border-t-orange-500 border-r-transparent border-b-orange-400 border-l-transparent shadow-[0_0_25px_rgba(249,115,22,0.3)]"
-                />
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <Rocket className="w-8 h-8 text-orange-500" />
-                </div>
+              {/* Background Particles */}
+              <div className="absolute inset-0 pointer-events-none">
+                {[...Array(50)].map((_, i) => (
+                  <motion.div
+                    key={i}
+                    initial={{
+                      x: Math.random() * 100 + '%',
+                      y: Math.random() * 100 + '%',
+                      opacity: Math.random() * 0.5,
+                      scale: Math.random() * 0.5 + 0.5
+                    }}
+                    animate={{
+                      y: [null, '110%'],
+                      opacity: [null, 0]
+                    }}
+                    transition={{
+                      duration: Math.random() * 10 + 5,
+                      repeat: Infinity,
+                      ease: "linear",
+                      delay: Math.random() * 5
+                    }}
+                    className="absolute w-1 h-1 bg-white rounded-full"
+                  />
+                ))}
+                {/* Warp Lines */}
+                {[...Array(20)].map((_, i) => (
+                  <motion.div
+                    key={`warp-${i}`}
+                    initial={{
+                      x: Math.random() * 100 + '%',
+                      y: -100,
+                      opacity: 0,
+                      height: 0
+                    }}
+                    animate={{
+                      y: '110%',
+                      opacity: [0, 0.5, 0],
+                      height: [0, 200, 0]
+                    }}
+                    transition={{
+                      duration: 0.5,
+                      repeat: Infinity,
+                      ease: "linear",
+                      delay: Math.random() * 2
+                    }}
+                    className="absolute w-0.5 bg-orange-500/30 blur-[1px]"
+                  />
+                ))}
               </div>
 
-              <motion.h2 
-                initial={{ y: 15, opacity: 0 }}
-                animate={{ y: 0, opacity: 1 }}
-                transition={{ delay: 0.2 }}
-                className="text-3xl md:text-5xl font-orbitron font-black text-white mb-4 tracking-[0.5em] uppercase text-center relative"
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                className="relative z-10 w-full max-w-xl p-4 flex flex-col items-center"
               >
-                <span className="relative z-10 neon-text-orange">ROTAS 2</span>
-                <motion.div
-                  animate={{ x: ['-100%', '200%'] }}
-                  transition={{ duration: 2.5, repeat: Infinity, ease: "linear" }}
-                  className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent skew-x-12 pointer-events-none"
-                />
-              </motion.h2>
-
-              <div className="space-y-2 text-center mb-6 w-full">
-                <motion.p
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: 0.3 }}
-                  className="text-orange-500 font-orbitron font-bold text-base tracking-[0.3em] uppercase mb-2"
-                >
-                  {t('systemUnlocked')}
-                </motion.p>
-
-                <div className="space-y-0.5 opacity-80">
-                  <motion.p
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ delay: 0.4 }}
-                    className="text-base md:text-[14px] font-orbitron uppercase tracking-widest text-slate-300"
-                  >
-                    {t('conqueredSolarSystem')}
-                  </motion.p>
-                  <motion.p
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ delay: 0.5 }}
-                    className="text-base md:text-[14px] font-orbitron uppercase tracking-widest text-slate-400"
-                  >
-                    {t('interstellarJourneyBegins')}
-                  </motion.p>
-                  <motion.p
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ delay: 0.6 }}
-                    className="text-base md:text-[14px] font-orbitron uppercase tracking-widest text-emerald-400 mt-2"
-                  >
-                    {t('pulsarShipReward')}
-                  </motion.p>
+                {/* Energy Ring - Compact version */}
+                <div className="relative w-24 h-24 mb-4">
+                  <motion.div
+                    animate={{ rotate: 360 }}
+                    transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
+                    className="absolute inset-0 rounded-full border-2 border-dashed border-orange-500/20"
+                  />
+                  <motion.div
+                    animate={{
+                      scale: [1, 1.15, 1],
+                      opacity: [0.4, 0.8, 0.4],
+                      rotate: -360
+                    }}
+                    transition={{
+                      scale: { duration: 2, repeat: Infinity, ease: "easeInOut" },
+                      opacity: { duration: 2, repeat: Infinity, ease: "easeInOut" },
+                      rotate: { duration: 4, repeat: Infinity, ease: "linear" }
+                    }}
+                    className="absolute inset-0 rounded-full border-4 border-t-orange-500 border-r-transparent border-b-orange-400 border-l-transparent shadow-[0_0_25px_rgba(249,115,22,0.3)]"
+                  />
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <img
+                      src="/images/bobby_blue/bobby_blue_summer.webp"
+                      alt="Bobby Blue"
+                      className="w-16 h-16 object-contain"
+                    />
+                  </div>
                 </div>
 
-                <motion.div
-                  initial={{ opacity: 0, y: 5 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.7 }}
-                  className="py-2"
+                <motion.h2
+                  initial={{ y: 15, opacity: 0 }}
+                  animate={{ y: 0, opacity: 1 }}
+                  transition={{ delay: 0.2 }}
+                  className="text-3xl md:text-5xl font-orbitron font-black text-white mb-4 tracking-[0.5em] uppercase text-center relative"
                 >
-                  <span className="text-red-500 font-orbitron font-black text-base md:text-[14px] tracking-[0.2em] uppercase border-y border-red-500/20 py-1 px-4">
-                    {t('sacrificeRequired')}
-                  </span>
-                </motion.div>
-
-                <motion.p
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: 0.8 }}
-                  className="text-[15px] md:text-[14px] font-orbitron uppercase tracking-widest text-slate-500 max-w-xs mx-auto leading-relaxed"
-                >
-                  {t('legacyConversionDesc')}
-                </motion.p>
-
-                <motion.p
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: 1.2 }}
-                  className="text-base md:text-[14px] font-orbitron font-bold uppercase tracking-[0.2em] text-orange-400/80"
-                >
-                  {language === 'pt' ? 'RUMO AO PRÃ“XIMO SALTO' : 'TOWARDS THE NEXT LEAP'}
-                </motion.p>
-              </div>
-
-              <div className="flex flex-col gap-3 w-full max-w-xs">
-                <motion.button
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ delay: 1.4 }}
-                  whileHover={{ scale: 1.05, boxShadow: "0 0 50px rgba(249,115,22,0.6)" }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => {
-                    playSfx('click');
-                    setShowRoute2Confirm(false);
-                    setShowRoute2Lore(true);
-                    setLoreLineIndex(0);
-                    setActiveBattle(null);
-                  }}
-                  className="w-full py-5 rounded-xl font-orbitron text-base bg-orange-600 text-black font-black shadow-[0_0_40px_rgba(249,115,22,0.4)] hover:bg-orange-500 transition-all uppercase tracking-[0.4em] relative overflow-hidden group"
-                >
-                  <span className="relative z-10">{language === 'pt' ? 'INICIAR' : 'START'}</span>
+                  <span className="relative z-10 neon-text-orange">ROTAS 2</span>
                   <motion.div
                     animate={{ x: ['-100%', '200%'] }}
-                    transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-                    className="absolute inset-0 bg-gradient-to-r from-transparent via-white/50 to-transparent -skew-x-12 pointer-events-none"
+                    transition={{ duration: 2.5, repeat: Infinity, ease: "linear" }}
+                    className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent skew-x-12 pointer-events-none"
                   />
-                </motion.button>
-                
-                <motion.button
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: 1.6 }}
-                  onClick={() => setShowRoute2Confirm(false)}
-                  className="w-full py-2 rounded-lg font-orbitron text-[15px] text-white/30 hover:text-white/60 transition-colors uppercase tracking-widest"
-                >
-                  {t('cancel').toUpperCase()}
-                </motion.button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+                </motion.h2>
 
-      {/* Speed Run Win Modal */}
-      <AnimatePresence>
-        {showSpeedRunWinModal && (
-          <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md">
-            <motion.div 
-              initial={{ scale: 0.9, opacity: 0, y: 20 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              className="bg-slate-900 border-2 border-emerald-500/50 p-8 rounded-2xl max-w-md w-full text-center shadow-[0_0_50px_rgba(16,185,129,0.2)]"
-            >
-              <div className="w-20 h-20 bg-emerald-500/20 rounded-full flex items-center justify-center mx-auto mb-6 border-2 border-emerald-500/30">
-                <Trophy className="w-10 h-10 text-emerald-400" />
-              </div>
-              
-              <h2 className="text-3xl font-orbitron font-bold text-white mb-2 uppercase tracking-tighter">
-                SPEED RUN COMPLETE!
-              </h2>
-              
-              <p className="text-slate-400 mb-8 font-medium">
-                Congratulations, {playerName}! You&apos;ve mastered the galaxy in record time.
-              </p>
-              
-              <div className="bg-black/40 rounded-xl p-6 mb-8 border border-white/5">
-                <div className="text-[14px] text-slate-500 uppercase tracking-widest mb-1">Final Time</div>
-                <div className="text-4xl font-orbitron font-bold text-emerald-400 tabular-nums">
-                  {formatTime(speedRunTime)}
+                <div className="space-y-2 text-center mb-6 w-full">
+                  <motion.p
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 0.3 }}
+                    className="text-orange-500 font-orbitron font-bold text-base tracking-[0.3em] uppercase mb-2"
+                  >
+                    {t('systemUnlocked')}
+                  </motion.p>
+
+                  <div className="space-y-0.5 opacity-80">
+                    <motion.p
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ delay: 0.4 }}
+                      className="text-base md:text-[14px] font-orbitron uppercase tracking-widest text-slate-300"
+                    >
+                      {t('conqueredSolarSystem')}
+                    </motion.p>
+                    <motion.p
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ delay: 0.5 }}
+                      className="text-base md:text-[14px] font-orbitron uppercase tracking-widest text-slate-400"
+                    >
+                      {t('interstellarJourneyBegins')}
+                    </motion.p>
+                    <motion.p
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ delay: 0.6 }}
+                      className="text-base md:text-[14px] font-orbitron uppercase tracking-widest text-emerald-400 mt-2"
+                    >
+                      {t('pulsarShipReward')}
+                    </motion.p>
+                  </div>
+
+                  <motion.div
+                    initial={{ opacity: 0, y: 5 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.7 }}
+                    className="py-2"
+                  >
+                    <span className="text-red-500 font-orbitron font-black text-base md:text-[14px] tracking-[0.2em] uppercase border-y border-red-500/20 py-1 px-4">
+                      {language === 'pt' ? 'RUMO AO PRÓXIMO SALTO' : 'TOWARDS THE NEXT LEAP'}
+                    </span>
+                  </motion.div>
+
+                  <motion.p
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 0.8 }}
+                    className="text-[15px] md:text-[14px] font-orbitron uppercase tracking-widest text-slate-500 max-w-xs mx-auto leading-relaxed"
+                  >
+                    {t('legacyConversionDesc')}
+                  </motion.p>
+
+                  <motion.p
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 1.2 }}
+                    className="text-base md:text-[14px] font-orbitron font-bold uppercase tracking-[0.2em] text-orange-400/80"
+                  >
+                    {language === 'pt' ? 'RUMO AO PRÓXIMO SALTO' : 'TOWARDS THE NEXT LEAP'}
+                  </motion.p>
                 </div>
-              </div>
-              
-              <button
-                onClick={() => onReturnToMenu()}
-                className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white font-orbitron font-bold rounded-xl transition-all shadow-[0_4px_15px_rgba(16,185,129,0.3)] hover:shadow-[0_6px_20px_rgba(16,185,129,0.4)] uppercase tracking-widest"
-              >
-                RETURN TO MENU
-              </button>
+
+                <div className="flex flex-col gap-3 w-full max-w-xs">
+                  <motion.button
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ delay: 1.4 }}
+                    whileHover={{ scale: 1.05, boxShadow: "0 0 50px rgba(249,115,22,0.6)" }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => {
+                      playSfx('click');
+                      setShowRoute2Confirm(false);
+                      setShowRoute2Lore(true);
+                      setLoreLineIndex(0);
+                      setActiveBattle(null);
+                    }}
+                    className="w-full py-5 rounded-xl font-orbitron text-base bg-orange-600 text-black font-black shadow-[0_0_40px_rgba(249,115,22,0.4)] hover:bg-orange-500 transition-all uppercase tracking-[0.4em] relative overflow-hidden group"
+                  >
+                    <span className="relative z-10">{language === 'pt' ? 'INICIAR' : 'START'}</span>
+                    <motion.div
+                      animate={{ x: ['-100%', '200%'] }}
+                      transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                      className="absolute inset-0 bg-gradient-to-r from-transparent via-white/50 to-transparent -skew-x-12 pointer-events-none"
+                    />
+                  </motion.button>
+
+                  <motion.button
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 1.6 }}
+                    onClick={() => setShowRoute2Confirm(false)}
+                    className="w-full py-2 rounded-lg font-orbitron text-[15px] text-white/30 hover:text-white/60 transition-colors uppercase tracking-widest"
+                  >
+                    {t('cancel').toUpperCase()}
+                  </motion.button>
+                </div>
+              </motion.div>
             </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+          )}
+        </AnimatePresence>
+
+        {/* Speed Run Win Modal */}
+        <AnimatePresence>
+          {showSpeedRunWinModal && (
+            <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md">
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0, y: 20 }}
+                animate={{ scale: 1, opacity: 1, y: 0 }}
+                className="bg-slate-900 border-2 border-emerald-500/50 p-8 rounded-2xl max-w-md w-full text-center shadow-[0_0_50px_rgba(16,185,129,0.2)]"
+              >
+                <div className="w-20 h-20 bg-emerald-500/20 rounded-full flex items-center justify-center mx-auto mb-6 border-2 border-emerald-500/30">
+                  <Trophy className="w-10 h-10 text-emerald-400" />
+                </div>
+
+                <h2 className="text-3xl font-orbitron font-bold text-white mb-2 uppercase tracking-tighter">
+                  SPEED RUN COMPLETE!
+                </h2>
+
+                <p className="text-slate-400 mb-8 font-medium">
+                  Congratulations, {playerName}! You&apos;ve mastered the galaxy in record time.
+                </p>
+
+                <div className="bg-black/40 rounded-xl p-6 mb-8 border border-white/5">
+                  <div className="text-[14px] text-slate-500 uppercase tracking-widest mb-1">Final Time</div>
+                  <div className="text-4xl font-orbitron font-bold text-emerald-400 tabular-nums">
+                    {formatTime(speedRunTime)}
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => onReturnToMenu()}
+                  className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white font-orbitron font-bold rounded-xl transition-all shadow-[0_4px_15px_rgba(16,185,129,0.3)] hover:shadow-[0_6px_20px_rgba(16,185,129,0.4)] uppercase tracking-widest"
+                >
+                  RETURN TO MENU
+                </button>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
 
         {/* Export Modal */}
         <AnimatePresence>
@@ -7298,7 +7686,7 @@ const completeInitialMission = useCallback((missionId: string) => {
                     { id: 'achievements', label: t('achievements'), desc: t('achievementsDesc') },
                     { id: 'everything', label: t('everything'), desc: t('everythingDesc') }
                   ].map((option) => (
-                    <div 
+                    <div
                       key={option.id}
                       onClick={() => {
                         if (option.id === 'everything') {
@@ -7318,17 +7706,15 @@ const completeInitialMission = useCallback((missionId: string) => {
                           }));
                         }
                       }}
-                      className={`flex items-start gap-4 p-3 rounded-xl border cursor-pointer transition-all ${
-                        exportOptions[option.id as keyof typeof exportOptions]
+                      className={`flex items-start gap-4 p-3 rounded-xl border cursor-pointer transition-all ${exportOptions[option.id as keyof typeof exportOptions]
                           ? (isInterstellar ? 'bg-orange-500/20 border-orange-500/50' : 'bg-cyan-500/20 border-cyan-500/50')
                           : 'bg-white/5 border-white/10 hover:bg-white/10'
-                      }`}
+                        }`}
                     >
-                      <div className={`mt-1 w-4 h-4 rounded border flex items-center justify-center ${
-                        exportOptions[option.id as keyof typeof exportOptions]
+                      <div className={`mt-1 w-4 h-4 rounded border flex items-center justify-center ${exportOptions[option.id as keyof typeof exportOptions]
                           ? (isInterstellar ? 'bg-orange-500 border-orange-500' : 'bg-cyan-500 border-cyan-500')
                           : 'border-white/30'
-                      }`}>
+                        }`}>
                         {exportOptions[option.id as keyof typeof exportOptions] && <CheckCircle2 size={12} className="text-black" />}
                       </div>
                       <div className="space-y-0.5">
@@ -7362,78 +7748,84 @@ const completeInitialMission = useCallback((missionId: string) => {
           )}
         </AnimatePresence>
 
-      {/* Achievement Notification */}
-      <AnimatePresence>
-        {achievementNotification && (
-          <motion.div
-            initial={{ opacity: 0, x: 100, scale: 0.8 }}
-            animate={{ opacity: 1, x: 0, scale: 1 }}
-            exit={{ opacity: 0, x: 100, scale: 0.8 }}
-            className="fixed bottom-8 right-8 z-[1000] flex items-center gap-4 p-4 glass-panel neon-border-cyan bg-black/80 backdrop-blur-xl rounded-2xl shadow-[0_0_50px_rgba(6,182,212,0.3)]"
-          >
-            <div className="w-12 h-12 rounded-xl bg-cyan-500/20 flex items-center justify-center border border-cyan-500/40 animate-pulse-glow">
-              {(() => {
-                const icons: any = { CheckCircle2, Coins, Sword, Bot, Globe, Cpu, Skull, Rocket, TrendingUp, Zap, HistoryIcon };
-                const Icon = icons[achievementNotification.icon] || Trophy;
-                return <Icon className="w-6 h-6 text-cyan-400" />;
-              })()}
-            </div>
-            <div>
-              <h4 className="text-base font-orbitron font-black text-cyan-400 uppercase tracking-[0.2em]">Conquista Desbloqueada!</h4>
-              <p className="text-base font-orbitron font-bold text-white uppercase">{achievementNotification.name}</p>
-              <p className="text-base text-slate-400 font-mono uppercase tracking-wider">{achievementNotification.description}</p>
-            </div>
-            <div className="absolute -top-2 -right-2 w-6 h-6 bg-cyan-500 rounded-full flex items-center justify-center animate-bounce shadow-lg">
-              <Trophy className="w-3 h-3 text-black" />
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Route 2 Goals Modal */}
-      <AnimatePresence>
-        {showRoute2Goals && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[200] flex items-center justify-center bg-black/95 backdrop-blur-xl p-4"
-          >
+        {/* Achievement Notification */}
+        <AnimatePresence>
+          {achievementNotification && (
             <motion.div
-              initial={{ scale: 0.9, y: 20 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.9, y: 20 }}
-              className={`w-full max-w-4xl glass-panel ${isVoid ? 'neon-border-purple' : isInterstellar ? 'neon-border-orange' : 'neon-border-cyan'} rounded-2xl p-6 relative overflow-hidden flex flex-col max-h-[95vh]`}
+              initial={{ opacity: 0, x: 100, scale: 0.8 }}
+              animate={{ opacity: 1, x: 0, scale: 1 }}
+              exit={{ opacity: 0, x: 100, scale: 0.8 }}
+              className="fixed bottom-8 right-8 z-[1000] flex items-center gap-4 p-4 glass-panel neon-border-cyan bg-black/80 backdrop-blur-xl rounded-2xl shadow-[0_0_50px_rgba(6,182,212,0.3)]"
             >
-              <div className={`absolute inset-0 bg-gradient-to-b ${isVoid ? 'from-purple-500/5' : isInterstellar ? 'from-orange-500/5' : 'from-cyan-500/5'} to-transparent pointer-events-none`} />
-              
-              <div className="flex justify-between items-center mb-6 relative z-10">
-                <div>
-                  <h2 className={`text-xl font-orbitron font-bold text-white tracking-widest uppercase ${isVoid ? 'neon-text-purple' : isInterstellar ? 'neon-text-orange' : 'neon-text-cyan'}`}>
-                    {isVoid ? t('projectEarthGoals') : isInterstellar ? t('route3Goals') : t('route2Goals')}
-                  </h2>
-                  <p className="text-base text-slate-500 font-mono uppercase tracking-widest">
-                    {isVoid 
-                      ? t('planetaryRestorationRequirements')
-                      : isInterstellar 
-                        ? t('galacticUnlockPath')
-                        : t('interstellarUnlockPath')}
-                  </p>
-                </div>
-                <button 
-                  onClick={() => {
-                    setShowRoute2Goals(false);
-                    playSfx('close_window');
-                  }}
-                  className="p-2 hover:bg-white/10 rounded-full transition-colors"
-                >
-                  <LogOut className="w-5 h-5 text-slate-400" />
-                </button>
-              </div>
-
-              <div className="flex-1 space-y-4 relative z-10">
+              <div className="w-12 h-12 rounded-xl bg-cyan-500/20 flex items-center justify-center border border-cyan-500/40 animate-pulse-glow">
                 {(() => {
-                  const goals = isVoid 
+                  const icons: any = { CheckCircle2, Coins, Sword, Bot, Globe, Cpu, Skull, Rocket, TrendingUp, Zap, HistoryIcon };
+                  const Icon = icons[achievementNotification.icon] || Trophy;
+                  return <Icon className="w-6 h-6 text-cyan-400" />;
+                })()}
+              </div>
+              <div>
+                <h4 className="text-base font-orbitron font-black text-cyan-400 uppercase tracking-[0.2em]">Conquista Desbloqueada!</h4>
+                <p className="text-base font-orbitron font-bold text-white uppercase">{achievementNotification.name}</p>
+                <p className="text-base text-slate-400 font-mono uppercase tracking-wider">{achievementNotification.description}</p>
+              </div>
+              <div className="absolute -top-2 -right-2 w-6 h-6 bg-cyan-500 rounded-full flex items-center justify-center animate-bounce shadow-lg">
+                <Trophy className="w-3 h-3 text-black" />
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Route 2 Goals Modal */}
+        <AnimatePresence>
+          {showRoute2Goals && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[200] flex items-center justify-center bg-black/95 backdrop-blur-xl p-4"
+            >
+              <motion.div
+                initial={{ scale: 0.9, y: 20 }}
+                animate={{ scale: 1, y: 0 }}
+                exit={{ scale: 0.9, y: 20 }}
+                className={`w-full max-w-4xl glass-panel ${isVoid ? 'neon-border-purple' : isInterstellar ? 'neon-border-orange' : 'neon-border-cyan'} rounded-2xl p-6 relative overflow-hidden flex flex-col max-h-[95vh]`}
+              >
+                <div className={`absolute inset-0 bg-gradient-to-b ${isVoid ? 'from-purple-500/5' : isInterstellar ? 'from-orange-500/5' : 'from-cyan-500/5'} to-transparent pointer-events-none`} />
+
+                <div className="flex justify-between items-center mb-6 relative z-10">
+                  <div>
+                    <h2 className={`text-xl font-orbitron font-bold text-white tracking-widest uppercase ${isVoid ? 'neon-text-purple' : isInterstellar ? 'neon-text-orange' : 'neon-text-cyan'}`}>
+                      {isVoid ? t('projectEarthGoals') : isInterstellar ? t('route3Goals') : t('route2Goals')}
+                    </h2>
+                    <p className="text-base text-slate-500 font-mono uppercase tracking-widest">
+                      {isVoid
+                        ? t('planetaryRestorationRequirements')
+                        : isInterstellar
+                          ? t('galacticUnlockPath')
+                          : t('interstellarUnlockPath')}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setShowRoute2Goals(false);
+                      playSfx('close_window');
+                    }}
+                    className="p-2 hover:bg-white/10 rounded-full transition-colors"
+                  >
+                    <LogOut className="w-5 h-5 text-slate-400" />
+                  </button>
+                </div>
+
+                {(() => {
+                  const solarStats = historyStats['Solar'] || {};
+                  const interstellarStats = historyStats['Interstellar'] || {};
+
+                  const aggregatedMissions = isInterstellar ? (solarStats.missionsCompleted || 0) + (interstellarStats.missionsCompleted || 0) : (solarStats.missionsCompleted || 0);
+                  const aggregatedQC = isInterstellar ? (solarStats.qcTotalAcquired || 0) + (interstellarStats.qcTotalAcquired || 0) : (solarStats.qcTotalAcquired || 0);
+                  const aggregatedDeliveries = isInterstellar ? (solarStats.deliveries || 0) + (interstellarStats.deliveries || 0) : (solarStats.deliveries || 0);
+
+                  const goals = isVoid
                     ? [
                       { id: 'energy', label: t('quantumCellsSent'), progress: earthReconstructionProgress.energy, current: (earthReconstructionProgress.energy || 0).toFixed(1) + '%', target: '100%' },
                       { id: 'minerals', label: t('compactedMineralCoresSent'), progress: earthReconstructionProgress.minerals, current: (earthReconstructionProgress.minerals || 0).toFixed(1) + '%', target: '100%' },
@@ -7444,738 +7836,772 @@ const completeInitialMission = useCallback((missionId: string) => {
                     : [
                       { id: 'techs', label: t('unlockAllTechs'), progress: (unlockedTechLevels[isInterstellar ? 'Interstellar' : 'Solar'] || 0) / (TECHNOLOGIES.filter(t => t.tier === (isInterstellar ? 'Interstellar' : 'Solar')).length) * 100, current: unlockedTechLevels[isInterstellar ? 'Interstellar' : 'Solar'] || 0, target: TECHNOLOGIES.filter(t => t.tier === (isInterstellar ? 'Interstellar' : 'Solar')).length },
                       { id: 'ships', label: t('buyAllShips'), progress: (Object.entries(ownedShips).filter(([k]) => k.startsWith(isInterstellar ? 'Interstellar' : 'Solar')).reduce((acc, [, v]) => acc + Math.min(5, v), 0) / (SHIPS.filter(s => s.tier === (isInterstellar ? 'Interstellar' : 'Solar')).length * 5)) * 100, current: Object.entries(ownedShips).filter(([k]) => k.startsWith(isInterstellar ? 'Interstellar' : 'Solar')).reduce((acc, [, v]) => acc + Math.min(5, v), 0), target: SHIPS.filter(s => s.tier === (isInterstellar ? 'Interstellar' : 'Solar')).length * 5 },
-                      { id: 'upgrades', label: t('buyAllUpgrades'), progress: (Object.entries(techLevels).filter(([id]) => ROUTES_MAP.get(id)?.tier === (isInterstellar ? 'Interstellar' : 'Solar')).reduce((acc, [, levels]) => acc + Object.values(levels).reduce((a, b) => a + b, 0), 0) / (ROUTES.filter(r => r.tier === (isInterstellar ? 'Interstellar' : 'Solar')).length * UPGRADES.reduce((acc, u) => acc + u.tiers.length, 0))) * 100, current: Object.entries(techLevels).filter(([id]) => ROUTES_MAP.get(id)?.tier === (isInterstellar ? 'Interstellar' : 'Solar')).reduce((acc, [, levels]) => acc + Object.values(levels).reduce((a, b) => a + b, 0), 0), target: ROUTES.filter(r => r.tier === (isInterstellar ? 'Interstellar' : 'Solar')).length * UPGRADES.reduce((acc, u) => acc + u.tiers.length, 0) },
+                      { id: 'upgrades', label: t('buyAllUpgrades'), progress: (Object.entries(techLevels).filter(([id]) => ROUTES_MAP.get(id)?.tier === (isInterstellar ? 'Interstellar' : 'Solar')).reduce((acc, [, levels]) => acc + Object.values(levels).reduce((a, b) => a + b, 0), 0) / (ROUTES.filter(r => r.tier === (isInterstellar ? 'Interstellar' : 'Solar')).length * 21)) * 100, current: Object.entries(techLevels).filter(([id]) => ROUTES_MAP.get(id)?.tier === (isInterstellar ? 'Interstellar' : 'Solar')).reduce((acc, [, levels]) => acc + Object.values(levels).reduce((a, b) => a + b, 0), 0), target: ROUTES.filter(r => r.tier === (isInterstellar ? 'Interstellar' : 'Solar')).length * 21 },
                       { id: 'auto', label: t('buyAllAutoSlots'), progress: (Object.entries(autoTravelSlots).filter(([id]) => ROUTES_MAP.get(id)?.tier === (isInterstellar ? 'Interstellar' : 'Solar')).reduce((acc, [, v]) => acc + v, 0) / (ROUTES.filter(r => r.tier === (isInterstellar ? 'Interstellar' : 'Solar')).length * 5)) * 100, current: Object.entries(autoTravelSlots).filter(([id]) => ROUTES_MAP.get(id)?.tier === (isInterstellar ? 'Interstellar' : 'Solar')).reduce((acc, [, v]) => acc + v, 0), target: ROUTES.filter(r => r.tier === (isInterstellar ? 'Interstellar' : 'Solar')).length * 5 },
                       { id: 'robots', label: t('buyAllRobots'), progress: (Object.entries(miningRobots).filter(([id]) => ORES_MAP.get(id)?.tier === (isInterstellar ? 'Interstellar' : 'Solar')).reduce((acc, [, v]) => acc + v, 0) / (ORES.filter(o => o.tier === (isInterstellar ? 'Interstellar' : 'Solar')).length * 5)) * 100, current: Object.entries(miningRobots).filter(([id]) => ORES_MAP.get(id)?.tier === (isInterstellar ? 'Interstellar' : 'Solar')).reduce((acc, [, v]) => acc + v, 0), target: ORES.filter(o => o.tier === (isInterstellar ? 'Interstellar' : 'Solar')).length * 5 },
                       { id: 'robotLevels', label: t('upgradeAllRobotsMax'), progress: (Object.entries(miningRobotLevels).filter(([id]) => ORES_MAP.get(id)?.tier === (isInterstellar ? 'Interstellar' : 'Solar')).reduce((acc, [, v]) => acc + v, 0) / (ORES.filter(o => o.tier === (isInterstellar ? 'Interstellar' : 'Solar')).length * 5)) * 100, current: Object.entries(miningRobotLevels).filter(([id]) => ORES_MAP.get(id)?.tier === (isInterstellar ? 'Interstellar' : 'Solar')).reduce((acc, [, v]) => acc + v, 0), target: ORES.filter(o => o.tier === (isInterstellar ? 'Interstellar' : 'Solar')).length * 5 },
                       { id: 'compressions', label: t('upgradeRefinedCompression'), progress: (Object.entries(miningCompressionLevels).filter(([id]) => ORES_MAP.get(id)?.tier === (isInterstellar ? 'Interstellar' : 'Solar')).reduce((acc, [, v]) => acc + v, 0) / (ORES.filter(o => o.tier === (isInterstellar ? 'Interstellar' : 'Solar')).length * 10)) * 100, current: Object.entries(miningCompressionLevels).filter(([id]) => ORES_MAP.get(id)?.tier === (isInterstellar ? 'Interstellar' : 'Solar')).reduce((acc, [, v]) => acc + v, 0), target: ORES.filter(o => o.tier === (isInterstellar ? 'Interstellar' : 'Solar')).length * 10 },
-                      { id: 'missions', label: `${t('missions')} ${language === 'pt' ? 'Concluídas' : 'Completed'}`, progress: Math.min(100, ((historyStats[isInterstellar ? 'Interstellar' : 'Solar']?.missionsCompleted || 0) / (isInterstellar ? 1000 : 100)) * 100), current: historyStats[isInterstellar ? 'Interstellar' : 'Solar']?.missionsCompleted || 0, target: isInterstellar ? 1000 : 100 },
-                      { id: 'qc', label: `${t('reachQC')} ${isInterstellar ? '999 trilhÃµes' : '1 trilhão'} QC`, progress: Math.min(100, ((historyStats[isInterstellar ? 'Interstellar' : 'Solar']?.qcTotalAcquired || 0) / (isInterstellar ? 999000000000000 : 1000000000000)) * 100), current: formatValue(historyStats[isInterstellar ? 'Interstellar' : 'Solar']?.qcTotalAcquired || 0), target: formatValue(isInterstellar ? 999000000000000 : 1000000000000) },
-                      { id: 'deliveries', label: `${t('total')} ${isInterstellar ? 9999 : 3000} ${t('deliveries')}`, progress: Math.min(100, ((historyStats[isInterstellar ? 'Interstellar' : 'Solar']?.deliveries || 0) / (isInterstellar ? 9999 : 3000)) * 100), current: historyStats[isInterstellar ? 'Interstellar' : 'Solar']?.deliveries || 0, target: isInterstellar ? 9999 : 3000 },
+                      { id: 'missions', label: `${t('missions')} ${language === 'pt' ? 'Concluídas' : 'Completed'}`, progress: Math.min(100, (aggregatedMissions / (isInterstellar ? 1000 : 100)) * 100), current: aggregatedMissions, target: isInterstellar ? 1000 : 100 },
+                      { id: 'qc', label: `${t('reachQC')} ${isInterstellar ? '999 trilhões' : '1 trilhão'} QC`, progress: Math.min(100, (aggregatedQC / (isInterstellar ? 999000000000000 : 1000000000000)) * 100), current: formatValue(aggregatedQC), target: formatValue(isInterstellar ? 999000000000000 : 1000000000000) },
+                      { id: 'deliveries', label: `${t('total')} ${isInterstellar ? 9999 : 3000} ${t('deliveries')}`, progress: Math.min(100, (aggregatedDeliveries / (isInterstellar ? 9999 : 3000)) * 100), current: aggregatedDeliveries, target: isInterstellar ? 9999 : 3000 },
                     ];
 
-                  return <EconomicGoals goals={goals as any} isInterstellar={isInterstellar} />;
+                  const allGoalsMet = goals.every(g => g.progress >= 99.9);
+
+                  return (
+                    <>
+                      <div className="flex-1 space-y-4 relative z-10">
+                        <EconomicGoals goals={goals as any} isInterstellar={isInterstellar} />
+                      </div>
+
+                      <div className="mt-8 pt-6 border-t border-white/5 flex justify-between items-center relative z-10">
+                        <div className="flex items-center gap-2">
+                          <div className={`w-2 h-2 rounded-full ${isInterstellar ? 'bg-orange-500' : 'bg-cyan-500'} animate-pulse`} />
+                          <span className="text-[14px] text-slate-500 font-mono uppercase tracking-widest">
+                            {language === 'pt' ? 'Sincronização em tempo real' : 'Real-time synchronization'}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          {allGoalsMet && !isVoid && (
+                            <button
+                              onClick={() => {
+                                setShowRoute2Goals(false);
+                                playSfx('click');
+                                if (isInterstellar) {
+                                  setShowRoute3Info(true);
+                                } else {
+                                  setShowRoute2Info(true);
+                                }
+                              }}
+                              className={`px-8 py-3 rounded-xl font-orbitron font-black text-[14px] tracking-[0.2em] transition-all uppercase flex items-center gap-2 ${isInterstellar
+                                  ? 'bg-purple-600 text-white hover:bg-purple-500 shadow-[0_0_20px_rgba(168,85,247,0.4)]'
+                                  : 'bg-orange-600 text-black hover:bg-orange-500 shadow-[0_0_20px_rgba(249,115,22,0.4)]'
+                                }`}
+                            >
+                              <Rocket className="w-4 h-4" />
+                              {language === 'pt' ? 'INICIAR' : 'START'}
+                            </button>
+                          )}
+                          <button
+                            onClick={() => {
+                              setShowRoute2Goals(false);
+                              playSfx('close_window');
+                            }}
+                            className={`px-8 py-3 rounded-xl font-orbitron font-bold text-[14px] tracking-[0.2em] transition-all uppercase ${isInterstellar ? 'bg-orange-500 text-black hover:bg-orange-400' : 'bg-cyan-500 text-black hover:bg-cyan-400'
+                              }`}
+                          >
+                            {t('close')}
+                          </button>
+                        </div>
+                      </div>
+                    </>
+                  );
                 })()}
-              </div>
-
-              <div className="mt-8 pt-6 border-t border-white/5 flex justify-between items-center relative z-10">
-                <div className="flex items-center gap-2">
-                  <div className={`w-2 h-2 rounded-full ${isInterstellar ? 'bg-orange-500' : 'bg-cyan-500'} animate-pulse`} />
-                  <span className="text-[14px] text-slate-500 font-mono uppercase tracking-widest">
-                    {language === 'pt' ? 'Sincronização em tempo real' : 'Real-time synchronization'}
-                  </span>
-                </div>
-                <button
-                  onClick={() => {
-                    setShowRoute2Goals(false);
-                    playSfx('close_window');
-                  }}
-                  className={`px-8 py-3 rounded-xl font-orbitron font-bold text-[14px] tracking-[0.2em] transition-all uppercase ${
-                    isInterstellar ? 'bg-orange-500 text-black hover:bg-orange-400' : 'bg-cyan-500 text-black hover:bg-cyan-400'
-                  }`}
-                >
-                  {t('close')}
-                </button>
-              </div>
+              </motion.div>
             </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          )}
+        </AnimatePresence>
 
 
-      {/* Skill Map Modal */}
-      <SkillMap 
-        show={showSkillMap}
-        onClose={() => {
-          setShowSkillMap(false);
-          playSfx('close_window');
-        }}
-        isInterstellar={isInterstellar}
-        language={language}
-        qc={qc}
-        setQc={setQc}
-        onUpgrade={handleSkillUpgrade}
-        formatValue={formatValue}
-        playSfx={playSfx}
-        addLog={addLog}
-        t={t}
-        updateHistoryStats={updateHistoryStats}
-        skills={[
-          { 
-            id: 'lendaria', 
-            name: language === 'pt' ? 'Chance de Missão Lendária' : 'Legendary Mission Chance', 
-            desc: language === 'pt' ? '+1% de chance por nível' : '+1% chance per level', 
-            level: skillLendariaLevel[routeTier], 
-            max: 15, 
-            baseCost: routeTier === 'Solar' ? 5000 : 10000, 
-            mult: 2.5,
-            setter: (val: number) => setSkillLendariaLevel(prev => ({ ...prev, [routeTier]: val })),
-            icon: Trophy,
-            color: 'text-orange-400'
-          },
-          { 
-            id: 'mitica', 
-            name: language === 'pt' ? 'Chance de Missão Mítica' : 'Mythic Mission Chance', 
-            desc: language === 'pt' ? '+1% de chance por nível' : '+1% chance per level', 
-            level: skillMiticaLevel[routeTier], 
-            max: 15, 
-            baseCost: routeTier === 'Solar' ? 32500 : 50000, 
-            mult: 3,
-            setter: (val: number) => setSkillMiticaLevel(prev => ({ ...prev, [routeTier]: val })),
-            icon: Zap,
-            color: 'text-slate-300'
-          },
-          { 
-            id: 'alien', 
-            name: language === 'pt' ? 'Chance de Missão Alien' : 'Alien Mission Chance', 
-            desc: language === 'pt' ? '+1% de chance por nível' : '+1% chance per level', 
-            level: skillAlienLevel[routeTier], 
-            max: 15, 
-            baseCost: routeTier === 'Solar' ? 150000 : 250000, 
-            mult: 4,
-            setter: (val: number) => setSkillAlienLevel(prev => ({ ...prev, [routeTier]: val })),
-            icon: Globe,
-            color: 'text-green-400'
-          },
-          { 
-            id: 'tempo', 
-            name: language === 'pt' ? 'Tempo é dinheiro' : 'Time is Money', 
-            desc: language === 'pt' ? '-1 entrega por nível (Base: 20)' : '-1 delivery per level (Base: 20)', 
-            level: skillTempoDinheiroLevel[routeTier], 
-            max: 15, 
-            baseCost: routeTier === 'Solar' ? 9750 : 15000, 
-            mult: 2.2,
-            setter: (val: number) => setSkillTempoDinheiroLevel(prev => ({ ...prev, [routeTier]: val })),
-            icon: Clock,
-            color: 'text-cyan-400'
-          },
-          { 
-            id: 'robos', 
-            name: language === 'pt' ? 'RobÃ´s Olímpicos' : 'Olympic Robots', 
-            desc: language === 'pt' ? '-1 pack por nível (Base: 10)' : '-1 pack per level (Base: 10)', 
-            level: skillRobosOlimpicosLevel[routeTier], 
-            max: 10, 
-            baseCost: routeTier === 'Solar' ? 13000 : 20000, 
-            mult: 2.8,
-            setter: (val: number) => setSkillRobosOlimpicosLevel(prev => ({ ...prev, [routeTier]: val })),
-            icon: Pickaxe,
-            color: 'text-yellow-400'
-        }
-      ]}
-    />
+        {/* Skill Map Modal */}
+        <SkillMap
+          show={showSkillMap}
+          onClose={() => {
+            setShowSkillMap(false);
+            playSfx('close_window');
+          }}
+          isInterstellar={isInterstellar}
+          language={language}
+          qc={qc}
+          setQc={setQc}
+          onUpgrade={handleSkillUpgrade}
+          formatValue={formatValue}
+          playSfx={playSfx}
+          addLog={addLog}
+          t={t}
+          updateHistoryStats={updateHistoryStats}
+          skills={[
+            {
+              id: 'lendaria',
+              name: language === 'pt' ? 'Chance de Missão Lendária' : 'Legendary Mission Chance',
+              desc: language === 'pt' ? '+1% de chance por nível' : '+1% chance per level',
+              level: skillLendariaLevel[routeTier],
+              max: 15,
+              baseCost: routeTier === 'Solar' ? 5000 : 10000,
+              mult: 2.5,
+              setter: (val: number) => setSkillLendariaLevel(prev => ({ ...prev, [routeTier]: val })),
+              icon: Trophy,
+              color: 'text-orange-400'
+            },
+            {
+              id: 'mitica',
+              name: language === 'pt' ? 'Chance de Missão Mítica' : 'Mythic Mission Chance',
+              desc: language === 'pt' ? '+1% de chance por nível' : '+1% chance per level',
+              level: skillMiticaLevel[routeTier],
+              max: 15,
+              baseCost: routeTier === 'Solar' ? 32500 : 50000,
+              mult: 3,
+              setter: (val: number) => setSkillMiticaLevel(prev => ({ ...prev, [routeTier]: val })),
+              icon: Zap,
+              color: 'text-slate-300'
+            },
+            {
+              id: 'alien',
+              name: language === 'pt' ? 'Chance de Missão Alien' : 'Alien Mission Chance',
+              desc: language === 'pt' ? '+1% de chance por nível' : '+1% chance per level',
+              level: skillAlienLevel[routeTier],
+              max: 15,
+              baseCost: routeTier === 'Solar' ? 150000 : 250000,
+              mult: 4,
+              setter: (val: number) => setSkillAlienLevel(prev => ({ ...prev, [routeTier]: val })),
+              icon: Globe,
+              color: 'text-green-400'
+            },
+            {
+              id: 'tempo',
+              name: language === 'pt' ? 'Tempo é dinheiro' : 'Time is Money',
+              desc: language === 'pt' ? '-1 entrega por nível (Base: 20)' : '-1 delivery per level (Base: 20)',
+              level: skillTempoDinheiroLevel[routeTier],
+              max: 15,
+              baseCost: routeTier === 'Solar' ? 9750 : 15000,
+              mult: 2.2,
+              setter: (val: number) => setSkillTempoDinheiroLevel(prev => ({ ...prev, [routeTier]: val })),
+              icon: Clock,
+              color: 'text-cyan-400'
+            },
+            {
+              id: 'robos',
+              name: language === 'pt' ? 'Robôs Olímpicos' : 'Olympic Robots',
+              desc: language === 'pt' ? '-1 pack por nível (Base: 10)' : '-1 pack per level (Base: 10)',
+              level: skillRobosOlimpicosLevel[routeTier],
+              max: 10,
+              baseCost: routeTier === 'Solar' ? 13000 : 20000,
+              mult: 2.8,
+              setter: (val: number) => setSkillRobosOlimpicosLevel(prev => ({ ...prev, [routeTier]: val })),
+              icon: Pickaxe,
+              color: 'text-yellow-400'
+            }
+          ]}
+        />
 
-      {/* Reset Confirmation Modal */}
-      <AnimatePresence>
-        {showResetConfirm && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[200] flex items-center justify-center bg-black/95 backdrop-blur-xl p-4"
-          >
+        {/* Reset Confirmation Modal */}
+        <AnimatePresence>
+          {showResetConfirm && (
             <motion.div
-              initial={{ scale: 0.9, y: 20 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.9, y: 20 }}
-              className={`w-full max-w-sm glass-panel ${isInterstellar ? 'neon-border-orange' : 'neon-border-cyan'} rounded-2xl p-8 text-center relative overflow-hidden`}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[200] flex items-center justify-center bg-black/95 backdrop-blur-xl p-4"
             >
-              <div className={`absolute inset-0 bg-gradient-to-b ${isInterstellar ? 'from-orange-500/10' : 'from-cyan-500/10'} to-transparent pointer-events-none`} />
-              
-              <AlertTriangle className="w-16 h-16 text-rose-500 mx-auto mb-6 animate-pulse" />
-              
-              <h2 className={`text-xl font-orbitron font-bold text-white mb-4 tracking-widest uppercase ${isInterstellar ? 'neon-text-orange' : 'neon-text-cyan'}`}>
-                {t('confirmReset')}
-              </h2>
-              
-              <p className="text-[14px] font-orbitron text-slate-400 mb-8 leading-relaxed uppercase tracking-wider">
-                {t('resetWarning') || 'This will permanently delete all your progress, ships, and upgrades. This action cannot be undone.'}
-              </p>
+              <motion.div
+                initial={{ scale: 0.9, y: 20 }}
+                animate={{ scale: 1, y: 0 }}
+                exit={{ scale: 0.9, y: 20 }}
+                className={`w-full max-w-sm glass-panel ${isInterstellar ? 'neon-border-orange' : 'neon-border-cyan'} rounded-2xl p-8 text-center relative overflow-hidden`}
+              >
+                <div className={`absolute inset-0 bg-gradient-to-b ${isInterstellar ? 'from-orange-500/10' : 'from-cyan-500/10'} to-transparent pointer-events-none`} />
 
-              <div className="grid grid-cols-2 gap-4">
-                <button
-                  onClick={() => setShowResetConfirm(false)}
-                  className="py-3 rounded-lg font-orbitron text-base border border-white/10 text-white/60 hover:bg-white/5 transition-all uppercase tracking-widest"
-                >
-                  {t('cancel').toUpperCase()}
-                </button>
-                <button
-                  onClick={async () => {
-                    isResettingRef.current = true;
-                    setIsLoaded(false);
+                <AlertTriangle className="w-16 h-16 text-rose-500 mx-auto mb-6 animate-pulse" />
 
-                    // 1. Zerar todos os refs ANTES de qualquer outra coisa
-                    qcRef.current = 100;
-                    lastFlushedQcRef.current = 100;
-                    aetherionRef.current = 0;
-                    lastFlushedAetherionRef.current = 0;
-                    miningWasteRef.current = 0;
-                    lastFlushedWasteRef.current = 0;
-                    solarEnergyRef.current = 0;
-                    lastFlushedSolarRef.current = 0;
-                    aetherionTubesRef.current = 0;
-                    lastFlushedTubesRef.current = 0;
-                    ownedShipsRef.current = {};
-                    unlockedRouteIdsRef.current = [];
-                    techLevelsRef.current = {};
-                    unlockedTechLevelsRef.current = {};
-                    autoTravelSlotsRef.current = {};
-                    autoTravelActiveRef.current = {};
-                    autoTravelDesiredRef.current = {};
-                    miningRobotsRef.current = {};
-                    miningRobotLevelsRef.current = {};
-                    oresCollectedRef.current = {};
-                    historyStatsRef.current = {};
-                    battleLevelRef.current = 1;
-                    routeTierRef.current = 'Solar';
-                    pendingMissionProgressRef.current = {};
+                <h2 className={`text-xl font-orbitron font-bold text-white mb-4 tracking-widest uppercase ${isInterstellar ? 'neon-text-orange' : 'neon-text-cyan'}`}>
+                  {t('confirmReset')}
+                </h2>
 
-                    // 2. Resetar Redux
-                    dispatch({ type: 'RESET_GAME' });
-
-                    // 3. Apagar O SERVIDOR também â€” não só o localStorage
-                    try {
-                      await fetch('/api/save?key=time_travel_save', { method: 'DELETE' });
-                      await fetch('/api/save?key=speed_run_save', { method: 'DELETE' });
-                      await fetch('/api/save?key=colonies_data', { method: 'DELETE' });
-                    } catch (e) {
-                      console.warn('Server delete failed, continuing reset', e);
-                    }
-
-                    // 4. Apagar localStorage e sessionStorage completamente
-                    localStorage.clear();
-                    sessionStorage.clear();
-
-                    // 5. Reload sem cache buster na URL
-                    window.location.replace(window.location.origin + window.location.pathname);
-                  }}
-                  className="py-3 rounded-lg font-orbitron text-base bg-rose-600 text-white font-bold shadow-[0_0_20px_rgba(225,29,72,0.3)] hover:bg-rose-500 transition-all uppercase tracking-widest"
-                >
-                  {t('reset').toUpperCase()}
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Tutorial Modal */}
-      <AnimatePresence>
-        {activeTutorial && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.9, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className={`glass-panel ${isInterstellar ? 'neon-border-orange' : 'neon-border-cyan'} max-w-md w-full p-8 rounded-2xl relative overflow-hidden`}
-            >
-              <div className={`absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-${isInterstellar ? 'orange' : 'cyan'}-500 to-transparent`} />
-              
-              <div className="flex flex-col items-center text-center space-y-6">
-                <div className={`w-16 h-16 rounded-full ${isInterstellar ? 'bg-orange-500/10 border-orange-500/30' : 'bg-cyan-500/10 border-cyan-500/30'} flex items-center justify-center border`}>
-                  <Info className={`w-8 h-8 ${isInterstellar ? 'text-orange-400' : 'text-cyan-400'}`} />
-                </div>
-                
-                <div className="space-y-2">
-                  <h2 className={`text-xl font-orbitron font-bold text-white uppercase tracking-widest ${isInterstellar ? 'neon-text-orange' : 'neon-text-cyan'}`}>
-                    {t(`tutorial${activeTutorial.charAt(0).toUpperCase() + activeTutorial.slice(1)}Title` as any)}
-                  </h2>
-                  <div className={`h-0.5 w-12 ${isInterstellar ? 'bg-orange-500/30' : 'bg-cyan-500/30'} mx-auto`} />
-                </div>
-                
-                <p className="text-base text-slate-300 leading-relaxed font-inter">
-                  {t(`tutorial${activeTutorial.charAt(0).toUpperCase() + activeTutorial.slice(1)}Desc` as any)}
+                <p className="text-[14px] font-orbitron text-slate-400 mb-8 leading-relaxed uppercase tracking-wider">
+                  {t('resetWarning') || 'This will permanently delete all your progress, ships, and upgrades. This action cannot be undone.'}
                 </p>
-                
-                <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-lg px-4 py-2 flex items-center gap-2">
-                  <Coins className="w-4 h-4 text-emerald-400" />
-                  <span className="text-[14px] font-orbitron text-emerald-400 font-bold uppercase tracking-widest">
-                    {activeTutorial === 'routes2' ? t('tutorialRoutes2Bonus') : t('tutorialBonus')}
-                  </span>
-                </div>
-                
-                <button
-                  onClick={closeTutorial}
-                  className={`w-full py-4 ${isInterstellar ? 'bg-orange-500 hover:bg-orange-400 shadow-[0_0_30px_rgba(249,115,22,0.3)]' : 'bg-cyan-500 hover:bg-cyan-400 shadow-[0_0_30px_rgba(6,182,212,0.3)]'} text-black font-orbitron font-bold text-[14px] tracking-[0.3em] rounded-xl transition-all active:scale-95 uppercase`}
-                >
-                  {t('close')}
-                </button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
 
-      {/* Doom Protocol Info Modal */}
-      <AnimatePresence>
-        {showDoomProtocolInfo && (
-          <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.8, rotateX: -20 }}
-              animate={{ opacity: 1, scale: 1, rotateX: 0 }}
-              exit={{ opacity: 0, scale: 0.8, rotateX: 20 }}
-              transition={{ type: "spring", damping: 25, stiffness: 300 }}
-              className="relative max-w-xl w-full overflow-hidden rounded-3xl border border-white/20 shadow-[0_0_50px_rgba(59,130,246,0.3)]"
-            >
-              {/* Cyberpunk Gradient Background */}
-              <div className="absolute inset-0 bg-gradient-to-br from-blue-900/90 via-purple-900/90 to-red-900/90" />
-              <div className="absolute inset-0 bg-[url()] opacity-20 mix-blend-overlay" />
-              
-              {/* Animated Scanline Effect */}
-              <div className="absolute inset-0 pointer-events-none overflow-hidden">
-                <motion.div 
-                   animate={{ y: ["0%", "100%"] }}
-                  transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
-                  className="w-full h-1/4 bg-gradient-to-b from-transparent via-blue-500/10 to-transparent"
-                />
-              </div>
-
-              <div className="relative p-8 space-y-6">
-                {/* Header with Blinking Icon */}
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-4">
-                    <motion.div
-                      animate={{ opacity: [1, 0.4, 1] }}
-                      transition={{ duration: 1.5, repeat: Infinity }}
-                      className="w-12 h-12 rounded-xl bg-blue-500/30 border border-blue-400/50 flex items-center justify-center shadow-[0_0_15px_rgba(59,130,246,0.5)]"
-                    >
-                      <ShieldAlert className="w-6 h-6 text-blue-400" />
-                    </motion.div>
-                    <div>
-                      <h2 className="text-2xl font-black text-white uppercase tracking-[0.2em] font-orbitron italic">
-                        DOOM PROTOCOL
-                      </h2>
-                      <div className="h-1 w-24 bg-gradient-to-r from-blue-500 via-purple-500 to-red-500 rounded-full" />
-                    </div>
-                  </div>
-                  <button 
-                    onClick={() => setShowDoomProtocolInfo(false)}
-                    className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center hover:bg-white/20 transition-colors border border-white/10"
+                <div className="grid grid-cols-2 gap-4">
+                  <button
+                    onClick={() => setShowResetConfirm(false)}
+                    className="py-3 rounded-lg font-orbitron text-base border border-white/10 text-white/60 hover:bg-white/5 transition-all uppercase tracking-widest"
                   >
-                    <X className="w-4 h-4 text-white" />
+                    {t('cancel').toUpperCase()}
+                  </button>
+                  <button
+                    onClick={async () => {
+                      isResettingRef.current = true;
+                      setIsLoaded(false);
+
+                      // 1. Zerar todos os refs ANTES de qualquer outra coisa
+                      qcRef.current = 100;
+                      lastFlushedQcRef.current = 100;
+                      aetherionRef.current = 0;
+                      lastFlushedAetherionRef.current = 0;
+                      miningWasteRef.current = 0;
+                      lastFlushedWasteRef.current = 0;
+                      solarEnergyRef.current = 0;
+                      lastFlushedSolarRef.current = 0;
+                      aetherionTubesRef.current = 0;
+                      lastFlushedTubesRef.current = 0;
+                      ownedShipsRef.current = {};
+                      unlockedRouteIdsRef.current = [];
+                      techLevelsRef.current = {};
+                      unlockedTechLevelsRef.current = {};
+                      autoTravelSlotsRef.current = {};
+                      autoTravelActiveRef.current = {};
+                      autoTravelDesiredRef.current = {};
+                      miningRobotsRef.current = {};
+                      miningRobotLevelsRef.current = {};
+                      oresCollectedRef.current = {};
+                      historyStatsRef.current = {};
+                      battleLevelRef.current = 1;
+                      routeTierRef.current = 'Solar';
+                      pendingMissionProgressRef.current = {};
+
+                      // 2. Resetar Redux
+                      dispatch({ type: 'RESET_GAME' });
+
+                      // 3. Apagar O SERVIDOR também é um procedimento padrão, não só o localStorage
+                      try {
+                        await fetch('/api/save?key=time_travel_save', { method: 'DELETE' });
+                        await fetch('/api/save?key=speed_run_save', { method: 'DELETE' });
+                        await fetch('/api/save?key=colonies_data', { method: 'DELETE' });
+                      } catch (e) {
+                        console.warn('Server delete failed, continuing reset', e);
+                      }
+
+                      // 4. Apagar localStorage e sessionStorage completamente
+                      localStorage.clear();
+                      sessionStorage.clear();
+
+                      // 5. Reload sem cache buster na URL
+                      window.location.replace(window.location.origin + window.location.pathname);
+                    }}
+                    className="py-3 rounded-lg font-orbitron text-base bg-rose-600 text-white font-bold shadow-[0_0_20px_rgba(225,29,72,0.3)] hover:bg-rose-500 transition-all uppercase tracking-widest"
+                  >
+                    {t('reset').toUpperCase()}
                   </button>
                 </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-                {/* Content */}
-                <div className="space-y-4">
-                  <div className="text-base text-blue-100 leading-relaxed font-inter font-medium drop-shadow-md space-y-3">
-                    {language === 'pt' ? (
-                      <>
-                        <p className="text-blue-400 font-bold">Doom Protocol!</p>
-                        <p>Um sistema de intervenção tática projetado para garantir superioridade em combate automático.</p>
-                        <p>Ao contratar unidades especializadas, você aumenta drasticamente suas chances de vitória em confrontos pelo cosmos — seja em encontros aleatórios automáticos ou ao pular batalhas de radar.</p>
-                        <p className="pt-2 border-t border-white/10">
-                          <span className="text-purple-400 font-bold">O excesso de eficiência é recompensado:</span><br />
-                          Toda chance de vitória que ultrapassar 100% é convertida em bônus adicionais sobre os recursos conquistados (apenas em resoluções automáticas).
-                        </p>
-                      </>
-                    ) : (
-                      <>
-                        <p className="text-blue-400 font-bold">Doom Protocol!</p>
-                        <p>A tactical intervention system designed to ensure superiority in automatic combat.</p>
-                        <p>By hiring specialized units, you drastically increase your victory chances in confrontations across the cosmos — in automatic random encounters or when skipping radar battles.</p>
-                        <p className="pt-2 border-t border-white/10">
-                          <span className="text-purple-400 font-bold">Excess efficiency is rewarded:</span><br />
-                          Every victory chance exceeding 100% is converted into additional bonuses on conquered resources (automatic resolution only).
-                        </p>
-                      </>
-                    )}
+        {/* Tutorial Modal */}
+        <AnimatePresence>
+          {activeTutorial && (
+            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                className={`glass-panel ${isInterstellar ? 'neon-border-orange' : 'neon-border-cyan'} max-w-md w-full p-8 rounded-2xl relative overflow-hidden`}
+              >
+                <div className={`absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-${isInterstellar ? 'orange' : 'cyan'}-500 to-transparent`} />
+
+                <div className="flex flex-col items-center text-center space-y-6">
+                  <div className={`w-16 h-16 rounded-full ${isInterstellar ? 'bg-orange-500/10 border-orange-500/30' : 'bg-cyan-500/10 border-cyan-500/30'} flex items-center justify-center border`}>
+                    <Info className={`w-8 h-8 ${isInterstellar ? 'text-orange-400' : 'text-cyan-400'}`} />
                   </div>
-                  
-                  <div className="grid grid-cols-3 gap-2 pt-4">
-                    <div className="h-1 bg-blue-500/50 rounded-full animate-pulse" />
-                    <div className="h-1 bg-purple-500/50 rounded-full animate-pulse delay-75" />
-                    <div className="h-1 bg-red-500/50 rounded-full animate-pulse delay-150" />
+
+                  <div className="space-y-2">
+                    <h2 className={`text-xl font-orbitron font-bold text-white uppercase tracking-widest ${isInterstellar ? 'neon-text-orange' : 'neon-text-cyan'}`}>
+                      {t(`tutorial${activeTutorial.charAt(0).toUpperCase() + activeTutorial.slice(1)}Title` as any)}
+                    </h2>
+                    <div className={`h-0.5 w-12 ${isInterstellar ? 'bg-orange-500/30' : 'bg-cyan-500/30'} mx-auto`} />
                   </div>
+
+                  <p className="text-base text-slate-300 leading-relaxed font-inter">
+                    {t(`tutorial${activeTutorial.charAt(0).toUpperCase() + activeTutorial.slice(1)}Desc` as any)}
+                  </p>
+
+                  <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-lg px-4 py-2 flex items-center gap-2">
+                    <Coins className="w-4 h-4 text-emerald-400" />
+                    <span className="text-[14px] font-orbitron text-emerald-400 font-bold uppercase tracking-widest">
+                      {activeTutorial === 'routes2' ? t('tutorialRoutes2Bonus') : t('tutorialBonus')}
+                    </span>
+                  </div>
+
+                  <button
+                    onClick={closeTutorial}
+                    className={`w-full py-4 ${isInterstellar ? 'bg-orange-500 hover:bg-orange-400 shadow-[0_0_30px_rgba(249,115,22,0.3)]' : 'bg-cyan-500 hover:bg-cyan-400 shadow-[0_0_30px_rgba(6,182,212,0.3)]'} text-black font-orbitron font-bold text-[14px] tracking-[0.3em] rounded-xl transition-all active:scale-95 uppercase`}
+                  >
+                    {t('close')}
+                  </button>
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
+
+        {/* Doom Protocol Info Modal */}
+        <AnimatePresence>
+          {showDoomProtocolInfo && (
+            <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.8, rotateX: -20 }}
+                animate={{ opacity: 1, scale: 1, rotateX: 0 }}
+                exit={{ opacity: 0, scale: 0.8, rotateX: 20 }}
+                transition={{ type: "spring", damping: 25, stiffness: 300 }}
+                className="relative max-w-xl w-full overflow-hidden rounded-3xl border border-white/20 shadow-[0_0_50px_rgba(59,130,246,0.3)]"
+              >
+                {/* Cyberpunk Gradient Background */}
+                <div className="absolute inset-0 bg-gradient-to-br from-blue-900/90 via-purple-900/90 to-red-900/90" />
+                <div className="absolute inset-0 bg-[url()] opacity-20 mix-blend-overlay" />
+
+                {/* Animated Scanline Effect */}
+                <div className="absolute inset-0 pointer-events-none overflow-hidden">
+                  <motion.div
+                    animate={{ y: ["0%", "100%"] }}
+                    transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
+                    className="w-full h-1/4 bg-gradient-to-b from-transparent via-blue-500/10 to-transparent"
+                  />
                 </div>
 
-                {/* Footer Button */}
-                <button
-                  onClick={() => setShowDoomProtocolInfo(false)}
-                  className="w-full py-4 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-orbitron font-black text-[14px] tracking-[0.4em] rounded-xl transition-all active:scale-95 uppercase shadow-[0_0_30px_rgba(59,130,246,0.4)] border border-white/20"
-                >
-                  {language === 'pt' ? 'ENTENDIDO' : 'UNDERSTOOD'}
-                </button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* Capture Info Modal */}
-      <AnimatePresence>
-        {showCaptureInfo && (
-          <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.8, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.8, y: -20 }}
-              className="relative max-w-xl w-full overflow-hidden rounded-3xl border border-orange-500/30 shadow-[0_0_50px_rgba(249,115,22,0.2)]"
-            >
-              <div className="absolute inset-0 bg-gradient-to-br from-orange-900/90 via-red-900/90 to-yellow-900/90" />
-              <div className="absolute inset-0  opacity-20 mix-blend-overlay" />
-              
-              <div className="relative p-8 space-y-6">
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-xl bg-orange-500/30 border border-orange-400/50 flex items-center justify-center shadow-[0_0_15px_rgba(249,115,22,0.5)]">
-                      <Zap className="w-6 h-6 text-orange-400" />
+                <div className="relative p-8 space-y-6">
+                  {/* Header with Blinking Icon */}
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center gap-4">
+                      <motion.div
+                        animate={{ opacity: [1, 0.4, 1] }}
+                        transition={{ duration: 1.5, repeat: Infinity }}
+                        className="w-12 h-12 rounded-xl bg-blue-500/30 border border-blue-400/50 flex items-center justify-center shadow-[0_0_15px_rgba(59,130,246,0.5)]"
+                      >
+                        <ShieldAlert className="w-6 h-6 text-blue-400" />
+                      </motion.div>
+                      <div>
+                        <h2 className="text-2xl font-black text-white uppercase tracking-[0.2em] font-orbitron italic">
+                          DOOM PROTOCOL
+                        </h2>
+                        <div className="h-1 w-24 bg-gradient-to-r from-blue-500 via-purple-500 to-red-500 rounded-full" />
+                      </div>
                     </div>
-                    <div>
-                      <h2 className="text-2xl font-black text-white uppercase tracking-[0.2em] font-orbitron italic">
-                        {language === 'pt' ? 'SISTEMA DE CAPTAÇÃO' : 'CAPTURE SYSTEM'}
-                      </h2>
-                      <div className="h-1 w-24 bg-gradient-to-r from-orange-500 via-red-500 to-yellow-500 rounded-full" />
+                    <button
+                      onClick={() => setShowDoomProtocolInfo(false)}
+                      className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center hover:bg-white/20 transition-colors border border-white/10"
+                    >
+                      <X className="w-4 h-4 text-white" />
+                    </button>
+                  </div>
+
+                  {/* Content */}
+                  <div className="space-y-4">
+                    <div className="text-base text-blue-100 leading-relaxed font-inter font-medium drop-shadow-md space-y-3">
+                      <p className="text-blue-400 font-bold">Doom Protocol!</p>
+                      <p>Um sistema de intervenção tática projetado para garantir superioridade em combate automático.</p>
+                      <p>Ao contratar unidades especializadas, você aumenta drasticamente suas chances de vitória em confrontos pelo cosmos — seja em encontros aleatórios automáticos ou ao pular batalhas de radar.</p>
+                      <p className="pt-2 border-t border-white/10">
+                        <span className="text-purple-400 font-bold">O excesso de eficiência é recompensado:</span><br />
+                        Toda chance de vitória que ultrapassar 100% é convertida em bônus adicionais sobre os recursos conquistados (apenas em resoluções automáticas).
+                      </p>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-2 pt-4">
+                      <div className="h-1 bg-blue-500/50 rounded-full animate-pulse" />
+                      <div className="h-1 bg-purple-500/50 rounded-full animate-pulse delay-75" />
+                      <div className="h-1 bg-red-500/50 rounded-full animate-pulse delay-150" />
                     </div>
                   </div>
-                  <button 
+
+                  {/* Footer Button */}
+                  <button
+                    onClick={() => setShowDoomProtocolInfo(false)}
+                    className="w-full py-4 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-orbitron font-black text-[14px] tracking-[0.4em] rounded-xl transition-all active:scale-95 uppercase shadow-[0_0_30px_rgba(59,130,246,0.4)] border border-white/20"
+                  >
+                    {language === 'pt' ? 'ENTENDIDO' : 'UNDERSTOOD'}
+                  </button>
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
+
+        {/* Capture Info Modal */}
+        <AnimatePresence>
+          {showCaptureInfo && (
+            <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.8, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.8, y: -20 }}
+                className="relative max-w-xl w-full overflow-hidden rounded-3xl border border-orange-500/30 shadow-[0_0_50px_rgba(249,115,22,0.2)]"
+              >
+                <div className="absolute inset-0 bg-gradient-to-br from-orange-900/90 via-red-900/90 to-yellow-900/90" />
+                <div className="absolute inset-0  opacity-20 mix-blend-overlay" />
+
+                <div className="relative p-8 space-y-6">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 rounded-xl bg-orange-500/30 border border-orange-400/50 flex items-center justify-center shadow-[0_0_15px_rgba(249,115,22,0.5)]">
+                        <Zap className="w-6 h-6 text-orange-400" />
+                      </div>
+                      <div>
+                        <h2 className="text-2xl font-black text-white uppercase tracking-[0.2em] font-orbitron italic">
+                          {language === 'pt' ? 'SISTEMA DE CAPTAÇÃO' : 'CAPTURE SYSTEM'}
+                        </h2>
+                        <div className="h-1 w-24 bg-gradient-to-r from-orange-500 via-red-500 to-yellow-500 rounded-full" />
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => {
+                        setShowCaptureInfo(false);
+                        playSfx('close_window');
+                      }}
+                      className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center hover:bg-white/20 transition-colors border border-white/10"
+                    >
+                      <X className="w-4 h-4 text-white" />
+                    </button>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div className="p-4 rounded-2xl bg-black/40 border border-white/10 space-y-3">
+                      <p className="text-base text-slate-300 leading-relaxed">
+                        {language === 'pt'
+                          ? 'O Sistema de Captação Interestelar é uma tecnologia avançada que permite extrair Quantum Credits (QC) diretamente do campo de batalha e de anomalias cósmicas.'
+                          : 'The Interstellar Capture System is an advanced technology that allows extracting Quantum Credits (QC) directly from the battlefield and cosmic anomalies.'}
+                      </p>
+
+                      <div className="grid grid-cols-1 gap-3">
+                        <div className="flex items-center gap-3 p-3 rounded-xl bg-orange-500/10 border border-orange-500/20">
+                          <TrendingUp className="w-5 h-5 text-orange-400" />
+                          <div>
+                            <p className="text-[14px] font-bold text-white uppercase">{language === 'pt' ? 'Bônus de Vitória' : 'Victory Bonus'}</p>
+                            <p className="text-base text-slate-400">{language === 'pt' ? 'Aumenta massivamente os ganhos de QC em cada batalha vencida.' : 'Massively increases QC gains in each won battle.'}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3 p-3 rounded-xl bg-orange-500/10 border border-orange-500/20">
+                          <Zap className="w-5 h-5 text-yellow-400" />
+                          <div>
+                            <p className="text-[14px] font-bold text-white uppercase">{language === 'pt' ? 'Eficiência de Nódulo' : 'Node Efficiency'}</p>
+                            <p className="text-base text-slate-400">{language === 'pt' ? 'Melhora a taxa de conversão de energia interestelar em créditos.' : 'Improves the conversion rate of interstellar energy into credits.'}</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="p-4 rounded-2xl bg-orange-500/10 border border-orange-500/20">
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="text-[14px] font-bold text-orange-400 uppercase tracking-widest">{language === 'pt' ? 'Status Atual' : 'Current Status'}</span>
+                        <span className="text-[14px] font-mono text-white">LVL {captureLevel} / 10</span>
+                      </div>
+                      <div className="h-2 bg-black/40 rounded-full overflow-hidden border border-white/10">
+                        <motion.div
+                          initial={{ width: 0 }}
+                          animate={{ width: `${(captureLevel / 10) * 100}%` }}
+                          className="h-full bg-gradient-to-r from-orange-600 to-yellow-400"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <button
                     onClick={() => {
                       setShowCaptureInfo(false);
                       playSfx('close_window');
                     }}
-                    className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center hover:bg-white/20 transition-colors border border-white/10"
+                    className="w-full py-4 bg-orange-500 hover:bg-orange-400 text-black font-black text-base tracking-[0.2em] rounded-2xl transition-all shadow-[0_0_20px_rgba(249,115,22,0.4)] uppercase"
                   >
-                    <X className="w-4 h-4 text-white" />
+                    {language === 'pt' ? 'ENTENDIDO' : 'UNDERSTOOD'}
                   </button>
                 </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
 
-                <div className="space-y-4">
-                  <div className="p-4 rounded-2xl bg-black/40 border border-white/10 space-y-3">
-                    <p className="text-base text-slate-300 leading-relaxed">
-                      {language === 'pt' 
-                        ? 'O Sistema de Captação Interestelar é uma tecnologia avançada que permite extrair Quantum Credits (QC) diretamente do campo de batalha e de anomalias cósmicas.' 
-                        : 'The Interstellar Capture System is an advanced technology that allows extracting Quantum Credits (QC) directly from the battlefield and cosmic anomalies.'}
-                    </p>
-                    
-                    <div className="grid grid-cols-1 gap-3">
-                      <div className="flex items-center gap-3 p-3 rounded-xl bg-orange-500/10 border border-orange-500/20">
-                        <TrendingUp className="w-5 h-5 text-orange-400" />
-                        <div>
-                          <p className="text-[14px] font-bold text-white uppercase">{language === 'pt' ? 'Bônus de Vitória' : 'Victory Bonus'}</p>
-                          <p className="text-base text-slate-400">{language === 'pt' ? 'Aumenta massivamente os ganhos de QC em cada batalha vencida.' : 'Massively increases QC gains in each won battle.'}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3 p-3 rounded-xl bg-orange-500/10 border border-orange-500/20">
-                        <Zap className="w-5 h-5 text-yellow-400" />
-                        <div>
-                          <p className="text-[14px] font-bold text-white uppercase">{language === 'pt' ? 'Eficiência de Nódulo' : 'Node Efficiency'}</p>
-                          <p className="text-base text-slate-400">{language === 'pt' ? 'Melhora a taxa de conversão de energia interestelar em créditos.' : 'Improves the conversion rate of interstellar energy into credits.'}</p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+        <AnimatePresence>
+          {selectedReward && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
+              onClick={() => {
+                setSelectedReward(null);
+                playSfx('close_window');
+              }}
+            >
+              <motion.div
+                className={`glass-panel p-8 rounded-3xl border ${selectedReward.color === 'emerald' ? 'border-emerald-500/40 shadow-[0_0_30px_rgba(16,185,129,0.2)]' : 'border-purple-500/40 shadow-[0_0_30px_rgba(168,85,247,0.2)]'} max-w-md w-full text-center space-y-6 relative overflow-hidden`}
+                onClick={(e) => e.stopPropagation()}
+              >
+                {/* Background Glow */}
+                <div className={`absolute -top-24 -left-24 w-48 h-48 ${selectedReward.color === 'emerald' ? 'bg-emerald-500/10' : 'bg-purple-500/10'} blur-[80px] rounded-full`} />
+                <div className={`absolute -bottom-24 -right-24 w-48 h-48 ${selectedReward.color === 'emerald' ? 'bg-emerald-500/10' : 'bg-purple-500/10'} blur-[80px] rounded-full`} />
 
-                  <div className="p-4 rounded-2xl bg-orange-500/10 border border-orange-500/20">
-                    <div className="flex justify-between items-center mb-2">
-                      <span className="text-[14px] font-bold text-orange-400 uppercase tracking-widest">{language === 'pt' ? 'Status Atual' : 'Current Status'}</span>
-                      <span className="text-[14px] font-mono text-white">LVL {captureLevel} / 10</span>
-                    </div>
-                    <div className="h-2 bg-black/40 rounded-full overflow-hidden border border-white/10">
-                      <motion.div 
-                        initial={{ width: 0 }}
-                        animate={{ width: `${(captureLevel / 10) * 100}%` }}
-                        className="h-full bg-gradient-to-r from-orange-600 to-yellow-400"
-                      />
-                    </div>
+                <div className={`w-20 h-20 rounded-2xl ${selectedReward.color === 'emerald' ? 'bg-emerald-500/20 border-emerald-500/40' : 'bg-purple-500/20 border-purple-500/40'} flex items-center justify-center mx-auto`}>
+                  <Star className={`w-10 h-10 ${selectedReward.color === 'emerald' ? 'text-emerald-400' : 'text-purple-400'}`} />
+                </div>
+
+                <div className="space-y-2 relative z-10">
+                  <div className={`text-base font-orbitron font-bold ${selectedReward.color === 'emerald' ? 'text-emerald-400' : 'text-purple-400'} tracking-[0.3em] uppercase`}>
+                    {language === "pt" ? `NÍVEL ${selectedReward.level} DESBLOQUEADO` : `LEVEL ${selectedReward.level} UNLOCKED`}
                   </div>
+                  <h3 className="text-2xl font-black text-white uppercase tracking-tighter">
+                    {selectedReward.title}
+                  </h3>
+                  <div className="h-px w-12 bg-white/10 mx-auto my-4" />
+                  <p className="text-slate-300 text-base leading-relaxed font-medium">
+                    {selectedReward.description}
+                  </p>
+
+                  {selectedReward.toggleable && (
+                    <div className="pt-4 flex flex-col items-center gap-3">
+                      <div className="text-base text-slate-500 uppercase font-bold tracking-widest">
+                        {language === 'pt' ? 'Status da Melhoria' : 'Upgrade Status'}
+                      </div>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (selectedReward.level === 30) toggleRetribution();
+                          if (selectedReward.level === 50) toggleFatigue();
+                        }}
+                        className={`px-6 py-2 rounded-full border transition-all flex items-center gap-2 ${(selectedReward.level === 30 ? isRetributionActive : isFatigueActive)
+                            ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-400"
+                            : "bg-white/5 border-white/10 text-slate-500"
+                          }`}
+                      >
+                        <div className={`w-2 h-2 rounded-full ${(selectedReward.level === 30 ? isRetributionActive : isFatigueActive) ? "bg-emerald-400 animate-pulse" : "bg-slate-600"}`} />
+                        {(selectedReward.level === 30 ? isRetributionActive : isFatigueActive)
+                          ? (language === 'pt' ? 'ATIVADO' : 'ACTIVE')
+                          : (language === 'pt' ? 'DESATIVADO' : 'DISABLED')}
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 <button
                   onClick={() => {
-                    setShowCaptureInfo(false);
+                    setSelectedReward(null);
                     playSfx('close_window');
                   }}
-                  className="w-full py-4 bg-orange-500 hover:bg-orange-400 text-black font-black text-base tracking-[0.2em] rounded-2xl transition-all shadow-[0_0_20px_rgba(249,115,22,0.4)] uppercase"
+                  className={`w-full py-4 rounded-xl font-orbitron font-black text-[14px] tracking-[0.4em] transition-all active:scale-95 uppercase border ${selectedReward.color === 'emerald' ? 'bg-emerald-600 hover:bg-emerald-500 border-emerald-400 shadow-[0_0_20px_rgba(16,185,129,0.3)]' : 'bg-purple-600 hover:bg-purple-500 border-purple-400 shadow-[0_0_20px_rgba(168,85,247,0.3)]'} text-white`}
                 >
-                  {language === 'pt' ? 'ENTENDIDO' : 'UNDERSTOOD'}
+                  {language === 'pt' ? 'FECHAR' : 'CLOSE'}
                 </button>
-              </div>
+              </motion.div>
             </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+          )}
 
-      <AnimatePresence>
-        {selectedReward && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.9 }}
-            className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
-            onClick={() => {
-              setSelectedReward(null);
-              playSfx('close_window');
-            }}
-          >
-            <motion.div 
-              className={`glass-panel p-8 rounded-3xl border ${selectedReward.color === 'emerald' ? 'border-emerald-500/40 shadow-[0_0_30px_rgba(16,185,129,0.2)]' : 'border-purple-500/40 shadow-[0_0_30px_rgba(168,85,247,0.2)]'} max-w-md w-full text-center space-y-6 relative overflow-hidden`}
-              onClick={(e) => e.stopPropagation()}
+          {foundBattle && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
             >
-              {/* Background Glow */}
-              <div className={`absolute -top-24 -left-24 w-48 h-48 ${selectedReward.color === 'emerald' ? 'bg-emerald-500/10' : 'bg-purple-500/10'} blur-[80px] rounded-full`} />
-              <div className={`absolute -bottom-24 -right-24 w-48 h-48 ${selectedReward.color === 'emerald' ? 'bg-emerald-500/10' : 'bg-purple-500/10'} blur-[80px] rounded-full`} />
-
-              <div className={`w-20 h-20 rounded-2xl ${selectedReward.color === 'emerald' ? 'bg-emerald-500/20 border-emerald-500/40' : 'bg-purple-500/20 border-purple-500/40'} flex items-center justify-center mx-auto`}>
-                <Star className={`w-10 h-10 ${selectedReward.color === 'emerald' ? 'text-emerald-400' : 'text-purple-400'}`} />
-              </div>
-              
-              <div className="space-y-2 relative z-10">
-                <div className={`text-base font-orbitron font-bold ${selectedReward.color === 'emerald' ? 'text-emerald-400' : 'text-purple-400'} tracking-[0.3em] uppercase`}>
-                  {language === "pt" ? `NÍVEL ${selectedReward.level} DESBLOQUEADO` : `LEVEL ${selectedReward.level} UNLOCKED`}
+              <div className="glass-panel p-8 rounded-3xl border border-cyan-500/40 max-w-md w-full text-center space-y-6">
+                <div className="w-20 h-20 rounded-full bg-cyan-500/20 border border-cyan-500/40 flex items-center justify-center mx-auto">
+                  <ShieldAlert className="w-10 h-10 text-cyan-400" />
                 </div>
-                <h3 className="text-2xl font-black text-white uppercase tracking-tighter">
-                  {selectedReward.title}
-                </h3>
-                <div className="h-px w-12 bg-white/10 mx-auto my-4" />
-                <p className="text-slate-300 text-base leading-relaxed font-medium">
-                  {selectedReward.description}
-                </p>
 
-                {selectedReward.toggleable && (
-                  <div className="pt-4 flex flex-col items-center gap-3">
-                    <div className="text-base text-slate-500 uppercase font-bold tracking-widest">
-                      {language === 'pt' ? 'Status da Melhoria' : 'Upgrade Status'}
-                    </div>
+                <div className="space-y-2">
+                  <h3 className="text-2xl font-black text-white uppercase tracking-tighter">
+                    {language === 'pt' ? 'Inimigo Detectado!' : 'Enemy Detected!'}
+                  </h3>
+                  <p className="text-slate-400 text-base">
+                    {language === 'pt'
+                      ? 'Um sinal hostil foi localizado no setor. Prepare-se para o combate.'
+                      : 'A hostile signal has been located in the sector. Prepare for combat.'}
+                  </p>
+                </div>
+                <div className="flex flex-col gap-3">
+                  <div className="grid grid-cols-2 gap-4">
                     <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (selectedReward.level === 30) setIsRetributionActive(!isRetributionActive);
-                        if (selectedReward.level === 50) setIsFatigueActive(!isFatigueActive);
-                        playSfx('toggle');
-                      }}
-                      className={`px-6 py-2 rounded-full border transition-all flex items-center gap-2 ${
-                        (selectedReward.level === 30 ? isRetributionActive : isFatigueActive) 
-                          ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-400" 
-                          : "bg-white/5 border-white/10 text-slate-500"
-                      }`}
+                      onClick={() => setFoundBattle(null)}
+                      className="py-3 rounded-xl bg-white/5 border border-white/10 text-slate-400 font-bold hover:bg-white/10 transition-all uppercase text-[14px]"
                     >
-                      <div className={`w-2 h-2 rounded-full ${(selectedReward.level === 30 ? isRetributionActive : isFatigueActive) ? "bg-emerald-400 animate-pulse" : "bg-slate-600"}`} />
-                      {(selectedReward.level === 30 ? isRetributionActive : isFatigueActive) 
-                        ? (language === 'pt' ? 'ATIVADO' : 'ACTIVE') 
-                        : (language === 'pt' ? 'DESATIVADO' : 'DISABLED')}
+                      {language === 'pt' ? 'Ignorar' : 'Ignore'}
+                    </button>
+                    <button
+                      onClick={() => {
+                        setActiveBattle(foundBattle);
+                        setFoundBattle(null);
+                      }}
+                      className="py-3 rounded-xl bg-cyan-600 text-white font-black hover:bg-cyan-500 transition-all shadow-[0_0_20px_rgba(6,182,212,0.4)] uppercase text-[14px]"
+                    >
+                      {language === 'pt' ? 'Atacar' : 'Attack'}
                     </button>
                   </div>
-                )}
-              </div>
 
-              <button
-                onClick={() => {
-                  setSelectedReward(null);
-                  playSfx('close_window');
-                }}
-                className={`w-full py-4 rounded-xl font-orbitron font-black text-[14px] tracking-[0.4em] transition-all active:scale-95 uppercase border ${selectedReward.color === 'emerald' ? 'bg-emerald-600 hover:bg-emerald-500 border-emerald-400 shadow-[0_0_20px_rgba(16,185,129,0.3)]' : 'bg-purple-600 hover:bg-purple-500 border-purple-400 shadow-[0_0_20px_rgba(168,85,247,0.3)]'} text-white`}
-              >
-                {language === 'pt' ? 'FECHAR' : 'CLOSE'}
-              </button>
-            </motion.div>
-          </motion.div>
-        )}
-
-        {foundBattle && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.9 }}
-            className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
-          >
-            <div className="glass-panel p-8 rounded-3xl border border-cyan-500/40 max-w-md w-full text-center space-y-6">
-              <div className="w-20 h-20 rounded-full bg-cyan-500/20 border border-cyan-500/40 flex items-center justify-center mx-auto">
-                <ShieldAlert className="w-10 h-10 text-cyan-400" />
-              </div>
-              
-              <div className="space-y-2">
-                <h3 className="text-2xl font-black text-white uppercase tracking-tighter">
-                  {language === 'pt' ? 'Inimigo Detectado!' : 'Enemy Detected!'}
-                </h3>
-                <p className="text-slate-400 text-base">
-                  {language === 'pt' 
-                    ? 'Um sinal hostil foi localizado no setor. Prepare-se para o combate.' 
-                    : 'A hostile signal has been located in the sector. Prepare for combat.'}
-                </p>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <button
-                  onClick={() => setFoundBattle(null)}
-                  className="py-3 rounded-xl bg-white/5 border border-white/10 text-slate-400 font-bold hover:bg-white/10 transition-all uppercase text-[14px]"
-                >
-                  {language === 'pt' ? 'Ignorar' : 'Ignore'}
-                </button>
-                <button
-                  onClick={() => {
-                    setActiveBattle(foundBattle);
-                    setFoundBattle(null);
-                  }}
-                  className="py-3 rounded-xl bg-cyan-600 text-white font-black hover:bg-cyan-500 transition-all shadow-[0_0_20px_rgba(6,182,212,0.4)] uppercase text-[14px]"
-                >
-                  {language === 'pt' ? 'Atacar' : 'Attack'}
-                </button>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      <AnimatePresence>
-      </AnimatePresence>
-
-      <BattleOverlay
-        activeBattle={activeBattle}
-        routeTier={routeTier}
-        language={language}
-        t={t}
-        formatValue={formatValue}
-        finishBattle={finishBattle}
-        resolveBattleVictory={resolveBattleVictory}
-        resolveBattleDefeat={resolveBattleDefeat}
-        setActiveBattle={setActiveBattle}
-        playSfx={playSfx}
-        stopSfx={stopSfx}
-        addLog={addLog}
-        voidResources={voidResources}
-        shipLevel={shipLevel}
-        battleLevel={battleLevel}
-        privatePoliceLevel={privatePoliceLevel}
-        getPoliceBonus={getPoliceBonus}
-        ROUTES_MAP={ROUTES_MAP}
-      />
-
-      {/* Route 3 Confirmation Modal */}
-      <AnimatePresence>
-        {showRoute3Confirm && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-black/90 backdrop-blur-xl"
-          >
-            <motion.div 
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="max-w-lg w-full glass-panel border-2 border-purple-500/50 p-8 rounded-3xl space-y-8 relative overflow-hidden"
-            >
-              <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-purple-500 to-transparent" />
-              
-              <div className="text-center space-y-4">
-                <div className="w-20 h-20 rounded-full bg-purple-500/20 flex items-center justify-center mx-auto border-2 border-purple-500 shadow-[0_0_30px_rgba(168,85,247,0.4)]">
-                  <Zap className="w-10 h-10 text-purple-400" />
+                  <button
+                    onClick={() => {
+                      const skipCost = routeTier === 'Interstellar' ? 40 : 10;
+                      if (aetherion >= skipCost) {
+                        autoSkipBattle(foundBattle, skipCost);
+                        setFoundBattle(null);
+                      }
+                    }}
+                    disabled={aetherion < (routeTier === 'Interstellar' ? 40 : 10)}
+                    className={`py-3 rounded-xl border font-black transition-all uppercase text-[14px] ${aetherion >= (routeTier === 'Interstellar' ? 40 : 10)
+                        ? 'bg-orange-600/20 text-orange-400 border-orange-500/40 hover:bg-orange-600/30'
+                        : 'bg-white/5 border-white/10 text-slate-600 cursor-not-allowed'
+                      }`}
+                  >
+                    {language === 'pt' ? 'Pular Batalha' : 'Skip Battle'}
+                    <span className="ml-1 text-[10px] opacity-70">(-{routeTier === 'Interstellar' ? 40 : 10} AE)</span>
+                  </button>
                 </div>
-                <h2 className="text-3xl font-orbitron font-black text-purple-400 uppercase tracking-[0.3em]">
-                  {t('startVoidProtocol')}
-                </h2>
-                <p className="text-base text-purple-200/60 font-mono uppercase tracking-widest leading-relaxed">
-                  {language === 'pt' 
-                    ? 'Ao avançar para a Era Sem Tempo, você deixará para trás seu império interestelar para enfrentar o desconhecido. Seus recursos serão resetados, mas uma nova tecnologia te aguarda.' 
-                    : 'By advancing to the Timeless Era, you will leave behind your interstellar empire to face the unknown. Your resources will be reset, but a new technology awaits you.'}
-                </p>
-              </div>
-
-              <div className="flex flex-col gap-4">
-                <button
-                  onClick={() => {
-                    setShowRoute3Confirm(false);
-                    setShowVoidLore(true);
-                    setLoreLineIndex(0);
-                    setActiveBattle(null);
-                  }}
-                  className="w-full py-5 bg-purple-600 text-white font-orbitron font-black text-xl rounded-xl hover:bg-purple-500 transition-all shadow-[0_0_40px_rgba(168,85,247,0.5)] uppercase tracking-[0.2em] border-b-4 border-purple-800 active:border-b-0 active:translate-y-1"
-                >
-                  {language === 'pt' ? 'EU ACEITO O DESAFIO' : 'I ACCEPT THE CHALLENGE'}
-                </button>
-                <button
-                  onClick={() => setShowRoute3Confirm(false)}
-                  className="w-full py-3 text-[14px] font-orbitron text-slate-500 hover:text-white transition-colors uppercase tracking-widest"
-                >
-                  {language === 'pt' ? 'AINDA NÃƒÆ’O ESTOU PRONTO' : 'I AM NOT READY YET'}
-                </button>
               </div>
             </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          )}
+        </AnimatePresence>
 
-      {/* Void Lore Screen */}
-      <AnimatePresence>
-        {showVoidLore && (
-          <LoreScreen
-            lines={VOID_LORE_LINES}
-            currentIndex={loreLineIndex}
-            onNext={() => {
-              setLoreLineIndex(prev => prev + 1);
-              playSfx('click');
-            }}
-            onComplete={startVoidTransition}
-            language={language}
-            theme="purple"
-            completeText={language === 'pt' ? 'INICIAR ROTA 3' : 'START ROUTE 3'}
-            videoSrc="/videos/bobby_blue/transition.webm"
-          />
-        )}
-      </AnimatePresence>
+        <AnimatePresence>
+        </AnimatePresence>
 
-      {/* Route 2 Lore Screen */}
-      <AnimatePresence>
-        {showRoute2Lore && (
-          <LoreScreen
-            lines={ROUTE2_LORE_LINES}
-            currentIndex={loreLineIndex}
-            onNext={() => {
-              setLoreLineIndex(prev => prev + 1);
-              playSfx('click');
-            }}
-            onComplete={() => {
-              setShowRoute2Lore(false);
-              startRoute2Transition();
-            }}
-            language={language}
-            theme="orange"
-            completeText={language === 'pt' ? 'INICIAR ROTA 2' : 'START ROUTE 2'}
-            videoSrc="/videos/bobby_blue/transition.webm"
-          />
-        )}
-      </AnimatePresence>
+        <BattleOverlay
+          activeBattle={activeBattle}
+          routeTier={routeTier}
+          language={language}
+          t={t}
+          formatValue={formatValue}
+          finishBattle={finishBattle}
+          resolveBattleVictory={resolveBattleVictory}
+          resolveBattleDefeat={resolveBattleDefeat}
+          setActiveBattle={setActiveBattle}
+          playSfx={playSfx}
+          stopSfx={stopSfx}
+          addLog={addLog}
+          voidResources={voidResources}
+          shipLevel={shipLevel}
+          battleLevel={battleLevel}
+          privatePoliceLevel={privatePoliceLevel}
+          getPoliceBonus={getPoliceBonus}
+          aetherion={aetherion}
+          autoSkipBattle={autoSkipBattle}
+          ROUTES_MAP={ROUTES_MAP}
+        />
 
-      {/* Void War Start Lore Screen */}
-      <AnimatePresence>
-        {voidWarRobotSpeaking && (
-          <LoreScreen
-            lines={language === 'pt' ? VOID_WAR_START_LORE.pt : VOID_WAR_START_LORE.en}
-            currentIndex={loreLineIndex}
-            onNext={() => {
-              setLoreLineIndex(prev => prev + 1);
-              playSfx('click');
-            }}
-            onComplete={() => {
-              setVoidWarRobotSpeaking(false);
-              setIsShaking(true);
-              setIsFlashingRed(true);
-              setVoidWarAlertActive(true);
-              setShowInvasionAlertOverlay(true);
-              
-              setTimeout(() => {
-                setIsShaking(false);
-                setIsFlashingRed(false);
-                setShowInvasionAlertOverlay(false);
-              }, 3000);
+        {/* Route 3 Confirmation Modal */}
+        <AnimatePresence>
+          {showRoute3Confirm && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-black/90 backdrop-blur-xl"
+            >
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+                className="max-w-lg w-full glass-panel border-2 border-purple-500/50 p-8 rounded-3xl space-y-8 relative overflow-hidden"
+              >
+                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-purple-500 to-transparent" />
 
-              playSfx('alert_alert');
-              setIsFirstInvasionBattle(true);
-              addLog(language === 'pt' ? 'INVASÃƒO DETECTADA! Defenda a estrutura de reconstrução!' : 'INVASION DETECTED! Defend the reconstruction structure!', 'error');
-            }}
-            language={language}
-            theme="purple"
-            completeText={language === 'pt' ? 'DEFENDER TERRA' : 'DEFEND EARTH'}
-            imageSrc="/images/bobby_blue/bobby_blue_fear.webp"
-          />
-        )}
-      </AnimatePresence>
+                <div className="text-center space-y-4">
+                  <div className="w-20 h-20 rounded-full bg-purple-500/20 flex items-center justify-center mx-auto border-2 border-purple-500 shadow-[0_0_30px_rgba(168,85,247,0.4)]">
+                    <Zap className="w-10 h-10 text-purple-400" />
+                  </div>
+                  <h2 className="text-3xl font-orbitron font-black text-purple-400 uppercase tracking-[0.3em]">
+                    {t('startVoidProtocol')}
+                  </h2>
+                  <p className="text-base text-purple-200/60 font-mono uppercase tracking-widest leading-relaxed">
+                    {language === 'pt'
+                      ? 'Ao avançar para o Capítulo 3 - Rotas do Vazio: Projeto Terra, você deixará para trás seu império interestelar para enfrentar o desconhecido. Seus recursos serão resetados, mas uma nova tecnologia te aguarda.'
+                      : 'By advancing to Chapter 3 - Void Routes: Project Earth, you will leave behind your interstellar empire to face the unknown. Your resources will be reset, but a new technology awaits you.'}
+                  </p>
+                </div>
 
-      {RestorationModal()}
-      {RobotRepairModal()}
-      {BattleShipUpgradeModal()}
-      {VoidWarMap()}
-      {FliperamasTutorialModal()}
-      {showRoute3Ending && Route3EndingNarrativeModal()}
-    </motion.div>
+                <div className="flex flex-col gap-4">
+                  <button
+                    onClick={() => {
+                      setShowRoute3Confirm(false);
+                      setShowVoidLore(true);
+                      setLoreLineIndex(0);
+                      setActiveBattle(null);
+                    }}
+                    className="w-full py-5 bg-purple-600 text-white font-orbitron font-black text-xl rounded-xl hover:bg-purple-500 transition-all shadow-[0_0_40px_rgba(168,85,247,0.5)] uppercase tracking-[0.2em] border-b-4 border-purple-800 active:border-b-0 active:translate-y-1"
+                  >
+                    {language === 'pt' ? 'EU ACEITO O DESAFIO' : 'I ACCEPT THE CHALLENGE'}
+                  </button>
+                  <button
+                    onClick={() => setShowRoute3Confirm(false)}
+                    className="w-full py-3 text-[14px] font-orbitron text-slate-500 hover:text-white transition-colors uppercase tracking-widest"
+                  >
+                    {language === 'pt' ? 'AINDA NÃƒÆ’O ESTOU PRONTO' : 'I AM NOT READY YET'}
+                  </button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Void Lore Screen */}
+        <AnimatePresence>
+          {showVoidLore && (
+            <LoreScreen
+              lines={VOID_LORE_LINES}
+              currentIndex={loreLineIndex}
+              onNext={() => {
+                setLoreLineIndex(prev => prev + 1);
+                playSfx('click');
+              }}
+              onComplete={startVoidTransition}
+              language={language}
+              theme="purple"
+              completeText={language === 'pt' ? 'INICIAR ROTA 3' : 'START ROUTE 3'}
+              videoSrc="/videos/bobby_blue/transition.webm"
+            />
+          )}
+        </AnimatePresence>
+
+        {/* Route 2 Lore Screen */}
+        <AnimatePresence>
+          {showRoute2Lore && (
+            <LoreScreen
+              lines={ROUTE2_LORE_LINES}
+              currentIndex={loreLineIndex}
+              onNext={() => {
+                setLoreLineIndex(prev => prev + 1);
+                playSfx('click');
+              }}
+              onComplete={() => {
+                setShowRoute2Lore(false);
+                startRoute2Transition();
+              }}
+              language={language}
+              theme="orange"
+              completeText={language === 'pt' ? 'INICIAR ROTA 2' : 'START ROUTE 2'}
+              imageSrc="/images/bobby_blue/bobby_blue_summer.webp"
+            />
+          )}
+        </AnimatePresence>
+
+        {/* Void War Start Lore Screen */}
+        <AnimatePresence>
+          {voidWarRobotSpeaking && (
+            <LoreScreen
+              lines={language === 'pt' ? VOID_WAR_START_LORE.pt : VOID_WAR_START_LORE.en}
+              currentIndex={loreLineIndex}
+              onNext={() => {
+                setLoreLineIndex(prev => prev + 1);
+                playSfx('click');
+              }}
+              onComplete={() => {
+                setVoidWarRobotSpeaking(false);
+                setIsShaking(true);
+                setIsFlashingRed(true);
+                setVoidWarAlertActive(true);
+                setShowInvasionAlertOverlay(true);
+
+                setTimeout(() => {
+                  setIsShaking(false);
+                  setIsFlashingRed(false);
+                  setShowInvasionAlertOverlay(false);
+                }, 3000);
+
+                playSfx('alert_alert');
+                setIsFirstInvasionBattle(true);
+                addLog(language === 'pt' ? 'INVASÃƒO DETECTADA! Defenda a estrutura de reconstrução!' : 'INVASION DETECTED! Defend the reconstruction structure!', 'error');
+              }}
+              language={language}
+              theme="purple"
+              completeText={language === 'pt' ? 'DEFENDER TERRA' : 'DEFEND EARTH'}
+              imageSrc="/images/bobby_blue/bobby_blue_fear.webp"
+            />
+          )}
+        </AnimatePresence>
+
+        {RestorationModal()}
+        {RobotRepairModal()}
+        {BattleShipUpgradeModal()}
+        {VoidWarMap()}
+        {FliperamasTutorialModal()}
+        {showRoute3Ending && Route3EndingNarrativeModal()}
+      </motion.div>
     </div>
   );
 });

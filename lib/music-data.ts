@@ -9,7 +9,7 @@ export interface RouteTheme {
 export const ROUTE_THEMES: Record<string, RouteTheme> = {
   'Solar': {
     id: 'route1',
-    name: 'Solar System (Route 1)',
+    name: 'Chapter 1 - Solar Routes',
     playlist: [
       { id: 'r1_t1', title: 'Hidden Places', url: '/audio/themes/route1/hidden_places.ogg' },
       { id: 'r1_t2', title: 'Miss The Earth', url: '/audio/themes/route1/miss_the_earth.ogg' },
@@ -20,7 +20,7 @@ export const ROUTE_THEMES: Record<string, RouteTheme> = {
   },
   'Interstellar': {
     id: 'route2',
-    name: 'Interstellar (Route 2)',
+    name: 'Chapter 2 - Interstellar Routes',
     playlist: [
       { id: 'r2_t1', title: 'Ballad From Stars', url: '/audio/themes/route2/ballad_from _stars.ogg' },
       { id: 'r2_t2', title: 'Far Horizon Drift', url: '/audio/themes/route2/far_horizon _drift.ogg' },
@@ -28,9 +28,9 @@ export const ROUTE_THEMES: Record<string, RouteTheme> = {
       { id: 'r2_t4', title: 'This Way', url: '/audio/themes/route2/this_way.ogg' },
     ]
   },
-  'The Void': {
+  'Void': {
     id: 'route3',
-    name: 'The Void (Route 3)',
+    name: 'Chapter 3 - Void Routes: Project Earth',
     playlist: [
       { id: 'r3_t1', title: 'Abyssal War', url: '/audio/themes/route3/abyssal_war.ogg' },
       { id: 'r3_t2', title: 'Alien Instinct', url: '/audio/themes/route3/alien_instinct.ogg' },
@@ -38,9 +38,9 @@ export const ROUTE_THEMES: Record<string, RouteTheme> = {
       { id: 'r3_t4', title: 'Knight From Space', url: '/audio/themes/route3/knight_from_space.ogg' },
     ]
   },
-  'Singularity': {
+  'Earth': {
     id: 'route4',
-    name: 'Singularity (Route 4)',
+    name: 'Chapter 4 - New Earth',
     playlist: [
       { id: 'r4_t1', title: 'Living For Tomorrow', url: '/audio/themes/route4/living_for_tomorrow.ogg' },
       { id: 'r4_t2', title: 'Looking Out The Window', url: '/audio/themes/route4/looking_out the_window.ogg' },

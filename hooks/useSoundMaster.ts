@@ -8,13 +8,22 @@ export interface SoundSettings {
   masterMusicVolume: number;
   masterSfxOn: boolean;
   masterSfxVolume: number;
+  // Multi-channel categories
+  uiVolume: number;
+  playerVolume: number;
+  enemyVolume: number;
+  ambientVolume: number;
 }
 
 const DEFAULT_SETTINGS: SoundSettings = {
   masterMusicOn: true,
   masterMusicVolume: 0.5,
   masterSfxOn: true,
-  masterSfxVolume: 0.5,
+  masterSfxVolume: 0.7, // Increased default master SFX
+  uiVolume: 0.6,
+  playerVolume: 1.0,   // Player is the protagonist
+  enemyVolume: 0.7,
+  ambientVolume: 0.8,
 };
 
 // Custom event for sound settings changes
@@ -29,7 +38,7 @@ export function useSoundMaster() {
     const loadSettings = async () => {
       const saved = await GameStorage.loadSettings();
       if (saved && saved.masterMusicOn !== undefined) {
-        setSettings(saved);
+        setSettings({ ...DEFAULT_SETTINGS, ...saved });
       } else {
         // Migration from old simple settings if they exist
         const oldMusic = localStorage.getItem('musicOn');

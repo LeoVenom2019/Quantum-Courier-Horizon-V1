@@ -1,0 +1,4 @@
+interface:
+  display_name: "QCH Codebase"
+  short_description: "Work with the QCH project structure and conventions."
+  default_prompt: "Use QCH Codebase to find where this feature belongs."

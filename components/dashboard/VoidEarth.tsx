@@ -1,5 +1,6 @@
 import React from 'react';
 import { motion } from 'motion/react';
+import Image from 'next/image';
 import { Zap, Database, Cpu, Coffee, Activity, Globe } from 'lucide-react';
 
 interface VoidEarthProps {
@@ -7,13 +8,15 @@ interface VoidEarthProps {
   language: string;
   t: (key: string) => string;
   setShowRestorationModal: (show: boolean) => void;
+  playSfx: (type: string) => void;
 }
 
 const VoidEarth: React.FC<VoidEarthProps> = ({ 
   earthReconstructionProgress, 
   language, 
   t, 
-  setShowRestorationModal 
+  setShowRestorationModal,
+  playSfx
 }) => {
   const totalProgress = Object.values(earthReconstructionProgress).reduce((a, b) => a + b, 0) / 5;
   const isComplete = totalProgress >= 100;
@@ -27,14 +30,14 @@ const VoidEarth: React.FC<VoidEarthProps> = ({
   ];
 
   return (
-    <div className="h-full w-full flex flex-row gap-0.5 overflow-hidden p-0.5">
+    <div className="h-full w-full flex flex-row gap-4 overflow-hidden p-2">
       {/* Left Side: Projeto Terra */}
-      <div className="w-[30%] h-full min-h-0">
+      <div className="w-[36%] h-full min-h-0">
         <div className="glass-panel border-2 border-emerald-500/30 rounded-xl bg-gradient-to-br from-emerald-500/10 via-black/80 to-black relative overflow-hidden h-full flex flex-col items-center">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(16,185,129,0.05),transparent_70%)]" />
           
-          {/* Top Half: Command & Progress (50%) */}
-          <div className="h-1/2 w-full flex flex-col items-center justify-between py-2 border-b border-white/10 relative z-10">
+          {/* Top Half: Command & Progress */}
+          <div className="w-full flex flex-col items-center justify-between py-2 border-b border-white/10 relative z-10">
             <div className="flex flex-col items-center gap-1 shrink-0">
               <div className="w-12 h-12 rounded-full border-2 border-emerald-500/30 flex items-center justify-center shadow-[0_0_20px_rgba(16,185,129,0.2)] bg-black/60 relative group">
                 <Globe className={`w-6 h-6 ${isComplete ? 'text-emerald-400 animate-pulse' : 'text-emerald-500/60'}`} />
@@ -49,11 +52,11 @@ const VoidEarth: React.FC<VoidEarthProps> = ({
               <div className="grid grid-cols-2 gap-1.5">
                 <div className="bg-black/60 border border-white/5 rounded-lg p-1.5 space-y-0.5">
                   <p className="text-[6px] text-white/30 uppercase tracking-widest leading-none">{language === 'pt' ? 'VARREDURA' : 'SCAN'}</p>
-                  <p className="text-[9px] font-mono font-bold text-emerald-400 leading-none">00-EARTH</p>
+                  <p className="text-[9px] font-mono font-bold text-emerald-400 leading-none">SEC-0{Math.floor(totalProgress / 10)}</p>
                 </div>
                 <div className="bg-black/60 border border-white/5 rounded-lg p-1.5 space-y-0.5">
                   <p className="text-[6px] text-white/30 uppercase tracking-widest leading-none">{language === 'pt' ? 'SINCRONIA' : 'SYNC'}</p>
-                  <p className="text-[9px] font-mono font-bold text-cyan-400 leading-none">98.4%</p>
+                  <p className="text-[9px] font-mono font-bold text-cyan-400 leading-none">{totalProgress.toFixed(1)}%</p>
                 </div>
               </div>
 
@@ -73,7 +76,10 @@ const VoidEarth: React.FC<VoidEarthProps> = ({
 
               <div className="space-y-1 text-center">
                 <button 
-                  onClick={() => setShowRestorationModal(true)}
+                  onClick={() => {
+                    setShowRestorationModal(true);
+                    playSfx('ask_window');
+                  }}
                   className={`w-full py-1.5 rounded-lg font-orbitron font-black text-xs transition-all active:scale-95 border-b-2 ${
                     isComplete 
                       ? 'bg-emerald-500 text-black border-emerald-700 shadow-[0_0_15px_rgba(16,185,129,0.3)]' 
@@ -86,9 +92,8 @@ const VoidEarth: React.FC<VoidEarthProps> = ({
             </div>
           </div>
 
-          {/* Bottom Half: Bobby Observation Video (50%) */}
-          <div className="h-1/2 w-full p-2 relative z-10 flex flex-col">
-            <div className="flex-1 rounded-xl border border-emerald-500/20 overflow-hidden bg-black/40 relative group shadow-[inset_0_0_20px_rgba(0,0,0,0.5)]">
+          <div className="w-full flex-1 min-h-0 p-2 relative z-10 flex flex-col">
+            <div className="flex-1 min-h-0 rounded-xl border border-emerald-500/20 overflow-hidden bg-black/40 relative group shadow-[inset_0_0_20px_rgba(0,0,0,0.5)]">
               {/* Scanline Effect */}
               <div className="absolute inset-0 bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06))] z-20 pointer-events-none bg-[length:100%_2px,3px_100%]" />
               
@@ -118,7 +123,7 @@ const VoidEarth: React.FC<VoidEarthProps> = ({
               <div className="absolute bottom-0 right-0 w-2 h-2 border-b border-r border-emerald-500/40 z-30" />
             </div>
             
-            <div className="mt-1.5 flex flex-col items-center gap-0.5">
+            <div className="mt-2 flex flex-col items-center gap-0.5 shrink-0">
               <p className={`text-[8px] uppercase tracking-[0.2em] font-orbitron font-black leading-tight ${isComplete ? 'text-emerald-400 animate-pulse' : 'text-white/30'}`}>
                 {isComplete ? t('hopeSymbol') : t('waitingNoduleInit')}
               </p>
@@ -128,58 +133,47 @@ const VoidEarth: React.FC<VoidEarthProps> = ({
       </div>
 
       {/* Right Side: 2x3 Grid */}
-      <div className="w-[70%] h-full min-h-0 overflow-hidden">
-        <div className="grid grid-cols-2 grid-rows-3 gap-0.5 h-full">
+      <div className="w-[64%] h-full min-h-0 overflow-hidden">
+        <div className="grid grid-cols-2 grid-rows-3 gap-3 h-full">
           {resourceNodes.map(node => {
             const progress = earthReconstructionProgress[node.id];
             const isNodeComplete = progress >= 100;
             return (
-              <div key={node.id} className={`glass-panel border p-1 rounded-lg flex flex-col transition-all relative overflow-hidden min-h-0 ${isNodeComplete ? 'border-emerald-500/40 bg-emerald-500/5' : `border-white/5 ${node.bg} hover:border-white/10`}`}>
-                <div className="flex justify-between items-start shrink-0">
-                  <div className="flex items-center gap-1 min-w-0">
-                    <div className={`p-1 rounded-md bg-black/60 border border-white/10 ${node.color} shrink-0`}>
-                      <node.icon className="w-2.5 h-2.5" />
+              <div key={node.id} className={`glass-panel border p-4 rounded-xl flex flex-col justify-between transition-all relative overflow-hidden min-h-0 ${isNodeComplete ? 'border-emerald-500/40 bg-emerald-500/5 shadow-[0_0_18px_rgba(16,185,129,0.08)]' : `border-white/10 ${node.bg} hover:border-white/20`}`}>
+                <div className="flex justify-between items-start gap-3 shrink-0">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className={`p-2 rounded-lg bg-black/60 border border-white/10 ${node.color} shrink-0`}>
+                      <node.icon className="w-4 h-4" />
                     </div>
                     <div className="min-w-0">
-                      <h4 className="text-[10px] font-orbitron font-bold text-white uppercase tracking-wider leading-none truncate">{node.name}</h4>
-                      <p className="text-[6px] text-white/40 uppercase tracking-widest font-mono truncate">{t('captureNodule')}</p>
+                      <h4 className="text-[13px] font-orbitron font-black text-white uppercase tracking-wider leading-none truncate">{node.name}</h4>
+                      <p className="text-[8px] text-white/40 uppercase tracking-widest font-mono truncate mt-1">{language === 'pt' ? 'Enviados do Núcleo de Colonização' : 'Sent from Colonization Core'}</p>
                     </div>
                   </div>
                   <div className="text-right shrink-0">
-                    <div className={`text-[11px] font-orbitron font-black ${isNodeComplete ? 'text-emerald-400' : 'text-white'}`}>{progress.toFixed(1)}%</div>
+                    <div className={`text-lg font-orbitron font-black tabular-nums leading-none ${isNodeComplete ? 'text-emerald-400' : 'text-white'}`}>{progress.toFixed(1)}%</div>
                   </div>
                 </div>
 
-                <div className="flex-1 flex flex-col justify-center gap-0.5 min-h-0">
-                    <div className="flex justify-between items-center bg-black/40 p-0.5 rounded-md border border-white/5">
-                      <div className="space-y-0">
-                        <p className="text-[5px] text-white/30 uppercase tracking-tighter leading-none">{language === 'pt' ? 'Diagnóstico' : 'Diagnostic'}</p>
-                        <p className={`text-[8px] font-mono font-bold leading-tight ${isNodeComplete ? 'text-emerald-400' : 'text-white/60'}`}>
-                          {isNodeComplete ? (language === 'pt' ? 'ESTÁVEL' : 'STABLE') : (language === 'pt' ? 'ATIVO' : 'ACTIVE')}
-                        </p>
-                      </div>
-                      <div className="text-right space-y-0">
-                        <p className="text-[5px] text-white/30 uppercase tracking-tighter leading-none">{language === 'pt' ? 'Integridade' : 'Integrity'}</p>
-                        <p className="text-[8px] font-mono text-cyan-400 leading-tight">99.8%</p>
-                      </div>
-                    </div>
-
-                    <div className="space-y-0.5">
-                      <div className="h-1 bg-black/80 rounded-full overflow-hidden border border-white/5">
-                        <motion.div 
-                          initial={{ width: 0 }}
-                          animate={{ width: `${progress}%` }}
-                          className={`h-full rounded-full bg-gradient-to-r ${isNodeComplete ? 'from-emerald-600 to-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.4)]' : 'from-white/20 to-white/60'}`}
-                        />
-                      </div>
-                    </div>
+                <div className="flex-1 flex flex-col justify-end gap-3 min-h-0 pt-4">
+                  <div className="flex items-center justify-between bg-black/40 px-3 py-2 rounded-lg border border-white/5">
+                    <span className="text-[9px] text-white/35 uppercase tracking-widest font-mono leading-none">
+                      {language === 'pt' ? 'Progresso recebido' : 'Received progress'}
+                    </span>
+                    <span className={`text-[11px] font-mono font-bold leading-none ${isNodeComplete ? 'text-emerald-400' : node.color}`}>
+                      {isNodeComplete ? (language === 'pt' ? 'COMPLETO' : 'COMPLETE') : (language === 'pt' ? 'ATIVO' : 'ACTIVE')}
+                    </span>
+                  </div>
+                  <p className="text-[9px] text-white/35 uppercase tracking-widest font-mono leading-relaxed">
+                    {language === 'pt' ? 'Cada pack enviado pelo Núcleo de Colonização soma 0.1% até 100%.' : 'Each pack sent by the Colonization Core adds 0.1% up to 100%.'}
+                  </p>
                 </div>
               </div>
             );
           })}
 
-          {/* 6th Card: Earth Asset PNG */}
-          <div className="glass-panel border border-emerald-500/20 bg-emerald-500/5 rounded-lg flex flex-col relative overflow-hidden group min-h-0">
+          {/* 6th Card: Earth Asset WebP */}
+          <div className="glass-panel border border-emerald-500/25 bg-emerald-500/5 rounded-xl flex flex-col relative overflow-hidden group min-h-0 shadow-[0_0_24px_rgba(16,185,129,0.08)]">
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(16,185,129,0.1),transparent_70%)]" />
             
             <div className="flex-1 relative flex items-center justify-center min-h-0 overflow-hidden">
@@ -189,18 +183,20 @@ const VoidEarth: React.FC<VoidEarthProps> = ({
                   rotate: { duration: 80, repeat: Infinity, ease: "linear" },
                   scale: { duration: 12, repeat: Infinity, ease: "easeInOut" }
                 }}
-                className="relative z-10 w-full h-full flex items-center justify-center p-0.5"
+                className="relative z-10 w-full h-full flex items-center justify-center p-4"
               >
-                <img 
-                  src="/images/ui/earth_card.png" 
+                <Image 
+                  src="/images/ui/earth_card.webp" 
                   alt="Earth Restoration"
-                  className="max-w-full max-h-full object-contain drop-shadow-[0_0_10px_rgba(16,185,129,0.4)]"
+                  width={360}
+                  height={360}
+                  className="max-w-full max-h-full object-contain drop-shadow-[0_0_26px_rgba(16,185,129,0.5)]"
                 />
               </motion.div>
             </div>
-            <div className="px-1 py-0.5 bg-black/60 backdrop-blur-md border-t border-emerald-500/20 z-30 flex justify-between items-center shrink-0">
-              <span className="text-[6px] font-orbitron text-emerald-400/80 uppercase tracking-widest">PLANETARY STATUS</span>
-              <span className="text-[6px] font-mono text-white/40 uppercase">Sector 074</span>
+            <div className="px-4 py-2 bg-black/60 backdrop-blur-md border-t border-emerald-500/20 z-30 flex justify-between items-center shrink-0">
+              <span className="text-[9px] font-orbitron text-emerald-400/80 uppercase tracking-widest">PLANETARY STATUS</span>
+              <span className="text-[8px] font-mono text-white/40 uppercase">Sector 074</span>
             </div>
           </div>
         </div>

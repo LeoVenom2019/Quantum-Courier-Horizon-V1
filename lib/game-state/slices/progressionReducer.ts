@@ -25,6 +25,8 @@ export const initialProgressionState: ProgressionState = {
   gameTimeSeconds: 0,
   autoSkipRandomBattles: false,
   researchingTech: null,
+  totalDeliveries: 0,
+  deliveriesByLocation: {},
 };
 
 export function progressionReducer(state: ProgressionState = initialProgressionState, action: GameAction): ProgressionState {
@@ -75,6 +77,7 @@ export function progressionReducer(state: ProgressionState = initialProgressionS
           ...state.unlockedTechLevels,
           [tier]: level,
         },
+        researchingTech: null,
       };
     }
 

@@ -41,45 +41,24 @@ export const VOID_WAR_START_LORE = {
 };
 
 export const SHIPS_ROUTE_3_STEPS = [
-  { text: 'route3End_silence', type: 'info' },
-  { text: 'route3End_noAlarms', type: 'info' },
-  { text: 'route3End_noEnemies', type: 'info' },
-  { text: 'route3End_tiredInterface', type: 'info' },
-  { text: 'route3End_resources100', type: 'success' },
-  { text: 'route3End_initiatingFinal', type: 'success' },
-  { text: 'route3End_everythingFinished', type: 'info' },
-  { text: 'route3End_theAttack', type: 'danger' },
-  { text: 'route3End_noWarning', type: 'danger' },
-  { text: 'route3End_spaceTears', type: 'danger' },
-  { text: 'route3End_fleetsEmerge', type: 'danger' },
-  { text: 'route3End_notLikeBefore', type: 'danger' },
-  { text: 'route3End_blockade', type: 'danger' },
-  { text: 'route3End_robotRestored', type: 'robot' },
-  { text: 'route3End_robotWarning', type: 'robot' },
-  { text: 'route3End_robotIntent', type: 'robot' },
-  { text: 'route3End_theStand', type: 'danger' },
-  { text: 'route3End_fightForSurvival', type: 'danger' },
-  { text: 'route3End_evenSurrounded', type: 'danger' },
-  { text: 'route3End_youWin', type: 'success' },
-  { text: 'route3End_aftermath', type: 'info' },
-  { text: 'route3End_debris', type: 'info' },
-  { text: 'route3End_somethingWrong', type: 'info' },
-  { text: 'route3End_anomalyDetected', type: 'danger' },
-  { text: 'route3End_theTruth', type: 'info' },
-  { text: 'route3End_robotAnalysing', type: 'robot' },
-  { text: 'route3End_itWasATest', type: 'robot' },
-  { text: 'route3End_youAreApproved', type: 'robot' },
-  { text: 'route3End_protocolUpdated', type: 'robot' },
-  { text: 'route3End_activation', type: 'success' },
-  { text: 'route3End_earthResponds', type: 'success' },
-  { text: 'route3End_energyFlows', type: 'success' },
-  { text: 'route3End_theBreak', type: 'danger' },
-  { text: 'route3End_interfaceFails', type: 'danger' },
-  { text: 'route3End_controlsUnresponsive', type: 'danger' },
-  { text: 'route3End_modeTransition', type: 'danger' },
-  { text: 'route3End_route4Start', type: 'success' },
-  { text: 'route3End_newInterface', type: 'info' },
-  { text: 'route3End_robotFinal', type: 'robot' },
+  { text: { en: 'Silence.', pt: 'Silêncio.' }, type: 'info' },
+  { text: { en: 'No alarms.\nNo distress calls.\nNo enemy signal.', pt: 'Nenhum alarme.\nNenhum pedido de socorro.\nNenhum sinal inimigo.' }, type: 'info' },
+  { text: { en: 'Only Earth.', pt: 'Só a Terra.' }, type: 'success' },
+  { text: { en: 'The final Project Earth data is confirmed.', pt: 'Os últimos dados do Projeto Terra são confirmados.' }, type: 'success' },
+  { text: { en: 'Chapter 3 defense routes close one by one.', pt: 'As rotas de defesa do Capítulo 3 se fecham uma a uma.' }, type: 'info' },
+  { text: { en: 'The Void retreats, but it does not disappear.', pt: 'O Vazio recua, mas não desaparece.' }, type: 'danger' },
+  { text: { en: 'Bobby Blue stays silent for too long.', pt: 'Bobby Blue fica em silêncio por tempo demais.' }, type: 'robot' },
+  { text: { en: '"Boss... something is answering from down there."', pt: '"Chefe... tem alguma coisa respondendo daqui de baixo."' }, type: 'robot' },
+  { text: { en: 'Thin lines of light spread across Earth\'s surface.', pt: 'A superfície da Terra acende em linhas finas.' }, type: 'success' },
+  { text: { en: 'It does not look like a city.\nIt does not look like a machine.', pt: 'Não parece uma cidade.\nNão parece uma máquina.' }, type: 'info' },
+  { text: { en: 'It looks like an organism waking up.', pt: 'Parece um organismo acordando.' }, type: 'success' },
+  { text: { en: 'The old war map loses signal.', pt: 'O antigo mapa de guerra perde sinal.' }, type: 'danger' },
+  { text: { en: 'Chapter 3 commands are closed.', pt: 'Os comandos do Capítulo 3 são encerrados.' }, type: 'info' },
+  { text: { en: 'The panels change before you touch anything.', pt: 'Os painéis mudam antes de você tocar em qualquer coisa.' }, type: 'info' },
+  { text: { en: 'PROTOCOL EARTH UPDATED.', pt: 'PROTOCOLO TERRA ATUALIZADO.' }, type: 'success' },
+  { text: { en: 'Reconstruction is no longer a promise.', pt: 'A reconstrução deixou de ser promessa.' }, type: 'success' },
+  { text: { en: 'Now it demands presence.', pt: 'Agora ela exige presença.' }, type: 'info' },
+  { text: { en: 'Chapter 4 - New Earth initiated.', pt: 'Capítulo 4 - Nova Terra iniciado.' }, type: 'success' },
 ];
 
 export const MISSION_RARITY_UPGRADE_COSTS = [
@@ -112,23 +91,23 @@ export const DOOM_P_COSTS = [
 export const getDoomPBonus = (level: number) => level * 10;
 
 export const ROUTE2_LORE_LINES = [
-  "Ano 2482",
-  "A Expansão Solar — O Próximo Salto",
+  "Ano 3001",
+  "Capítulo 2 - As Rotas Interestelares",
   "Mestre, ultrapassamos as fronteiras do nosso sistema doméstico.",
-  "As estrelas de Route 2 brilham com uma intensidade que nossos sensores nunca viram.",
+  "As estrelas das Rotas Interestelares brilham com uma intensidade que nossos sensores nunca viram.",
   "Aqui, os créditos fluem como rios de luz, mas os riscos crescem proporcionalmente.",
   "Novas tecnologias de dobra nos permitiram alcançar setores antes inalcançáveis.",
-  "Mas cuidado... a densidade de radiação solar nestas rotas exige naves mais robustas.",
-  "A humanidade está de olho nessas novas rotas. O lucro é imenso.",
+  "Mas cuidado... a densidade de radiação nessas travessias exige naves mais robustas.",
+  "A humanidade está de olho neste novo capítulo. O lucro é imenso.",
   "Prepare-se para lidar com as flutuações do mercado solar e a pirataria avançada.",
-  "Iniciando Transição de Rota... Que o brilho das estrelas guie seu caminho.",
+  "Iniciando transição de capítulo... Que o brilho das estrelas guie seu caminho.",
   "---",
-  "Rota 2 Conectada. O Império Solar te aguarda."
+  "Capítulo 2 - Rotas Interestelares conectado. O espaço profundo te aguarda."
 ];
 
 export const VOID_LORE_LINES = [
   "Ano (??)",
-  "Prólogo —â€  O Mergulho no Vazio",
+  "Capítulo 3 - Rotas do Vazio: Projeto Terra",
   "Mestre... meus sensores estão detectando algo impossível.",
   "Não estamos mais apenas no espaço interestelar. Estamos na borda da realidade.",
   "O Vazio. Um lugar onde o tempo se dobra e a matéria perde o sentido.",
@@ -141,5 +120,5 @@ export const VOID_LORE_LINES = [
   "Prepare sua frota. No Vazio, a única regra é continuar avançando...",
   "...ou ser consumido por essas criaturas.",
   "---",
-  "Rota 3 Iniciada. O Vazio te observa com olhos que nunca piscam."
+  "Capítulo 3 - Rotas do Vazio: Projeto Terra iniciado. O Vazio te observa com olhos que nunca piscam."
 ];

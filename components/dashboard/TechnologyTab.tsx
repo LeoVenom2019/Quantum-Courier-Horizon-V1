@@ -51,7 +51,7 @@ const TechnologyTab = memo(() => {
   const { extractionAutoSellUnlocked, extractionAutoSell } = mining;
 
   const isInterstellar = routeTier === 'Interstellar';
-  const allTechUnlocked = (unlockedTechLevels[routeTier] || 0) >= 10;
+  const allTechUnlocked = (unlockedTechLevels[routeTier] || 0) >= 9;
   
   const getShipNeonBorder = (colorClass: string) => {
     if (colorClass.includes('cyan')) return 'neon-border-cyan';
@@ -212,13 +212,13 @@ const TechnologyTab = memo(() => {
 
                         <button
                           onClick={(e) => sellExtractionPointPacks(point.id, e as any)}
-                          disabled={packs < 1000}
+                          disabled={packs < 100}
                           className={`p-2 rounded-xl border transition-all flex flex-col items-center justify-center gap-1 ${
-                            packs >= 1000 ? 'border-emerald-500/40 bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30' : 'border-white/5 bg-white/5 text-slate-700'
+                            packs >= 100 ? 'border-emerald-500/40 bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30' : 'border-white/5 bg-white/5 text-slate-700'
                           }`}
                         >
                           <Coins className="w-4 h-4" />
-                          <span className="text-[10px] font-bold">{packs >= 1000 ? t('sell') : 'MIN. 1000'}</span>
+                          <span className="text-[10px] font-bold">{packs >= 100 ? t('sell') : 'MIN. 100'}</span>
                         </button>
                       </div>
                     </div>
@@ -252,9 +252,12 @@ const TechnologyTab = memo(() => {
                             </div>
                             <button 
                               onClick={() => boostResearchExtractionPoint(point.id)}
-                              className="ml-3 p-2 bg-yellow-500/20 border border-yellow-500/40 rounded-lg text-yellow-400 hover:bg-yellow-500/30 transition-all"
+                              className="ml-3 p-2 bg-yellow-500/20 border border-yellow-500/40 rounded-lg text-yellow-400 hover:bg-yellow-500/30 transition-all flex items-center gap-2"
                             >
                               <Zap className="w-3 h-3 animate-pulse" />
+                              <span className="text-[10px] font-bold font-mono">
+                                {formatValue(Math.floor(point.cost * (getEconomicMultipliers().cost) * 0.75))} QC
+                              </span>
                             </button>
                           </div>
                         </div>

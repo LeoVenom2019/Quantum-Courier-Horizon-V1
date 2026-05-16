@@ -5,6 +5,12 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Gamepad2, Play, Info, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { MINI_GAMES_CONFIG } from '@/lib/mini-games-config';
 import ArcadeCard from './ArcadeCard';
+import { GameStorage } from '@/lib/game-storage';
+import {
+  COLONY_CARD_CATALOG,
+  DEFAULT_OWNED_COLONY_CARD_IDS,
+  getOwnedArcadeIdsFromCards,
+} from '@/lib/colony-cards';
 
 interface MiniGamesProps {
   onGameSelect: (id: string) => void;
@@ -15,9 +21,39 @@ export const MiniGames: React.FC<MiniGamesProps> = ({ onGameSelect, language }) 
   const [selectedGameInfo, setSelectedGameInfo] = React.useState<typeof MINI_GAMES_CONFIG[number] | null>(null);
   const [highScore, setHighScore] = React.useState<number>(0);
   const [currentPage, setCurrentPage] = React.useState(0);
+  const [ownedCardIds, setOwnedCardIds] = React.useState<string[]>(DEFAULT_OWNED_COLONY_CARD_IDS);
   const GAMES_PER_PAGE = 4;
 
   const totalPages = Math.ceil(MINI_GAMES_CONFIG.length / GAMES_PER_PAGE);
+  const unlockedArcadeIds = React.useMemo(() => getOwnedArcadeIdsFromCards(ownedCardIds), [ownedCardIds]);
+
+  React.useEffect(() => {
+    let mounted = true;
+    const loadOwnedCards = () => GameStorage.load('colony_cards_data').then(saved => {
+      if (!mounted) return;
+      if (Array.isArray(saved) && saved.length > 0) {
+        setOwnedCardIds(saved);
+      }
+    });
+
+    const handleCardsUpdated = (event: Event) => {
+      const detail = (event as CustomEvent<string[]>).detail;
+      if (Array.isArray(detail)) {
+        setOwnedCardIds(detail);
+        return;
+      }
+      loadOwnedCards();
+    };
+
+    loadOwnedCards();
+    window.addEventListener('qch:colony-cards-updated', handleCardsUpdated);
+    window.addEventListener('focus', loadOwnedCards);
+    return () => {
+      mounted = false;
+      window.removeEventListener('qch:colony-cards-updated', handleCardsUpdated);
+      window.removeEventListener('focus', loadOwnedCards);
+    };
+  }, []);
 
   const getHighScore = (gameId: string) => {
     if (typeof window === 'undefined') return 0;
@@ -115,8 +151,8 @@ export const MiniGames: React.FC<MiniGamesProps> = ({ onGameSelect, language }) 
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -20 }}
             transition={{ duration: 0.3 }}
-            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 xl:gap-12 items-center px-8 xl:px-12 relative z-10 mx-auto"
-            style={{ width: '1245.34px', height: '540px' }}
+            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 xl:gap-9 items-center px-6 xl:px-10 relative z-10 mx-auto"
+            style={{ width: '1245.34px', height: '548px' }}
           >
             {currentGames.map((game) => {
               // Theme mapping for arcade cards
@@ -129,9 +165,10 @@ export const MiniGames: React.FC<MiniGamesProps> = ({ onGameSelect, language }) 
                 'neo-catcher': { primary: '#00f2ff', secondary: '#0891b2', visual: 'nebula' }
               };
               const theme = themes[game.id] || { primary: '#06b6d4', secondary: '#0891b2', visual: 'sci-fi' };
+              const isUnlockedByCard = unlockedArcadeIds.has(game.id);
 
               return (
-                <div key={game.id} className="flex flex-col items-center gap-4 w-full max-w-[215px] xl:max-w-[235px] mx-auto group/cabinet">
+                <div key={game.id} className="flex flex-col items-center gap-2 w-full max-w-[215px] xl:max-w-[235px] mx-auto group/cabinet">
                   <div className="relative w-full">
                     <ArcadeCard
                       titulo={game.name[language]}
@@ -139,8 +176,8 @@ export const MiniGames: React.FC<MiniGamesProps> = ({ onGameSelect, language }) 
                       corPrimaria={theme.primary}
                       corSecundaria={theme.secondary}
                       temaVisual={theme.visual}
-                      status={game.status === 'available' ? (language === 'pt' ? 'DISPONÍVEL' : 'AVAILABLE') : (language === 'pt' ? 'BLOQUEADO' : 'LOCKED')}
-                      onPlay={() => game.status === 'available' && onGameSelect(game.id)}
+                      status={isUnlockedByCard ? (language === 'pt' ? 'DISPONÍVEL' : 'AVAILABLE') : (language === 'pt' ? 'CARTA BLOQUEADA' : 'CARD LOCKED')}
+                      onPlay={() => isUnlockedByCard && onGameSelect(game.id)}
                       onInfo={() => handleInfoOpen(game)}
                       screenshot={game.image}
                       language={language}
@@ -205,6 +242,24 @@ export const MiniGames: React.FC<MiniGamesProps> = ({ onGameSelect, language }) 
               </div>
 
               <div className="text-xs text-slate-500 font-medium leading-relaxed bg-slate-800/50 p-4 rounded-xl border border-white/5">
+                {!unlockedArcadeIds.has(selectedGameInfo.id) && (
+                  <div className="mb-4 rounded-xl border border-amber-400/30 bg-amber-400/10 p-3">
+                    <p className="text-[10px] font-orbitron font-black text-amber-300 uppercase tracking-[0.2em] mb-1">
+                      {language === 'pt' ? 'Carta Necessária' : 'Required Card'}
+                    </p>
+                    <p className="text-xs text-amber-100/80 leading-relaxed">
+                      {(() => {
+                        const requiredCard = COLONY_CARD_CATALOG
+                          .find(card => card.unlocksArcadeId === selectedGameInfo.id);
+                        return requiredCard
+                          ? requiredCard.name[language]
+                          : (language === 'pt'
+                              ? 'Encontre a carta de fliperama correspondente no Capítulo 4 - Nova Terra.'
+                              : 'Find the matching arcade card in Chapter 4 - New Earth.');
+                      })()}
+                    </p>
+                  </div>
+                )}
                 <p className="mb-2">
                   {language === 'pt' ? 'INSTRUÇÕES:' : 'INSTRUCTIONS:'}
                 </p>
@@ -244,13 +299,21 @@ export const MiniGames: React.FC<MiniGamesProps> = ({ onGameSelect, language }) 
 
               <button
                 onClick={() => {
+                  if (!unlockedArcadeIds.has(selectedGameInfo.id)) return;
                   onGameSelect(selectedGameInfo.id);
                   setSelectedGameInfo(null);
                 }}
-                className="w-full py-4 rounded-2xl bg-cyan-600 text-white font-orbitron font-black uppercase tracking-[0.2em] hover:bg-cyan-500 transition-all shadow-[0_0_20px_rgba(6,182,212,0.3)] flex items-center justify-center gap-3"
+                disabled={!unlockedArcadeIds.has(selectedGameInfo.id)}
+                className={`w-full py-4 rounded-2xl font-orbitron font-black uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-3 ${
+                  unlockedArcadeIds.has(selectedGameInfo.id)
+                    ? 'bg-cyan-600 text-white hover:bg-cyan-500 shadow-[0_0_20px_rgba(6,182,212,0.3)]'
+                    : 'bg-zinc-800 text-zinc-500 cursor-not-allowed border border-zinc-700'
+                }`}
               >
                 <Play className="w-5 h-5" />
-                {language === 'pt' ? 'Iniciar Missão' : 'Start Mission'}
+                {unlockedArcadeIds.has(selectedGameInfo.id)
+                  ? (language === 'pt' ? 'Iniciar Missão' : 'Start Mission')
+                  : (language === 'pt' ? 'Carta Bloqueada' : 'Card Locked')}
               </button>
             </div>
           </motion.div>

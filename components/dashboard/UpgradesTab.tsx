@@ -7,7 +7,17 @@ import { ROUTES, SHIPS, UPGRADES } from '@/lib/game-data';
 import { ROUTES_MAP, DOUBLE_ROUTE_COSTS, DOOM_P_COSTS } from '@/lib/game-constants';
 import { useDashboard } from './DashboardProvider';
 
-const UpgradesTab = memo(() => {
+const HANGAR_VIDEO_IDS: Record<string, string> = {
+  'Pulsar I': 'pulsar_I',
+  'Pulsar II': 'pulsar_II',
+  'Orion VX': 'orion_xv'
+};
+
+const getHangarVideoId = (shipName: string) => (
+  HANGAR_VIDEO_IDS[shipName] || shipName.toLowerCase().replace(/\s+/g, '_')
+);
+
+const UpgradesTab = memo(function UpgradesTab() {
   const { 
     t, 
     progression, 
@@ -47,6 +57,7 @@ const UpgradesTab = memo(() => {
 
   const translateData = (data: any) => {
     if (!data) return '';
+    if (typeof data === 'string') return data;
     return data[language as keyof typeof data] || data['en'] || '';
   };
 
@@ -410,18 +421,19 @@ const UpgradesTab = memo(() => {
                 {/* Maintenance/Hangar Video */}
                 {(() => {
                   const shipData = SHIPS.find(s => s.level === (ROUTES_MAP.get(selectedUpgradeLocation!)?.requiredShipLevel || 1) && s.tier === (ROUTES_MAP.get(selectedUpgradeLocation!)?.tier || routeTier));
-                  const shipId = shipData?.name.toLowerCase().replace(/\s+/g, '-') || 'atlas-courier';
+                  const shipId = shipData ? getHangarVideoId(shipData.name) : 'atlas_courier';
                   return (
                     <video 
                       key={`h-${shipId}`}
-                      src={`/videos/hangar/${shipId}.webm`}
                       autoPlay 
                       loop 
                       muted 
                       playsInline
                       className="absolute inset-0 w-full h-full object-cover z-0"
                       style={{ backgroundColor: 'black' }}
-                    />
+                    >
+                      <source src={`/videos/hangar/${shipId}.mp4`} type="video/mp4" />
+                    </video>
                   );
                 })()}
 
@@ -450,19 +462,40 @@ const UpgradesTab = memo(() => {
               const progressPercent = Math.min((level / maxLvl) * 100, 100);
 
               return (
-                <div key={upgrade.id} className={`glass-panel ${isInterstellar ? 'neon-border-orange' : 'neon-border-cyan'} rounded-3xl p-5 flex flex-col hover:bg-white/5 transition-all border-2 group h-full min-h-0 relative`}>
-                  <div className="flex justify-between items-start mb-3 shrink-0">
-                    <h3 className="font-orbitron text-lg font-bold text-white leading-tight uppercase tracking-wider group-hover:text-cyan-400 transition-colors">{translateData(upgrade.name)}</h3>
-                    <div className={`text-sm font-orbitron font-bold ${isInterstellar ? 'text-orange-400 border-orange-500/20 bg-orange-500/5' : 'text-cyan-400 border-cyan-500/20 bg-cyan-500/5'} px-3 py-0.5 rounded border`}>{t('level').toUpperCase()} {level}</div>
+                <div key={upgrade.id} className={`glass-panel ${isInterstellar ? 'neon-border-orange' : 'neon-border-cyan'} rounded-3xl p-4 flex flex-col hover:bg-white/5 transition-all border-2 group h-full min-h-[240px] relative`}>
+                  <div className="grid grid-cols-[1fr_auto] items-start gap-3 mb-3 shrink-0">
+                    <h3 className="font-orbitron text-[15px] xl:text-base font-bold text-white leading-tight uppercase tracking-wide group-hover:text-cyan-400 transition-colors">
+                      {translateData(upgrade.name)}
+                    </h3>
+                    <div className={`text-[12px] font-orbitron font-bold ${isInterstellar ? 'text-orange-400 border-orange-500/20 bg-orange-500/5' : 'text-cyan-400 border-cyan-500/20 bg-cyan-500/5'} px-2.5 py-1 rounded border whitespace-nowrap leading-tight`}>
+                      {t('level').toUpperCase()} {level}
+                    </div>
                   </div>
-                  <div className={`text-md font-bold ${isInterstellar ? 'text-orange-100' : 'text-cyan-100'} mb-1 leading-tight uppercase tracking-tight shrink-0`}>{translateData(currentTier.name)}</div>
-                  <p className={`text-[13px] font-mono ${isInterstellar ? 'text-orange-500/60' : 'text-cyan-500/60'} mb-auto flex-1 leading-relaxed uppercase tracking-tighter overflow-hidden`}>{t('bonus')}: {translateData(currentTier.bonus)}</p>
+                  <div className={`text-sm font-bold ${isInterstellar ? 'text-orange-100' : 'text-cyan-100'} mb-1 leading-tight uppercase tracking-tight shrink-0`}>
+                    {translateData(currentTier.name)}
+                  </div>
+                  <div className="mb-auto flex-1 space-y-2 min-h-0">
+                    <p className={`text-[12px] font-mono ${isInterstellar ? 'text-orange-500/70' : 'text-cyan-500/70'} leading-snug uppercase tracking-tighter`}>
+                      {t('bonus')}: {translateData(currentTier.bonus)}
+                    </p>
+                    {nextTier && (
+                      <div className="rounded-lg border border-white/10 bg-black/25 px-3 py-2">
+                        <p className="text-[9px] font-orbitron font-black uppercase tracking-[0.18em] text-white/35 leading-none">
+                          {language === 'pt' ? 'Próximo nível' : 'Next level'}
+                        </p>
+                        <p className="mt-1.5 text-[11px] font-mono uppercase tracking-tighter text-white/75 leading-tight">
+                          <span className="block truncate">{translateData(nextTier.name)}</span>
+                          <span className="block truncate">{translateData(nextTier.bonus)}</span>
+                        </p>
+                      </div>
+                    )}
+                  </div>
                   
-                  <div className="mt-4 shrink-0">
+                  <div className="mt-3 shrink-0">
                     <button
                       disabled={!canAfford || !nextTier}
                       onClick={() => buyUpgrade(selectedUpgradeLocation!, upgrade)}
-                      className={`w-full py-3 rounded-xl font-orbitron font-bold text-lg tracking-[0.2em] transition-all flex items-center justify-center gap-2 uppercase border-b-4 relative overflow-hidden ${
+                      className={`w-full py-3 rounded-xl font-orbitron font-bold text-base tracking-[0.18em] transition-all flex items-center justify-center gap-2 uppercase border-b-4 relative overflow-hidden ${
                         canAfford && nextTier
                         ? (isInterstellar ? 'bg-orange-950 text-orange-400 border-orange-700' : 'bg-pink-950 text-pink-400 border-pink-800')
                         : 'bg-white/5 text-slate-600 cursor-not-allowed border-slate-800'

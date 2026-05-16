@@ -38,6 +38,8 @@ interface BattleOverlayProps {
   privatePoliceLevel: number;
   getPoliceBonus: (level: number) => number;
   ROUTES_MAP: Map<string, any>;
+  aetherion: number;
+  autoSkipBattle: (battle: any, cost: number) => boolean;
 }
 
 const BattleOverlay = memo(({
@@ -58,7 +60,9 @@ const BattleOverlay = memo(({
   battleLevel,
   privatePoliceLevel,
   getPoliceBonus,
-  ROUTES_MAP
+  ROUTES_MAP,
+  aetherion,
+  autoSkipBattle
 }: BattleOverlayProps) => {
   if (!activeBattle) return null;
   
@@ -79,6 +83,12 @@ const BattleOverlay = memo(({
     return Math.min(100, (elapsed / cooldowns[type]) * 100);
   };
 
+  const forceBattleDefeat = () => {
+    const updated = { ...activeBattle, isDefeat: true, playerHp: 0 };
+    setActiveBattle(updated);
+    resolveBattleDefeat(updated);
+  };
+
   if (activeBattle.isVictory || activeBattle.isDefeat) {
     return (
       <AnimatePresence>
@@ -86,7 +96,7 @@ const BattleOverlay = memo(({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-[500] flex items-center justify-center bg-black/80 backdrop-blur-xl p-4"
+          className="fixed inset-0 z-[20000] flex items-center justify-center bg-black/80 backdrop-blur-xl p-4"
         >
           {/* Animated Background Elements */}
           <div className="absolute inset-0 overflow-hidden pointer-events-none">
@@ -227,13 +237,15 @@ const BattleOverlay = memo(({
     }];
 
     return (
-      <VoidBattleArena 
-        initialEnemies={enemies}
+      <div className="relative w-full h-full">
+        <VoidBattleArena 
+          initialEnemies={enemies}
         playerShipStats={stats}
         voidResources={voidResources} // Not used for Solar/Interstellar
         routeTier={routeTier}
         locationId={0}
         activeShipImage={activeBattle.playerImage}
+        battleLevel={battleLevel}
         onBattleEnd={(status, result) => {
           if (status === 'won') {
             const updated = { 
@@ -259,7 +271,38 @@ const BattleOverlay = memo(({
         addLog={addLog}
         formatValue={formatValue}
         isGroupBattle={false}
+        onExitBattle={forceBattleDefeat}
       />
+
+        {/* Skip Button during active combat */}
+        <div className="absolute top-6 right-6 z-[600]">
+          <button
+            onClick={() => {
+              const skipCost = routeTier === 'Interstellar' ? 40 : 10;
+              if (aetherion >= skipCost) {
+                const victory = autoSkipBattle(activeBattle, skipCost);
+                if (victory) {
+                  setActiveBattle({ ...activeBattle, isVictory: true, enemyHp: 0 });
+                } else {
+                  setActiveBattle({ ...activeBattle, isDefeat: true, playerHp: 0 });
+                }
+              }
+            }}
+            disabled={aetherion < (routeTier === 'Interstellar' ? 40 : 10)}
+            className={`px-6 py-3 rounded-xl border font-black transition-all uppercase text-[14px] flex flex-col items-center gap-1 shadow-2xl backdrop-blur-md ${
+              aetherion >= (routeTier === 'Interstellar' ? 40 : 10)
+              ? 'bg-orange-600/40 text-orange-400 border-orange-500/60 hover:bg-orange-600/60'
+              : 'bg-black/60 border-white/10 text-slate-600 cursor-not-allowed opacity-50'
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <Clock className="w-4 h-4" />
+              <span>{t('skipBattle')}</span>
+            </div>
+            <span className="text-[10px] opacity-70">-{routeTier === 'Interstellar' ? 40 : 10} AE</span>
+          </button>
+        </div>
+      </div>
     );
   }
 
@@ -270,8 +313,17 @@ const BattleOverlay = memo(({
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 z-[300] flex items-center justify-center bg-black/95 backdrop-blur-2xl p-4 overflow-hidden"
+        className="fixed inset-0 z-[20000] flex items-center justify-center bg-black/95 backdrop-blur-2xl p-4 overflow-hidden"
       >
+        <button
+          type="button"
+          onClick={forceBattleDefeat}
+          className="absolute top-6 right-6 z-[20010] flex items-center gap-2 rounded-lg border border-red-500/50 bg-red-950/70 px-4 py-2 font-orbitron text-[12px] font-black uppercase tracking-widest text-red-200 shadow-[0_0_24px_rgba(239,68,68,0.25)] backdrop-blur-md transition-all hover:border-red-400 hover:bg-red-900/90 hover:text-white"
+        >
+          <ZapOff className="h-4 w-4" />
+          {language === 'pt' ? 'Sair da Batalha' : 'Exit Battle'}
+        </button>
+
         {/* Space Background for Battle */}
         <div className="absolute inset-0 z-0 opacity-40">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.05)_0%,transparent_70%)]" />
@@ -445,7 +497,7 @@ const BattleOverlay = memo(({
                 <div className="absolute -inset-4 bg-red-500/20 blur-2xl rounded-full animate-pulse" />
                 <div className="relative w-48 h-48 flex items-center justify-center">
                   <img 
-                    src={activeBattle.enemyImage || '/images/battle/enemy_scout.png'} 
+                    src={activeBattle.enemyImage || '/images/battle/enemy_alien.webp'} 
                     alt={activeBattle.enemyName}
                     className="w-full h-full object-contain relative z-10 drop-shadow-[0_0_30px_rgba(239,68,68,0.8)] scale-x-[-1]"
                   />
@@ -618,7 +670,7 @@ const BattleOverlay = memo(({
           </AnimatePresence>
         </motion.div>
       </motion.div>
-    </AnimatePresence>
+      </AnimatePresence>
     );
   }
 
