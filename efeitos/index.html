@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Horizon Combat Laboratory - Rota 4</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@500;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-color: #020617;
+      --panel-bg: rgba(9, 9, 11, 0.65);
+      --border-color: rgba(34, 211, 238, 0.25);
+      --cyan-glow: #22d3ee;
+      --orange-glow: #fb923c;
+      --fuchsia-glow: #f0abfc;
+      --gold-glow: #facc15;
+      --text-color: #f8fafc;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      font-family: 'Rajdhani', sans-serif;
+      min-height: 100vh;
+      overflow-x: hidden;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      background-image: 
+        radial-gradient(circle at 10% 20%, rgba(34, 211, 238, 0.05) 0%, transparent 40%),
+        radial-gradient(circle at 90% 80%, rgba(251, 146, 60, 0.04) 0%, transparent 40%);
+    }
+
+    header {
+      width: 100%;
+      max-width: 1200px;
+      padding: 40px 20px 20px;
+      text-align: center;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      margin-bottom: 40px;
+      position: relative;
+    }
+
+    header::after {
+      content: '';
+      position: absolute;
+      bottom: -1px;
+      left: 25%;
+      width: 50%;
+      height: 1px;
+      background: linear-gradient(to right, transparent, var(--cyan-glow), transparent);
+    }
+
+    .subtitle {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 11px;
+      letter-spacing: 0.5em;
+      text-transform: uppercase;
+      color: var(--cyan-glow);
+      text-shadow: 0 0 10px rgba(34, 211, 238, 0.4);
+      margin-bottom: 8px;
+    }
+
+    h1 {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 3rem;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: -0.02em;
+      background: linear-gradient(to right, #ffffff, #94a3b8);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 16px;
+    }
+
+    p.description {
+      max-width: 600px;
+      margin: 0 auto;
+      color: #94a3b8;
+      font-size: 1.15rem;
+      line-height: 1.5;
+    }
+
+    main {
+      width: 100%;
+      max-width: 1200px;
+      padding: 0 20px 60px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 40px;
+      flex: 1;
+    }
+
+    .gallery {
+      display: grid;
+      grid-template-cols: repeat(auto-fit, minmax(270px, 1fr));
+      gap: 24px;
+      width: 100%;
+    }
+
+    .card {
+      background-color: var(--panel-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 20px;
+      padding: 30px;
+      position: relative;
+      overflow: hidden;
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      min-height: 400px;
+    }
+
+    .card::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle at top left, rgba(255,255,255,0.02), transparent 70%);
+      pointer-events: none;
+    }
+
+    .card:hover {
+      transform: translateY(-8px);
+      box-shadow: 0 15px 40px rgba(0, 0, 0, 0.5);
+    }
+
+    .card.laser1 {
+      --accent: var(--fuchsia-glow);
+      --accent-rgb: 240, 171, 252;
+    }
+    .card.laser2 {
+      --accent: #d946ef;
+      --accent-rgb: 217, 70, 239;
+    }
+    .card.barrage {
+      --accent: var(--orange-glow);
+      --accent-rgb: 251, 146, 60;
+    }
+    .card.trina {
+      --accent: var(--gold-glow);
+      --accent-rgb: 250, 204, 21;
+    }
+
+    .card:hover {
+      border-color: var(--accent);
+      box-shadow: 0 0 30px rgba(var(--accent-rgb), 0.15);
+    }
+
+    .card-top {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .badge {
+      align-self: flex-start;
+      font-family: 'Orbitron', sans-serif;
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      padding: 4px 10px;
+      border-radius: 6px;
+      background-color: rgba(var(--accent-rgb), 0.12);
+      border: 1px solid rgba(var(--accent-rgb), 0.3);
+      color: var(--accent);
+      text-shadow: 0 0 8px rgba(var(--accent-rgb), 0.4);
+    }
+
+    .card-title {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 1.6rem;
+      font-weight: 900;
+      color: #ffffff;
+      text-transform: uppercase;
+    }
+
+    .card-description {
+      color: #94a3b8;
+      font-size: 1.02rem;
+      line-height: 1.5;
+    }
+
+    .card-stats {
+      margin-top: 16px;
+      border-top: 1px solid rgba(255, 255, 255, 0.05);
+      padding-top: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .stat-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.95rem;
+    }
+
+    .stat-label {
+      color: #64748b;
+    }
+
+    .stat-value {
+      color: var(--accent);
+      font-family: 'Orbitron', sans-serif;
+      font-weight: 700;
+    }
+
+    .card-button {
+      margin-top: 24px;
+      width: 100%;
+      padding: 14px;
+      border-radius: 12px;
+      font-family: 'Orbitron', sans-serif;
+      font-size: 11px;
+      font-weight: 900;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      cursor: pointer;
+      background-color: transparent;
+      border: 1px solid rgba(var(--accent-rgb), 0.3);
+      color: var(--accent);
+      transition: all 0.3s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      text-decoration: none;
+    }
+
+    .card-button:hover {
+      background-color: var(--accent);
+      color: #000000;
+      box-shadow: 0 0 20px rgba(var(--accent-rgb), 0.4);
+      border-color: var(--accent);
+    }
+
+    footer {
+      width: 100%;
+      text-align: center;
+      padding: 40px 20px;
+      border-top: 1px solid rgba(255, 255, 255, 0.05);
+      color: #475569;
+      font-size: 0.9rem;
+    }
+
+    footer a {
+      color: #64748b;
+      text-decoration: none;
+      transition: color 0.2s ease;
+    }
+
+    footer a:hover {
+      color: var(--cyan-glow);
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <p class="subtitle">Sistemas de Armamento & Combate</p>
+    <h1>Horizon Combat Laboratory</h1>
+    <p class="description">
+      Simulação interativa dos efeitos de energia e projéteis da Defesa Aérea da Nova Terra (Rota 4). Escolha um módulo abaixo para iniciar o simulador físico e visual.
+    </p>
+  </header>
+
+  <main>
+    <div class="gallery">
+      <!-- CARD 1: APOCALYPSE LASER 1.0 -->
+      <div class="card laser1">
+        <div class="card-top">
+          <span class="badge">ESPECIAL CLÁSSICO</span>
+          <h2 class="card-title">Apocalypse 1.0</h2>
+          <p class="card-description">
+            Versão original do canhão de aniquilação. Canaliza energia de partículas espiraladas simples no muzzle e projeta um laser linear de 5 camadas, colapsando com decaimento luminoso de embers.
+          </p>
+          <div class="card-stats">
+            <div class="stat-row">
+              <span class="stat-label">Tipo de Visual:</span>
+              <span class="stat-value">Energia Linear</span>
+            </div>
+            <div class="stat-row">
+              <span class="stat-label">Complexidade:</span>
+              <span class="stat-value">Partículas Simples</span>
+            </div>
+            <div class="stat-row">
+              <span class="stat-label">Cor de Emissão:</span>
+              <span class="stat-value" style="color: var(--fuchsia-glow)">Magenta/Fucsia</span>
+            </div>
+          </div>
+        </div>
+        <a href="apocalypse-laser.html" class="card-button">Iniciar Módulo</a>
+      </div>
+
+      <!-- CARD 2: APOCALYPSE LASER 2.0 -->
+      <div class="card laser2">
+        <div class="card-top">
+          <span class="badge">ESPECIAL UPGRADE 2.0</span>
+          <h2 class="card-title">Apocalypse 2.0</h2>
+          <p class="card-description">
+            Nova versão refinada com lógica de fluxo estelar estendido de fundo, raios perimetrais de alta voltagem, 5 anéis de força magnética no muzzle, feixe de plasma com relâmpagos bifurcados e colapso termal com ondas de choque duplas.
+          </p>
+          <div class="card-stats">
+            <div class="stat-row">
+              <span class="stat-label">Tipo de Visual:</span>
+              <span class="stat-value">Plasma Instável</span>
+            </div>
+            <div class="stat-row">
+              <span class="stat-label">Complexidade:</span>
+              <span class="stat-value">Fluxos & Raios 2.0</span>
+            </div>
+            <div class="stat-row">
+              <span class="stat-label">Cor de Emissão:</span>
+              <span class="stat-value" style="color: #d946ef">Neon Fucsia/Cian</span>
+            </div>
+          </div>
+        </div>
+        <a href="apocalypse-laser-2.html" class="card-button">Iniciar Módulo</a>
+      </div>
+
+      <!-- CARD 3: HELLFIRE BARRAGE -->
+      <div class="card barrage">
+        <div class="card-top">
+          <span class="badge">ARMA ESPECIAL [F]</span>
+          <h2 class="card-title">Hellfire Barrage</h2>
+          <p class="card-description">
+            Barragem de artilharia termonuclear termal guiada. Dispara sequencialmente 5 esferas de fogo concentrado de alto impacto que curvejam e perseguem alvos na tela via física de atração orbital, causando explosões térmicas.
+          </p>
+          <div class="card-stats">
+            <div class="stat-row">
+              <span class="stat-label">Tipo de Visual:</span>
+              <span class="stat-value">Combustão Homing</span>
+            </div>
+            <div class="stat-row">
+              <span class="stat-label">Complexidade:</span>
+              <span class="stat-value">Perseguição Física</span>
+            </div>
+            <div class="stat-row">
+              <span class="stat-label">Cor de Emissão:</span>
+              <span class="stat-value" style="color: var(--orange-glow)">Laranja-Fogo</span>
+            </div>
+          </div>
+        </div>
+        <a href="hellfire-barrage.html" class="card-button">Iniciar Módulo</a>
+      </div>
+
+      <!-- CARD 4: TRINITY SHOT -->
+      <div class="card trina">
+        <div class="card-top">
+          <span class="badge">DISPARO MÍTICO [ESPAÇO]</span>
+          <h2 class="card-title">Disparo Trino</h2>
+          <p class="card-description">
+            Projétil lendário gerado ao equipar a carta mítica **Reator Aurora Trina**. Dispara um pulso plasmático dourado que carrega rastros combinados das três forças elementais (Fogo, Raio, Gelo), gerando uma explosão circular de 24 partículas no alvo.
+          </p>
+          <div class="card-stats">
+            <div class="stat-row">
+              <span class="stat-label">Tipo de Visual:</span>
+              <span class="stat-value">Elemental Híbrido</span>
+            </div>
+            <div class="stat-row">
+              <span class="stat-label">Complexidade:</span>
+              <span class="stat-value">Ondas & Rastros</span>
+            </div>
+            <div class="stat-row">
+              <span class="stat-label">Cor de Emissão:</span>
+              <span class="stat-value" style="color: var(--gold-glow)">Trina Tricromática</span>
+            </div>
+          </div>
+        </div>
+        <a href="trinity-shot.html" class="card-button">Iniciar Módulo</a>
+      </div>
+    </div>
+  </main>
+
+  <footer>
+    <p>Horizon System Diagnostic • Quantum Courier Horizon V1</p>
+    <p style="margin-top: 6px; font-size: 0.8rem; opacity: 0.7;">Desenvolvido para análise interativa sem mutação do core React.</p>
+  </footer>
+
+</body>
+</html>

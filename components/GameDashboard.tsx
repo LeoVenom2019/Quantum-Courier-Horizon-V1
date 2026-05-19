@@ -112,6 +112,17 @@ import { SpaceAmbience } from './SpaceAmbience';
 import { MINI_GAMES_CONFIG } from '@/lib/mini-games-config';
 import { MiniGames } from './MiniGames';
 import { ColonySystem, Colony, cleanColoniesData } from './ColonySystem';
+import {
+  ARCADE_CARD_REWARD_CHANCE,
+  ARCADE_CARD_REWARD_RULES,
+  ColonyCard,
+  getBattleEffects,
+  getCardBackgroundImage,
+  getCardClass,
+  getPoliticalEffects,
+  normalizeOwnedColonyCardIds,
+  rollAnyMissingColonyCardReward,
+} from '@/lib/colony-cards';
 import { LoreScreen, RobotVisual } from './LoreSystem';
 import Lottie from 'lottie-react';
 import EconomicGoals from './dashboard/EconomicGoals';
@@ -469,6 +480,7 @@ const DashboardContent = memo(({
   const [saveProgress, setSaveProgress] = useState(0);
 
   const [activeMiniGameId, setActiveMiniGameId] = useState<string | null>(null);
+  const [arcadeCardReward, setArcadeCardReward] = useState<ColonyCard | null>(null);
   const [achievementNotification, setAchievementNotification] = useState<Achievement | null>(null);
   const [showRoute3Ending, setShowRoute3Ending] = useState(false);
   const [route3EndingStep, setRoute3EndingStep] = useState(0);
@@ -556,6 +568,8 @@ const DashboardContent = memo(({
   const hydrosphereRef = React.useRef(hydrosphere);
   const biosphereRef = React.useRef(biosphere);
   const activeMiniGameIdRef = React.useRef<string | null>(null);
+  const lastArcadeMusicGameIdRef = React.useRef<string | null>(null);
+  const arcadeRewardSessionRef = React.useRef<Record<string, { guaranteedAwarded: boolean; chanceRolled: boolean }>>({});
   const voidAutoShipmentActiveRef = React.useRef(voidAutoShipmentActive);
   const voidAutoShipmentUnlockedRef = React.useRef(voidAutoShipmentUnlocked);
   const extractionPacksRef = React.useRef(extractionPacks);
@@ -819,6 +833,10 @@ const DashboardContent = memo(({
     isLoadedRef.current = isLoaded;
   }, [isLoaded]);
 
+  useEffect(() => {
+    activeMiniGameIdRef.current = activeMiniGameId;
+  }, [activeMiniGameId]);
+
   // 6. Void Aircraft & Battle
   useEffect(() => {
     voidAircraftMissionsRef.current = voidAircraftMissions;
@@ -914,6 +932,37 @@ const DashboardContent = memo(({
                     'bg-cyan-500/5';
   const themeGlow = isNeon ? 'shadow-[0_0_20px_rgba(219,39,119,0.6)]' : (isVoid ? 'shadow-[0_0_20px_rgba(168,85,247,0.6)]' : (isInterstellar ? 'shadow-[0_0_20px_rgba(234,88,12,0.6)]' : 'shadow-[0_0_15px_rgba(6,182,212,0.4)]'));
   const themeAccent = isNeon ? 'from-pink-600 to-purple-400' : (isVoid ? 'from-purple-600 to-fuchsia-400' : (isInterstellar ? 'from-red-600 via-orange-500 to-yellow-400' : 'from-cyan-600 to-cyan-400'));
+  const headerVisual = useMemo(() => {
+    if (routeTier === 'Earth') {
+      return {
+        background: '/assets/rota4/layout_header_cap_4/background_header_rota_4.webp',
+        border: 'neon-border-emerald',
+        particles: 'route-header-particles route-header-particles-earth',
+      };
+    }
+
+    if (routeTier === 'Void') {
+      return {
+        background: '/assets/rota3/layout_header_cap_3/background_header_rota_3.webp',
+        border: 'neon-border-purple',
+        particles: 'route-header-particles route-header-particles-void',
+      };
+    }
+
+    if (routeTier === 'Interstellar') {
+      return {
+        background: '/assets/rota2/layout_header_cap_2/background_header_rota_2.webp',
+        border: 'neon-border-orange',
+        particles: 'route-header-particles route-header-particles-heat',
+      };
+    }
+
+    return {
+      background: '/assets/rota1/layout_header_cap_1/background_header_rota_1.webp',
+      border: 'neon-border-cyan',
+      particles: 'route-header-particles route-header-particles-solar',
+    };
+  }, [routeTier]);
 
   const { playSfx, stopSfx } = useSFX(sfxOn);
 
@@ -1041,6 +1090,7 @@ const DashboardContent = memo(({
       if (isLoaded && !musicOn) {
         console.log('[MusicEngine] Music is OFF, stopping playback');
         jukebox.stop();
+        lastArcadeMusicGameIdRef.current = null;
       }
       return;
     }
@@ -1049,17 +1099,16 @@ const DashboardContent = memo(({
     if (activeMiniGameId) {
       const arcadeTheme = ARCADE_THEMES[activeMiniGameId];
       if (arcadeTheme && arcadeTheme.playlist.length > 0) {
-        const currentUrl = jukebox.currentTrack?.url;
-        const isArcadeTrack = currentUrl && arcadeTheme.playlist.some((t: any) => t.url === currentUrl);
-
-        if (!isArcadeTrack) {
-          console.log(`[MusicEngine] Arcade detected: ${activeMiniGameId}. Switching to arcade playlist...`);
-          jukebox.playPlaylist(arcadeTheme.playlist);
+        if (lastArcadeMusicGameIdRef.current !== activeMiniGameId) {
+          console.log(`[MusicEngine] Arcade started: ${activeMiniGameId}. Restarting arcade playlist...`);
+          jukebox.playPlaylist(arcadeTheme.playlist, { restart: true, loop: true });
+          lastArcadeMusicGameIdRef.current = activeMiniGameId;
         }
         return; // Stay in arcade music
       }
     }
 
+    lastArcadeMusicGameIdRef.current = null;
     const theme = ROUTE_THEMES[routeTier];
     if (theme && theme.playlist.length > 0) {
       const currentUrl = jukebox.currentTrack?.url;
@@ -1067,14 +1116,14 @@ const DashboardContent = memo(({
 
       if (!isThemeTrack) {
         console.log(`[MusicEngine] Route detected: ${routeTier}. Switching to theme playlist...`);
-        jukebox.playPlaylist(theme.playlist);
+        jukebox.playPlaylist(theme.playlist, { loop: false });
       }
     } else {
       console.warn(`[MusicEngine] No playlist found for route: ${routeTier}. Stopping playback.`);
       jukebox.stop();
     }
 
-  }, [activeMiniGameId || routeTier, isLoaded, musicOn, jukebox.playPlaylist, jukebox.currentTrack?.url]);
+  }, [activeMiniGameId, routeTier, isLoaded, musicOn, jukebox.playPlaylist, jukebox.stop, jukebox.currentTrack?.url]);
   const setOresCollected = useCallback((val: Record<string, number> | ((prev: Record<string, number>) => Record<string, number>)) => {
     const nextVal = typeof val === 'function' ? val(oresCollectedRef.current) : val;
     oresCollectedRef.current = nextVal;
@@ -1786,6 +1835,51 @@ const DashboardContent = memo(({
 
   const { hasSeenRoute2UnlockMessage } = useSystem();
 
+  const awardArcadeCardReward = useCallback(async (gameId: string, guaranteed: boolean) => {
+    const savedCards = await GameStorage.load('colony_cards_data');
+    const ownedIds = normalizeOwnedColonyCardIds(Array.isArray(savedCards) ? savedCards : undefined);
+    const reward = rollAnyMissingColonyCardReward(ownedIds);
+    if (!reward) return false;
+
+    const nextOwnedIds = normalizeOwnedColonyCardIds([...ownedIds, reward.id]);
+    await GameStorage.save(nextOwnedIds, 'colony_cards_data');
+    window.dispatchEvent(new CustomEvent('qch:colony-cards-updated', { detail: nextOwnedIds }));
+    setArcadeCardReward(reward);
+    playSfx('claim_card');
+    addLog(
+      language === 'pt'
+        ? `${guaranteed ? 'Marco' : 'Prêmio'} de fliperama em ${gameId}: carta ${reward.name.pt} adquirida.`
+        : `${guaranteed ? 'Milestone' : 'Arcade'} reward in ${gameId}: ${reward.name.en} acquired.`,
+      'success'
+    );
+    return true;
+  }, [addLog, language, playSfx]);
+
+  const evaluateArcadeCardReward = useCallback(async (gameId: string, score: number, isFinal: boolean) => {
+    if (routeTierRef.current !== 'Earth') return;
+    if (!isFinal) return;
+    const rule = ARCADE_CARD_REWARD_RULES[gameId];
+    if (!rule || score < rule.minimumScore) return;
+
+    const savedMilestones = await GameStorage.load('arcade_card_reward_milestones');
+    const milestones: Record<string, boolean> = savedMilestones && typeof savedMilestones === 'object' ? savedMilestones : {};
+    const session = arcadeRewardSessionRef.current[gameId] || { guaranteedAwarded: false, chanceRolled: false };
+
+    if (!milestones[gameId] && !session.guaranteedAwarded) {
+      const awarded = await awardArcadeCardReward(gameId, true);
+      if (!awarded) return;
+      const nextMilestones = { ...milestones, [gameId]: true };
+      await GameStorage.save(nextMilestones, 'arcade_card_reward_milestones');
+      arcadeRewardSessionRef.current[gameId] = { ...session, guaranteedAwarded: true };
+      return;
+    }
+
+    if (session.chanceRolled) return;
+    arcadeRewardSessionRef.current[gameId] = { ...session, chanceRolled: true };
+    if (Math.random() * 100 >= ARCADE_CARD_REWARD_CHANCE) return;
+    await awardArcadeCardReward(gameId, false);
+  }, [awardArcadeCardReward]);
+
   useEffect(() => {
     // Load arcade scores from localStorage initially
     const scores: { [key: string]: number } = {};
@@ -1804,6 +1898,11 @@ const DashboardContent = memo(({
     const handleMessage = (event: MessageEvent) => {
       if (!event.data) return;
 
+      if (event.data.type === 'ARCADE_RESULT_SHOWN') {
+        jukebox.stop();
+        lastArcadeMusicGameIdRef.current = null;
+      }
+
       if (event.data.type === 'CLOSE_MINI_GAME') {
         const wasMiniGameActive = !!activeMiniGameIdRef.current;
         setActiveMiniGameId(null);
@@ -1820,7 +1919,9 @@ const DashboardContent = memo(({
 
       if (event.data.score !== undefined && event.data.gameId) {
         const gameId = event.data.gameId;
-        const score = event.data.score;
+        const score = Number(event.data.score) || 0;
+        const isFinalScore = event.data.type === 'GAME_COMPLETE' || event.data.final === true;
+        evaluateArcadeCardReward(gameId, score, isFinalScore);
         setArcadeScores(prev => {
           // Check if this game is time-based (where lower is better)
           // For now, all current games are "higher is better" either by points or remaining time
@@ -1835,7 +1936,7 @@ const DashboardContent = memo(({
     };
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, []);
+  }, [evaluateArcadeCardReward, jukebox.stop]);
 
 
   const updateHistoryStats = useCallback((
@@ -6447,8 +6548,16 @@ const DashboardContent = memo(({
           </motion.div>
         )}
         {/* Header */}
-        <header className={`glass-panel ${isInterstellar ? 'neon-border-orange' : 'neon-border-cyan'} p-4 justify-between items-center rounded-xl shrink-0 ${(activeBattle || ['fighting', 'won', 'lost'].includes(voidBattleStatus)) ? 'hidden' : 'flex'}`}>
-          <div className="flex items-center gap-4">
+        <header className={`glass-panel ${headerVisual.border} relative overflow-hidden p-4 justify-between items-center rounded-xl shrink-0 ${(activeBattle || ['fighting', 'won', 'lost'].includes(voidBattleStatus)) ? 'hidden' : 'flex'}`}>
+          <div
+            aria-hidden="true"
+            className="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-95"
+            style={{ backgroundImage: `url(${headerVisual.background})` }}
+          />
+          <div aria-hidden="true" className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/45 to-black/70" />
+          <div aria-hidden="true" className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.08),transparent_68%)]" />
+          <div aria-hidden="true" className={headerVisual.particles} />
+          <div className="relative z-10 flex items-center gap-4">
             <div className={`w-12 h-12 rounded-lg ${isInterstellar ? 'bg-orange-500/10 border-orange-500/30' : 'bg-cyan-500/10 border-cyan-500/30'} flex items-center justify-center border animate-pulse-glow`}>
               <Rocket className={`w-6 h-6 ${themeText}`} />
             </div>
@@ -6534,7 +6643,7 @@ const DashboardContent = memo(({
           </div>
 
           {isSpeedRun && (
-            <div className="flex-1 max-w-md mx-8 hidden md:block">
+            <div className="relative z-10 flex-1 max-w-md mx-8 hidden md:block">
               <div className="relative h-4 bg-slate-900/80 rounded-full border border-cyan-500/30 overflow-hidden shadow-[0_0_15px_rgba(6,182,212,0.1)]">
                 {(() => {
                   const p = getSpeedRunProgress();
@@ -6567,7 +6676,7 @@ const DashboardContent = memo(({
             </div>
           )}
 
-          <div className="flex items-center gap-6">
+          <div className="relative z-10 flex items-center gap-6">
             <div className="flex flex-col items-end">
               <div className="flex items-center gap-3">
                 {isSpeedRun && (
@@ -6959,6 +7068,7 @@ const DashboardContent = memo(({
                       <MiniGames
                         onGameSelect={(id) => {
                           if (!isArcadeUnlocked) return;
+                          arcadeRewardSessionRef.current[id] = { guaranteedAwarded: false, chanceRolled: false };
                           setActiveMiniGameId(id);
                           addLog(`${language === 'pt' ? 'Iniciando' : 'Starting'} ${id}...`, 'info');
                         }}
@@ -7105,13 +7215,38 @@ const DashboardContent = memo(({
                 )}
 
                 {activeTab === 'void_earth' && (
-                  <VoidEarth
-                    earthReconstructionProgress={earthReconstructionProgress}
-                    language={language}
-                    t={t}
-                    setShowRestorationModal={setShowRestorationModal}
-                    playSfx={playSfx}
-                  />
+                  isEarth ? (
+                    <motion.div
+                      key="new_earth_empty_panel"
+                      initial={{ opacity: 0, x: 20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: -20 }}
+                      transition={{ duration: 0.3 }}
+                      className="h-full overflow-hidden rounded-3xl border border-cyan-300/20 bg-black/35 p-6"
+                    >
+                      <div className="flex h-full min-h-[360px] flex-col justify-center rounded-2xl border border-dashed border-cyan-300/20 bg-cyan-300/[0.03] p-8 text-center">
+                        <p className="font-mono text-[10px] uppercase tracking-[0.38em] text-cyan-200/75">
+                          {language === 'pt' ? 'Nova Terra' : 'New Earth'}
+                        </p>
+                        <h2 className="mt-3 font-orbitron text-2xl font-black uppercase text-white">
+                          {language === 'pt' ? 'Conteúdo exclusivo em preparação' : 'Exclusive content in preparation'}
+                        </h2>
+                        <p className="mx-auto mt-3 max-w-2xl text-sm leading-relaxed text-zinc-400">
+                          {language === 'pt'
+                            ? 'Esta aba da Rota 4 foi limpa para receber uma experiência própria da Nova Terra.'
+                            : 'This Route 4 tab was cleared to receive a dedicated New Earth experience.'}
+                        </p>
+                      </div>
+                    </motion.div>
+                  ) : (
+                    <VoidEarth
+                      earthReconstructionProgress={earthReconstructionProgress}
+                      language={language}
+                      t={t}
+                      setShowRestorationModal={setShowRestorationModal}
+                      playSfx={playSfx}
+                    />
+                  )
                 )}
 
                 {activeTab === 'history' && (
@@ -7776,6 +7911,81 @@ const DashboardContent = memo(({
           )}
         </AnimatePresence>
 
+        {/* Arcade Card Reward */}
+        <AnimatePresence>
+          {arcadeCardReward && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[1200] flex items-center justify-center bg-black/85 p-4 backdrop-blur-xl"
+            >
+              <motion.div
+                initial={{ scale: 0.92, y: 24 }}
+                animate={{ scale: 1, y: 0 }}
+                exit={{ scale: 0.92, y: 24 }}
+                className={`relative grid w-full max-w-4xl grid-cols-[300px_1fr] gap-8 overflow-hidden rounded-[2rem] border border-cyan-300/30 bg-zinc-950 p-7 shadow-[0_0_90px_rgba(6,182,212,0.22)] ${getCardClass(arcadeCardReward) === 'battle' ? 'border-red-300/35' : 'border-cyan-300/30'}`}
+              >
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(34,211,238,0.18),transparent_32%),linear-gradient(135deg,rgba(255,255,255,0.05),transparent_45%)]" />
+                <div className="relative aspect-[2/3] overflow-hidden rounded-[3.8%] border border-white/20 shadow-[0_0_42px_rgba(255,255,255,0.12)]">
+                  <img
+                    src={getCardBackgroundImage(arcadeCardReward.rarity)}
+                    alt=""
+                    className="absolute inset-0 h-full w-full object-cover"
+                  />
+                  <div className="absolute left-[9%] right-[12%] top-[22%] space-y-2">
+                    <div className="inline-flex rounded-full border border-white/15 bg-zinc-950/88 px-2 py-1 font-mono text-[9px] font-black uppercase tracking-widest text-white">
+                      {getCardClass(arcadeCardReward) === 'battle' ? 'Batalha' : 'Política'}
+                    </div>
+                    <h3 className="rounded-lg bg-zinc-950/90 px-2 py-1.5 font-orbitron text-sm font-black uppercase leading-tight text-white">
+                      {arcadeCardReward.name[language as 'pt' | 'en']}
+                    </h3>
+                    <p className="line-clamp-3 rounded-lg bg-zinc-950/88 px-2 py-1.5 text-[11px] leading-snug text-zinc-100">
+                      {arcadeCardReward.lore[language as 'pt' | 'en']}
+                    </p>
+                  </div>
+                </div>
+                <div className="relative flex min-w-0 flex-col justify-center">
+                  <p className="font-mono text-[10px] font-black uppercase tracking-[0.45em] text-cyan-300">
+                    {language === 'pt' ? 'Prêmio de Fliperama' : 'Arcade Reward'}
+                  </p>
+                  <h2 className="mt-3 font-orbitron text-4xl font-black uppercase leading-tight text-white">
+                    {arcadeCardReward.name[language as 'pt' | 'en']}
+                  </h2>
+                  <p className="mt-3 text-base text-zinc-300">
+                    {arcadeCardReward.role[language as 'pt' | 'en']}
+                  </p>
+                  <div className="mt-6 rounded-2xl border border-white/10 bg-black/45 p-4">
+                    <p className="mb-3 font-mono text-[10px] uppercase tracking-[0.35em] text-zinc-500">
+                      {language === 'pt' ? 'Impacto direto' : 'Direct impact'}
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {(getCardClass(arcadeCardReward) === 'battle'
+                        ? getBattleEffects(arcadeCardReward)
+                        : getPoliticalEffects(arcadeCardReward)
+                      ).map((effect: any) => {
+                        const label = getCardClass(arcadeCardReward) === 'battle' ? effect.stat : effect.sector;
+                        const value = effect.value;
+                        return (
+                          <span key={`${label}-${value}`} className="rounded-full border border-cyan-300/25 bg-cyan-300/10 px-3 py-1 font-mono text-[11px] font-black text-cyan-100">
+                            {value > 0 ? '+' : ''}{value}{getCardClass(arcadeCardReward) === 'battle' ? '%' : ''} {label}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setArcadeCardReward(null)}
+                    className="mt-7 rounded-2xl bg-emerald-400 px-8 py-4 font-orbitron text-sm font-black uppercase tracking-[0.35em] text-black transition-all hover:bg-emerald-300 active:scale-95"
+                  >
+                    {language === 'pt' ? 'Registrar Carta' : 'Register Card'}
+                  </button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* Route 2 Goals Modal */}
         <AnimatePresence>
           {showRoute2Goals && (
@@ -8138,7 +8348,6 @@ const DashboardContent = memo(({
               >
                 {/* Cyberpunk Gradient Background */}
                 <div className="absolute inset-0 bg-gradient-to-br from-blue-900/90 via-purple-900/90 to-red-900/90" />
-                <div className="absolute inset-0 bg-[url()] opacity-20 mix-blend-overlay" />
 
                 {/* Animated Scanline Effect */}
                 <div className="absolute inset-0 pointer-events-none overflow-hidden">

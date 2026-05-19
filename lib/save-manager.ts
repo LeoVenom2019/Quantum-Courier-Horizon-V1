@@ -1,4 +1,131 @@
-export const CURRENT_SAVE_VERSION = "1.1.0";
+export const CURRENT_SAVE_VERSION = "1.2.0";
+
+export const COLONY_SAVE_STORAGE_KEYS = [
+  'colony_cards_data',
+  'colony_card_levels',
+  'colony_search_upgrade_levels',
+  'colony_active_search',
+  'colony_search_threat_bonus',
+  'horizon_ship_xp',
+  'route4_defense_battle_level',
+  'battle_cards_loadout',
+  'battle_card_legendary_pity',
+  'colony_supplies_data',
+  'defense_special_loadout',
+  'colony_defense_threats',
+] as const;
+
+export type ColonySaveStorageKey = typeof COLONY_SAVE_STORAGE_KEYS[number];
+
+const MAX_PENDING_DEFENSE_THREATS = 2;
+
+export interface ColonySystemSaveData {
+  ownedCardIds: string[];
+  cardLevels: Record<string, number>;
+  searchUpgradeLevels: Record<'land' | 'sea', number>;
+  activeSearches: Record<string, any>;
+  searchThreatBonus: Record<'land' | 'sea', number>;
+  horizonShipXp: number;
+  horizonShipLevel: number;
+  defenseBattleLevel: number;
+  battleLoadout: Record<string, string>;
+  legendaryBattleCardPity: number;
+  supplies: Record<string, number>;
+  defenseSpecialLoadout: string[];
+  pendingDefenseThreats: any[];
+  storage: Partial<Record<ColonySaveStorageKey, any>>;
+}
+
+const safeParseLocalStorage = (key: string): any => {
+  if (typeof localStorage === 'undefined') return undefined;
+
+  const serialized = localStorage.getItem(key);
+  if (!serialized) return undefined;
+
+  try {
+    return JSON.parse(serialized);
+  } catch {
+    return undefined;
+  }
+};
+
+const getHorizonXpForNextLevel = (level: number) => (
+  Math.round(420 + Math.max(1, level) * 90 + Math.pow(Math.max(1, level), 1.35) * 42)
+);
+
+const getHorizonLevelFromXp = (xp = 0) => {
+  let level = 1;
+  let remainingXp = Math.max(0, Math.floor(xp));
+
+  while (level < 50) {
+    const needed = getHorizonXpForNextLevel(level);
+    if (remainingXp < needed) break;
+    remainingXp -= needed;
+    level += 1;
+  }
+
+  return level;
+};
+
+const getFlatOrStorageValue = (flatData: any, flatKey: string, storageKey: ColonySaveStorageKey, fallback: any) => {
+  if (flatData?.[flatKey] !== undefined) return flatData[flatKey];
+  const stored = safeParseLocalStorage(storageKey);
+  return stored !== undefined ? stored : fallback;
+};
+
+const createColonySystemSave = (flatData: any): ColonySystemSaveData => {
+  const ownedCardIds = getFlatOrStorageValue(flatData, 'colonyCardIds', 'colony_cards_data', []);
+  const cardLevels = getFlatOrStorageValue(flatData, 'colonyCardLevels', 'colony_card_levels', {});
+  const searchUpgradeLevels = getFlatOrStorageValue(flatData, 'colonySearchUpgradeLevels', 'colony_search_upgrade_levels', { land: 0, sea: 0 });
+  const activeSearches = getFlatOrStorageValue(flatData, 'colonyActiveSearches', 'colony_active_search', {});
+  const searchThreatBonus = getFlatOrStorageValue(flatData, 'colonySearchThreatBonus', 'colony_search_threat_bonus', { land: 0, sea: 0 });
+  const horizonShipXp = Number(getFlatOrStorageValue(flatData, 'horizonShipXp', 'horizon_ship_xp', 0)) || 0;
+  const defenseBattleLevel = Number(getFlatOrStorageValue(flatData, 'route4DefenseBattleLevel', 'route4_defense_battle_level', 1)) || 1;
+  const battleLoadout = getFlatOrStorageValue(flatData, 'battleCardsLoadout', 'battle_cards_loadout', {});
+  const legendaryBattleCardPity = Number(getFlatOrStorageValue(flatData, 'battleCardLegendaryPity', 'battle_card_legendary_pity', 0)) || 0;
+  const supplies = getFlatOrStorageValue(flatData, 'colonySupplies', 'colony_supplies_data', {});
+  const defenseSpecialLoadout = getFlatOrStorageValue(flatData, 'defenseSpecialLoadout', 'defense_special_loadout', []);
+  const pendingDefenseThreats = getFlatOrStorageValue(flatData, 'colonyDefenseThreats', 'colony_defense_threats', []);
+  const normalizedPendingDefenseThreats = Array.isArray(pendingDefenseThreats)
+    ? pendingDefenseThreats.filter(threat => threat?.status === 'pending').slice(0, MAX_PENDING_DEFENSE_THREATS)
+    : [];
+
+  return {
+    ownedCardIds: Array.isArray(ownedCardIds) ? ownedCardIds : [],
+    cardLevels: cardLevels && typeof cardLevels === 'object' ? cardLevels : {},
+    searchUpgradeLevels: {
+      land: Math.max(0, Number(searchUpgradeLevels?.land) || 0),
+      sea: Math.max(0, Number(searchUpgradeLevels?.sea) || 0),
+    },
+    activeSearches: activeSearches && typeof activeSearches === 'object' ? activeSearches : {},
+    searchThreatBonus: {
+      land: Math.max(0, Number(searchThreatBonus?.land) || 0),
+      sea: Math.max(0, Number(searchThreatBonus?.sea) || 0),
+    },
+    horizonShipXp: Math.max(0, horizonShipXp),
+    horizonShipLevel: getHorizonLevelFromXp(horizonShipXp),
+    defenseBattleLevel: Math.max(1, Math.floor(defenseBattleLevel)),
+    battleLoadout: battleLoadout && typeof battleLoadout === 'object' ? battleLoadout : {},
+    legendaryBattleCardPity: Math.max(0, legendaryBattleCardPity),
+    supplies: supplies && typeof supplies === 'object' ? supplies : {},
+    defenseSpecialLoadout: Array.isArray(defenseSpecialLoadout) ? defenseSpecialLoadout : [],
+    pendingDefenseThreats: normalizedPendingDefenseThreats,
+    storage: {
+      colony_cards_data: Array.isArray(ownedCardIds) ? ownedCardIds : [],
+      colony_card_levels: cardLevels && typeof cardLevels === 'object' ? cardLevels : {},
+      colony_search_upgrade_levels: searchUpgradeLevels && typeof searchUpgradeLevels === 'object' ? searchUpgradeLevels : { land: 0, sea: 0 },
+      colony_active_search: activeSearches && typeof activeSearches === 'object' ? activeSearches : {},
+      colony_search_threat_bonus: searchThreatBonus && typeof searchThreatBonus === 'object' ? searchThreatBonus : { land: 0, sea: 0 },
+      horizon_ship_xp: Math.max(0, horizonShipXp),
+      route4_defense_battle_level: Math.max(1, Math.floor(defenseBattleLevel)),
+      battle_cards_loadout: battleLoadout && typeof battleLoadout === 'object' ? battleLoadout : {},
+      battle_card_legendary_pity: Math.max(0, legendaryBattleCardPity),
+      colony_supplies_data: supplies && typeof supplies === 'object' ? supplies : {},
+      defense_special_loadout: Array.isArray(defenseSpecialLoadout) ? defenseSpecialLoadout : [],
+      colony_defense_threats: normalizedPendingDefenseThreats,
+    },
+  };
+};
 
 export interface ModularSaveData {
   version: string;
@@ -125,6 +252,7 @@ export interface ModularSaveData {
     hydrosphere: number;
     biosphere: number;
   };
+  colony_system: ColonySystemSaveData;
   arcadeScores: Record<string, number>;
   localRecords: any[];
   unlockedCodes: string[];
@@ -256,6 +384,7 @@ export const SaveManager = {
         hydrosphere: flatData.hydrosphere || 0,
         biosphere: flatData.biosphere || 0
       },
+      colony_system: createColonySystemSave(flatData),
       arcadeScores: flatData.arcadeScores || {},
       localRecords: flatData.localRecords || [],
       unlockedCodes: flatData.unlockedCodes || []

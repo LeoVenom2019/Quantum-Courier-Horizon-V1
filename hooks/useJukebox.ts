@@ -1,21 +1,25 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { GameStorage } from '@/lib/game-storage';
-import { ROUTE_THEMES, ARCADE_THEMES } from '@/lib/music-data';
+import { ROUTE_THEMES, ARCADE_THEMES, Track } from '@/lib/music-data';
 import { useSoundMaster } from './useSoundMaster';
 
-export interface Track {
-  id: string;
-  title: string;
-  url: string;
-  duration?: string;
-  origin?: string;
-}
+export type { Track };
 
 export const LANDING_BGM: Track = { 
   id: 'landing', 
   title: 'Galactic Horizon (Landing BGM)', 
   url: '/audio/bgm_landing.ogg',
   origin: 'System'
+};
+
+const isAbortAudioError = (error: unknown) => (
+  error instanceof DOMException && error.name === 'AbortError'
+);
+
+const reportAudioError = (label: string, error: unknown) => {
+  if (isAbortAudioError(error)) return;
+  const message = error instanceof Error ? error.message : String(error);
+  console.warn(`[Jukebox] ${label}:`, message);
 };
 
 export function useJukebox(onPlayStateChange?: (isPlaying: boolean) => void) {
@@ -108,7 +112,7 @@ export function useJukebox(onPlayStateChange?: (isPlaying: boolean) => void) {
       audioRef.current.pause();
       setIsPlaying(false);
     } else {
-      audioRef.current.play().catch(console.error);
+      audioRef.current.play().catch(error => reportAudioError('Manual playback failed', error));
       setIsPlaying(true);
     }
   }, [isPlaying, playlist.length]);
@@ -154,11 +158,7 @@ export function useJukebox(onPlayStateChange?: (isPlaying: boolean) => void) {
     const handleEnded = () => {
       if (isLoop) {
         audio.currentTime = 0;
-        audio.play().catch(err => {
-          if (err.name !== 'AbortError') {
-            console.warn('[Jukebox] Loop playback failed:', err.message);
-          }
-        });
+        audio.play().catch(error => reportAudioError('Loop playback failed', error));
       } else {
         playNext();
       }
@@ -168,9 +168,14 @@ export function useJukebox(onPlayStateChange?: (isPlaying: boolean) => void) {
     return () => audio.removeEventListener('ended', handleEnded);
   }, [isLoop, playNext]);
 
-  const playPlaylist = useCallback((newPlaylist: Track[]) => {
+  const playPlaylist = useCallback((newPlaylist: Track[], options: { restart?: boolean; loop?: boolean } = {}) => {
     setPlaylist(newPlaylist);
     setCurrentTrackIndex(0);
+    if (typeof options.loop === 'boolean') setIsLoop(options.loop);
+    if (options.restart && audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+    }
     setIsPlaying(true);
   }, []);
 
@@ -200,13 +205,7 @@ export function useJukebox(onPlayStateChange?: (isPlaying: boolean) => void) {
       if (isPlaying) {
         audioRef.current.play()
           .then(() => console.log(`[Jukebox] Playback started successfully`))
-          .catch(e => {
-            if (e.name !== 'AbortError') {
-              console.error("[Jukebox] Playback failed:", e.message);
-            } else {
-              console.log("[Jukebox] Playback interrupted by new request (AbortError)");
-            }
-          });
+          .catch(error => reportAudioError('Playback failed', error));
       } else {
         audioRef.current.pause();
         console.log(`[Jukebox] Playback paused`);

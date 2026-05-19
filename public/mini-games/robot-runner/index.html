@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>The Robot Runner - QCH</title>
     <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="../shared/arcade-results.css">
     <link href="https://fonts.googleapis.com/css2?family=Michroma&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
 </head>
 <body>
@@ -61,6 +62,10 @@
         <div id="game-over" class="overlay hidden">
             <h2 class="danger">SISTEMA CORROMPIDO</h2>
             <p>O Robô foi capturado.</p>
+            <div class="stats-panel">
+                <p>Score Final: <span id="game-over-score">0</span></p>
+                <p>Tempo Total: <span id="game-over-time">0</span></p>
+            </div>
             <div style="display: flex; gap: 10px; justify-content: center;">
                 <button id="retry-btn">REINICIAR</button>
                 <button id="exit-game-btn">SAIR</button>
@@ -77,6 +82,7 @@
             <button id="finish-btn">FINALIZAR</button>
         </div>
     </div>
+    <script src="../shared/arcade-results.js"></script>
     <script src="script.js"></script>
 </body>
 </html>

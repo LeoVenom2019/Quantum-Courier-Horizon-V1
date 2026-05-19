@@ -5,7 +5,6 @@ const finalScoreElement = document.getElementById('final-score');
 const overlay = document.getElementById('overlay');
 const restartBtn = document.getElementById('restart-btn');
 const exitBtn = document.getElementById('exit-btn');
-const statusElement = document.getElementById('game-status');
 
 // Grid configuration
 const COLS = 30;
@@ -14,8 +13,8 @@ const CELL_SIZE = 32;
 
 // Colors
 const COLOR_HEAD = '#06b6d4';
-const COLOR_BG = '#01040a';
-const SOUND_DEAD = '/audio/sfx/snake_dead.ogg';
+const COLOR_BG = '#000000';
+const SOUND_DEAD = '/assets/games/flipers_sfx/snake_dead.ogg';
 
 const SNAKE_COLOR_STAGES = [
     { minLength: 0, color: '#06b6d4', trail: 'rgba(6, 182, 212, 0.2)', body: [6, 182, 212] },
@@ -32,7 +31,7 @@ const FOOD_TYPES = [
         color: '#facc15',
         glow: 'rgba(250, 204, 21, 0.9)',
         flash: 'rgba(250, 204, 21, 0.18)',
-        sound: '/audio/sfx/snake_take_1.ogg',
+        sound: '/assets/games/flipers_sfx/snake_take_1.ogg',
         score: 100,
         growth: 1,
         weight: 72
@@ -43,7 +42,7 @@ const FOOD_TYPES = [
         color: '#ef4444',
         glow: 'rgba(239, 68, 68, 0.95)',
         flash: 'rgba(239, 68, 68, 0.18)',
-        sound: '/audio/sfx/snake_take_2.ogg',
+        sound: '/assets/games/flipers_sfx/snake_take_2.ogg',
         score: 200,
         growth: 2,
         weight: 20
@@ -54,7 +53,7 @@ const FOOD_TYPES = [
         color: '#d946ef',
         glow: 'rgba(217, 70, 239, 1)',
         flash: 'rgba(217, 70, 239, 0.18)',
-        sound: '/audio/sfx/snake_take_3.ogg',
+        sound: '/assets/games/flipers_sfx/snake_take_3.ogg',
         score: 400,
         growth: 3,
         weight: 8
@@ -80,13 +79,17 @@ const soundCache = new Map();
 
 function createStars() {
     stars = [];
-    for (let i = 0; i < 150; i++) {
+    for (let i = 0; i < 136; i++) {
+        const layer = i % 4;
+        const x = (i * 137 + layer * 29) % canvas.width;
+        const y = (i * 89 + layer * 47) % canvas.height;
+        const isAnchor = i % 17 === 0;
         stars.push({
-            x: Math.random() * canvas.width,
-            y: Math.random() * canvas.height,
-            size: Math.random() * 2,
-            opacity: Math.random(),
-            pulseSpeed: 0.02 + Math.random() * 0.05
+            x,
+            y,
+            size: isAnchor ? 1.8 : 0.7 + layer * 0.22,
+            opacity: isAnchor ? 0.72 : 0.16 + layer * 0.08,
+            color: isAnchor ? '6, 182, 212' : '255, 255, 255'
         });
     }
 }
@@ -125,8 +128,6 @@ function init() {
     spawnFood();
     gameActive = true;
     overlay.classList.add('hidden');
-    statusElement.innerText = 'ACTIVE';
-    statusElement.className = 'status-active';
     lastTickTime = performance.now();
     requestID = requestAnimationFrame(gameLoop);
 }
@@ -331,10 +332,7 @@ function draw(interp) {
 
 function drawStars() {
     stars.forEach(star => {
-        star.opacity += star.pulseSpeed;
-        if (star.opacity > 1 || star.opacity < 0.2) star.pulseSpeed *= -1;
-        
-        ctx.fillStyle = `rgba(255, 255, 255, ${star.opacity * 0.5})`;
+        ctx.fillStyle = `rgba(${star.color}, ${star.opacity})`;
         ctx.beginPath();
         ctx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
         ctx.fill();
@@ -342,20 +340,20 @@ function drawStars() {
 }
 
 function drawGrid() {
-    ctx.strokeStyle = 'rgba(6, 182, 212, 0.05)';
+    ctx.strokeStyle = 'rgba(6, 182, 212, 0.035)';
     ctx.lineWidth = 1;
     
     for (let x = 0; x <= COLS; x++) {
-        if (x % 5 === 0) ctx.strokeStyle = 'rgba(6, 182, 212, 0.12)';
-        else ctx.strokeStyle = 'rgba(6, 182, 212, 0.05)';
+        if (x % 5 === 0) ctx.strokeStyle = 'rgba(6, 182, 212, 0.09)';
+        else ctx.strokeStyle = 'rgba(6, 182, 212, 0.035)';
         ctx.beginPath();
         ctx.moveTo(x * CELL_SIZE, 0);
         ctx.lineTo(x * CELL_SIZE, canvas.height);
         ctx.stroke();
     }
     for (let y = 0; y <= ROWS; y++) {
-        if (y % 5 === 0) ctx.strokeStyle = 'rgba(6, 182, 212, 0.12)';
-        else ctx.strokeStyle = 'rgba(6, 182, 212, 0.05)';
+        if (y % 5 === 0) ctx.strokeStyle = 'rgba(6, 182, 212, 0.09)';
+        else ctx.strokeStyle = 'rgba(6, 182, 212, 0.035)';
         ctx.beginPath();
         ctx.moveTo(0, y * CELL_SIZE);
         ctx.lineTo(canvas.width, y * CELL_SIZE);
@@ -408,9 +406,15 @@ function drawFood() {
     ctx.stroke();
 
     if (foodType.id === 'void') {
-        ctx.rotate(0);
         ctx.beginPath();
-        ctx.ellipse(centerX, centerY, radius + 9, radius / 2, foodPulse, 0, Math.PI * 2);
+        for (let i = 0; i < 4; i++) {
+            const angle = foodPulse + (Math.PI / 2) * i;
+            const px = centerX + Math.cos(angle) * (radius + 8);
+            const py = centerY + Math.sin(angle) * (radius + 8);
+            if (i === 0) ctx.moveTo(px, py);
+            else ctx.lineTo(px, py);
+        }
+        ctx.closePath();
         ctx.stroke();
     }
 
@@ -470,24 +474,6 @@ function drawSnake(interp) {
     const headY = (head.py + (head.y - head.py) * interp) * CELL_SIZE;
     drawShip(headX, headY, direction, colorStage.color);
     
-    // Speed Particles (Exhaust)
-    if (Math.random() > 0.5) {
-        let ex, ey;
-        if (direction === 'UP') { ex = headX + CELL_SIZE/2; ey = headY + CELL_SIZE; }
-        else if (direction === 'DOWN') { ex = headX + CELL_SIZE/2; ey = headY; }
-        else if (direction === 'LEFT') { ex = headX + CELL_SIZE; ey = headY + CELL_SIZE/2; }
-        else { ex = headX; ey = headY + CELL_SIZE/2; }
-        
-        particles.push({
-            x: ex, y: ey,
-            vx: (Math.random() - 0.5) * 2,
-            vy: (Math.random() - 0.5) * 2,
-            life: 15,
-            maxLife: 15,
-            color: `rgba(${colorStage.body[0]}, ${colorStage.body[1]}, ${colorStage.body[2]}, 0.5)`,
-            size: Math.random() * 2
-        });
-    }
 }
 
 function drawShip(x, y, dir, shipColor = COLOR_HEAD) {
@@ -521,7 +507,7 @@ function drawShip(x, y, dir, shipColor = COLOR_HEAD) {
     ctx.fill();
 
     // Booster energy
-    const pulse = Math.abs(Math.sin(Date.now() / 100)) * 5;
+    const pulse = Math.abs(Math.sin(Date.now() / 120)) * 3;
     ctx.fillStyle = '#fff';
     ctx.shadowBlur = 10 + pulse;
     ctx.shadowColor = '#fff';
@@ -575,18 +561,20 @@ function gameOver() {
 
     finalScoreElement.innerText = score;
     setTimeout(() => {
-        if (!gameActive) overlay.classList.remove('hidden');
+        if (!gameActive) {
+            const victory = score >= 5000;
+            window.QCHArcadeResults.show({
+                gameId: 'salto-espacial',
+                victory,
+                score,
+                stats: [
+                    { label: 'Final Score', value: score },
+                    { label: 'Target', value: '5000' },
+                ],
+            });
+        }
     }, 420);
-    statusElement.innerText = 'OFFLINE';
-    statusElement.className = 'status-danger';
     updateHighScore();
-    
-    // Final score update on game over
-    window.parent.postMessage({ 
-        type: 'GAME_COMPLETE', 
-        gameId: 'salto-espacial', 
-        score: score 
-    }, '*');
 }
 
 function gameLoop(currentTime) {
@@ -597,14 +585,19 @@ function gameLoop(currentTime) {
 
     requestID = requestAnimationFrame(gameLoop);
 
-    const deltaTime = currentTime - lastTickTime;
+    let deltaTime = currentTime - lastTickTime;
     
     if (deltaTime >= tickSpeed) {
         update();
-        lastTickTime = currentTime;
+        lastTickTime += tickSpeed;
+
+        if (currentTime - lastTickTime > tickSpeed) {
+            lastTickTime = currentTime;
+        }
+
+        deltaTime = currentTime - lastTickTime;
     }
     
-    // Draw with interp progress
     const interp = Math.min(1, deltaTime / tickSpeed);
     draw(interp);
 }

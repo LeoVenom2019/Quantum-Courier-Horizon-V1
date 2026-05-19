@@ -1,0 +1,1113 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Apocalipse Laser 2.0 - Horizon Simulator</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@500;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-color: #020617;
+      --panel-bg: rgba(12, 10, 15, 0.76);
+      --border-color: rgba(217, 70, 239, 0.28);
+      --accent-color: #d946ef;
+      --cyan-color: #22d3ee;
+      --text-color: #f8fafc;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      font-family: 'Rajdhani', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      background-image: 
+        radial-gradient(circle at 20% 30%, rgba(217, 70, 239, 0.05) 0%, transparent 50%),
+        radial-gradient(circle at 80% 70%, rgba(34, 211, 238, 0.05) 0%, transparent 50%);
+    }
+
+    .container {
+      width: 100%;
+      max-width: 1040px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      padding: 20px;
+    }
+
+    .header-nav {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .back-btn {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      text-decoration: none;
+      color: #64748b;
+      border: 1px solid rgba(255,255,255,0.08);
+      padding: 8px 16px;
+      border-radius: 8px;
+      background-color: rgba(255,255,255,0.02);
+      transition: all 0.2s ease;
+    }
+
+    .back-btn:hover {
+      color: var(--accent-color);
+      border-color: var(--accent-color);
+      background-color: rgba(217, 70, 239, 0.05);
+    }
+
+    .title-block {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .title-block h1 {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 1.8rem;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: -0.01em;
+      color: #ffffff;
+      text-shadow: 0 0 10px rgba(217, 70, 239, 0.3);
+    }
+
+    .title-block p {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.35em;
+      text-transform: uppercase;
+      color: var(--accent-color);
+    }
+
+    .simulator-wrapper {
+      position: relative;
+      border-radius: 24px;
+      overflow: hidden;
+      border: 1px solid var(--border-color);
+      box-shadow: 0 10px 45px rgba(217, 70, 239, 0.15);
+      background-color: #000;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: auto;
+      cursor: crosshair;
+    }
+
+    .control-panel {
+      background-color: var(--panel-bg);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 20px;
+      padding: 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 20px;
+    }
+
+    .btn-laser {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 11px;
+      font-weight: 900;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      padding: 14px 28px;
+      border-radius: 12px;
+      border: 1px solid var(--accent-color);
+      background-color: rgba(217, 70, 239, 0.15);
+      color: #ffffff;
+      cursor: pointer;
+      text-shadow: 0 0 8px rgba(217, 70, 239, 0.5);
+      transition: all 0.3s ease;
+      box-shadow: 0 0 15px rgba(217, 70, 239, 0.1);
+    }
+
+    .btn-laser:hover:not(:disabled) {
+      background-color: var(--accent-color);
+      color: #000000;
+      box-shadow: 0 0 25px rgba(217, 70, 239, 0.4);
+      transform: scale(1.02);
+    }
+
+    .btn-laser:disabled {
+      opacity: 0.35;
+      cursor: not-allowed;
+      border-color: rgba(255,255,255,0.1);
+      background-color: transparent;
+      color: #64748b;
+      text-shadow: none;
+    }
+
+    .instructions {
+      font-size: 0.95rem;
+      color: #64748b;
+      line-height: 1.5;
+    }
+
+    .instructions strong {
+      color: var(--text-color);
+      font-family: 'Orbitron', sans-serif;
+      font-size: 0.85rem;
+    }
+
+    .audio-toggle {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-family: 'Orbitron', sans-serif;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #94a3b8;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .audio-toggle input {
+      display: none;
+    }
+
+    .checkbox-box {
+      width: 16px;
+      height: 16px;
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s ease;
+    }
+
+    .audio-toggle input:checked + .checkbox-box {
+      background-color: var(--accent-color);
+      border-color: var(--accent-color);
+      box-shadow: 0 0 10px rgba(217, 70, 239, 0.4);
+    }
+
+    .audio-toggle input:checked + .checkbox-box::after {
+      content: '';
+      width: 6px;
+      height: 6px;
+      background-color: #000000;
+      border-radius: 1px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <div class="header-nav">
+      <div class="title-block">
+        <p>Horizon Combat Simulator</p>
+        <h1>Apocalipse Laser 2.0 (Upgrade)</h1>
+      </div>
+      <a href="index.html" class="back-btn">← Voltar ao Codex</a>
+    </div>
+
+    <div class="simulator-wrapper">
+      <canvas id="laserCanvas" width="960" height="540"></canvas>
+    </div>
+
+    <div class="control-panel">
+      <div class="instructions">
+        <strong>CONTROLES:</strong> Movimento: <code>W, A, S, D / Setas</code> • 
+        Disparar Comum: <code>Espaço / Clique</code> • 
+        Especial Laser 2.0: <code>Q / C</code><br>
+        <strong>NOVIDADES 2.0:</strong> Partículas de fundo, raios perimetrais de carga, anéis de energia, 4 camadas de laser e choque duplo no colapso.
+      </div>
+      <div class="audio-toggle-wrapper" style="display: flex; gap: 20px; align-items: center;">
+        <label class="audio-toggle">
+          <input type="checkbox" id="audioCheckbox" checked>
+          <span class="checkbox-box"></span>
+          Áudio Sintetizado
+        </label>
+        <button class="btn-laser" id="triggerBtn">Disparar Especial [C]</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const canvas = document.getElementById('laserCanvas');
+    const ctx = canvas.getContext('2d');
+    const triggerBtn = document.getElementById('triggerBtn');
+    const audioCheckbox = document.getElementById('audioCheckbox');
+
+    const WIDTH = 960;
+    const HEIGHT = 540;
+
+    // Teclado
+    const keys = {};
+    window.addEventListener('keydown', (e) => {
+      keys[e.key.toLowerCase()] = true;
+      if ([' ', 'q', 'e', 'c', 'f'].includes(e.key.toLowerCase())) e.preventDefault();
+    });
+    window.addEventListener('keyup', (e) => {
+      keys[e.key.toLowerCase()] = false;
+    });
+
+    // Sons Sintetizados via Web Audio API
+    let audioCtx = null;
+    function getAudioContext() {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      return audioCtx;
+    }
+
+    let activeSynthSource = null;
+    let activeNoiseSource = null;
+
+    function playSynthShoot() {
+      if (!audioCheckbox.checked) return;
+      const actx = getAudioContext();
+      const osc = actx.createOscillator();
+      const gain = actx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(450, actx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(100, actx.currentTime + 0.12);
+      gain.gain.setValueAtTime(0.12, actx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, actx.currentTime + 0.12);
+      osc.connect(gain);
+      gain.connect(actx.destination);
+      osc.start();
+      osc.stop(actx.currentTime + 0.12);
+    }
+
+    function playLaserChargeAudio() {
+      if (!audioCheckbox.checked) return;
+      const actx = getAudioContext();
+
+      // Oscilador de pitch crescente para carregamento
+      const osc = actx.createOscillator();
+      const gain = actx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(80, actx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(880, actx.currentTime + 0.9);
+
+      gain.gain.setValueAtTime(0.01, actx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.35, actx.currentTime + 0.9);
+
+      osc.connect(gain);
+      gain.connect(actx.destination);
+      osc.start();
+      osc.stop(actx.currentTime + 0.9);
+    }
+
+    function startLaserFiringAudio() {
+      if (!audioCheckbox.checked) return;
+      const actx = getAudioContext();
+
+      // Sub-graves oscilantes
+      const osc = actx.createOscillator();
+      const gain = actx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.value = 110;
+      
+      // Vibrato do laser
+      const lfo = actx.createOscillator();
+      const lfoGain = actx.createGain();
+      lfo.frequency.value = 18;
+      lfoGain.gain.value = 15;
+      lfo.connect(lfoGain);
+      lfoGain.connect(osc.frequency);
+
+      gain.gain.setValueAtTime(0.48, actx.currentTime);
+
+      // Filtro Lowpass Dinâmico
+      const filter = actx.createBiquadFilter();
+      filter.type = 'lowpass';
+      filter.frequency.value = 450;
+
+      osc.connect(filter);
+      filter.connect(gain);
+      gain.connect(actx.destination);
+
+      osc.start();
+      lfo.start();
+      activeSynthSource = { osc, lfo, gain };
+
+      // Ruído branco contínuo para o fluxo de partículas termal do laser
+      const bufferSize = actx.sampleRate * 3.0; // 3 segundos
+      const buffer = actx.createBuffer(1, bufferSize, actx.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < bufferSize; i++) {
+        data[i] = Math.random() * 2 - 1;
+      }
+      const noise = actx.createBufferSource();
+      noise.buffer = buffer;
+      noise.loop = true;
+
+      const noiseFilter = actx.createBiquadFilter();
+      noiseFilter.type = 'bandpass';
+      noiseFilter.frequency.value = 280;
+
+      const noiseGain = actx.createGain();
+      noiseGain.gain.setValueAtTime(0.28, actx.currentTime);
+
+      noise.connect(noiseFilter);
+      noiseFilter.connect(noiseGain);
+      noiseGain.connect(actx.destination);
+      noise.start();
+
+      activeNoiseSource = { noise, gain: noiseGain };
+    }
+
+    function stopLaserFiringAudio() {
+      if (activeSynthSource) {
+        try {
+          activeSynthSource.gain.gain.exponentialRampToValueAtTime(0.001, getAudioContext().currentTime + 0.15);
+          activeSynthSource.osc.stop(getAudioContext().currentTime + 0.15);
+          activeSynthSource.lfo.stop(getAudioContext().currentTime + 0.15);
+        } catch(e) {}
+        activeSynthSource = null;
+      }
+      if (activeNoiseSource) {
+        try {
+          activeNoiseSource.gain.gain.exponentialRampToValueAtTime(0.001, getAudioContext().currentTime + 0.15);
+          activeNoiseSource.noise.stop(getAudioContext().currentTime + 0.15);
+        } catch(e) {}
+        activeNoiseSource = null;
+      }
+    }
+
+    function playLaserCollapseAudio() {
+      if (!audioCheckbox.checked) return;
+      const actx = getAudioContext();
+
+      // Boom de Baixa Frequência
+      const osc = actx.createOscillator();
+      const gain = actx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(160, actx.currentTime);
+      osc.frequency.linearRampToValueAtTime(20, actx.currentTime + 1.2);
+
+      const filter = actx.createBiquadFilter();
+      filter.type = 'lowpass';
+      filter.frequency.setValueAtTime(250, actx.currentTime);
+      filter.frequency.exponentialRampToValueAtTime(30, actx.currentTime + 1.2);
+
+      gain.gain.setValueAtTime(0.65, actx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, actx.currentTime + 1.2);
+
+      osc.connect(filter);
+      filter.connect(gain);
+      gain.connect(actx.destination);
+      osc.start();
+      osc.stop(actx.currentTime + 1.2);
+
+      // Crystalline Spark Boom (Ruído filtrado agudo)
+      const bufferSize = actx.sampleRate * 0.9;
+      const buffer = actx.createBuffer(1, bufferSize, actx.sampleRate);
+      const data = buffer.getChannelData(0);
+      for(let i=0; i<bufferSize; i++) {
+        data[i] = Math.random() * 2 - 1;
+      }
+      const noise = actx.createBufferSource();
+      noise.buffer = buffer;
+      const noiseFilter = actx.createBiquadFilter();
+      noiseFilter.type = 'highpass';
+      noiseFilter.frequency.setValueAtTime(1500, actx.currentTime);
+      noiseFilter.frequency.exponentialRampToValueAtTime(100, actx.currentTime + 0.8);
+
+      const noiseGain = actx.createGain();
+      noiseGain.gain.setValueAtTime(0.42, actx.currentTime);
+      noiseGain.gain.exponentialRampToValueAtTime(0.001, actx.currentTime + 0.8);
+
+      noise.connect(noiseFilter);
+      noiseFilter.connect(noiseGain);
+      noiseGain.connect(actx.destination);
+      noise.start();
+      noise.stop(actx.currentTime + 0.8);
+    }
+
+    // Entidades e Estados
+    const player = { x: 120, y: HEIGHT / 2 };
+    const projectiles = [];
+    const targets = [];
+    const floatingTexts = [];
+
+    // Upgrades Especiais da versão 2.0
+    let laserState = 'idle'; // 'idle', 'charge', 'firing', 'collapse'
+    let laserStateStart = 0;
+    let laserFlashAlpha = 0;
+    let laserShake = 0;
+    let laserBeamWidth = 0;
+
+    let laserParticles = [];
+    let laserEmbers = [];
+    let backgroundParticles = [];
+    let shockwaves = [];
+
+    // Helper functions
+    function spawnParticle(x, y, color, speed = 2, life = 0.8, size = 3, bucket = laserEmbers) {
+      const angle = Math.random() * Math.PI * 2;
+      const velocity = speed * (0.35 + Math.random() * 0.9);
+      bucket.push({
+        x,
+        y,
+        vx: Math.cos(angle) * velocity,
+        vy: Math.sin(angle) * velocity,
+        life,
+        maxLife: life,
+        size: Math.max(0.8, size * (0.45 + Math.random() * 0.9)),
+        color
+      });
+    }
+
+    function drawGlowCircle(ctx, x, y, radius, color, alpha = 1) {
+      const glow = ctx.createRadialGradient(x, y, 0, x, y, radius);
+      glow.addColorStop(0, color);
+      glow.addColorStop(0.45, color.replace('1)', `${0.22 * alpha})`));
+      glow.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = glow;
+      ctx.beginPath();
+      ctx.arc(x, y, radius, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    function drawLightning(ctx, startX, startY, endX, endY, color, width = 2, chaos = 18, segments = 7) {
+      ctx.beginPath();
+      ctx.moveTo(startX, startY);
+      for (let i = 1; i < segments; i++) {
+        const t = i / segments;
+        const x = startX + (endX - startX) * t;
+        const y = startY + (endY - startY) * t + (Math.random() - 0.5) * chaos;
+        ctx.lineTo(x, y);
+      }
+      ctx.lineTo(endX, endY);
+      ctx.strokeStyle = color;
+      ctx.shadowColor = color;
+      ctx.shadowBlur = 16;
+      ctx.lineWidth = width;
+      ctx.stroke();
+    }
+
+    function drawEnergyRing(ctx, x, y, radius, color, alpha = 1) {
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.strokeStyle = color;
+      ctx.shadowColor = color;
+      ctx.shadowBlur = 18;
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.ellipse(x, y, radius * 1.45, radius * 0.55, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    function drawShockwave(ctx, wave) {
+      const progress = 1 - wave.life;
+      const radius = wave.maxRadius * progress;
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, wave.life) * 0.75;
+      ctx.strokeStyle = wave.color;
+      ctx.shadowColor = wave.color;
+      ctx.shadowBlur = 24;
+      ctx.lineWidth = 8 * wave.life;
+      ctx.beginPath();
+      ctx.arc(wave.x, wave.y, radius, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    function getLaserStart() {
+      return { x: player.x + 56, y: player.y };
+    }
+
+    function getLaserEnd() {
+      return { x: WIDTH * 0.96, y: getLaserStart().y };
+    }
+
+    function distanceToSegment(px, py, ax, ay, bx, by) {
+      const dx = bx - ax;
+      const dy = by - ay;
+      const lengthSq = dx * dx + dy * dy;
+      if (lengthSq === 0) return Math.hypot(px - ax, py - ay);
+      const tValue = Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / lengthSq));
+      return Math.hypot(px - (ax + tValue * dx), py - (ay + tValue * dy));
+    }
+
+    function spawnDrone() {
+      targets.push({
+        id: Math.random(),
+        x: 680 + Math.random() * 180,
+        y: 80 + Math.random() * (HEIGHT - 160),
+        hp: 1200,
+        maxHp: 1200,
+        radius: 28,
+        pulseOffset: Math.random() * 10
+      });
+    }
+
+    // Clique canvas
+    canvas.addEventListener('click', (e) => {
+      const rect = canvas.getBoundingClientRect();
+      const clickX = ((e.clientX - rect.left) / rect.width) * WIDTH;
+      const clickY = ((e.clientY - rect.top) / rect.height) * HEIGHT;
+
+      const hitTarget = targets.find(t => Math.hypot(t.x - clickX, t.y - clickY) < t.radius + 30);
+      if (!hitTarget) {
+        spawnDrone();
+      } else {
+        playSynthShoot();
+        projectiles.push({ x: player.x + 36, y: player.y, vx: 12, vy: (clickY - player.y) / ((clickX - player.x) / 12) });
+      }
+    });
+
+    for(let i=0; i<4; i++) spawnDrone();
+
+    function triggerLaser() {
+      if (laserState !== 'idle') return;
+      laserState = 'charge';
+      laserStateStart = performance.now();
+      laserFlashAlpha = 0.42;
+      laserShake = 8;
+
+      laserParticles = [];
+      laserEmbers = [];
+      backgroundParticles = [];
+      shockwaves = [];
+
+      triggerBtn.disabled = true;
+      playLaserChargeAudio();
+
+      const start = getLaserStart();
+
+      // Carga de Partículas Espiraladas
+      for (let i = 0; i < 96; i++) {
+        laserParticles.push({
+          x: start.x + (Math.random() - 0.5) * 520,
+          y: start.y + (Math.random() - 0.5) * 420,
+          targetX: start.x,
+          targetY: start.y,
+          size: 1.4 + Math.random() * 4.2,
+          life: 1.0,
+          speed: 0.02 + Math.random() * 0.032,
+          color: ['#ff00ff', '#ff3355', '#00ffff', '#ffffff', '#f0abfc'][Math.floor(Math.random() * 5)]
+        });
+      }
+
+      // Fluxo Estelar de Fundo (2.0)
+      for (let i = 0; i < 70; i++) {
+        backgroundParticles.push({
+          x: Math.random() * WIDTH,
+          y: Math.random() * HEIGHT,
+          vx: -0.25 - Math.random() * 0.9,
+          vy: (Math.random() - 0.5) * 0.55,
+          life: 0.45 + Math.random() * 0.45,
+          size: 0.8 + Math.random() * 2,
+          color: ['rgba(34,211,238,0.8)', 'rgba(217,70,239,0.8)', 'rgba(255,255,255,0.65)'][Math.floor(Math.random() * 3)]
+        });
+      }
+    }
+
+    triggerBtn.addEventListener('click', triggerLaser);
+
+    let lastShot = 0;
+    let lastDamageTick = 0;
+
+    function update(now) {
+      // Movimento WASD
+      const speed = 4.2;
+      if (keys.w || keys.arrowup) player.y -= speed;
+      if (keys.s || keys.arrowdown) player.y += speed;
+      if (keys.a || keys.arrowleft) player.x -= speed;
+      if (keys.d || keys.arrowright) player.x += speed;
+
+      player.x = Math.max(50, Math.min(WIDTH * 0.45, player.x));
+      player.y = Math.max(45, Math.min(HEIGHT - 45, player.y));
+
+      // Disparos comuns
+      if (keys[' '] && now - lastShot > 180) {
+        playSynthShoot();
+        projectiles.push({ x: player.x + 36, y: player.y, vx: 12, vy: 0 });
+        lastShot = now;
+      }
+
+      // Acionador Laser
+      if (keys.q || keys.c) {
+        triggerLaser();
+      }
+
+      // Atualização do Estado do Laser
+      if (laserState !== 'idle') {
+        const elapsed = now - laserStateStart;
+        const chargeDuration = 900;
+        const firingDuration = 3000;
+        const collapseDuration = 1700;
+
+        if (laserState === 'charge') {
+          if (elapsed > chargeDuration) {
+            laserState = 'firing';
+            laserStateStart = now;
+            laserFlashAlpha = 0.82;
+            laserShake = 18;
+            lastDamageTick = now - 1000;
+            startLaserFiringAudio();
+          }
+        } 
+        else if (laserState === 'firing') {
+          // Aplicação de dano contínuo a cada tick de 180ms
+          if (now - lastDamageTick >= 180) {
+            lastDamageTick = now;
+            
+            const start = getLaserStart();
+            const end = getLaserEnd();
+            targets.forEach(t => {
+              if (t.hp > 0) {
+                const dist = distanceToSegment(t.x, t.y, start.x, start.y, end.x, end.y);
+                if (dist < 105) {
+                  t.hp -= 96;
+                  floatingTexts.push({
+                    x: t.x + (Math.random()-0.5)*20,
+                    y: t.y - 30,
+                    text: '96',
+                    life: 20,
+                    color: '#f0abfc'
+                  });
+                  // Embers do laser termal
+                  for (let i = 0; i < 4; i++) {
+                    spawnParticle(t.x, t.y, ['#f0abfc', '#22d3ee', '#ff3355', '#ffffff'][i % 4], 3.2, 0.62, 3.2);
+                  }
+                }
+              }
+            });
+          }
+
+          if (elapsed > firingDuration) {
+            laserState = 'collapse';
+            laserStateStart = now;
+            laserFlashAlpha = 0.92;
+            laserShake = 26;
+            stopLaserFiringAudio();
+            playLaserCollapseAudio();
+
+            const end = getLaserEnd();
+            
+            // Onda de choque duplo (Upgrade 2.0)
+            shockwaves.push({ x: end.x, y: end.y, life: 1, maxRadius: 720, color: 'rgba(255,255,255,0.95)' });
+            shockwaves.push({ x: end.x, y: end.y, life: 1, maxRadius: 520, color: 'rgba(34,211,238,0.85)' });
+
+            // 150 partículas de colapso termal e cinza escuro
+            for (let i = 0; i < 150; i++) {
+              const color = i % 6 === 0 
+                ? 'rgba(30,30,36,0.72)' 
+                : ['#ff00ff', '#ff3355', '#00ffff', '#ffffff', '#fb923c'][Math.floor(Math.random() * 5)];
+              spawnParticle(end.x, end.y, color, 6 + Math.random() * 7, 1 + Math.random() * 0.9, 2 + Math.random() * 9, laserEmbers);
+            }
+          }
+        } 
+        else if (laserState === 'collapse') {
+          if (elapsed > collapseDuration) {
+            laserState = 'idle';
+            laserParticles = [];
+            laserEmbers = [];
+            shockwaves = [];
+            backgroundParticles = [];
+            laserShake = 0;
+            triggerBtn.disabled = false;
+          }
+        }
+      }
+
+      // Projéteis Normais
+      projectiles.forEach(proj => {
+        proj.x += proj.vx;
+        proj.y += proj.vy;
+
+        targets.forEach(t => {
+          if (t.hp > 0 && Math.hypot(t.x - proj.x, t.y - proj.y) < t.radius) {
+            t.hp -= 25;
+            proj.x = WIDTH + 999;
+            floatingTexts.push({ x: t.x, y: t.y - 20, text: '25', life: 25, color: '#ffffff' });
+          }
+        });
+      });
+
+      // Limpeza projéteis
+      for (let i = projectiles.length - 1; i >= 0; i--) {
+        if (projectiles[i].x > WIDTH + 80) projectiles.splice(i, 1);
+      }
+
+      // Drones mortos recarregam
+      targets.forEach((t, idx) => {
+        if (t.hp <= 0) {
+          targets.splice(idx, 1);
+          setTimeout(spawnDrone, 2500);
+        }
+      });
+
+      // Partículas & Shockwaves (2.0)
+      if (laserState !== 'idle') {
+        backgroundParticles.forEach(p => {
+          p.x += p.vx - 0.7;
+          p.y += p.vy;
+          p.life -= 0.006;
+          if (p.x < -20) p.x = WIDTH + 20;
+        });
+        backgroundParticles = backgroundParticles.filter(p => p.life > 0);
+
+        shockwaves.forEach(w => {
+          w.life -= 0.018;
+        });
+        shockwaves = shockwaves.filter(w => w.life > 0);
+
+        laserEmbers.forEach(e => {
+          e.x += e.vx;
+          e.y += e.vy;
+          e.vx *= e.color.includes('30,30,36') ? 0.985 : 0.955;
+          e.vy *= e.color.includes('30,30,36') ? 0.985 : 0.955;
+          e.life -= e.color.includes('30,30,36') ? 0.008 : 0.018;
+        });
+        laserEmbers = laserEmbers.filter(e => e.life > 0);
+      }
+
+      // Textos flutuantes
+      floatingTexts.forEach(ft => {
+        ft.y -= 0.5;
+        ft.life--;
+      });
+      for(let i=floatingTexts.length-1; i>=0; i--) {
+        if(floatingTexts[i].life <= 0) floatingTexts.splice(i, 1);
+      }
+
+      if (laserFlashAlpha > 0.01) {
+        laserFlashAlpha *= 0.84;
+      }
+      if (laserShake > 0) {
+        laserShake *= 0.88;
+      }
+    }
+
+    function draw(now) {
+      ctx.save();
+      
+      if (laserShake > 0.1) {
+        ctx.translate((Math.random() - 0.5) * laserShake, (Math.random() - 0.5) * laserShake);
+      }
+
+      // Grid Fundo Ciberpunk
+      ctx.fillStyle = laserState !== 'idle' ? 'rgba(29, 3, 39, 0.38)' : 'rgba(2, 6, 23, 0.42)';
+      ctx.fillRect(0, 0, WIDTH, HEIGHT);
+      
+      ctx.strokeStyle = laserState !== 'idle' ? 'rgba(217, 70, 239, 0.14)' : 'rgba(34, 211, 238, 0.06)';
+      ctx.lineWidth = 1;
+      for (let x = 0; x < WIDTH; x += 48) {
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x - 120, HEIGHT);
+        ctx.stroke();
+      }
+
+      // Fluxo Estelar (2.0)
+      if (laserState !== 'idle') {
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        backgroundParticles.forEach(p => {
+          ctx.globalAlpha = Math.max(0, p.life);
+          ctx.fillStyle = p.color;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+          ctx.fill();
+        });
+        ctx.restore();
+      }
+
+      // Drones
+      targets.forEach(t => {
+        const float = Math.sin(now / 150 + t.pulseOffset) * 5;
+        ctx.save();
+        ctx.shadowBlur = 15;
+        ctx.shadowColor = '#d946ef';
+        ctx.fillStyle = '#1e1b4b';
+        ctx.strokeStyle = '#d946ef';
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        ctx.arc(t.x, t.y + float, t.radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+
+        // HP Bar
+        ctx.fillStyle = '#111827';
+        ctx.fillRect(t.x - 24, t.y + float - 36, 48, 4);
+        ctx.fillStyle = '#d946ef';
+        ctx.fillRect(t.x - 24, t.y + float - 36, 48 * Math.max(0, t.hp / t.maxHp), 4);
+        ctx.restore();
+      });
+
+      // Disparos comuns
+      projectiles.forEach(p => {
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
+        ctx.fill();
+      });
+
+      // Nave
+      ctx.save();
+      ctx.shadowBlur = 20;
+      ctx.shadowColor = '#22d3ee';
+      ctx.fillStyle = '#22d3ee';
+      ctx.beginPath();
+      ctx.moveTo(player.x + 36, player.y);
+      ctx.lineTo(player.x - 30, player.y - 22);
+      ctx.lineTo(player.x - 14, player.y);
+      ctx.lineTo(player.x - 30, player.y + 22);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+
+      // Renderizador Apocalypse Laser 2.0
+      if (laserState !== 'idle') {
+        const start = getLaserStart();
+        const end = laserState === 'collapse' ? getLaserEnd() : getLaserEnd();
+        const elapsed = now - laserStateStart;
+
+        // FASE A: Carregamento Termal (Charge)
+        if (laserState === 'charge') {
+          const progress = Math.min(1, elapsed / 900);
+          ctx.save();
+          ctx.fillStyle = `rgba(0,0,0,${0.18 + progress * 0.54})`;
+          ctx.fillRect(0, 0, WIDTH, HEIGHT);
+          ctx.globalCompositeOperation = 'lighter';
+
+          // Partículas Espiraladas convergentes
+          laserParticles.forEach((particle, index) => {
+            const arm = index % 2 === 0 ? 1 : -1;
+            const angle = now / 155 + index * 0.22 * arm;
+            const radius = (1 - progress) * (190 + (index % 12) * 9) + 24;
+            particle.targetX = start.x - 12 + Math.cos(angle) * radius;
+            particle.targetY = start.y + Math.sin(angle) * radius * 0.55;
+            
+            particle.x += (particle.targetX - particle.x) * particle.speed * (1 + progress * 1.4);
+            particle.y += (particle.targetY - particle.y) * particle.speed * (1 + progress * 1.4);
+            particle.life *= 0.992;
+
+            ctx.globalAlpha = particle.life;
+            ctx.fillStyle = particle.color;
+            ctx.shadowBlur = 18;
+            ctx.shadowColor = particle.color;
+            ctx.beginPath();
+            ctx.arc(particle.x, particle.y, particle.size, 0, Math.PI * 2);
+            ctx.fill();
+          });
+
+          // 5 Anéis de Energia Concêntricos (2.0)
+          for (let i = 0; i < 5; i++) {
+            const ringRadius = 28 + i * 22 + Math.sin(now / 90 + i) * 4 + progress * 28;
+            drawEnergyRing(ctx, start.x + 26 + i * 5, start.y, ringRadius, i % 2 ? '#00ffff' : '#ff00ff', 0.55 + progress * 0.32);
+          }
+
+          // 16 Raios Ciberpunk das bordas ao muzzle (2.0)
+          for (let i = 0; i < 16; i++) {
+            const sx = (i / 15) * WIDTH;
+            const sy = (i % 2 === 0 ? 30 : HEIGHT - 30) + Math.sin(now / 180 + i) * 42;
+            drawLightning(ctx, sx, sy, start.x + 34, start.y, i % 2 ? 'rgba(34,211,238,0.34)' : 'rgba(217,70,239,0.34)', 1, 22, 5);
+          }
+
+          // Curvas senoidais secundárias
+          ctx.globalAlpha = 0.2 + progress * 0.24;
+          ctx.strokeStyle = '#ffffff';
+          ctx.lineWidth = 1;
+          for (let i = 0; i < 6; i++) {
+            ctx.beginPath();
+            ctx.moveTo(start.x - 80 + i * 26, start.y - 44 + Math.sin(now / 120 + i) * 8);
+            ctx.quadraticCurveTo(start.x + 8, start.y + Math.sin(now / 80 + i) * 18, start.x + 74, start.y + Math.cos(now / 90 + i) * 14);
+            ctx.stroke();
+          }
+          ctx.globalAlpha = 1;
+
+          // Círculos de Brilho Centralizados
+          drawGlowCircle(ctx, start.x + 45, start.y, 110 + progress * 55, 'rgba(255,0,255,1)', 0.55);
+          drawGlowCircle(ctx, start.x + 45, start.y, 70 + progress * 35, 'rgba(34,211,238,1)', 0.6);
+
+          // Interface HUD de Progresso e Scanlines
+          ctx.globalCompositeOperation = 'source-over';
+          ctx.fillStyle = 'rgba(255,255,255,0.06)';
+          for (let i = 0; i < 7; i++) {
+            ctx.fillRect(0, (i * 79 + (now / 18) % 79) % HEIGHT, WIDTH, 1);
+          }
+          ctx.fillStyle = 'rgba(240,171,252,0.9)';
+          ctx.font = '900 34px Orbitron, sans-serif';
+          ctx.textAlign = 'center';
+          ctx.shadowBlur = 24;
+          ctx.shadowColor = '#d946ef';
+          ctx.fillText('APOCALIPSE LASER 2.0', WIDTH / 2, 92);
+          
+          ctx.shadowBlur = 0;
+          ctx.fillStyle = 'rgba(255,255,255,0.16)';
+          ctx.fillRect(WIDTH / 2 - 190, 112, 380, 7);
+          ctx.fillStyle = '#f0abfc';
+          ctx.fillRect(WIDTH / 2 - 190, 112, 380 * progress, 7);
+          ctx.restore();
+        }
+
+        // FASE B: Disparo Termal Contínuo (Firing)
+        if (laserState === 'firing') {
+          ctx.save();
+          ctx.fillStyle = 'rgba(0,0,0,0.52)';
+          ctx.fillRect(0, 0, WIDTH, HEIGHT);
+          
+          const beamFlicker = Math.sin(now * 0.075) * 7 + Math.random() * 5;
+          laserBeamWidth = 42 + beamFlicker;
+          ctx.globalCompositeOperation = 'lighter';
+
+          // As 4 Camadas Visuais do Canhão Termal
+          const layers = [
+            { color: 'rgba(239,68,68,0.35)', width: 185, blur: 70 },
+            { color: 'rgba(34,211,238,0.58)', width: 92, blur: 48 },
+            { color: 'rgba(217,70,239,0.82)', width: 48, blur: 36 },
+            { color: 'rgba(255,255,255,1)', width: 14, blur: 88 },
+          ];
+
+          layers.forEach((layer, layerIndex) => {
+            ctx.beginPath();
+            ctx.moveTo(start.x, start.y);
+            for (let j = 1; j <= 9; j++) {
+              const tx = start.x + (end.x - start.x) * (j / 9);
+              const ty = start.y + (end.y - start.y) * (j / 9) + Math.sin(now / 55 + j * 1.7 + layerIndex) * (8 - layerIndex * 1.4);
+              ctx.lineTo(tx, ty);
+            }
+            ctx.strokeStyle = layer.color;
+            ctx.shadowColor = layer.color;
+            ctx.shadowBlur = layer.blur;
+            ctx.globalAlpha = 0.9;
+            ctx.lineWidth = layer.width + beamFlicker * (1.8 - layerIndex * 0.25);
+            ctx.stroke();
+          });
+
+          // 9 Relâmpagos de plasma bifurcados ao longo do laser (2.0)
+          for (let i = 0; i < 9; i++) {
+            const t = 0.14 + i * 0.095;
+            const bx = start.x + (end.x - start.x) * t;
+            const by = start.y + Math.sin(now / 70 + i) * 18;
+            const length = 46 + Math.random() * 70;
+            drawLightning(ctx, bx, by, bx + length, by + (Math.random() - 0.5) * 90, i % 2 ? '#00ffff' : '#ff00ff', 1.4, 28, 5);
+          }
+
+          // Traços residuais de plasma periférico
+          for (let i = 0; i < 5; i++) {
+            ctx.globalAlpha = 0.12 - i * 0.015;
+            ctx.strokeStyle = i % 2 === 0 ? '#ff00ff' : '#00ffff';
+            ctx.shadowColor = i % 2 === 0 ? '#ff00ff' : '#00ffff';
+            ctx.shadowBlur = 28;
+            ctx.lineWidth = 18 + i * 30;
+            ctx.beginPath();
+            ctx.moveTo(start.x - 14 - i * 9, start.y + Math.sin(now / 120 + i) * 12);
+            ctx.lineTo(end.x - i * 26, end.y + Math.cos(now / 100 + i) * 26);
+            ctx.stroke();
+          }
+          ctx.globalAlpha = 1;
+
+          // Brilho do Muzzle da Nave
+          const orbRadius = 55 + laserBeamWidth * 0.45;
+          const orb = ctx.createRadialGradient(start.x, start.y, 0, start.x, start.y, orbRadius);
+          orb.addColorStop(0, 'rgba(255,255,255,1)');
+          orb.addColorStop(0.25, 'rgba(200,160,255,0.9)');
+          orb.addColorStop(0.65, 'rgba(255,0,255,0.35)');
+          orb.addColorStop(1, 'transparent');
+          ctx.fillStyle = orb;
+          ctx.beginPath();
+          ctx.arc(start.x, start.y, orbRadius, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Impacto terminal e anéis térmicos
+          drawGlowCircle(ctx, end.x, end.y, 120 + Math.random() * 36, 'rgba(255,51,85,1)', 0.62);
+          for (let i = 0; i < 4; i++) {
+            drawEnergyRing(ctx, end.x, end.y, 42 + i * 18 + Math.sin(now / 80 + i) * 6, i % 2 ? '#00ffff' : '#ff00ff', 0.34);
+          }
+          ctx.restore();
+        }
+
+        // FASE C: Colapso Termal do Núcleo (Collapse)
+        if (laserState === 'collapse') {
+          const p = Math.min(1, elapsed / 1700);
+          const radius = 120 + p * 680;
+          const glow = ctx.createRadialGradient(end.x, end.y, 10, end.x, end.y, radius);
+          glow.addColorStop(0, '#ffffff');
+          glow.addColorStop(0.2, '#ff3355');
+          glow.addColorStop(0.55, 'rgba(239,68,68,0.45)');
+          glow.addColorStop(1, 'transparent');
+          
+          ctx.save();
+          ctx.globalAlpha = (1 - p) * 0.78;
+          ctx.fillStyle = glow;
+          ctx.beginPath();
+          ctx.arc(end.x, end.y, radius, 0, Math.PI * 2);
+          ctx.fill();
+
+          ctx.globalCompositeOperation = 'lighter';
+          
+          // Desenhar as duas ondas de choque esféricas (2.0)
+          shockwaves.forEach(wave => {
+            drawShockwave(ctx, wave);
+          });
+
+          // Renderizar partículas e cinzas pretas
+          laserEmbers.forEach(ember => {
+            ctx.globalAlpha = Math.max(0, ember.life);
+            ctx.shadowBlur = ember.color.includes('30,30,36') ? 0 : 16;
+            ctx.shadowColor = ember.color;
+            ctx.fillStyle = ember.color;
+            ctx.beginPath();
+            ctx.arc(ember.x, ember.y, ember.size, 0, Math.PI * 2);
+            ctx.fill();
+          });
+          ctx.restore();
+        }
+      }
+
+      // Textos de dano
+      floatingTexts.forEach(ft => {
+        ctx.save();
+        ctx.globalAlpha = Math.max(0, ft.life / 20);
+        ctx.fillStyle = ft.color;
+        ctx.font = 'bold 11px monospace';
+        ctx.fillText(ft.text, ft.x - 8, ft.y);
+        ctx.restore();
+      });
+
+      // Flash Branco na tela
+      if (laserFlashAlpha > 0.01) {
+        ctx.save();
+        ctx.fillStyle = `rgba(255,255,255,${laserFlashAlpha})`;
+        ctx.fillRect(0, 0, WIDTH, HEIGHT);
+        ctx.restore();
+      }
+
+      ctx.restore();
+    }
+
+    function gameLoop() {
+      const now = performance.now();
+      update(now);
+      draw(now);
+      requestAnimationFrame(gameLoop);
+    }
+
+    requestAnimationFrame(gameLoop);
+  </script>
+</body>
+</html>

@@ -1,0 +1,944 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Apocalipse Laser - Horizon Simulator</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@500;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-color: #020617;
+      --panel-bg: rgba(9, 9, 11, 0.72);
+      --border-color: rgba(240, 171, 252, 0.25);
+      --accent-color: #f0abfc;
+      --cyan-color: #22d3ee;
+      --text-color: #f8fafc;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      font-family: 'Rajdhani', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      background-image: radial-gradient(circle at 50% 50%, rgba(240, 171, 252, 0.05) 0%, transparent 60%);
+    }
+
+    .container {
+      width: 100%;
+      max-width: 1040px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      padding: 20px;
+    }
+
+    .header-nav {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .back-btn {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      text-decoration: none;
+      color: #64748b;
+      border: 1px solid rgba(255,255,255,0.08);
+      padding: 8px 16px;
+      border-radius: 8px;
+      background-color: rgba(255,255,255,0.02);
+      transition: all 0.2s ease;
+    }
+
+    .back-btn:hover {
+      color: var(--cyan-color);
+      border-color: var(--cyan-color);
+      background-color: rgba(34, 211, 238, 0.05);
+    }
+
+    .title-block {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .title-block h1 {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 1.8rem;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: -0.01em;
+      color: #ffffff;
+    }
+
+    .title-block p {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.3em;
+      text-transform: uppercase;
+      color: var(--accent-color);
+    }
+
+    .simulator-wrapper {
+      position: relative;
+      border-radius: 24px;
+      overflow: hidden;
+      border: 1px solid var(--border-color);
+      box-shadow: 0 10px 40px rgba(0,0,0,0.6);
+      background-color: #000;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: auto;
+      cursor: crosshair;
+    }
+
+    .control-panel {
+      background-color: var(--panel-bg);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 20px;
+      padding: 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 20px;
+    }
+
+    .btn-laser {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 11px;
+      font-weight: 900;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      padding: 14px 28px;
+      border-radius: 12px;
+      border: 1px solid var(--accent-color);
+      background-color: rgba(240, 171, 252, 0.12);
+      color: #ffffff;
+      cursor: pointer;
+      text-shadow: 0 0 8px rgba(240, 171, 252, 0.5);
+      transition: all 0.3s ease;
+      box-shadow: 0 0 15px rgba(240, 171, 252, 0.1);
+    }
+
+    .btn-laser:hover:not(:disabled) {
+      background-color: var(--accent-color);
+      color: #000000;
+      box-shadow: 0 0 25px rgba(240, 171, 252, 0.4);
+      transform: scale(1.02);
+    }
+
+    .btn-laser:disabled {
+      opacity: 0.35;
+      cursor: not-allowed;
+      border-color: rgba(255,255,255,0.1);
+      background-color: transparent;
+      color: #64748b;
+      text-shadow: none;
+    }
+
+    .instructions {
+      font-size: 0.95rem;
+      color: #64748b;
+      line-height: 1.5;
+    }
+
+    .instructions strong {
+      color: var(--text-color);
+      font-family: 'Orbitron', sans-serif;
+      font-size: 0.85rem;
+    }
+
+    .audio-toggle {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-family: 'Orbitron', sans-serif;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #94a3b8;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .audio-toggle input {
+      display: none;
+    }
+
+    .checkbox-box {
+      width: 16px;
+      height: 16px;
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s ease;
+    }
+
+    .audio-toggle input:checked + .checkbox-box {
+      background-color: var(--cyan-color);
+      border-color: var(--cyan-color);
+      box-shadow: 0 0 10px rgba(34, 211, 238, 0.4);
+    }
+
+    .audio-toggle input:checked + .checkbox-box::after {
+      content: '';
+      width: 6px;
+      height: 6px;
+      background-color: #000000;
+      border-radius: 1px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <div class="header-nav">
+      <div class="title-block">
+        <p>Horizon Combat Simulator</p>
+        <h1>Apocalipse Laser</h1>
+      </div>
+      <a href="index.html" class="back-btn">← Voltar ao Codex</a>
+    </div>
+
+    <div class="simulator-wrapper">
+      <canvas id="laserCanvas" width="960" height="540"></canvas>
+    </div>
+
+    <div class="control-panel">
+      <div class="instructions">
+        <strong>CONTROLES:</strong> Movimento: <code>W, A, S, D / Setas</code> • 
+        Disparo Principal: <code>Espaço / Clique</code> • 
+        Especial: <code>Q / C</code><br>
+        <strong>OBJETIVO:</strong> Mova a Horizon e incinere os drones de teste com a arma especial!
+      </div>
+      <div class="audio-toggle-wrapper" style="display: flex; gap: 20px; align-items: center;">
+        <label class="audio-toggle">
+          <input type="checkbox" id="audioCheckbox" checked>
+          <span class="checkbox-box"></span>
+          Áudio Sintetizado
+        </label>
+        <button class="btn-laser" id="triggerBtn">Ativar Laser [C]</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const canvas = document.getElementById('laserCanvas');
+    const ctx = canvas.getContext('2d');
+    const triggerBtn = document.getElementById('triggerBtn');
+    const audioCheckbox = document.getElementById('audioCheckbox');
+
+    const WIDTH = 960;
+    const HEIGHT = 540;
+
+    // Teclado
+    const keys = {};
+    window.addEventListener('keydown', (e) => {
+      keys[e.key.toLowerCase()] = true;
+      if ([' ', 'q', 'e', 'c', 'f'].includes(e.key.toLowerCase())) e.preventDefault();
+    });
+    window.addEventListener('keyup', (e) => {
+      keys[e.key.toLowerCase()] = false;
+    });
+
+    // Sons Sintetizados via Web Audio API
+    let audioCtx = null;
+    function getAudioContext() {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      return audioCtx;
+    }
+
+    function playSynthShoot() {
+      if (!audioCheckbox.checked) return;
+      const actx = getAudioContext();
+      const osc = actx.createOscillator();
+      const gain = actx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(450, actx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(100, actx.currentTime + 0.18);
+      gain.gain.setValueAtTime(0.18, actx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, actx.currentTime + 0.18);
+      osc.connect(gain);
+      gain.connect(actx.destination);
+      osc.start();
+      osc.stop(actx.currentTime + 0.18);
+    }
+
+    function synthLaserCharge() {
+      if (!audioCheckbox.checked) return;
+      const actx = getAudioContext();
+      
+      // Oscilador de Subida
+      const osc = actx.createOscillator();
+      const gain = actx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(60, actx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(800, actx.currentTime + 0.9);
+      
+      gain.gain.setValueAtTime(0.01, actx.currentTime);
+      gain.gain.linearRampToValueAtTime(0.35, actx.currentTime + 0.9);
+      
+      osc.connect(gain);
+      gain.connect(actx.destination);
+      osc.start();
+      osc.stop(actx.currentTime + 0.9);
+
+      // Oscilador Harmônico
+      const osc2 = actx.createOscillator();
+      const gain2 = actx.createGain();
+      osc2.type = 'triangle';
+      osc2.frequency.setValueAtTime(120, actx.currentTime);
+      osc2.frequency.linearRampToValueAtTime(400, actx.currentTime + 0.9);
+      gain2.gain.setValueAtTime(0.005, actx.currentTime);
+      gain2.gain.linearRampToValueAtTime(0.15, actx.currentTime + 0.9);
+      
+      osc2.connect(gain2);
+      gain2.connect(actx.destination);
+      osc2.start();
+      osc2.stop(actx.currentTime + 0.9);
+    }
+
+    let activeLaserNode = null;
+    let activeLaserNoise = null;
+    function synthLaserFiring() {
+      if (!audioCheckbox.checked) return;
+      const actx = getAudioContext();
+      
+      // Tom Principal
+      const osc = actx.createOscillator();
+      const gain = actx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(260, actx.currentTime);
+      
+      // LFO para tremer o som
+      const lfo = actx.createOscillator();
+      const lfoGain = actx.createGain();
+      lfo.type = 'sine';
+      lfo.frequency.setValueAtTime(32, actx.currentTime);
+      lfoGain.gain.setValueAtTime(40, actx.currentTime);
+      lfo.connect(lfoGain);
+      lfoGain.connect(osc.frequency);
+      
+      gain.gain.setValueAtTime(0.24, actx.currentTime);
+      osc.connect(gain);
+      gain.connect(actx.destination);
+      
+      osc.start();
+      lfo.start();
+      
+      activeLaserNode = { osc, lfo, gain };
+
+      // Ruído Branco (Laser Rumble)
+      const bufferSize = actx.sampleRate * 3.0; // 3 segundos
+      const buffer = actx.createBuffer(1, bufferSize, actx.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < bufferSize; i++) {
+        data[i] = Math.random() * 2 - 1;
+      }
+      
+      const noiseNode = actx.createBufferSource();
+      noiseNode.buffer = buffer;
+      const noiseFilter = actx.createBiquadFilter();
+      noiseFilter.type = 'bandpass';
+      noiseFilter.frequency.value = 180;
+      
+      const noiseGain = actx.createGain();
+      noiseGain.gain.setValueAtTime(0.35, actx.currentTime);
+      
+      noiseNode.connect(noiseFilter);
+      noiseFilter.connect(noiseGain);
+      noiseGain.connect(actx.destination);
+      
+      noiseNode.start();
+      activeLaserNoise = { source: noiseNode, gain: noiseGain };
+    }
+
+    function stopLaserSound() {
+      if (activeLaserNode) {
+        try {
+          activeLaserNode.gain.gain.exponentialRampToValueAtTime(0.001, getAudioContext().currentTime + 0.1);
+          activeLaserNode.osc.stop(getAudioContext().currentTime + 0.1);
+          activeLaserNode.lfo.stop(getAudioContext().currentTime + 0.1);
+        } catch(e) {}
+        activeLaserNode = null;
+      }
+      if (activeLaserNoise) {
+        try {
+          activeLaserNoise.gain.gain.exponentialRampToValueAtTime(0.001, getAudioContext().currentTime + 0.1);
+          activeLaserNoise.source.stop(getAudioContext().currentTime + 0.1);
+        } catch(e) {}
+        activeLaserNoise = null;
+      }
+    }
+
+    function synthLaserCollapse() {
+      if (!audioCheckbox.checked) return;
+      const actx = getAudioContext();
+      const osc = actx.createOscillator();
+      const gain = actx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(160, actx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(20, actx.currentTime + 1.2);
+      
+      const filter = actx.createBiquadFilter();
+      filter.type = 'lowpass';
+      filter.frequency.setValueAtTime(300, actx.currentTime);
+      filter.frequency.exponentialRampToValueAtTime(10, actx.currentTime + 1.2);
+
+      gain.gain.setValueAtTime(0.48, actx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, actx.currentTime + 1.2);
+      
+      osc.connect(filter);
+      filter.connect(gain);
+      gain.connect(actx.destination);
+      
+      osc.start();
+      osc.stop(actx.currentTime + 1.2);
+
+      // Barulho do impacto explosivo
+      const bufferSize = actx.sampleRate * 1.5;
+      const buffer = actx.createBuffer(1, bufferSize, actx.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < bufferSize; i++) {
+        data[i] = Math.random() * 2 - 1;
+      }
+      
+      const noise = actx.createBufferSource();
+      noise.buffer = buffer;
+      const noiseFilter = actx.createBiquadFilter();
+      noiseFilter.type = 'lowpass';
+      noiseFilter.frequency.setValueAtTime(180, actx.currentTime);
+      noiseFilter.frequency.exponentialRampToValueAtTime(20, actx.currentTime + 1.5);
+      
+      const noiseGain = actx.createGain();
+      noiseGain.gain.setValueAtTime(0.55, actx.currentTime);
+      noiseGain.gain.exponentialRampToValueAtTime(0.001, actx.currentTime + 1.5);
+      
+      noise.connect(noiseFilter);
+      noiseFilter.connect(noiseGain);
+      noiseGain.connect(actx.destination);
+      
+      noise.start();
+      noise.stop(actx.currentTime + 1.5);
+    }
+
+    // Entidades do Jogo
+    const player = { x: 120, y: HEIGHT / 2, width: 84, height: 50 };
+    const projectiles = [];
+    const particles = [];
+    const embers = [];
+    const targets = [];
+    const floatingTexts = [];
+
+    // Apocalypse Laser State
+    let laserState = 'idle'; // idle, charge, firing, collapse
+    let laserStateStart = 0;
+    let laserBeamWidth = 0;
+    let laserFlashAlpha = 0;
+    let laserParticles = [];
+    let laserEmbers = [];
+    let screenShake = 0;
+
+    // Spawn de Drones Inimigos
+    function spawnTarget() {
+      targets.push({
+        id: Math.random(),
+        x: 600 + Math.random() * 260,
+        y: 80 + Math.random() * (HEIGHT - 160),
+        hp: 300,
+        maxHp: 300,
+        radius: 28,
+        width: 64,
+        height: 48,
+        pulseOffset: Math.random() * 10
+      });
+    }
+
+    // Spawn Inicial
+    for(let i=0; i<4; i++) spawnTarget();
+
+    function triggerLaser() {
+      if (laserState !== 'idle') return;
+      laserState = 'charge';
+      laserStateStart = performance.now();
+      triggerBtn.disabled = true;
+      synthLaserCharge();
+
+      // Encher partículas espirais
+      const startX = player.x + 45;
+      const startY = player.y;
+      laserParticles = [];
+      for (let i = 0; i < 90; i++) {
+        laserParticles.push({
+          x: startX + (Math.random() - 0.5) * 520,
+          y: startY + (Math.random() - 0.5) * 420,
+          targetX: startX,
+          targetY: startY,
+          size: 2.2 + Math.random() * 5,
+          life: 1.0,
+          speed: 0.024 + Math.random() * 0.035,
+          color: ['#ff00ff', '#ff3355', '#00ffff', '#ffffff'][Math.floor(Math.random() * 4)],
+        });
+      }
+    }
+
+    triggerBtn.addEventListener('click', triggerLaser);
+
+    // Loop de Física & Atualização
+    let lastShot = 0;
+    function update(now) {
+      // Movimento do Jogador
+      const speed = 4.2;
+      if (keys.w || keys.arrowup) player.y -= speed;
+      if (keys.s || keys.arrowdown) player.y += speed;
+      if (keys.a || keys.arrowleft) player.x -= speed;
+      if (keys.d || keys.arrowright) player.x += speed;
+
+      player.x = Math.max(50, Math.min(WIDTH * 0.45, player.x));
+      player.y = Math.max(45, Math.min(HEIGHT - 45, player.y));
+
+      // Disparo Principal
+      if (keys[' '] && now - lastShot > 180 && laserState === 'idle') {
+        playSynthShoot();
+        projectiles.push({
+          x: player.x + 36,
+          y: player.y,
+          vx: 11,
+          vy: 0,
+          color: '#ffffff',
+          size: 5
+        });
+        lastShot = now;
+      }
+
+      // Especiais hotkeys
+      if ((keys.q || keys.c) && laserState === 'idle') {
+        triggerLaser();
+      }
+
+      // Projéteis
+      projectiles.forEach((proj, idx) => {
+        proj.x += proj.vx;
+        
+        // Colisão com drones
+        targets.forEach(target => {
+          if (target.hp > 0) {
+            const dx = target.x - proj.x;
+            const dy = target.y - proj.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist < target.radius) {
+              target.hp -= 28;
+              proj.x = WIDTH + 999; // destroy
+              // Text flutuante
+              floatingTexts.push({
+                x: target.x,
+                y: target.y - 20,
+                text: '28',
+                life: 30,
+                color: '#ffffff'
+              });
+              // Pequena explosão de faísca
+              for (let i = 0; i < 4; i++) {
+                particles.push({
+                  x: proj.x - 10,
+                  y: proj.y,
+                  vx: -2 - Math.random() * 3,
+                  vy: (Math.random() - 0.5) * 4,
+                  life: 25,
+                  size: 2,
+                  color: '#22d3ee'
+                });
+              }
+            }
+          }
+        });
+      });
+
+      // Limpar projéteis fora da tela
+      for (let i = projectiles.length - 1; i >= 0; i--) {
+        if (projectiles[i].x > WIDTH + 40) projectiles.splice(i, 1);
+      }
+
+      // Filtro de Drones Mortos
+      targets.forEach((target, index) => {
+        if (target.hp <= 0) {
+          // Explosão
+          synthLaserCollapse();
+          for (let i = 0; i < 30; i++) {
+            particles.push({
+              x: target.x,
+              y: target.y,
+              vx: (Math.random() - 0.5) * 10,
+              vy: (Math.random() - 0.5) * 10,
+              life: 45,
+              size: 2 + Math.random() * 4,
+              color: i % 2 === 0 ? '#fb923c' : '#ef4444'
+            });
+          }
+          targets.splice(index, 1);
+          setTimeout(spawnTarget, 2000); // Respawn drone
+        }
+      });
+
+      // Lógica do Laser
+      if (laserState !== 'idle') {
+        const elapsed = now - laserStateStart;
+        const startX = player.x + 45;
+        const startY = player.y;
+
+        if (laserState === 'charge') {
+          // Atualiza partículas espirais em convergência
+          laserParticles.forEach(p => {
+            p.targetX = startX;
+            p.targetY = startY;
+            p.x += (p.targetX - p.x) * p.speed;
+            p.y += (p.targetY - p.y) * p.speed;
+            p.life *= 0.991;
+          });
+
+          if (elapsed > 900) {
+            laserState = 'firing';
+            laserStateStart = now;
+            laserFlashAlpha = 1.1;
+            synthLaserFiring();
+            screenShake = 12;
+          }
+        }
+        else if (laserState === 'firing') {
+          laserBeamWidth = 38 + Math.sin(now * 0.08) * 10 + Math.random() * 8;
+          screenShake = 4 + Math.random() * 4;
+
+          // Causa Dano contínuo aos Drones sob a linha do Laser
+          targets.forEach(target => {
+            if (target.hp > 0 && Math.abs(target.y - startY) < (80 + laserBeamWidth * 0.5) && target.x > startX) {
+              target.hp -= 2.6; // Dano contínuo rápido
+              if (Math.random() > 0.8) {
+                floatingTexts.push({
+                  x: target.x,
+                  y: target.y - 25,
+                  text: 'LASER CRIT',
+                  life: 25,
+                  color: '#ff00ff'
+                });
+              }
+              // Faíscas no alvo
+              particles.push({
+                x: target.x + (Math.random() - 0.5) * 20,
+                y: target.y + (Math.random() - 0.5) * 20,
+                vx: Math.random() * 6,
+                vy: (Math.random() - 0.5) * 6,
+                life: 20,
+                size: 2 + Math.random() * 3,
+                color: '#f0abfc'
+              });
+            }
+          });
+
+          if (elapsed > 3000) {
+            laserState = 'collapse';
+            laserStateStart = now;
+            laserFlashAlpha = 1.2;
+            stopLaserSound();
+            synthLaserCollapse();
+            screenShake = 22;
+
+            // Gerar centelhas na explosão final do laser
+            const endX = WIDTH * 0.95;
+            for (let i = 0; i < 120; i++) {
+              laserEmbers.push({
+                x: endX,
+                y: startY,
+                vx: (Math.random() - 0.5) * 22,
+                vy: (Math.random() - 0.5) * 22,
+                life: 1.0 + Math.random() * 0.7,
+                size: 2 + Math.random() * 11,
+                color: i % 5 === 0 ? 'rgba(80,80,80,0.6)' : ['#ff00ff', '#ff3355', '#00ffff', '#ffffff'][Math.floor(Math.random() * 4)],
+              });
+            }
+          }
+        }
+        else if (laserState === 'collapse') {
+          // Embers
+          laserEmbers.forEach(em => {
+            em.x += em.vx;
+            em.y += em.vy;
+            em.vx *= 0.96;
+            em.vy *= 0.96;
+            em.life -= 0.016;
+          });
+          laserEmbers = laserEmbers.filter(em => em.life > 0);
+
+          if (elapsed > 1700) {
+            laserState = 'idle';
+            laserParticles = [];
+            laserEmbers = [];
+            triggerBtn.disabled = false;
+            screenShake = 0;
+          }
+        }
+      }
+
+      // Animadores secundários
+      floatingTexts.forEach(ft => {
+        ft.y -= 0.6;
+        ft.life--;
+      });
+      for(let i = floatingTexts.length - 1; i >= 0; i--) {
+        if(floatingTexts[i].life <= 0) floatingTexts.splice(i, 1);
+      }
+
+      particles.forEach(p => {
+        p.x += p.vx;
+        p.y += p.vy;
+        p.life--;
+      });
+      for(let i = particles.length - 1; i >= 0; i--) {
+        if(particles[i].life <= 0) particles.splice(i, 1);
+      }
+    }
+
+    // Renderização
+    function draw(now) {
+      ctx.save();
+
+      // Efeito de Tremor de Tela
+      if (screenShake > 0) {
+        const dx = (Math.random() - 0.5) * screenShake;
+        const dy = (Math.random() - 0.5) * screenShake;
+        ctx.translate(dx, dy);
+      }
+
+      // Desenhar Fundo Espacial (Gradiente Escuro + Estrelas de fundo estáticas)
+      ctx.fillStyle = '#020617';
+      ctx.fillRect(0, 0, WIDTH, HEIGHT);
+
+      // Grade digital de combate (Grade ciberpunk)
+      ctx.strokeStyle = 'rgba(34, 211, 238, 0.04)';
+      ctx.lineWidth = 1;
+      for (let x = 0; x < WIDTH; x += 48) {
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x - 80, HEIGHT);
+        ctx.stroke();
+      }
+
+      // Drones
+      targets.forEach(target => {
+        const floatAnim = Math.sin(now / 200 + target.pulseOffset) * 6;
+        ctx.save();
+        ctx.shadowBlur = 18;
+        ctx.shadowColor = '#ef4444';
+        ctx.fillStyle = '#ef4444';
+        // Desenha asa do drone
+        ctx.beginPath();
+        ctx.arc(target.x, target.y + floatAnim, target.radius, 0, Math.PI * 2);
+        ctx.fill();
+        // Barra de Vida
+        ctx.fillStyle = '#111827';
+        ctx.fillRect(target.x - 24, target.y + floatAnim - 38, 48, 4);
+        ctx.fillStyle = '#22c55e';
+        ctx.fillRect(target.x - 24, target.y + floatAnim - 38, 48 * Math.max(0, target.hp / target.maxHp), 4);
+        ctx.font = 'bold 9px monospace';
+        ctx.fillStyle = '#f8fafc';
+        ctx.fillText(`DRONE LVL 10`, target.x - 28, target.y + floatAnim - 45);
+        ctx.restore();
+      });
+
+      // Projéteis simples
+      projectiles.forEach(proj => {
+        ctx.fillStyle = '#22d3ee';
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = '#22d3ee';
+        ctx.beginPath();
+        ctx.roundRect(proj.x, proj.y - 2, 16, 4, 2);
+        ctx.fill();
+      });
+      ctx.shadowBlur = 0;
+
+      // Partículas
+      particles.forEach(p => {
+        ctx.fillStyle = p.color;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+        ctx.fill();
+      });
+
+      // Nave do Jogador (Horizon)
+      ctx.save();
+      ctx.shadowBlur = 20;
+      ctx.shadowColor = '#22d3ee';
+      ctx.fillStyle = '#22d3ee';
+      // Desenho simplificado do Horizon como um caça ciberpunk triangular futurista
+      ctx.beginPath();
+      ctx.moveTo(player.x + 36, player.y);
+      ctx.lineTo(player.x - 30, player.y - 22);
+      ctx.lineTo(player.x - 14, player.y);
+      ctx.lineTo(player.x - 30, player.y + 22);
+      ctx.closePath();
+      ctx.fill();
+      // Propulsor a jato
+      const flameSize = 10 + Math.random() * 12;
+      const grad = ctx.createLinearGradient(player.x - 36, player.y, player.x - 14, player.y);
+      grad.addColorStop(0, 'transparent');
+      grad.addColorStop(0.5, '#fb923c');
+      grad.addColorStop(1, '#ff3355');
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(player.x - 22, player.y, flameSize, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+
+      // Desenho dos Efeitos Especiais do Laser
+      if (laserState === 'charge') {
+        ctx.fillStyle = `rgba(0,0,0, ${0.1 + Math.min(0.4, (now - laserStateStart) / 1200)})`;
+        ctx.fillRect(0, 0, WIDTH, HEIGHT);
+        
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        laserParticles.forEach(particle => {
+          ctx.globalAlpha = particle.life;
+          ctx.fillStyle = particle.color;
+          ctx.beginPath();
+          ctx.arc(particle.x, particle.y, particle.size, 0, Math.PI * 2);
+          ctx.fill();
+        });
+        ctx.restore();
+      }
+      else if (laserState === 'firing') {
+        const startX = player.x + 45;
+        const startY = player.y;
+        const endX = WIDTH * 0.96;
+        const colors = ['#ff00ff', '#ff3355', '#00ffff', '#ffffff'];
+
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+
+        // 5 Camadas de laser externas pulsantes
+        for (let i = 0; i < 5; i++) {
+          ctx.beginPath();
+          ctx.moveTo(startX, startY);
+          for (let j = 1; j <= 6; j++) {
+            const tx = startX + (endX - startX) * (j / 6);
+            const ty = startY + (Math.random() - 0.5) * 18;
+            ctx.lineTo(tx, ty);
+          }
+          ctx.strokeStyle = colors[i % colors.length];
+          ctx.shadowColor = colors[i % colors.length];
+          ctx.shadowBlur = 24 + i * 28;
+          ctx.globalAlpha = 0.18 - i * 0.02;
+          ctx.lineWidth = laserBeamWidth + i * 44;
+          ctx.stroke();
+        }
+
+        // Centro do Laser Sólido Branco
+        ctx.globalAlpha = 1.0;
+        ctx.beginPath();
+        ctx.moveTo(startX, startY);
+        ctx.lineTo(endX, startY);
+        ctx.strokeStyle = '#ffffff';
+        ctx.shadowColor = '#ffffff';
+        ctx.shadowBlur = 90;
+        ctx.lineWidth = 10 + Math.random() * 8;
+        ctx.stroke();
+
+        // Plasma Orb na ponta
+        const orbRadius = 45 + laserBeamWidth * 0.5;
+        const orb = ctx.createRadialGradient(startX, startY, 0, startX, startY, orbRadius);
+        orb.addColorStop(0, '#ffffff');
+        orb.addColorStop(0.24, 'rgba(200,160,255,0.9)');
+        orb.addColorStop(0.65, 'rgba(255,0,255,0.3)');
+        orb.addColorStop(1, 'transparent');
+        ctx.fillStyle = orb;
+        ctx.beginPath();
+        ctx.arc(startX, startY, orbRadius, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.restore();
+      }
+      else if (laserState === 'collapse') {
+        const startY = player.y;
+        const endX = WIDTH * 0.95;
+        const elapsed = now - laserStateStart;
+        const p = Math.min(1.0, elapsed / 1700);
+        const radius = 100 + p * 620;
+
+        ctx.save();
+        ctx.globalAlpha = (1.0 - p) * 0.85;
+        const glow = ctx.createRadialGradient(endX, startY, 10, endX, startY, radius);
+        glow.addColorStop(0, '#ffffff');
+        glow.addColorStop(0.25, '#ff3355');
+        glow.addColorStop(0.6, 'rgba(239,68,68,0.45)');
+        glow.addColorStop(1, 'transparent');
+        ctx.fillStyle = glow;
+        ctx.beginPath();
+        ctx.arc(endX, startY, radius, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.globalCompositeOperation = 'lighter';
+        laserEmbers.forEach(em => {
+          ctx.globalAlpha = em.life;
+          ctx.fillStyle = em.color;
+          ctx.beginPath();
+          ctx.arc(em.x, em.y, em.size, 0, Math.PI * 2);
+          ctx.fill();
+        });
+        ctx.restore();
+      }
+
+      // Flash da tela
+      if (laserFlashAlpha > 0.02) {
+        ctx.fillStyle = `rgba(255,255,255,${laserFlashAlpha})`;
+        ctx.fillRect(0, 0, WIDTH, HEIGHT);
+        laserFlashAlpha *= 0.82;
+      }
+
+      // Desenhar textos flutuantes
+      floatingTexts.forEach(ft => {
+        ctx.save();
+        ctx.globalAlpha = Math.max(0, ft.life / 30);
+        ctx.fillStyle = ft.color;
+        ctx.font = 'bold 12px monospace';
+        ctx.fillText(ft.text, ft.x - 12, ft.y);
+        ctx.restore();
+      });
+
+      ctx.restore();
+    }
+
+    // Loop Principal
+    function gameLoop() {
+      const now = performance.now();
+      update(now);
+      draw(now);
+      requestAnimationFrame(gameLoop);
+    }
+
+    requestAnimationFrame(gameLoop);
+  </script>
+</body>
+</html>

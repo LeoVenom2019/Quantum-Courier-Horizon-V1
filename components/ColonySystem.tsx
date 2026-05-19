@@ -24,30 +24,165 @@ import {
   BadgeCheck,
   Activity,
   Gamepad2,
-  X
+  X,
+  Coins,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import { GameStorage } from '@/lib/game-storage';
 import { MINI_GAMES_CONFIG } from '@/lib/mini-games-config';
+import NewEarthDefenseBattle, { BattleResultSummary } from './NewEarthDefenseBattle';
 import {
+  BATTLE_CARD_SLOTS,
+  BATTLE_STAT_CONFIG,
+  BASE_BATTLE_SHIP_STATS,
   COLONY_CARD_CATALOG,
+  ColonyCardLevels,
   DEFAULT_COLONY_SECTORS,
   DEFAULT_OWNED_COLONY_CARD_IDS,
+  POLITICAL_CARD_SLOTS,
   SECTOR_CONFIG,
+  BattleCardSlot,
   ColonyCard,
   ColonyCardSlot,
   ColonySectorId,
   getCardById,
+  getBattleEffects,
+  getBattleCardElementTypes,
+  getCardBackgroundImage,
   getCardClass,
+  getCardLevel,
+  getHorizonLevelFromXp,
   getCardStyle,
   getPoliticalEffects,
+  calculateBattleShipStats,
+  calculateBattleStatTotals,
+  canEquipBattleCardWithElementRule,
+  isBattleCard,
   isPoliticalCard,
+  normalizeOwnedColonyCardIds,
+  rollBattleCardReward,
+  TRINITY_REACTOR_CARD_ID,
 } from '@/lib/colony-cards';
 
 // --- Types ---
 
 export type ConstructionType = 'forest' | 'factory' | 'school' | 'culture' | 'defense' | 'restaurant';
-type ColonySupplyId = 'materials' | 'biomass' | 'tech' | 'defense';
+type ColonySupplyId = 'materials' | 'biomass' | 'tech' | 'defense' | 'food' | 'meds';
 type ColonySupplies = Record<ColonySupplyId, number>;
+type ColonySearchId = 'land' | 'sea' | 'air';
+type ColonyExpeditionId = Exclude<ColonySearchId, 'air'>;
+type ActiveColonySearches = Record<string, ActiveColonySearch>;
+type SearchThreatBonus = Record<ColonyExpeditionId, number>;
+type SearchUpgradeLevels = Record<ColonyExpeditionId, number>;
+type BattleLoadout = Partial<Record<BattleCardSlot, string>>;
+type DefenseSpecialId = 'apocalypse-laser' | 'hellfire-barrage' | 'special-slot-3' | 'special-slot-4';
+
+const BATTLE_CARD_CODEX_PAGE_SIZE = 6;
+const MAX_SEARCH_UPGRADE_LEVEL = 5;
+const MAX_PARALLEL_SEARCHES_PER_TYPE = 3;
+const SEARCH_UPGRADE_RESOURCE_BONUS = 15;
+const SEARCH_UPGRADE_THREAT_BONUS = 5;
+const DEFAULT_SEARCH_UPGRADE_LEVELS: SearchUpgradeLevels = { land: 0, sea: 0 };
+const getSearchSlotKey = (id: ColonyExpeditionId, slotIndex: number) => `${id}-${slotIndex}`;
+const SEARCH_SLOT_STYLES = [
+  'border-cyan-300/35 bg-cyan-300/10 text-cyan-100 hover:border-cyan-200/70 hover:bg-cyan-300 hover:text-black',
+  'border-emerald-300/35 bg-emerald-300/10 text-emerald-100 hover:border-emerald-200/70 hover:bg-emerald-300 hover:text-black',
+  'border-amber-300/35 bg-amber-300/10 text-amber-100 hover:border-amber-200/70 hover:bg-amber-300 hover:text-black',
+];
+const BATTLE_SLOT_LABEL: Record<BattleCardSlot, Record<'en' | 'pt', string>> = {
+  weapon: { en: 'Weapon', pt: 'Arma' },
+  armor: { en: 'Armor', pt: 'Blindagem' },
+  core: { en: 'Core', pt: 'Núcleo' },
+  tactic: { en: 'Tactic', pt: 'Tática' },
+  auxiliary: { en: 'Auxiliary', pt: 'Auxiliar' },
+  protocol: { en: 'Protocol', pt: 'Protocolo' },
+};
+
+interface ActiveColonySearch {
+  id: ColonyExpeditionId;
+  searchKey: string;
+  slotIndex: number;
+  title: string;
+  subtitle: string;
+  rewards: Partial<ColonySupplies>;
+  threatChance: number;
+  startedAt: number;
+  endsAt: number;
+}
+
+interface ColonySearchOption {
+  id: ColonyExpeditionId;
+  title: string;
+  subtitle: string;
+  description: string;
+  tone: string;
+  icon: any;
+  durationSeconds: number;
+  threatChance: number;
+  rewards: Partial<ColonySupplies>;
+  upgradeLevel: number;
+  upgradeCost: number;
+  resourceBonusPercent: number;
+  upgradeThreatBonus: number;
+}
+
+const getMiniBattleCardStyle = (card: ColonyCard, equipped: boolean) => {
+  const styles: Record<string, string> = {
+    common: equipped
+      ? 'border-zinc-200/55 bg-zinc-200/12 shadow-[0_0_18px_rgba(228,228,231,0.08)]'
+      : 'border-zinc-400/28 bg-zinc-500/10 hover:border-zinc-200/55',
+    rare: equipped
+      ? 'border-cyan-300/55 bg-cyan-300/12 shadow-[0_0_18px_rgba(34,211,238,0.12)]'
+      : 'border-cyan-300/28 bg-cyan-300/10 hover:border-cyan-200/55',
+    epic: equipped
+      ? 'border-violet-300/60 bg-violet-300/14 shadow-[0_0_20px_rgba(167,139,250,0.15)]'
+      : 'border-violet-300/30 bg-violet-400/10 hover:border-violet-200/60',
+    legendary: equipped
+      ? 'border-amber-300/60 bg-amber-300/14 shadow-[0_0_22px_rgba(251,191,36,0.16)]'
+      : 'border-amber-300/32 bg-amber-300/10 hover:border-amber-200/60',
+    mythic: equipped
+      ? 'border-rose-200/70 bg-rose-300/16 shadow-[0_0_24px_rgba(244,114,182,0.2)]'
+      : 'border-rose-200/40 bg-rose-300/12 hover:border-rose-100/70',
+  };
+
+  return styles[card.rarity] || styles.common;
+};
+
+interface DefenseSpecial {
+  id: DefenseSpecialId;
+  name: Record<'en' | 'pt', string>;
+  description: Record<'en' | 'pt', string>;
+  implemented: boolean;
+}
+
+interface PendingDefenseThreat {
+  id: string;
+  sourceSearchId: ColonyExpeditionId;
+  sourceTitle: string;
+  threatChance: number;
+  detectedAt: number;
+  status: 'pending';
+}
+
+const MAX_PENDING_DEFENSE_THREATS = 2;
+const ROUTE4_SEARCH_SFX_BASE = '/assets/rota4/SFX_new_land';
+const route4SearchSfxCache = new Map<string, HTMLAudioElement>();
+
+const playRoute4SearchSfx = (id: ColonyExpeditionId, slotIndex: number) => {
+  if (typeof Audio === 'undefined') return;
+  const prefix = id === 'land' ? 'start_truck' : 'start_airplane';
+  const src = `${ROUTE4_SEARCH_SFX_BASE}/${prefix}_${slotIndex + 1}.ogg`;
+  let audio = route4SearchSfxCache.get(src);
+  if (!audio) {
+    audio = new Audio(src);
+    audio.preload = 'auto';
+    route4SearchSfxCache.set(src, audio);
+  }
+  const instance = audio.cloneNode(true) as HTMLAudioElement;
+  instance.volume = 0.68;
+  instance.play().catch(() => {});
+};
 
 export interface Construction {
   id: string;
@@ -85,6 +220,10 @@ export interface ColonySystemProps {
   playSfx?: (type: string, config?: any) => void;
   onBuildingComplete?: (type: ConstructionType, level: number) => void;
   onAllocate10k?: () => void;
+  qc?: number;
+  onEarnQC?: (amount: number) => void;
+  onSpendQC?: (amount: number) => void;
+  formatValue?: (value: number) => string;
 }
 
 // --- Configuration ---
@@ -155,7 +294,29 @@ const DEFAULT_COLONY_SUPPLIES: ColonySupplies = {
   biomass: 0,
   tech: 0,
   defense: 0,
+  food: 0,
+  meds: 0,
 };
+
+const DEFAULT_SEARCH_THREAT_BONUS: SearchThreatBonus = {
+  land: 0,
+  sea: 0,
+};
+
+const SEARCH_THREAT_BONUS_STEP = 15;
+const LEGENDARY_BATTLE_CARD_PITY_STEP = 3;
+const getSearchUpgradeCost = (level: number) => (level >= MAX_SEARCH_UPGRADE_LEVEL ? 0 : 30000 * (level + 1));
+const applySearchUpgradeRewards = (rewards: Partial<ColonySupplies>, level: number): Partial<ColonySupplies> => {
+  const multiplier = 1 + (Math.max(0, Math.min(MAX_SEARCH_UPGRADE_LEVEL, level)) * SEARCH_UPGRADE_RESOURCE_BONUS) / 100;
+  return (Object.entries(rewards) as Array<[ColonySupplyId, number]>).reduce((acc, [key, value]) => {
+    acc[key] = Math.max(1, Math.round(value * multiplier));
+    return acc;
+  }, {} as Partial<ColonySupplies>);
+};
+
+const getFreePoliticalSlot = (equippedCards: Partial<Record<ColonyCardSlot, string>> = {}) => (
+  POLITICAL_CARD_SLOTS.find(slot => !equippedCards[slot])
+);
 
 const SUPPLY_CONFIG: Record<ColonySupplyId, {
   label: Record<'en' | 'pt', string>;
@@ -166,6 +327,8 @@ const SUPPLY_CONFIG: Record<ColonySupplyId, {
   biomass: { label: { en: 'Biomass', pt: 'Biomassa' }, color: 'text-emerald-300', border: 'border-emerald-400/30 bg-emerald-400/10' },
   tech: { label: { en: 'Tech Parts', pt: 'Peças Tec.' }, color: 'text-cyan-300', border: 'border-cyan-400/30 bg-cyan-400/10' },
   defense: { label: { en: 'Defense Cores', pt: 'Núcleos Def.' }, color: 'text-red-300', border: 'border-red-400/30 bg-red-400/10' },
+  food: { label: { en: 'Food', pt: 'Comida' }, color: 'text-lime-300', border: 'border-lime-400/30 bg-lime-400/10' },
+  meds: { label: { en: 'Medical Inputs', pt: 'Insumos Méd.' }, color: 'text-pink-300', border: 'border-pink-400/30 bg-pink-400/10' },
 };
 
 const CONSTRUCTION_SUPPLY_COST: Record<ConstructionType, Partial<ColonySupplies>> = {
@@ -176,6 +339,45 @@ const CONSTRUCTION_SUPPLY_COST: Record<ConstructionType, Partial<ColonySupplies>
   defense: { materials: 4, tech: 2, defense: 3 },
   restaurant: { biomass: 5, materials: 2 },
 };
+
+const DEFENSE_SPECIALS: DefenseSpecial[] = [
+  {
+    id: 'apocalypse-laser',
+    name: { en: 'Apocalypse Laser', pt: 'Apocalipse Laser' },
+    description: {
+      en: 'Route 3 special: a sustained beam for deleting priority threats.',
+      pt: 'Especial da Rota 3: feixe sustentado para apagar ameaças prioritárias.',
+    },
+    implemented: true,
+  },
+  {
+    id: 'hellfire-barrage',
+    name: { en: 'Hellfire Barrage', pt: 'Hellfire Barrage' },
+    description: {
+      en: 'Route 3 special: a heavy missile rain for pressure windows.',
+      pt: 'Especial da Rota 3: chuva pesada de mísseis para janelas de pressão.',
+    },
+    implemented: true,
+  },
+  {
+    id: 'special-slot-3',
+    name: { en: 'Special Slot 3', pt: 'Especial 3' },
+    description: {
+      en: 'Reserved slot for a future aerial defense special.',
+      pt: 'Slot reservado para um futuro especial de defesa aérea.',
+    },
+    implemented: false,
+  },
+  {
+    id: 'special-slot-4',
+    name: { en: 'Special Slot 4', pt: 'Especial 4' },
+    description: {
+      en: 'Reserved slot for a future aerial defense special.',
+      pt: 'Slot reservado para um futuro especial de defesa aérea.',
+    },
+    implemented: false,
+  },
+];
 
 const canPaySupplies = (stock: ColonySupplies, cost: Partial<ColonySupplies>, batches = 1) => (
   (Object.entries(cost) as Array<[ColonySupplyId, number]>).every(([key, value]) => stock[key] >= value * batches)
@@ -216,25 +418,60 @@ const COLONY_BLUEPRINTS: Array<{
 }> = [
   {
     id: 'colony-1',
-    name: { en: 'Alpha Colony', pt: 'Colônia Alpha' },
+    name: { en: 'Genesis', pt: 'Genesis' },
     sectors: DEFAULT_COLONY_SECTORS,
   },
   {
     id: 'colony-2',
-    name: { en: 'Colony B (Temporary)', pt: 'Colônia B (Provisório)' },
+    name: { en: 'Eden', pt: 'Eden' },
     sectors: { happiness: 42, health: 44, economy: 52, security: 48, technology: 38, culture: 36 },
   },
   {
     id: 'colony-3',
-    name: { en: 'Colony C (Temporary)', pt: 'Colônia C (Provisório)' },
+    name: { en: 'Elysium', pt: 'Elysium' },
     sectors: { happiness: 34, health: 50, economy: 40, security: 56, technology: 46, culture: 42 },
   },
   {
     id: 'colony-4',
-    name: { en: 'Colony D (Temporary)', pt: 'Colônia D (Provisório)' },
+    name: { en: 'Gaia', pt: 'Gaia' },
     sectors: { happiness: 48, health: 36, economy: 44, security: 40, technology: 58, culture: 50 },
   },
 ];
+
+const COLONY_COMPLETION_BACKGROUNDS: Record<string, Partial<Record<ConstructionType, string>>> = {
+  'colony-1': {
+    forest: '/assets/rota4/colonys/genesis/genesis_forest.webp',
+    factory: '/assets/rota4/colonys/genesis/genesis_factory.webp',
+    school: '/assets/rota4/colonys/genesis/genesis_school.webp',
+    culture: '/assets/rota4/colonys/genesis/genesis_theater.webp',
+    defense: '/assets/rota4/colonys/genesis/genesis_police.webp',
+    restaurant: '/assets/rota4/colonys/genesis/genesis_restaurant.webp',
+  },
+  'colony-2': {
+    forest: '/assets/rota4/colonys/eden/eden_forest.webp',
+    factory: '/assets/rota4/colonys/eden/eden_factory.webp',
+    school: '/assets/rota4/colonys/eden/eden_school.webp',
+    culture: '/assets/rota4/colonys/eden/eden_theater.webp',
+    defense: '/assets/rota4/colonys/eden/eden_police.webp',
+    restaurant: '/assets/rota4/colonys/eden/eden_restaurant.webp',
+  },
+  'colony-3': {
+    forest: '/assets/rota4/colonys/elysium/elysium_forest.webp',
+    factory: '/assets/rota4/colonys/elysium/elysium_factory.webp',
+    school: '/assets/rota4/colonys/elysium/elysium_school.webp',
+    culture: '/assets/rota4/colonys/elysium/elysium_theater.webp',
+    defense: '/assets/rota4/colonys/elysium/elysium_police.webp',
+    restaurant: '/assets/rota4/colonys/elysium/elysium_restaurant.webp',
+  },
+  'colony-4': {
+    forest: '/assets/rota4/colonys/gaia/gaia_forest.webp',
+    factory: '/assets/rota4/colonys/gaia/gaia_factory.webp',
+    school: '/assets/rota4/colonys/gaia/gaia_school.webp',
+    culture: '/assets/rota4/colonys/gaia/gaia_theater.webp',
+    defense: '/assets/rota4/colonys/gaia/gaia_police.webp',
+    restaurant: '/assets/rota4/colonys/gaia/gaia_restaurant.webp',
+  },
+};
 
 const createColonyFromBlueprint = (blueprint: typeof COLONY_BLUEPRINTS[number], language: 'en' | 'pt'): Colony => ({
   id: blueprint.id,
@@ -249,12 +486,21 @@ const createColonyFromBlueprint = (blueprint: typeof COLONY_BLUEPRINTS[number], 
   age: 0,
 });
 
+const sanitizePoliticalEquippedCards = (equippedCards: Partial<Record<ColonyCardSlot, string>> = {}) => (
+  POLITICAL_CARD_SLOTS.reduce((acc, slot) => {
+    const card = getCardById(equippedCards[slot]);
+    if (card && isPoliticalCard(card)) acc[slot] = card.id;
+    return acc;
+  }, {} as Partial<Record<ColonyCardSlot, string>>)
+);
+
 export const cleanColoniesData = (data: any, language: 'en' | 'pt'): Colony[] => {
   if (!data || !Array.isArray(data) || data.length === 0) {
     return COLONY_BLUEPRINTS.map(blueprint => createColonyFromBlueprint(blueprint, language));
   }
 
   const cleaned = data.map((col: Colony) => {
+    const blueprint = COLONY_BLUEPRINTS.find(item => item.id === col.id);
     const uniqueTypes = new Set();
     const cleanConstructions = (col.constructions || []).filter(c => {
       if (CONSTRUCTION_CONFIG[c.type] && !uniqueTypes.has(c.type)) {
@@ -297,8 +543,9 @@ export const cleanColoniesData = (data: any, language: 'en' | 'pt'): Colony[] =>
 
     return {
       ...col,
+      name: blueprint ? blueprint.name[language] : col.name,
       sectors,
-      equippedCards: col.equippedCards || {},
+      equippedCards: sanitizePoliticalEquippedCards(col.equippedCards || {}),
       constructions: finalConstructions.sort((a, b) => a.order - b.order),
     };
   });
@@ -322,6 +569,7 @@ const RARITY_LABEL: Record<string, Record<'en' | 'pt', string>> = {
   rare: { en: 'Rare', pt: 'Rara' },
   epic: { en: 'Epic', pt: 'Épica' },
   legendary: { en: 'Legendary', pt: 'Lendária' },
+  mythic: { en: 'Mythic', pt: 'Mítica' },
 };
 
 const PanelHeader = ({
@@ -346,15 +594,15 @@ const PanelHeader = ({
   </div>
 );
 
-const CardEffectPills = ({ card, language }: { card: ColonyCard; language: 'en' | 'pt' }) => (
+const CardEffectPills = ({ card, language, cardLevels = {} }: { card: ColonyCard; language: 'en' | 'pt'; cardLevels?: ColonyCardLevels }) => (
   <div className="mt-3 flex flex-wrap gap-1.5">
-    {getPoliticalEffects(card).map(effect => (
+    {getPoliticalEffects(card, cardLevels).map(effect => (
       <span
         key={`${card.id}-${effect.sector}`}
         className={`rounded-full border px-2 py-0.5 text-[10px] font-mono ${
           effect.value >= 0
-            ? 'border-emerald-400/30 text-emerald-300 bg-emerald-400/10'
-            : 'border-red-400/30 text-red-300 bg-red-400/10'
+            ? 'border-emerald-300/60 text-emerald-200 bg-zinc-950/90 shadow-[0_0_10px_rgba(0,0,0,0.45)]'
+            : 'border-red-300/60 text-red-200 bg-zinc-950/90 shadow-[0_0_10px_rgba(0,0,0,0.45)]'
         }`}
       >
         {effect.value > 0 ? '+' : ''}{effect.value} {SECTOR_CONFIG[effect.sector].label[language]}
@@ -369,45 +617,75 @@ const ColonyCardView = ({
   onClick,
   isEquipped = false,
   actionLabel,
+  cardLevels = {},
 }: {
   card: ColonyCard;
   language: 'en' | 'pt';
   onClick?: () => void;
   isEquipped?: boolean;
   actionLabel?: string;
+  cardLevels?: ColonyCardLevels;
 }) => {
+  const cardClass = getCardClass(card);
+  const backgroundImage = getCardBackgroundImage(card.rarity);
   const content = (
     <>
-      <div className="absolute inset-0 opacity-0 transition-opacity group-hover/card:opacity-100 bg-[radial-gradient(circle_at_20%_0%,rgba(255,255,255,0.16),transparent_38%)]" />
-      <div className="relative z-10 flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2 mb-2">
-            <span className="rounded-full border border-white/10 bg-black/30 px-2 py-0.5 text-[9px] text-zinc-300 font-mono uppercase tracking-widest">
-              {RARITY_LABEL[card.rarity]?.[language] || card.rarity}
+      <img
+        src={backgroundImage}
+        alt=""
+        aria-hidden="true"
+        className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover/card:scale-[1.018]"
+      />
+      <div className="absolute inset-[8%] rounded-[8%] bg-gradient-to-b from-black/8 via-black/10 to-black/36" />
+      <div className="absolute inset-0 opacity-0 transition-opacity group-hover/card:opacity-100 bg-[radial-gradient(circle_at_50%_34%,rgba(255,255,255,0.16),transparent_36%)]" />
+      <div className="absolute inset-x-[11%] top-[18%] z-10">
+        <div className="min-w-0 space-y-2">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className={`rounded-full border px-2 py-0.5 text-[9px] font-mono uppercase tracking-widest ${
+              cardClass === 'battle'
+                ? 'border-red-300/45 bg-zinc-950/85 text-red-100'
+                : 'border-cyan-300/45 bg-zinc-950/85 text-cyan-100'
+            }`}>
+              {cardClass === 'battle' ? (language === 'pt' ? 'Batalha' : 'Battle') : (language === 'pt' ? 'Política' : 'Political')}
             </span>
-            <span className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[9px] text-zinc-400 font-mono uppercase tracking-widest">
+            <span className="rounded-full border border-white/20 bg-zinc-950/85 px-2 py-0.5 text-[9px] text-zinc-200 font-mono uppercase tracking-widest">
               {card.slot}
             </span>
           </div>
-          <h5 className="text-sm font-orbitron font-black text-white uppercase leading-tight">{card.name[language]}</h5>
-          <p className="mt-1 text-[11px] text-zinc-400 leading-snug">{card.lore[language]}</p>
+          <h5 className="line-clamp-3 rounded-lg bg-zinc-950/88 px-2 py-1.5 text-sm font-orbitron font-black text-white uppercase leading-tight shadow-[0_0_18px_rgba(0,0,0,0.45)]">{card.name[language]}</h5>
+          <p className="line-clamp-3 rounded-lg bg-zinc-950/86 px-2 py-1.5 text-[11px] text-zinc-100 leading-snug shadow-[0_0_14px_rgba(0,0,0,0.35)]">{card.lore[language]}</p>
         </div>
+      </div>
+      <div className="absolute right-[11%] top-[18%] z-10">
         {isEquipped ? (
           <BadgeCheck size={18} className="shrink-0 text-emerald-300" />
         ) : (
           <Sparkles size={18} className="shrink-0 text-white/40" />
         )}
       </div>
-      <div className="relative z-10">
-        <CardEffectPills card={card} language={language} />
+      <div className="absolute inset-x-[11%] bottom-[11%] z-10 space-y-2">
+        <div className="inline-flex rounded-full border border-white/20 bg-zinc-950/88 px-2 py-0.5 font-mono text-[9px] uppercase tracking-widest text-white">
+          LVL {getCardLevel(card.id, cardLevels)} / 10
+        </div>
+        {isBattleCard(card) ? (
+          <div className="mt-3 flex flex-wrap gap-1.5">
+            {getBattleEffects(card, cardLevels).slice(0, 4).map(effect => (
+              <span key={`${card.id}-${effect.stat}`} className="rounded-full border border-red-300/35 bg-zinc-950/90 px-2 py-0.5 font-mono text-[10px] text-red-100">
+                +{effect.value}% {BATTLE_STAT_CONFIG[effect.stat].label[language]}
+              </span>
+            ))}
+          </div>
+        ) : (
+          <CardEffectPills card={card} language={language} cardLevels={cardLevels} />
+        )}
         {actionLabel && (
-          <p className="mt-3 text-[10px] font-orbitron font-black uppercase tracking-[0.22em] text-white/70">{actionLabel}</p>
+          <p className="rounded-lg bg-zinc-950/90 px-2 py-1 text-[10px] font-orbitron font-black uppercase tracking-[0.22em] text-white">{actionLabel}</p>
         )}
       </div>
     </>
   );
 
-  const className = `group/card relative w-full overflow-hidden rounded-2xl border p-3 text-left transition-all ${getCardStyle(card.rarity, getCardClass(card))} ${
+  const className = `group/card relative mx-auto aspect-[2/3] w-full max-w-[290px] overflow-hidden rounded-[3.8%] border text-left transition-all ${getCardStyle(card.rarity, cardClass)} ${
     onClick ? 'hover:scale-[1.01] active:scale-[0.99]' : ''
   } ${isEquipped ? 'ring-1 ring-emerald-300/70' : ''}`;
 
@@ -471,10 +749,12 @@ const AcquisitionEventOverlay = ({
   card,
   language,
   onClose,
+  cardLevels = {},
 }: {
   card: ColonyCard | null;
   language: 'en' | 'pt';
   onClose: () => void;
+  cardLevels?: ColonyCardLevels;
 }) => {
   if (!card) return null;
 
@@ -487,6 +767,7 @@ const AcquisitionEventOverlay = ({
     rare: 'from-cyan-300/25 via-zinc-950 to-blue-950/70',
     epic: 'from-violet-300/25 via-zinc-950 to-fuchsia-950/70',
     legendary: 'from-amber-300/30 via-zinc-950 to-emerald-950/70',
+    mythic: 'from-rose-300/30 via-zinc-950 to-amber-950/70',
   };
 
   return (
@@ -517,7 +798,7 @@ const AcquisitionEventOverlay = ({
         </div>
 
         <div className="relative z-10 my-6">
-          <ColonyCardView card={card} language={language} />
+          <ColonyCardView card={card} language={language} cardLevels={cardLevels} />
         </div>
 
         {arcade && (
@@ -547,11 +828,17 @@ const CardDetailOverlay = ({
   language,
   onClose,
   onConfirm,
+  onNavigate,
+  navigationLabel,
+  cardLevels = {},
 }: {
-  selected: { card: ColonyCard; action: 'equip' | 'remove'; slot?: ColonyCardSlot; blockedBy?: string } | null;
+  selected: { card: ColonyCard; action: 'equip' | 'remove'; slot?: ColonyCardSlot | BattleCardSlot; blockedBy?: string } | null;
   language: 'en' | 'pt';
   onClose: () => void;
   onConfirm: () => void;
+  onNavigate?: (direction: -1 | 1) => void;
+  navigationLabel?: string;
+  cardLevels?: ColonyCardLevels;
 }) => {
   if (!selected) return null;
 
@@ -566,12 +853,12 @@ const CardDetailOverlay = ({
   const isBlocked = action === 'equip' && Boolean(selected.blockedBy);
 
   return (
-    <div className="fixed inset-0 z-[135] flex items-center justify-center bg-black/75 backdrop-blur-xl p-4">
+    <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/75 backdrop-blur-xl p-4">
       <motion.div
         initial={{ opacity: 0, scale: 0.9, y: 18 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.94, y: 10 }}
-        className={`relative w-full max-w-4xl overflow-hidden rounded-[2rem] border border-white/15 bg-zinc-950 shadow-[0_0_80px_rgba(34,211,238,0.12)] ${getCardStyle(card.rarity, getCardClass(card))}`}
+        className={`relative w-full max-w-5xl overflow-hidden rounded-[2rem] border border-white/15 bg-zinc-950 shadow-[0_0_80px_rgba(34,211,238,0.12)] ${getCardStyle(card.rarity, getCardClass(card))}`}
       >
         <div className="absolute inset-0 opacity-40 bg-[radial-gradient(circle_at_20%_0%,rgba(255,255,255,0.2),transparent_34%),radial-gradient(circle_at_80%_20%,rgba(45,212,191,0.18),transparent_30%)]" />
         <button
@@ -581,10 +868,33 @@ const CardDetailOverlay = ({
         >
           <X size={18} />
         </button>
+        {onNavigate && navigationLabel && (
+          <div className="absolute left-5 top-4 z-20 flex items-center gap-2 rounded-full border border-white/10 bg-black/65 p-1 shadow-[0_0_22px_rgba(0,0,0,0.35)]">
+            <button
+              type="button"
+              onClick={() => onNavigate(-1)}
+              className="rounded-full p-2 text-zinc-300 transition-all hover:bg-white/10 hover:text-white"
+              aria-label={language === 'pt' ? 'Carta anterior' : 'Previous card'}
+            >
+              <ChevronLeft size={18} />
+            </button>
+            <span className="min-w-12 text-center font-mono text-[10px] font-bold uppercase tracking-widest text-zinc-400">
+              {navigationLabel}
+            </span>
+            <button
+              type="button"
+              onClick={() => onNavigate(1)}
+              className="rounded-full p-2 text-zinc-300 transition-all hover:bg-white/10 hover:text-white"
+              aria-label={language === 'pt' ? 'Próxima carta' : 'Next card'}
+            >
+              <ChevronRight size={18} />
+            </button>
+          </div>
+        )}
 
         <div className="relative z-10 grid gap-5 p-5 md:grid-cols-[0.95fr_1.05fr] md:p-7">
-          <div className="flex items-center">
-            <ColonyCardView card={card} language={language} isEquipped={action === 'remove'} />
+          <div className="flex items-center pt-10 md:pt-9">
+            <ColonyCardView card={card} language={language} isEquipped={action === 'remove'} cardLevels={cardLevels} />
           </div>
 
           <div className="flex flex-col justify-between gap-5">
@@ -615,7 +925,17 @@ const CardDetailOverlay = ({
                 <p className="text-[10px] font-mono uppercase tracking-[0.3em] text-zinc-500">
                   {language === 'pt' ? 'Impacto direto' : 'Direct impact'}
                 </p>
-                <CardEffectPills card={card} language={language} />
+                {isBattleCard(card) ? (
+                  <div className="mt-3 flex flex-wrap gap-1.5">
+                    {getBattleEffects(card, cardLevels).map(effect => (
+                      <span key={`${card.id}-${effect.stat}`} className="rounded-full border border-red-300/35 bg-zinc-950/90 px-2 py-0.5 font-mono text-[10px] text-red-100">
+                        +{effect.value}% {BATTLE_STAT_CONFIG[effect.stat].label[language]}
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <CardEffectPills card={card} language={language} cardLevels={cardLevels} />
+                )}
               </div>
 
               {arcade && (
@@ -632,12 +952,12 @@ const CardDetailOverlay = ({
               {isBlocked && (
                 <div className="mt-3 rounded-2xl border border-amber-300/35 bg-amber-300/10 p-4">
                   <p className="text-[10px] font-mono uppercase tracking-[0.3em] text-amber-200">
-                    {language === 'pt' ? 'Slot ocupado' : 'Slot occupied'}
+                    {language === 'pt' ? 'Colônia cheia' : 'Colony full'}
                   </p>
                   <p className="mt-2 text-sm leading-relaxed text-zinc-200">
                     {language === 'pt'
-                      ? `Retire "${selected.blockedBy}" antes de equipar uma nova carta neste slot.`
-                      : `Remove "${selected.blockedBy}" before equipping a new card in this slot.`}
+                      ? 'Retire uma das três cartas políticas antes de equipar outra nesta colônia.'
+                      : 'Remove one of the three political cards before equipping another in this colony.'}
                   </p>
                 </div>
               )}
@@ -685,40 +1005,75 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
   unlockedAchievements = [],
   playSfx,
   onBuildingComplete,
-  onAllocate10k
+  onAllocate10k,
+  qc = 0,
+  onEarnQC,
+  onSpendQC,
+  formatValue = (value: number) => value.toLocaleString()
 }) => {
   const [activeColonyId, setActiveColonyId] = useState<string | null>(null);
   const [activeView, setActiveView] = useState<'colony' | 'searches'>('colony');
   const [isLoaded, setIsLoaded] = useState(false);
+  const [isSuppliesLoaded, setIsSuppliesLoaded] = useState(false);
+  const [isSearchLoaded, setIsSearchLoaded] = useState(false);
+  const [isThreatsLoaded, setIsThreatsLoaded] = useState(false);
   const [showConfirmAllocate, setShowConfirmAllocate] = useState(false);
   const [colonySupplies, setColonySupplies] = useState<ColonySupplies>(DEFAULT_COLONY_SUPPLIES);
   const [ownedCardIds, setOwnedCardIds] = useState<string[]>(DEFAULT_OWNED_COLONY_CARD_IDS);
   const [managementPanel, setManagementPanel] = useState<'status' | 'council' | 'claims'>('status');
   const [cardEvent, setCardEvent] = useState<ColonyCard | null>(null);
   const [cardFeedback, setCardFeedback] = useState<string | null>(null);
-  const [selectedCard, setSelectedCard] = useState<{ card: ColonyCard; action: 'equip' | 'remove'; slot?: ColonyCardSlot; blockedBy?: string } | null>(null);
+  const [activeSearches, setActiveSearches] = useState<ActiveColonySearches>({});
+  const [searchRemainingSeconds, setSearchRemainingSeconds] = useState<Record<string, number>>({});
+  const [searchThreatBonus, setSearchThreatBonus] = useState<SearchThreatBonus>(DEFAULT_SEARCH_THREAT_BONUS);
+  const [isSearchThreatBonusLoaded, setIsSearchThreatBonusLoaded] = useState(false);
+  const [searchUpgradeLevels, setSearchUpgradeLevels] = useState<SearchUpgradeLevels>(DEFAULT_SEARCH_UPGRADE_LEVELS);
+  const [isSearchUpgradeLevelsLoaded, setIsSearchUpgradeLevelsLoaded] = useState(false);
+  const [legendaryBattleCardPity, setLegendaryBattleCardPity] = useState(0);
+  const [isBattlePityLoaded, setIsBattlePityLoaded] = useState(false);
+  const [cardLevels, setCardLevels] = useState<ColonyCardLevels>({});
+  const [isCardLevelsLoaded, setIsCardLevelsLoaded] = useState(false);
+  const [horizonXp, setHorizonXp] = useState(0);
+  const [isHorizonXpLoaded, setIsHorizonXpLoaded] = useState(false);
+  const [defenseBattleLevel, setDefenseBattleLevel] = useState(1);
+  const [isDefenseBattleLevelLoaded, setIsDefenseBattleLevelLoaded] = useState(false);
+  const [lastSearchReport, setLastSearchReport] = useState<string | null>(null);
+  const [battleLoadout, setBattleLoadout] = useState<BattleLoadout>({});
+  const [selectedSpecialIds, setSelectedSpecialIds] = useState<DefenseSpecialId[]>(['apocalypse-laser', 'hellfire-barrage']);
+  const [pendingDefenseThreats, setPendingDefenseThreats] = useState<PendingDefenseThreat[]>([]);
+  const [activeDefenseThreat, setActiveDefenseThreat] = useState<PendingDefenseThreat | null>(null);
+  const [showDefenseHangar, setShowDefenseHangar] = useState(false);
+  const [battleCardCodexPage, setBattleCardCodexPage] = useState(0);
+  const [selectedCard, setSelectedCard] = useState<{ card: ColonyCard; action: 'equip' | 'remove'; slot?: ColonyCardSlot | BattleCardSlot; blockedBy?: string } | null>(null);
   const colonySuppliesRef = useRef<ColonySupplies>(DEFAULT_COLONY_SUPPLIES);
   const lastBuildingLevelsRef = useRef<Record<string, Record<string, number>>>({});
 
   const t = (en: string, pt: string) => language === 'pt' ? pt : en;
+  const effectiveActiveColonyId = activeColonyId ?? colonies[0]?.id ?? null;
+  const formatSearchTime = (seconds: number) => {
+    const safeSeconds = Math.max(0, Math.ceil(seconds));
+    const minutes = Math.floor(safeSeconds / 60);
+    const remainder = safeSeconds % 60;
+    return `${String(minutes).padStart(2, '0')}:${String(remainder).padStart(2, '0')}`;
+  };
 
   // Load state
   useEffect(() => {
-    if (colonies.length > 0 && !activeColonyId) {
-      setActiveColonyId(colonies[0].id);
-    }
-    setIsLoaded(true);
+    const timer = window.setTimeout(() => setIsLoaded(true), 0);
     onTabStatusChange(true);
-    return () => onTabStatusChange(false);
-  }, [colonies, activeColonyId, onTabStatusChange]);
+    return () => {
+      window.clearTimeout(timer);
+      onTabStatusChange(false);
+    };
+  }, [onTabStatusChange]);
 
   useEffect(() => {
     let mounted = true;
     GameStorage.load('colony_cards_data').then(saved => {
       if (!mounted) return;
-      if (Array.isArray(saved) && saved.length > 0) {
-        setOwnedCardIds(saved.filter(id => COLONY_CARD_CATALOG.some(card => card.id === id)));
-      }
+      const normalized = normalizeOwnedColonyCardIds(Array.isArray(saved) && saved.length > 0 ? saved : DEFAULT_OWNED_COLONY_CARD_IDS);
+      setOwnedCardIds(normalized);
+      GameStorage.save(normalized, 'colony_cards_data');
     });
     return () => { mounted = false; };
   }, []);
@@ -733,6 +1088,163 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
           ...saved,
         });
       }
+      setIsSuppliesLoaded(true);
+    });
+    return () => { mounted = false; };
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+    GameStorage.load('colony_active_search').then(saved => {
+      if (!mounted) return;
+      if (saved && typeof saved === 'object') {
+        const normalizeSearch = (search: any, fallbackId: ColonyExpeditionId, slotIndex: number): ActiveColonySearch | null => {
+          if (!search?.endsAt || !search?.rewards) return null;
+          const id = search.id === 'sea' ? 'sea' : fallbackId;
+          const safeSlot = Math.max(0, Math.min(MAX_PARALLEL_SEARCHES_PER_TYPE - 1, Number(search.slotIndex ?? slotIndex) || 0));
+          return {
+            ...search,
+            id,
+            searchKey: search.searchKey || getSearchSlotKey(id, safeSlot),
+            slotIndex: safeSlot,
+          } as ActiveColonySearch;
+        };
+
+        if (saved.endsAt && saved.rewards && (saved.id === 'land' || saved.id === 'sea')) {
+          const search = normalizeSearch(saved, saved.id, 0);
+          setActiveSearches(search ? { [search.searchKey]: search } : {});
+        } else {
+          const next: ActiveColonySearches = {};
+          (['land', 'sea'] as const).forEach(id => {
+            const legacySearch = normalizeSearch(saved[id], id, 0);
+            if (legacySearch) next[legacySearch.searchKey] = legacySearch;
+            for (let slotIndex = 0; slotIndex < MAX_PARALLEL_SEARCHES_PER_TYPE; slotIndex++) {
+              const key = getSearchSlotKey(id, slotIndex);
+              const search = normalizeSearch(saved[key], id, slotIndex);
+              if (search) next[key] = search;
+            }
+          });
+          setActiveSearches(next);
+        }
+      }
+      setIsSearchLoaded(true);
+    });
+    return () => { mounted = false; };
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+    GameStorage.load('colony_search_threat_bonus').then(saved => {
+      if (!mounted) return;
+      if (saved && typeof saved === 'object') {
+        setSearchThreatBonus({
+          land: Number.isFinite(saved.land) ? Math.max(0, saved.land) : 0,
+          sea: Number.isFinite(saved.sea) ? Math.max(0, saved.sea) : 0,
+        });
+      }
+      setIsSearchThreatBonusLoaded(true);
+    });
+    return () => { mounted = false; };
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+    GameStorage.load('colony_search_upgrade_levels').then(saved => {
+      if (!mounted) return;
+      if (saved && typeof saved === 'object') {
+        setSearchUpgradeLevels({
+          land: Math.max(0, Math.min(MAX_SEARCH_UPGRADE_LEVEL, Number(saved.land) || 0)),
+          sea: Math.max(0, Math.min(MAX_SEARCH_UPGRADE_LEVEL, Number(saved.sea) || 0)),
+        });
+      }
+      setIsSearchUpgradeLevelsLoaded(true);
+    });
+    return () => { mounted = false; };
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+    GameStorage.load('battle_card_legendary_pity').then(saved => {
+      if (!mounted) return;
+      if (Number.isFinite(saved)) setLegendaryBattleCardPity(Math.max(0, saved));
+      setIsBattlePityLoaded(true);
+    });
+    return () => { mounted = false; };
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+    GameStorage.load('colony_card_levels').then(saved => {
+      if (!mounted) return;
+      if (saved && typeof saved === 'object') setCardLevels(saved);
+      setIsCardLevelsLoaded(true);
+    });
+    return () => { mounted = false; };
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+    GameStorage.load('horizon_ship_xp').then(saved => {
+      if (!mounted) return;
+      if (Number.isFinite(saved)) setHorizonXp(Math.max(0, saved));
+      setIsHorizonXpLoaded(true);
+    });
+    return () => { mounted = false; };
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+    GameStorage.load('route4_defense_battle_level').then(saved => {
+      if (!mounted) return;
+      if (Number.isFinite(saved)) setDefenseBattleLevel(Math.max(1, Math.floor(saved)));
+      setIsDefenseBattleLevelLoaded(true);
+    });
+    return () => { mounted = false; };
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+    GameStorage.load('battle_cards_loadout').then(saved => {
+      if (!mounted) return;
+      if (saved && typeof saved === 'object') {
+        const next: BattleLoadout = {};
+        BATTLE_CARD_SLOTS.forEach(slot => {
+          const card = getCardById(saved[slot]);
+          if (card && isBattleCard(card)) next[slot] = card.id;
+        });
+        setBattleLoadout(next);
+      }
+    });
+    return () => { mounted = false; };
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+    GameStorage.load('defense_special_loadout').then(saved => {
+      if (!mounted) return;
+      if (Array.isArray(saved)) {
+        const valid = saved.filter(id => DEFENSE_SPECIALS.some(special => special.id === id)) as DefenseSpecialId[];
+        setSelectedSpecialIds(valid.slice(0, 2));
+      }
+    });
+    return () => { mounted = false; };
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+    GameStorage.load('colony_defense_threats').then(saved => {
+      if (!mounted) return;
+      if (Array.isArray(saved)) {
+        setPendingDefenseThreats(saved
+          .filter(threat => threat?.status === 'pending')
+          .map((threat, index) => ({
+            ...threat,
+            id: `${threat.id || `threat-${threat.sourceSearchId || 'unknown'}-${threat.detectedAt || Date.now()}`}-${index}`,
+          }))
+          .slice(0, MAX_PENDING_DEFENSE_THREATS)
+        );
+      }
+      setIsThreatsLoaded(true);
     });
     return () => { mounted = false; };
   }, []);
@@ -743,19 +1255,160 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
   }, [ownedCardIds, isLoaded]);
 
   useEffect(() => {
-    if (!isLoaded) return;
+    if (!isLoaded || !isSuppliesLoaded) return;
     GameStorage.save(colonySupplies, 'colony_supplies_data');
-  }, [colonySupplies, isLoaded]);
+  }, [colonySupplies, isLoaded, isSuppliesLoaded]);
+
+  useEffect(() => {
+    if (!isLoaded || !isSearchLoaded) return;
+    GameStorage.save(activeSearches, 'colony_active_search');
+  }, [activeSearches, isLoaded, isSearchLoaded]);
+
+  useEffect(() => {
+    if (!isLoaded || !isSearchThreatBonusLoaded) return;
+    GameStorage.save(searchThreatBonus, 'colony_search_threat_bonus');
+  }, [searchThreatBonus, isLoaded, isSearchThreatBonusLoaded]);
+
+  useEffect(() => {
+    if (!isLoaded || !isSearchUpgradeLevelsLoaded) return;
+    GameStorage.save(searchUpgradeLevels, 'colony_search_upgrade_levels');
+  }, [searchUpgradeLevels, isLoaded, isSearchUpgradeLevelsLoaded]);
+
+  useEffect(() => {
+    if (!isLoaded || !isBattlePityLoaded) return;
+    GameStorage.save(legendaryBattleCardPity, 'battle_card_legendary_pity');
+  }, [legendaryBattleCardPity, isLoaded, isBattlePityLoaded]);
+
+  useEffect(() => {
+    if (!isLoaded || !isCardLevelsLoaded) return;
+    GameStorage.save(cardLevels, 'colony_card_levels');
+  }, [cardLevels, isLoaded, isCardLevelsLoaded]);
+
+  useEffect(() => {
+    if (!isLoaded || !isHorizonXpLoaded) return;
+    GameStorage.save(horizonXp, 'horizon_ship_xp');
+  }, [horizonXp, isLoaded, isHorizonXpLoaded]);
+
+  useEffect(() => {
+    if (!isLoaded || !isDefenseBattleLevelLoaded) return;
+    GameStorage.save(Math.max(1, Math.floor(defenseBattleLevel)), 'route4_defense_battle_level');
+  }, [defenseBattleLevel, isLoaded, isDefenseBattleLevelLoaded]);
+
+  useEffect(() => {
+    if (!isLoaded) return;
+    GameStorage.save(battleLoadout, 'battle_cards_loadout');
+  }, [battleLoadout, isLoaded]);
+
+  useEffect(() => {
+    if (!isLoaded) return;
+    GameStorage.save(selectedSpecialIds, 'defense_special_loadout');
+  }, [selectedSpecialIds, isLoaded]);
+
+  useEffect(() => {
+    if (!isLoaded || !isThreatsLoaded) return;
+    GameStorage.save(pendingDefenseThreats.slice(0, MAX_PENDING_DEFENSE_THREATS), 'colony_defense_threats');
+  }, [pendingDefenseThreats, isLoaded, isThreatsLoaded]);
 
   useEffect(() => {
     colonySuppliesRef.current = colonySupplies;
   }, [colonySupplies]);
 
   useEffect(() => {
+    if (!isLoaded) return;
+    setColonies(prev => {
+      let changed = false;
+      const nextColonies = prev.map(colony => {
+        const sanitized = sanitizePoliticalEquippedCards(colony.equippedCards || {});
+        const current = colony.equippedCards || {};
+        const currentKeys = Object.keys(current);
+        const sanitizedKeys = Object.keys(sanitized);
+        const sameLength = currentKeys.length === sanitizedKeys.length;
+        const sameValues = sameLength && currentKeys.every(slot => current[slot as ColonyCardSlot] === sanitized[slot as ColonyCardSlot]);
+        if (sameValues) return colony;
+        changed = true;
+        return { ...colony, equippedCards: sanitized };
+      });
+      return changed ? nextColonies : prev;
+    });
+  }, [isLoaded, setColonies]);
+
+  const completeSearch = useCallback((search: ActiveColonySearch) => {
+    const nextSupplies = applySupplyDelta(colonySuppliesRef.current, search.rewards);
+    const attacked = Math.random() * 100 < search.threatChance;
+    const rewardText = (Object.entries(search.rewards) as Array<[ColonySupplyId, number]>)
+      .map(([key, value]) => `+${value} ${SUPPLY_CONFIG[key].label[language]}`)
+      .join(' · ');
+
+    colonySuppliesRef.current = nextSupplies;
+    setColonySupplies(nextSupplies);
+    setActiveSearches(prev => {
+      const next = { ...prev };
+      delete next[search.searchKey];
+      return next;
+    });
+    setSearchRemainingSeconds(prev => ({ ...prev, [search.searchKey]: 0 }));
+    setSearchThreatBonus(prev => ({
+      ...prev,
+      [search.id]: attacked ? 0 : Math.min(100, (prev[search.id] || 0) + SEARCH_THREAT_BONUS_STEP),
+    }));
+    if (attacked) {
+      const detectedAt = Date.now();
+      const threat: PendingDefenseThreat = {
+        id: `threat-${search.searchKey}-${detectedAt}-${Math.random().toString(36).slice(2, 8)}`,
+        sourceSearchId: search.id,
+        sourceTitle: search.title,
+        threatChance: search.threatChance,
+        detectedAt,
+        status: 'pending',
+      };
+      setPendingDefenseThreats(prev => [
+        threat,
+        ...prev,
+      ].slice(0, MAX_PENDING_DEFENSE_THREATS));
+    }
+    setLastSearchReport(attacked
+      ? t(`${search.title} returned with hostile contact registered. ${rewardText}`, `${search.title} retornou com contato hostil registrado. ${rewardText}`)
+      : t(`${search.title} completed. ${rewardText}`, `${search.title} concluída. ${rewardText}`)
+    );
+    setCardFeedback(attacked
+      ? t('Search returned under attack warning', 'Busca retornou com alerta de ataque')
+      : t('Search completed', 'Busca concluída')
+    );
+  }, [language]);
+
+  useEffect(() => {
+    const activeList = Object.values(activeSearches).filter(Boolean) as ActiveColonySearch[];
+    if (activeList.length === 0) return;
+
+    const updateSearchClock = () => {
+      const nextRemaining: Record<string, number> = {};
+      activeList.forEach(search => {
+        const remaining = Math.max(0, Math.ceil((search.endsAt - Date.now()) / 1000));
+        nextRemaining[search.searchKey] = remaining;
+        if (remaining <= 0) completeSearch(search);
+      });
+      setSearchRemainingSeconds(prev => ({ ...prev, ...nextRemaining }));
+    };
+
+    updateSearchClock();
+    const interval = window.setInterval(updateSearchClock, 1000);
+    return () => window.clearInterval(interval);
+  }, [activeSearches, completeSearch]);
+
+  useEffect(() => {
     if (!cardFeedback) return;
     const timer = window.setTimeout(() => setCardFeedback(null), 2200);
     return () => window.clearTimeout(timer);
   }, [cardFeedback]);
+
+  useEffect(() => {
+    const handleLevelsUpdated = (event: Event) => {
+      const detail = (event as CustomEvent<ColonyCardLevels>).detail;
+      if (detail && typeof detail === 'object') setCardLevels(detail);
+    };
+    window.addEventListener('qch:colony-card-levels-updated', handleLevelsUpdated);
+    return () => window.removeEventListener('qch:colony-card-levels-updated', handleLevelsUpdated);
+  }, []);
 
   // Remove local growth logic to centralize it in GameDashboard
   // (Removed calculateGrowth and its useEffect)
@@ -794,14 +1447,66 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
   }, [colonies, onAddYear, onBuildingComplete, isLoaded]);
 
   const activeColony = useMemo(() => 
-    colonies.find(c => c.id === activeColonyId) || null
-  , [colonies, activeColonyId]);
+    colonies.find(c => c.id === effectiveActiveColonyId) || null
+  , [colonies, effectiveActiveColonyId]);
 
   const ownedCards = useMemo(() =>
     ownedCardIds
       .map(id => getCardById(id))
       .filter(Boolean) as ColonyCard[]
   , [ownedCardIds]);
+
+  const ownedBattleCards = useMemo(() =>
+    ownedCards.filter(card => isBattleCard(card))
+  , [ownedCards]);
+
+  const battleLoadoutCards = useMemo(() =>
+    BATTLE_CARD_SLOTS
+      .map(slot => getCardById(battleLoadout[slot]))
+      .filter(Boolean)
+      .filter(card => card && isBattleCard(card)) as ColonyCard[]
+  , [battleLoadout]);
+
+  const horizonProgress = useMemo(() => getHorizonLevelFromXp(horizonXp), [horizonXp]);
+  const battleStatTotals = useMemo(() => calculateBattleStatTotals(battleLoadoutCards, cardLevels), [battleLoadoutCards, cardLevels]);
+  const battleShipStats = useMemo(() => calculateBattleShipStats(battleLoadoutCards, BASE_BATTLE_SHIP_STATS, cardLevels, horizonProgress.level), [battleLoadoutCards, cardLevels, horizonProgress.level]);
+  const trinityShotEnabled = useMemo(() => (
+    battleLoadoutCards.some(card => card.id === TRINITY_REACTOR_CARD_ID)
+  ), [battleLoadoutCards]);
+  const latestActiveSearchesByType = useMemo(() => {
+    const activeList = Object.values(activeSearches).filter(Boolean) as ActiveColonySearch[];
+    return (['land', 'sea'] as const)
+      .map(id => activeList
+        .filter(search => search.id === id)
+        .sort((a, b) => b.startedAt - a.startedAt)[0]
+      )
+      .filter(Boolean) as ActiveColonySearch[];
+  }, [activeSearches]);
+  const activeBattleStatTotals = useMemo(() => (
+    Object.entries(battleStatTotals).filter(([, value]) => value !== 0)
+  ), [battleStatTotals]);
+  const battleCardCodexPageCount = Math.max(1, Math.ceil(ownedBattleCards.length / BATTLE_CARD_CODEX_PAGE_SIZE));
+  const activeBattleCardCodexPage = Math.min(battleCardCodexPage, battleCardCodexPageCount - 1);
+  const visibleBattleCodexCards = useMemo(() => (
+    ownedBattleCards.slice(
+      activeBattleCardCodexPage * BATTLE_CARD_CODEX_PAGE_SIZE,
+      activeBattleCardCodexPage * BATTLE_CARD_CODEX_PAGE_SIZE + BATTLE_CARD_CODEX_PAGE_SIZE
+    )
+  ), [ownedBattleCards, activeBattleCardCodexPage]);
+  const selectedCardNavigationList = selectedCard
+    ? (isBattleCard(selectedCard.card) ? ownedBattleCards : ownedCards.filter(isPoliticalCard))
+    : [];
+  const selectedCardNavigationIndex = selectedCard
+    ? selectedCardNavigationList.findIndex(card => card.id === selectedCard.card.id)
+    : -1;
+  const selectedCardNavigationLabel = selectedCardNavigationList.length > 1 && selectedCardNavigationIndex >= 0
+    ? `${selectedCardNavigationIndex + 1}/${selectedCardNavigationList.length}`
+    : undefined;
+
+  useEffect(() => {
+    if (battleCardCodexPage < battleCardCodexPageCount) return;
+    setBattleCardCodexPage(Math.max(0, battleCardCodexPageCount - 1));
+  }, [battleCardCodexPage, battleCardCodexPageCount]);
 
   const equippedCards = useMemo(() => {
     if (!activeColony) return [];
@@ -815,20 +1520,20 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
     const next = { ...DEFAULT_COLONY_SECTORS, ...(activeColony.sectors || {}) };
     equippedCards.forEach(card => {
       if (!isPoliticalCard(card)) return;
-      getPoliticalEffects(card).forEach(effect => {
+      getPoliticalEffects(card, cardLevels).forEach(effect => {
         next[effect.sector] = Math.min(100, Math.max(0, next[effect.sector] + effect.value));
       });
     });
     return next;
-  }, [activeColony, equippedCards]);
+  }, [activeColony, equippedCards, cardLevels]);
 
   // Construction Progress Logic
   useEffect(() => {
-    if (!isLoaded || !activeColonyId) return;
+    if (!isLoaded || !effectiveActiveColonyId) return;
 
     const interval = setInterval(() => {
       setColonies(prev => {
-        const activeIdx = prev.findIndex(c => c.id === activeColonyId);
+        const activeIdx = prev.findIndex(c => c.id === effectiveActiveColonyId);
         if (activeIdx === -1) return prev;
 
         const colony = prev[activeIdx];
@@ -897,20 +1602,21 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [isLoaded, activeColonyId]);
+  }, [isLoaded, effectiveActiveColonyId]);
 
   // Actions
   const equipCard = (card: ColonyCard): boolean => {
     if (!isPoliticalCard(card)) return false;
-    if (!activeColonyId) return false;
-    const occupiedCardId = activeColony?.equippedCards?.[card.slot];
-    if (occupiedCardId && occupiedCardId !== card.id) {
-      setCardFeedback(t('Remove the equipped card first', 'Retire a carta equipada primeiro'));
+    if (!effectiveActiveColonyId) return false;
+    const currentSlot = POLITICAL_CARD_SLOTS.find(slot => activeColony?.equippedCards?.[slot] === card.id);
+    const targetSlot = currentSlot || getFreePoliticalSlot(activeColony?.equippedCards);
+    if (!targetSlot) {
+      setCardFeedback(t('This colony already has three political cards equipped', 'Esta colônia já possui três cartas políticas equipadas'));
       return false;
     }
 
     setColonies(prev => prev.map(colony => {
-      if (colony.id !== activeColonyId) return colony;
+      if (colony.id !== effectiveActiveColonyId) return colony;
 
       const equippedCards = { ...(colony.equippedCards || {}) };
       Object.keys(equippedCards).forEach(slot => {
@@ -918,7 +1624,7 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
           delete equippedCards[slot as ColonyCardSlot];
         }
       });
-      equippedCards[card.slot] = card.id;
+      equippedCards[targetSlot] = card.id;
 
       return { ...colony, equippedCards };
     }));
@@ -928,9 +1634,9 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
   };
 
   const unequipCard = (slot: ColonyCardSlot) => {
-    if (!activeColonyId) return;
+    if (!effectiveActiveColonyId) return;
     setColonies(prev => prev.map(colony => {
-      if (colony.id !== activeColonyId) return colony;
+      if (colony.id !== effectiveActiveColonyId) return colony;
       const equippedCards = { ...(colony.equippedCards || {}) };
       delete equippedCards[slot];
       return { ...colony, equippedCards };
@@ -941,95 +1647,66 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
 
   const openCardDetails = (card: ColonyCard, action: 'equip' | 'remove', slot?: ColonyCardSlot) => {
     if (!isPoliticalCard(card)) return;
-    const occupiedCardId = action === 'equip' ? activeColony?.equippedCards?.[card.slot] : undefined;
-    const blockedBy = occupiedCardId && occupiedCardId !== card.id
-      ? getCardById(occupiedCardId)?.name[language]
+    const currentSlot = POLITICAL_CARD_SLOTS.find(slotId => activeColony?.equippedCards?.[slotId] === card.id);
+    const blockedBy = action === 'equip' && !currentSlot && !getFreePoliticalSlot(activeColony?.equippedCards)
+      ? t('three active political cards', 'três cartas políticas ativas')
       : undefined;
 
     setSelectedCard({ card, action, slot, blockedBy });
     playSfx?.('view_card');
   };
 
+  const openBattleCardDetails = (card: ColonyCard, action: 'equip' | 'remove' = 'equip', slot?: BattleCardSlot) => {
+    if (!isBattleCard(card)) return;
+    setSelectedCard({ card, action, slot });
+    playSfx?.('view_card');
+  };
+
+  const navigateSelectedCard = (direction: -1 | 1) => {
+    if (!selectedCard) return;
+    const currentList = isBattleCard(selectedCard.card) ? ownedBattleCards : ownedCards.filter(isPoliticalCard);
+    if (currentList.length <= 1) return;
+    const currentIndex = currentList.findIndex(card => card.id === selectedCard.card.id);
+    if (currentIndex < 0) return;
+    const nextCard = currentList[(currentIndex + direction + currentList.length) % currentList.length];
+    if (isBattleCard(nextCard)) {
+      const slot = BATTLE_CARD_SLOTS.find(slotId => battleLoadout[slotId] === nextCard.id);
+      setSelectedCard({ card: nextCard, action: slot ? 'remove' : 'equip', slot });
+    } else {
+      const slot = POLITICAL_CARD_SLOTS.find(slotId => activeColony?.equippedCards?.[slotId] === nextCard.id);
+      const blockedBy = !slot && !getFreePoliticalSlot(activeColony?.equippedCards)
+        ? t('three active political cards', 'três cartas políticas ativas')
+        : undefined;
+      setSelectedCard({ card: nextCard, action: slot ? 'remove' : 'equip', slot, blockedBy });
+    }
+    playSfx?.('view_card');
+  };
+
   const confirmSelectedCardAction = () => {
     if (!selectedCard) return;
     if (selectedCard.action === 'remove' && selectedCard.slot) {
-      unequipCard(selectedCard.slot);
-      setSelectedCard(null);
+      if (isBattleCard(selectedCard.card)) {
+        unequipBattleCard(selectedCard.slot as BattleCardSlot);
+      } else {
+        unequipCard(selectedCard.slot as ColonyCardSlot);
+      }
     } else {
-      const equipped = equipCard(selectedCard.card);
-      if (equipped) setSelectedCard(null);
+      if (isBattleCard(selectedCard.card)) {
+        equipBattleCard(selectedCard.card);
+      } else {
+        equipCard(selectedCard.card);
+      }
     }
   };
 
   const getCardUnlockRequirement = (card: ColonyCard) => {
-    const solarStats = historyStats.Solar || {};
-    const interstellarStats = historyStats.Interstellar || {};
-    const voidStats = historyStats.Void || {};
-    const totalStats = Object.values(historyStats).reduce((acc: Record<string, number>, stats: any) => {
-      acc.qcTotalAcquired += Number(stats?.qcTotalAcquired) || 0;
-      acc.perfectDeliveries += Number(stats?.perfectDeliveries) || 0;
-      acc.missionsCompleted += Number(stats?.missionsCompleted) || 0;
-      acc.battlesWon += Number(stats?.battlesWon) || 0;
-      return acc;
-    }, { qcTotalAcquired: 0, perfectDeliveries: 0, missionsCompleted: 0, battlesWon: 0 });
-
-    switch (card.id) {
-      case 'legacy-solar-quartermaster':
-        return {
-          met: (solarStats.manualDeliveries || 0) >= 50 || unlockedAchievements.includes('first_delivery'),
-          label: t('Chapter 1: 50 manual deliveries', 'Capítulo 1: 50 entregas manuais'),
-        };
-      case 'legacy-interstellar-envoy':
-        return {
-          met: (interstellarStats.missionsCompleted || 0) >= 25 || totalStats.missionsCompleted >= 75,
-          label: t('Chapter 2: 25 missions completed', 'Capítulo 2: 25 missões concluídas'),
-        };
-      case 'legacy-void-veteran':
-        return {
-          met: (voidStats.battlesWon || 0) >= 20 || totalStats.battlesWon >= 80,
-          label: t('Chapter 3: 20 battles won', 'Capítulo 3: 20 batalhas vencidas'),
-        };
-      case 'legacy-perfect-route-planner':
-        return {
-          met: totalStats.perfectDeliveries >= 30,
-          label: t('Campaign: 30 perfect deliveries', 'Campanha: 30 entregas perfeitas'),
-        };
-      case 'legacy-civic-archive':
-        return {
-          met: totalStats.qcTotalAcquired >= 1000000000,
-          label: t('Campaign: 1B total QC acquired', 'Campanha: 1B de QC total adquirido'),
-        };
-      case 'arcade-ruptura-estelar':
-        return {
-          met: effectiveSectors.security >= 48,
-          label: t('Security 48+', 'Segurança 48+'),
-        };
-      case 'arcade-danger-zoom-zones':
-        return {
-          met: effectiveSectors.technology >= 55,
-          label: t('Technology 55+', 'Tecnologia 55+'),
-        };
-      case 'arcade-grid-collapse':
-        return {
-          met: effectiveSectors.technology >= 60 && effectiveSectors.economy >= 45,
-          label: t('Technology 60+ and Economy 45+', 'Tecnologia 60+ e Economia 45+'),
-        };
-      case 'arcade-robot-runner':
-        return {
-          met: effectiveSectors.happiness >= 60 && effectiveSectors.technology >= 60,
-          label: t('Happiness 60+ and Technology 60+', 'Felicidade 60+ e Tecnologia 60+'),
-        };
-      case 'arcade-neo-catcher':
-        return {
-          met: effectiveSectors.culture >= 60 && effectiveSectors.happiness >= 65,
-          label: t('Culture 60+ and Happiness 65+', 'Cultura 60+ e Felicidade 65+'),
-        };
-      default:
-        return {
-          met: false,
-          label: t('New Earth protocol', 'Protocolo Nova Terra'),
-        };
-    }
+    return {
+      met: false,
+      label: t(
+        'Chapter 4 drops: defense battles or arcade score rewards',
+        'Drops do Capítulo 4: batalhas de defesa ou prêmios de pontuação dos fliperamas'
+      ),
+    };
   };
 
   const claimCard = (cardId: string) => {
@@ -1071,17 +1748,17 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
     };
 
     setColonies(prev => prev.map(c => 
-      c.id === activeColonyId 
+      c.id === effectiveActiveColonyId 
         ? { ...c, constructions: [...c.constructions, newConstruction] }
         : c
     ));
   };
 
   const updateConstructors = (id: string, delta: number) => {
-    if (!activeColonyId) return;
+    if (!effectiveActiveColonyId) return;
     
     // 1. Encontrar a colônia e construção no estado atual (prop) para cálculos prévios
-    const colony = colonies.find(c => c.id === activeColonyId);
+    const colony = colonies.find(c => c.id === effectiveActiveColonyId);
     if (!colony) return;
     
     const construction = colony.constructions.find(con => con.id === id);
@@ -1123,7 +1800,7 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
 
     // 2. Agora atualizar as colônias apenas com o delta já validado
     setColonies(prev => {
-      const activeIdx = prev.findIndex(c => c.id === activeColonyId);
+      const activeIdx = prev.findIndex(c => c.id === effectiveActiveColonyId);
       if (activeIdx === -1) return prev;
 
       const targetColony = prev[activeIdx];
@@ -1138,7 +1815,7 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
   };
 
   const allocatePopulation = (requestedAmount: number) => {
-    if (!activeColonyId || !activeColony) return;
+    if (!effectiveActiveColonyId || !activeColony) return;
     if (!activeColony.isHabitable) return;
 
     if (earthPopulation <= 0) return;
@@ -1152,7 +1829,7 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
 
     // Update Colony population
     setColonies(prevColonies => {
-      const activeIdx = prevColonies.findIndex(c => c.id === activeColonyId);
+      const activeIdx = prevColonies.findIndex(c => c.id === effectiveActiveColonyId);
       if (activeIdx === -1) return prevColonies;
       
       const colony = prevColonies[activeIdx];
@@ -1166,54 +1843,216 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
     });
   };
 
+  const resolveDefenseVictory = useCallback((summary?: BattleResultSummary) => {
+    if (!activeDefenseThreat) return;
+    const reward = rollBattleCardReward(ownedCardIds, Math.random, legendaryBattleCardPity);
+    const kills = summary?.kills || 18;
+    const battleXp = summary?.xp || (kills * 45 + 450);
+    const battleQc = summary?.qc || (kills * 4200 + 35000);
+    const supplyReward: Partial<ColonySupplies> = {
+      materials: 10 + kills,
+      tech: 4 + Math.floor(kills / 3),
+      defense: 3 + Math.floor(kills / 4),
+    };
+    const nextSupplies = applySupplyDelta(colonySuppliesRef.current, supplyReward);
+    colonySuppliesRef.current = nextSupplies;
+    setColonySupplies(nextSupplies);
+    setHorizonXp(prev => prev + battleXp);
+    setDefenseBattleLevel(prev => Math.max(1, Math.floor(prev)) + 1);
+    onEarnQC?.(battleQc);
+    setPendingDefenseThreats(prev => prev.filter(threat => threat.id !== activeDefenseThreat.id));
+    setActiveDefenseThreat(null);
+
+    if (reward) {
+      const nextOwned = normalizeOwnedColonyCardIds([...ownedCardIds, reward.id]);
+      setOwnedCardIds(nextOwned);
+      GameStorage.save(nextOwned, 'colony_cards_data');
+      setLegendaryBattleCardPity(reward.rarity === 'legendary' ? 0 : legendaryBattleCardPity + LEGENDARY_BATTLE_CARD_PITY_STEP);
+      setCardEvent(reward);
+      playSfx?.('claim_card');
+      setCardFeedback(t(
+        `Battle won: +${battleXp} XP, +${formatValue(battleQc)} QC and card acquired`,
+        `Batalha vencida: +${battleXp} XP, +${formatValue(battleQc)} QC e carta adquirida`
+      ));
+      return;
+    }
+
+    setLegendaryBattleCardPity(prev => prev + LEGENDARY_BATTLE_CARD_PITY_STEP);
+    setCardFeedback(t(
+      `Threat neutralized: +${battleXp} XP and +${formatValue(battleQc)} QC`,
+      `Ameaça neutralizada: +${battleXp} XP e +${formatValue(battleQc)} QC`
+    ));
+  }, [activeDefenseThreat, ownedCardIds, playSfx, legendaryBattleCardPity, onEarnQC, formatValue]);
+
+  const resolveDefenseDefeat = useCallback(() => {
+    setActiveDefenseThreat(null);
+    setCardFeedback(t('Defense failed. Threat remains pending.', 'Defesa falhou. A ameaça permanece pendente.'));
+  }, []);
+
+  const handleRunSearch = useCallback((option: ColonySearchOption, slotIndex: number) => {
+    const searchKey = getSearchSlotKey(option.id, slotIndex);
+    if (activeSearches[searchKey]) {
+      setCardFeedback(t('This search slot is already active', 'Este slot de busca já está ativo'));
+      return;
+    }
+
+    const now = Date.now();
+    setLastSearchReport(null);
+    playRoute4SearchSfx(option.id, slotIndex);
+    setActiveSearches(prev => ({
+      ...prev,
+      [searchKey]: {
+        id: option.id,
+        searchKey,
+        slotIndex,
+        title: option.title,
+        subtitle: option.subtitle,
+        rewards: option.rewards,
+        threatChance: option.threatChance,
+        startedAt: now,
+        endsAt: now + option.durationSeconds * 1000,
+      }
+    }));
+    setSearchRemainingSeconds(prev => ({ ...prev, [searchKey]: option.durationSeconds }));
+    setCardFeedback(t('Search team deployed', 'Equipe de busca enviada'));
+  }, [activeSearches, t]);
+
+  const upgradeSearch = useCallback((id: ColonyExpeditionId) => {
+    const currentLevel = searchUpgradeLevels[id] || 0;
+    if (currentLevel >= MAX_SEARCH_UPGRADE_LEVEL) {
+      setCardFeedback(t('Search already at maximum level', 'Busca já está no nível máximo'));
+      return;
+    }
+    const cost = getSearchUpgradeCost(currentLevel);
+    if (qc < cost) {
+      setCardFeedback(t('Not enough QC for this search upgrade', 'QC insuficiente para esta melhoria de busca'));
+      return;
+    }
+
+    onSpendQC?.(cost);
+    setSearchUpgradeLevels(prev => ({
+      ...prev,
+      [id]: Math.min(MAX_SEARCH_UPGRADE_LEVEL, (prev[id] || 0) + 1),
+    }));
+    playSfx?.('equip_card');
+    setCardFeedback(t('Search protocol upgraded', 'Protocolo de busca melhorado'));
+  }, [searchUpgradeLevels, qc, onSpendQC, playSfx, t]);
+
   if (!activeColony) return null;
 
   const totalAssignedConstructors = activeColony.constructions.reduce((sum, c) => sum + c.assignedConstructors, 0);
   const availableConstructors = activeColony.constructors - totalAssignedConstructors;
-  const searchOptions = [
+  const landSearchLevel = searchUpgradeLevels.land || 0;
+  const seaSearchLevel = searchUpgradeLevels.sea || 0;
+  const landSearchRewards = applySearchUpgradeRewards({ materials: 18, food: 12, biomass: 6, meds: 3 }, landSearchLevel);
+  const seaSearchRewards = applySearchUpgradeRewards({ biomass: 14, food: 10, meds: 7, materials: 6, tech: 2 }, seaSearchLevel);
+  const searchOptions: ColonySearchOption[] = [
     {
       id: 'land',
       title: t('Land Search', 'Busca por Terra'),
       subtitle: t('Ground Vehicles', 'Veículos Terrestres'),
       description: t(
-        'Expeditions across ruined roads, supply depots, and old transit corridors.',
-        'Expedições por estradas destruídas, depósitos de suprimentos e antigos corredores de transporte.'
+        'Ground convoys cross ruined roads, supply depots, old farms, and transit corridors.',
+        'Comboios terrestres cruzam estradas destruídas, depósitos, antigas fazendas e corredores de transporte.'
       ),
       tone: 'text-emerald-300 border-emerald-400/40 bg-emerald-400/10',
       icon: Bot,
-      rewards: { materials: 18, biomass: 8, tech: 2 } as Partial<ColonySupplies>,
+      durationSeconds: 90,
+      threatChance: Math.min(100, 18 + searchThreatBonus.land + landSearchLevel * SEARCH_UPGRADE_THREAT_BONUS),
+      rewards: landSearchRewards,
+      upgradeLevel: landSearchLevel,
+      upgradeCost: getSearchUpgradeCost(landSearchLevel),
+      resourceBonusPercent: landSearchLevel * SEARCH_UPGRADE_RESOURCE_BONUS,
+      upgradeThreatBonus: landSearchLevel * SEARCH_UPGRADE_THREAT_BONUS,
     },
     {
       id: 'sea',
       title: t('Sea Search', 'Busca por Mar'),
       subtitle: t('Aquatic Vehicles', 'Veículos Aquáticos'),
       description: t(
-        'Recovered vessels scan coastlines and submerged cargo zones for useful supplies.',
-        'Embarcações recuperadas vasculham costas e zonas de carga submersas em busca de suprimentos.'
+        'Recovered vessels scan coastlines, submerged cargo zones, algae farms, and medical wreckage.',
+        'Embarcações recuperadas vasculham costas, cargas submersas, fazendas de algas e destroços médicos.'
       ),
       tone: 'text-cyan-300 border-cyan-400/40 bg-cyan-400/10',
       icon: Activity,
-      rewards: { biomass: 14, materials: 8, tech: 4 } as Partial<ColonySupplies>,
-    },
-    {
-      id: 'air',
-      title: t('Air Defense', 'Defesa Aérea'),
-      subtitle: t('Monster Interception', 'Intercepção de Monstros'),
-      description: t(
-        'Aerial patrols recover defense cores while keeping the sky dangerous.',
-        'Patrulhas aéreas recuperam núcleos de defesa enquanto mantêm o céu perigoso.'
-      ),
-      tone: 'text-red-300 border-red-400/40 bg-red-400/10',
-      icon: Shield,
-      rewards: { defense: 10, tech: 5, materials: 4 } as Partial<ColonySupplies>,
+      durationSeconds: 120,
+      threatChance: Math.min(100, 24 + searchThreatBonus.sea + seaSearchLevel * SEARCH_UPGRADE_THREAT_BONUS),
+      rewards: seaSearchRewards,
+      upgradeLevel: seaSearchLevel,
+      upgradeCost: getSearchUpgradeCost(seaSearchLevel),
+      resourceBonusPercent: seaSearchLevel * SEARCH_UPGRADE_RESOURCE_BONUS,
+      upgradeThreatBonus: seaSearchLevel * SEARCH_UPGRADE_THREAT_BONUS,
     },
   ];
 
-  const runSearch = (rewards: Partial<ColonySupplies>, title: string) => {
-    const nextSupplies = applySupplyDelta(colonySuppliesRef.current, rewards);
-    colonySuppliesRef.current = nextSupplies;
-    setColonySupplies(nextSupplies);
-    setCardFeedback(t(`${title} completed`, `${title} concluída`));
+  const equipBattleCard = (card: ColonyCard) => {
+    if (!isBattleCard(card)) return;
+    const currentSlot = BATTLE_CARD_SLOTS.find(slot => battleLoadout[slot] === card.id);
+    const targetSlot = currentSlot || BATTLE_CARD_SLOTS.find(slot => !battleLoadout[slot]);
+    if (!targetSlot) {
+      setCardFeedback(t('Remove the equipped battle card first', 'Retire uma carta de batalha equipada primeiro'));
+      return;
+    }
+    const equippedCardsForRule = BATTLE_CARD_SLOTS
+      .map(slot => getCardById(battleLoadout[slot]))
+      .filter(Boolean)
+      .filter(equippedCard => equippedCard?.id !== card.id)
+      .filter(equippedCard => equippedCard && isBattleCard(equippedCard)) as ColonyCard[];
+    const elementRule = canEquipBattleCardWithElementRule(card, equippedCardsForRule);
+    if (!elementRule.allowed) {
+      setCardFeedback(t(
+        'Only one elemental battle path can be active at a time',
+        'Apenas um caminho elemental de batalha pode ficar ativo por vez'
+      ));
+      return;
+    }
+
+    setBattleLoadout(prev => {
+      const next = { ...prev };
+      Object.keys(next).forEach(slot => {
+        if (next[slot as BattleCardSlot] === card.id) delete next[slot as BattleCardSlot];
+      });
+      next[targetSlot] = card.id;
+      return next;
+    });
+    playSfx?.('equip_card');
+    setCardFeedback(t('Battle card equipped', 'Carta de batalha equipada'));
+  };
+
+  const unequipBattleCard = (slot: BattleCardSlot) => {
+    setBattleLoadout(prev => {
+      const next = { ...prev };
+      const removedCard = getCardById(next[slot]);
+      delete next[slot];
+
+      if (removedCard?.id === TRINITY_REACTOR_CARD_ID) {
+        BATTLE_CARD_SLOTS.forEach(slotId => {
+          const card = getCardById(next[slotId]);
+          if (card && isBattleCard(card) && getBattleCardElementTypes(card).length > 0) {
+            delete next[slotId];
+          }
+        });
+      }
+
+      return next;
+    });
+    playSfx?.('unequip_card');
+    const removedCard = getCardById(battleLoadout[slot]);
+    setCardFeedback(removedCard?.id === TRINITY_REACTOR_CARD_ID
+      ? t('Trina removed. Elemental battle cards were automatically unequipped.', 'Trina retirada. Cartas elementais foram removidas automaticamente.')
+      : t('Battle card removed', 'Carta de batalha retirada')
+    );
+  };
+
+  const toggleDefenseSpecial = (specialId: DefenseSpecialId) => {
+    setSelectedSpecialIds(prev => {
+      if (prev.includes(specialId)) return prev.filter(id => id !== specialId);
+      if (prev.length >= 2) {
+        setCardFeedback(t('Only two specials can be equipped', 'Apenas dois especiais podem ser equipados'));
+        return prev;
+      }
+      return [...prev, specialId];
+    });
   };
 
   return (
@@ -1223,6 +2062,7 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
           <AcquisitionEventOverlay
             card={cardEvent}
             language={language}
+            cardLevels={cardLevels}
             onClose={() => setCardEvent(null)}
           />
         )}
@@ -1233,9 +2073,296 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
           <CardDetailOverlay
             selected={selectedCard}
             language={language}
+            cardLevels={cardLevels}
             onClose={() => setSelectedCard(null)}
             onConfirm={confirmSelectedCardAction}
+            onNavigate={selectedCardNavigationLabel ? navigateSelectedCard : undefined}
+            navigationLabel={selectedCardNavigationLabel}
           />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {activeDefenseThreat && (
+          <NewEarthDefenseBattle
+            language={language}
+            shipStats={battleShipStats}
+            horizonLevel={horizonProgress.level}
+            defenseBattleLevel={defenseBattleLevel}
+            horizonXp={horizonProgress.currentXp}
+            horizonNextXp={horizonProgress.nextXp}
+            specials={selectedSpecialIds}
+            trinityShotEnabled={trinityShotEnabled}
+            threatTitle={activeDefenseThreat.sourceTitle}
+            onVictory={resolveDefenseVictory}
+            onDefeat={resolveDefenseDefeat}
+            onClose={() => setActiveDefenseThreat(null)}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showDefenseHangar && (
+          <div className="fixed inset-0 z-[135] flex items-center justify-center bg-black/80 p-4 backdrop-blur-xl">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.94, y: 18 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96, y: 10 }}
+              className="relative flex h-[92vh] w-full max-w-7xl flex-col overflow-hidden rounded-[1.75rem] border border-red-300/25 bg-zinc-950 shadow-[0_0_70px_rgba(239,68,68,0.18)]"
+            >
+              <div className="flex shrink-0 items-center justify-between border-b border-white/10 bg-black/45 px-6 py-3">
+                <div>
+                  <p className="font-mono text-[10px] uppercase tracking-[0.38em] text-red-200">{t('New Earth Aerial Defense', 'Defesa Aérea da Nova Terra')}</p>
+                  <h3 className="font-orbitron text-xl font-black uppercase tracking-tight text-white">{t('Horizon Defense Hangar', 'Hangar de Defesa Horizon')}</h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowDefenseHangar(false)}
+                  className="rounded-2xl border border-white/10 bg-white/5 p-3 text-zinc-400 transition-all hover:text-white"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div className="grid min-h-0 flex-1 grid-cols-[1.05fr_1fr_1fr] gap-3 p-4">
+                <section className="flex min-h-0 flex-col rounded-2xl border border-red-300/25 bg-red-300/10 p-3">
+                  <div className="relative flex min-h-[210px] items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-black/45">
+                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(239,68,68,0.18),transparent_58%)]" />
+                    <img
+                      src="/assets/rota4/battles/player/horizon/horizon.webp"
+                      alt="Horizon"
+                      className="relative z-10 max-h-[175px] w-auto object-contain drop-shadow-[0_0_28px_rgba(34,211,238,0.35)]"
+                    />
+                  </div>
+
+                  <div className="mt-3 grid grid-cols-2 gap-2">
+                    <div className="col-span-2 rounded-xl border border-amber-300/25 bg-amber-300/10 p-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <p className="font-mono text-[9px] uppercase tracking-[0.22em] text-amber-200">Horizon XP</p>
+                          <p className="mt-0.5 font-orbitron text-base font-black text-white">LVL {horizonProgress.level} / 50</p>
+                        </div>
+                        <span className="rounded-lg border border-yellow-300/25 bg-black/35 px-2 py-1 font-mono text-[10px] uppercase tracking-widest text-yellow-200">
+                          <Coins size={11} className="mr-1 inline" />{formatValue(qc)} QC
+                        </span>
+                      </div>
+                      <div className="mt-2.5 h-2 overflow-hidden rounded-full bg-black/55">
+                        <div
+                          className="h-full rounded-full bg-gradient-to-r from-amber-400 via-cyan-300 to-emerald-300"
+                          style={{ width: `${horizonProgress.nextXp > 0 ? Math.min(100, (horizonProgress.currentXp / horizonProgress.nextXp) * 100) : 100}%` }}
+                        />
+                      </div>
+                      <p className="mt-2 font-mono text-[9px] uppercase tracking-widest text-zinc-400">
+                        {horizonProgress.nextXp > 0 ? `${horizonProgress.currentXp} / ${horizonProgress.nextXp} XP` : 'MAX'}
+                      </p>
+                    </div>
+                    {[
+                      { label: t('Damage', 'Dano'), value: battleShipStats.damage, base: BASE_BATTLE_SHIP_STATS.damage },
+                      { label: t('Health', 'Vida'), value: battleShipStats.health, base: BASE_BATTLE_SHIP_STATS.health },
+                      { label: t('Shield', 'Escudo'), value: battleShipStats.shield, base: BASE_BATTLE_SHIP_STATS.shield },
+                      { label: t('Crit Chance', 'Chance Crítica'), value: `${battleShipStats.critChance}%`, base: `${BASE_BATTLE_SHIP_STATS.critChance}%` },
+                      { label: t('Crit Damage', 'Dano Crítico'), value: `${battleShipStats.critMultiplier.toFixed(2)}x`, base: `${BASE_BATTLE_SHIP_STATS.critMultiplier.toFixed(2)}x` },
+                      { label: t('Special Recharge', 'Recarga Especial'), value: `-${battleShipStats.specialCooldownReductionPercent}%`, base: '0%' },
+                    ].map(item => (
+                      <div key={item.label} className="rounded-xl border border-white/10 bg-black/35 p-3">
+                        <p className="truncate font-mono text-[8px] uppercase tracking-[0.18em] text-zinc-500">{item.label}</p>
+                        <div className="mt-1 flex items-end justify-between gap-2">
+                          <span className="font-orbitron text-base font-black text-white">{item.value}</span>
+                          <span className="font-mono text-[9px] text-zinc-600">{t('Base', 'Base')}: {item.base}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="mt-3 grid grid-cols-3 gap-2">
+                    {[
+                      { id: 'ice', label: t('Ice', 'Gélido'), color: 'border-cyan-300/30 bg-cyan-300/10 text-cyan-100', value: battleShipStats.elementalDamage.ice, bonus: battleShipStats.elementalBonusPercent.ice },
+                      { id: 'electric', label: t('Electric', 'Elétrico'), color: 'border-sky-300/30 bg-sky-300/10 text-sky-100', value: battleShipStats.elementalDamage.electric, bonus: battleShipStats.elementalBonusPercent.electric },
+                      { id: 'fire', label: t('Fire', 'Fogo'), color: 'border-orange-300/30 bg-orange-300/10 text-orange-100', value: battleShipStats.elementalDamage.fire, bonus: battleShipStats.elementalBonusPercent.fire },
+                    ].map(item => (
+                      <div key={item.id} className={`rounded-xl border p-3 ${item.color}`}>
+                        <p className="truncate font-mono text-[8px] uppercase tracking-[0.16em] opacity-75">{item.label}</p>
+                        <p className="mt-0.5 font-orbitron text-base font-black">+{item.value}</p>
+                        <p className="font-mono text-[9px] opacity-60">+{item.bonus}%</p>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+
+                <section className="grid min-h-0 grid-rows-[auto_1.05fr_1.7fr_0.8fr] gap-3 rounded-2xl border border-white/10 bg-black/35 p-3">
+                  <div>
+                    <p className="font-mono text-[10px] uppercase tracking-[0.32em] text-red-200">{t('Battle Plan', 'Plano de Batalha')}</p>
+                    <h4 className="font-orbitron text-base font-black uppercase text-white">{t('Specials and Cards', 'Especiais e Cartas')}</h4>
+                  </div>
+
+                  <div className="grid min-h-0 grid-cols-2 gap-2">
+                    {DEFENSE_SPECIALS.map(special => {
+                      const selected = selectedSpecialIds.includes(special.id);
+                      return (
+                        <button
+                          key={special.id}
+                          type="button"
+                          onClick={() => toggleDefenseSpecial(special.id)}
+                          className={`flex min-h-0 flex-col justify-between rounded-xl border p-3 text-left transition-all ${
+                            selected
+                              ? 'border-red-300/70 bg-red-300/20 text-white'
+                              : 'border-white/10 bg-white/5 text-zinc-400 hover:border-red-300/40 hover:text-white'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="font-orbitron text-[10px] font-black uppercase leading-tight">{special.name[language]}</span>
+                            <span className={`h-2 w-2 shrink-0 rounded-full ${selected ? 'bg-red-300' : special.implemented ? 'bg-emerald-300' : 'bg-zinc-600'}`} />
+                          </div>
+                          <p className="mt-2 line-clamp-2 text-[10px] leading-snug opacity-70">{special.description[language]}</p>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <div className="grid min-h-0 grid-cols-2 grid-rows-3 gap-2">
+                    {BATTLE_CARD_SLOTS.map(slot => {
+                      const card = getCardById(battleLoadout[slot]);
+                      return (
+                        <button
+                          key={slot}
+                          type="button"
+                          onClick={() => card && unequipBattleCard(slot)}
+                          className={`flex min-h-0 flex-col justify-between rounded-xl border p-3 text-left ${card ? getCardStyle(card.rarity, getCardClass(card)) : 'border-dashed border-red-300/25 bg-black/35'}`}
+                        >
+                          <p className="font-mono text-[8px] uppercase tracking-[0.2em] text-red-200/70">{BATTLE_SLOT_LABEL[slot][language]}</p>
+                          <p className={`mt-2 line-clamp-2 font-orbitron text-[10px] font-black uppercase leading-tight ${card ? 'text-white' : 'text-zinc-600'}`}>
+                            {card ? card.name[language] : t('Empty slot', 'Slot vazio')}
+                          </p>
+                          <p className="mt-2 font-mono text-[8px] uppercase tracking-widest text-zinc-500">
+                            {card ? t('Click to remove', 'Clique para retirar') : t('Battle card', 'Carta de batalha')}
+                          </p>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <div className="flex min-h-0 flex-wrap content-start gap-1.5 rounded-2xl border border-red-300/10 bg-red-300/[0.03] p-3">
+                    {activeBattleStatTotals.length > 0 ? activeBattleStatTotals.slice(0, 10).map(([stat, value]) => (
+                      <span key={stat} className="rounded-lg border border-red-300/25 bg-black/30 px-2 py-1 font-mono text-[9px] uppercase tracking-widest text-red-100">
+                        +{value}% {BATTLE_STAT_CONFIG[stat as keyof typeof BATTLE_STAT_CONFIG].label[language]}
+                      </span>
+                    )) : (
+                      <span className="rounded-lg border border-zinc-700 bg-black/30 px-2 py-1 font-mono text-[9px] uppercase tracking-widest text-zinc-500">
+                        {t('No battle modifiers', 'Sem modificadores de batalha')}
+                      </span>
+                    )}
+                  </div>
+                </section>
+
+                <section className="flex min-h-0 flex-col rounded-2xl border border-white/10 bg-black/35 p-4">
+                  <p className="font-mono text-[10px] uppercase tracking-[0.32em] text-red-200">{t('Operational Board', 'Quadro Operacional')}</p>
+                  <h4 className="font-orbitron text-lg font-black uppercase text-white">{t('Threats and Reserve', 'Ameaças e Reserva')}</h4>
+
+                  <div className="mt-4 rounded-2xl border border-red-300/25 bg-red-300/10 p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="font-mono text-[10px] uppercase tracking-[0.28em] text-red-200/70">{t('Pending Threats', 'Ameaças Pendentes')}</p>
+                        <h5 className="font-orbitron text-xl font-black uppercase text-white">{pendingDefenseThreats.length}</h5>
+                      </div>
+                      <AlertTriangle size={18} className={pendingDefenseThreats.length > 0 ? 'text-red-300' : 'text-zinc-600'} />
+                    </div>
+                    <div className="mt-3 grid gap-2">
+                      {pendingDefenseThreats.length > 0 ? pendingDefenseThreats.slice(0, MAX_PENDING_DEFENSE_THREATS).map((threat, index) => (
+                        <div key={`${threat.id}-${index}`} className="rounded-xl border border-red-300/20 bg-black/35 p-3">
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="font-orbitron text-[10px] font-black uppercase text-white">{threat.sourceTitle}</p>
+                            <span className="rounded-full border border-red-300/25 bg-black/30 px-2 py-0.5 font-mono text-[9px] text-red-100">{threat.threatChance}%</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setShowDefenseHangar(false);
+                              setActiveDefenseThreat(threat);
+                            }}
+                            className="mt-3 w-full rounded-lg border border-red-300/30 bg-red-300/20 px-3 py-2 font-orbitron text-[10px] font-black uppercase tracking-widest text-white transition-all hover:bg-red-300 hover:text-black"
+                          >
+                            {t('Launch Defense', 'Iniciar Defesa')}
+                          </button>
+                        </div>
+                      )) : (
+                        <p className="rounded-xl border border-dashed border-zinc-700 bg-black/20 p-3 text-center font-mono text-[10px] uppercase tracking-widest text-zinc-500">
+                          {t('No attacks registered', 'Nenhum ataque registrado')}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="mt-4 min-h-0 flex-1 rounded-2xl border border-white/10 bg-black/35 p-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="font-mono text-[9px] uppercase tracking-[0.26em] text-zinc-500">{t('Battle Cards Codex', 'Codex de Batalha')}</p>
+                        <h5 className="mt-1 font-orbitron text-[12px] font-black uppercase tracking-tight text-white">{t('Owned Battle Cards', 'Cartas de Batalha Obtidas')}</h5>
+                      </div>
+                      {battleCardCodexPageCount > 1 && (
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => setBattleCardCodexPage(prev => (prev - 1 + battleCardCodexPageCount) % battleCardCodexPageCount)}
+                            className="rounded-lg border border-white/10 bg-white/5 p-1.5 text-zinc-400 transition-all hover:border-red-300/40 hover:text-white"
+                            aria-label={t('Previous battle card page', 'Página anterior de cartas de batalha')}
+                          >
+                            <ChevronLeft size={14} />
+                          </button>
+                          <span className="min-w-9 text-center font-mono text-[9px] uppercase tracking-widest text-zinc-500">
+                            {activeBattleCardCodexPage + 1}/{battleCardCodexPageCount}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setBattleCardCodexPage(prev => (prev + 1) % battleCardCodexPageCount)}
+                            className="rounded-lg border border-white/10 bg-white/5 p-1.5 text-zinc-400 transition-all hover:border-red-300/40 hover:text-white"
+                            aria-label={t('Next battle card page', 'Próxima página de cartas de batalha')}
+                          >
+                            <ChevronRight size={14} />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                    <div className="mt-3 grid min-h-0 grid-cols-2 grid-rows-3 gap-2 overflow-hidden">
+                      {ownedBattleCards.length > 0 ? visibleBattleCodexCards.map(card => {
+                        const equipped = BATTLE_CARD_SLOTS.some(slot => battleLoadout[slot] === card.id);
+                        return (
+                          <button
+                            key={card.id}
+                            type="button"
+                            onClick={() => openBattleCardDetails(card, equipped ? 'remove' : 'equip', BATTLE_CARD_SLOTS.find(slot => battleLoadout[slot] === card.id))}
+                            className={`min-h-[76px] rounded-xl border px-2.5 py-2 text-left transition-all ${getMiniBattleCardStyle(card, equipped)}`}
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <p className="line-clamp-2 font-orbitron text-[9px] font-black uppercase leading-tight text-white">{card.name[language]}</p>
+                              <span className={`shrink-0 rounded-full border px-1.5 py-0.5 font-mono text-[7px] uppercase tracking-widest ${
+                                equipped ? 'border-emerald-300/35 bg-emerald-300/10 text-emerald-200' : 'border-white/20 text-zinc-200/80'
+                              }`}>
+                                {equipped ? 'ON' : RARITY_LABEL[card.rarity]?.[language] || card.rarity}
+                              </span>
+                            </div>
+                            <div className="mt-1.5 flex flex-wrap gap-1">
+                              {getBattleEffects(card, cardLevels).slice(0, 2).map(effect => (
+                                <span key={`${card.id}-${effect.stat}`} className="rounded-full border border-white/15 bg-black/35 px-1.5 py-0.5 font-mono text-[8px] text-zinc-100">
+                                  +{effect.value}% {BATTLE_STAT_CONFIG[effect.stat].label[language]}
+                                </span>
+                              ))}
+                            </div>
+                          </button>
+                        );
+                      }) : (
+                        <p className="col-span-2 row-span-3 flex items-center justify-center rounded-xl border border-dashed border-red-300/20 bg-black/25 p-3 text-center font-mono text-[10px] uppercase tracking-widest text-zinc-500">
+                          {t('No battle cards owned yet', 'Nenhuma carta de batalha obtida ainda')}
+                        </p>
+                      )}
+                      {ownedBattleCards.length > 0 && visibleBattleCodexCards.length < BATTLE_CARD_CODEX_PAGE_SIZE && Array.from({ length: BATTLE_CARD_CODEX_PAGE_SIZE - visibleBattleCodexCards.length }).map((_, index) => (
+                        <div key={`empty-battle-codex-${index}`} className="min-h-[76px] rounded-xl border border-dashed border-white/5 bg-black/20" />
+                      ))}
+                    </div>
+                  </div>
+                </section>
+              </div>
+            </motion.div>
+          </div>
         )}
       </AnimatePresence>
 
@@ -1269,7 +2396,7 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
                   setActiveColonyId(colony.id);
                 }}
                 className={`rounded-xl px-3 py-2 text-[10px] font-orbitron font-black uppercase tracking-widest transition-all ${
-                  activeView === 'colony' && activeColonyId === colony.id
+                  activeView === 'colony' && effectiveActiveColonyId === colony.id
                     ? 'bg-emerald-300 text-black shadow-[0_0_18px_rgba(52,211,153,0.22)]'
                     : 'text-zinc-500 hover:bg-white/5 hover:text-zinc-200'
                 }`}
@@ -1409,14 +2536,15 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
               <span className="w-1.5 h-5 bg-emerald-500 rounded-full shadow-[0_0_10px_rgba(16,185,129,0.5)]"></span>
               {t('Infrastructure Nodes', 'Nódulos de Infraestrutura')}
             </h4>
-            <div className="flex flex-wrap justify-end gap-2">
+            <div className="grid flex-1 grid-cols-2 gap-2 pl-4 sm:grid-cols-3 xl:grid-cols-6">
               {(Object.keys(SUPPLY_CONFIG) as ColonySupplyId[]).map(supplyId => (
-                <span
+                <div
                   key={supplyId}
-                  className={`rounded-lg border px-2 py-1 font-mono text-[10px] uppercase tracking-widest ${SUPPLY_CONFIG[supplyId].border} ${SUPPLY_CONFIG[supplyId].color}`}
+                  className={`flex min-w-[118px] items-center justify-between gap-2 rounded-lg border px-2.5 py-1.5 font-mono text-[10px] uppercase tracking-[0.08em] ${SUPPLY_CONFIG[supplyId].border} ${SUPPLY_CONFIG[supplyId].color}`}
                 >
-                  {SUPPLY_CONFIG[supplyId].label[language]}: {colonySupplies[supplyId]}
-                </span>
+                  <span className="truncate">{SUPPLY_CONFIG[supplyId].label[language]}</span>
+                  <span className="shrink-0 font-orbitron text-[11px] font-black text-white">{colonySupplies[supplyId]}</span>
+                </div>
               ))}
             </div>
           </div>
@@ -1426,6 +2554,7 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
               const config = CONSTRUCTION_CONFIG[con.type];
               const isMaxed = con.level >= 10;
               const isWorking = con.assignedConstructors > 0 && !isMaxed;
+              const completedBackground = isMaxed ? COLONY_COMPLETION_BACKGROUNDS[activeColony.id]?.[con.type] : undefined;
               const supplyCost = CONSTRUCTION_SUPPLY_COST[con.type];
               const hasSuppliesFor50 = canPaySupplies(colonySupplies, supplyCost, 1);
               const hasSuppliesFor250 = canPaySupplies(colonySupplies, supplyCost, 5);
@@ -1456,59 +2585,65 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
                 <motion.div
                   key={con.id}
                   layout
-                  className={`relative p-3 rounded-2xl border-2 bg-black/60 flex flex-col transition-all duration-300 min-h-0 overflow-hidden ${colorClasses[config.color]} ${isMaxed ? 'opacity-90' : ''}`}
+                  className={`relative p-3 rounded-2xl border-2 bg-black/60 flex flex-col transition-all duration-300 min-h-0 overflow-hidden ${colorClasses[config.color]} ${completedBackground ? 'colony-completion-card shadow-[inset_0_0_50px_rgba(0,0,0,0.65)]' : ''}`}
                 >
-                  <div className="flex items-center justify-between mb-2">
-                    <div className={`p-2 rounded-xl ${accentColor[config.color]} shadow-inner`}>
-                      <config.icon size={18} />
+                  {completedBackground && (
+                    <>
+                      <div
+                        aria-hidden="true"
+                        className="colony-completion-bg bg-cover bg-center bg-no-repeat"
+                        style={{ backgroundImage: `url(${completedBackground})` }}
+                      />
+                      <div aria-hidden="true" className="colony-completion-bg bg-gradient-to-br from-black/78 via-black/48 to-black/76" />
+                      <div aria-hidden="true" className="colony-completion-bg bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.13),transparent_62%)]" />
+                    </>
+                  )}
+                  <div className={`flex items-start justify-between gap-3 ${isMaxed ? '' : 'mb-2'}`}>
+                    <div className="flex min-w-0 items-center gap-2">
+                      <div className={`shrink-0 rounded-xl p-2 ${accentColor[config.color]} shadow-inner ${isMaxed ? 'ring-1 ring-white/10' : ''}`}>
+                        <config.icon size={18} />
+                      </div>
+                      <h5 className="truncate font-orbitron text-[12px] font-bold uppercase leading-tight tracking-widest text-white">{config.label[language]}</h5>
                     </div>
                     <div className="text-right leading-none">
                        <span className="text-[11px] font-orbitron font-bold text-zinc-500 block uppercase mb-1">{t('Units Built', 'Unidade')}</span>
-                       <span className="text-xl font-orbitron font-black text-white tracking-widest">{con.level} <span className="text-[11px] text-zinc-600">/ 10</span></span>
+                       <span className="text-xl font-orbitron font-black text-white tracking-widest">{con.level} {!isMaxed && <span className="text-[11px] text-zinc-600">/ 10</span>}</span>
                     </div>
                   </div>
                   
-                  <div className="mb-2">
-                    <h5 className="font-orbitron font-bold text-white text-[12px] mb-2 leading-tight uppercase tracking-widest truncate">{config.label[language]}</h5>
-                    <p className="mb-2 truncate font-mono text-[9px] uppercase tracking-widest text-zinc-500">
-                      {t('Cost / 50:', 'Custo / 50:')} {costLabel}
-                    </p>
-                    <div className="flex items-center gap-2">
-                       <div className={`h-1 flex-1 rounded-full bg-zinc-800/50 overflow-hidden relative border border-white/5`}>
-                          <motion.div 
-                            initial={{ width: 0 }}
-                            animate={{ width: `${isMaxed ? 100 : con.progress}%` }}
-                            className={`h-full relative z-10 ${isMaxed ? 'bg-emerald-500' : 'bg-blue-500'}`}
-                          />
-                          {isWorking && (
-                            <motion.div
-                              animate={{ x: ['-100%', '100%'] }}
-                              transition={{ repeat: Infinity, duration: 1.5, ease: "linear" }}
-                              className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent z-20"
+                  {!isMaxed && (
+                    <div className="mb-1.5">
+                      <p className="mb-1.5 truncate font-mono text-[9px] uppercase tracking-widest text-zinc-500">
+                        {t('Cost / 50:', 'Custo / 50:')} {costLabel}
+                      </p>
+                      <div className="flex items-center gap-2">
+                         <div className="h-1 flex-1 rounded-full bg-zinc-800/50 overflow-hidden relative border border-white/5">
+                            <motion.div 
+                              initial={{ width: 0 }}
+                              animate={{ width: `${con.progress}%` }}
+                              className="h-full relative z-10 bg-blue-500"
                             />
-                          )}
-                       </div>
-                        {!isMaxed && (
-                          <span className="text-[11px] font-mono text-zinc-500 w-7 text-right">{Math.floor(con.progress)}%</span>
-                        )}
+                            {isWorking && (
+                              <motion.div
+                                animate={{ x: ['-100%', '100%'] }}
+                                transition={{ repeat: Infinity, duration: 1.5, ease: "linear" }}
+                                className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent z-20"
+                              />
+                            )}
+                         </div>
+                         <span className="text-[11px] font-mono text-zinc-500 w-7 text-right">{Math.floor(con.progress)}%</span>
+                      </div>
                     </div>
-                  </div>
+                  )}
 
-                  <div className="mt-auto">
-                    {!isMaxed ? (
-                      <div className="flex flex-col gap-2">
+                  {!isMaxed && (
+                    <div className="mt-auto">
+                      <div className="flex flex-col gap-1.5">
                         <div className="flex items-center justify-between text-[12px] font-orbitron font-bold text-zinc-400 px-1 leading-none uppercase tracking-widest">
                            <span>{t('Robots:', 'Robôs:')}</span>
                            <span className="text-white text-[12px]">{con.assignedConstructors.toLocaleString()}</span>
                         </div>
                         <div className="flex gap-2">
-                           <button 
-                             onClick={() => updateConstructors(con.id, -50)}
-                             disabled={con.assignedConstructors === 0}
-                             className="flex-1 py-2 rounded-xl bg-zinc-800/80 hover:bg-zinc-700 text-zinc-500 text-[12px] font-bold transition-colors disabled:opacity-20 border border-white/5"
-                           >
-                              -50
-                           </button>
                            <button 
                              onClick={() => updateConstructors(con.id, 50)}
                              disabled={!hasSuppliesFor50 || availableConstructors < 50}
@@ -1525,14 +2660,8 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
                            </button>
                         </div>
                       </div>
-                    ) : (
-                      <div className="flex items-center justify-center py-2 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[12px] font-orbitron font-black uppercase tracking-[0.3em] gap-3 relative overflow-hidden group/done">
-                         <div className="absolute inset-0 bg-emerald-500/5 animate-pulse" />
-                         <CheckCircle2 size={16} className="relative z-10" />
-                         <span className="relative z-10">{t('Done', 'Concluído')}</span>
-                      </div>
-                    )}
-                  </div>
+                    </div>
+                  )}
 
                   {isWorking && (
                      <div className="absolute top-2 right-12">
@@ -1551,13 +2680,19 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
           </div>
         </div>
       ) : (
-        <div className="flex-1 overflow-hidden rounded-2xl border border-cyan-300/20 bg-zinc-950/70 p-5">
-          <div className="mb-4 flex items-start justify-between gap-3">
+        <div className="flex flex-1 flex-col overflow-hidden rounded-2xl border border-cyan-300/20 bg-zinc-950/70 p-5">
+          <div className="mb-3 flex shrink-0 items-start justify-between gap-3">
             <div>
               <p className="font-mono text-[10px] uppercase tracking-[0.35em] text-cyan-300">{t('Supply Recon', 'Reconhecimento de Suprimentos')}</p>
               <h3 className="font-orbitron text-xl font-black uppercase tracking-tight text-white">{t('Search Operations', 'Operações de Busca')}</h3>
+              <p className="mt-1 max-w-2xl text-xs text-zinc-500">
+                {t(
+                  'Land and sea expeditions can run at the same time. Aerial defense is configured separately.',
+                  'Expedições por terra e mar podem rodar ao mesmo tempo. A defesa aérea é configurada separadamente.'
+                )}
+              </p>
             </div>
-            <div className="flex flex-wrap justify-end gap-2">
+            <div className="flex max-w-[48%] flex-wrap justify-end gap-2">
               {(Object.keys(SUPPLY_CONFIG) as ColonySupplyId[]).map(supplyId => (
                 <span
                   key={supplyId}
@@ -1569,22 +2704,105 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
             </div>
           </div>
 
-          <div className="grid h-[calc(100%-70px)] grid-cols-1 gap-4 lg:grid-cols-3">
-            {searchOptions.map(option => (
-              <div key={option.id} className={`flex min-h-0 flex-col rounded-2xl border p-5 ${option.tone}`}>
-                <div className="mb-5 flex items-start justify-between gap-3">
+          {(latestActiveSearchesByType.length > 0 || lastSearchReport) && (
+            <div className="mb-3 shrink-0 rounded-2xl border border-cyan-300/20 bg-black/45 px-3 py-2">
+              {latestActiveSearchesByType.length > 0 ? (
+                <div className="flex flex-wrap justify-end gap-2">
+                  {latestActiveSearchesByType.map(search => (
+                    <div key={search.id} className="flex flex-wrap justify-end gap-2">
+                      <span className="rounded-lg border border-cyan-300/30 bg-cyan-300/10 px-3 py-1 font-mono text-[10px] uppercase tracking-widest text-cyan-200">
+                        {search.id === 'land' ? t('Land Return', 'Retorno por terra') : t('Sea Return', 'Retorno por mar')}: {formatSearchTime(searchRemainingSeconds[search.searchKey] || 0)}
+                      </span>
+                      <span className="rounded-lg border border-red-300/30 bg-red-300/10 px-3 py-1 font-mono text-[10px] uppercase tracking-widest text-red-200">
+                        {t('Risk', 'Risco')}: {search.threatChance}%
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="font-mono text-[10px] uppercase tracking-widest text-emerald-200">{lastSearchReport}</p>
+              )}
+            </div>
+          )}
+
+          <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 lg:grid-cols-3">
+            {searchOptions.map(option => {
+              const searchSlots = Array.from({ length: MAX_PARALLEL_SEARCHES_PER_TYPE }, (_, slotIndex) => {
+                const searchKey = getSearchSlotKey(option.id, slotIndex);
+                return {
+                  slotIndex,
+                  searchKey,
+                  activeSearch: activeSearches[searchKey],
+                  style: SEARCH_SLOT_STYLES[slotIndex],
+                };
+              });
+              return (
+              <div key={option.id} className={`flex min-h-0 flex-col overflow-hidden rounded-2xl border p-4 ${option.tone}`}>
+                <div className="mb-2 flex items-start justify-between gap-3">
                   <div>
                     <p className="font-mono text-[10px] uppercase tracking-[0.28em] opacity-80">{option.subtitle}</p>
-                    <h4 className="mt-2 font-orbitron text-xl font-black uppercase leading-tight text-white">{option.title}</h4>
+                    <h4 className="font-orbitron text-xl font-black uppercase leading-tight text-white">{option.title}</h4>
                   </div>
                   <div className="rounded-2xl border border-white/10 bg-black/35 p-3">
                     <option.icon size={24} />
                   </div>
                 </div>
 
-                <p className="text-sm leading-relaxed text-zinc-300">{option.description}</p>
+                <p className="line-clamp-2 text-sm leading-snug text-zinc-300">{option.description}</p>
 
-                <div className="mt-auto rounded-2xl border border-white/10 bg-black/35 p-4">
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  <div className="rounded-xl border border-white/10 bg-black/25 p-3">
+                    <p className="font-mono text-[9px] uppercase tracking-[0.24em] text-zinc-500">{t('Duration', 'Duração')}</p>
+                    <div className="mt-2 grid grid-cols-3 gap-1">
+                      {searchSlots.map(slot => (
+                        <span
+                          key={`${option.id}-duration-${slot.slotIndex}`}
+                          className={`rounded-lg border px-1.5 py-1 text-center font-orbitron text-[11px] font-black ${slot.style}`}
+                        >
+                          {formatSearchTime(slot.activeSearch ? searchRemainingSeconds[slot.searchKey] || 0 : option.durationSeconds)}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="rounded-xl border border-white/10 bg-black/25 p-3">
+                    <p className="font-mono text-[9px] uppercase tracking-[0.24em] text-zinc-500">{t('Attack Risk', 'Risco de Ataque')}</p>
+                    <p className="mt-1 font-orbitron text-sm font-black text-red-200">
+                      {option.threatChance}%
+                      {searchThreatBonus[option.id] > 0 && (
+                        <span className="ml-2 font-mono text-[9px] uppercase tracking-wider text-amber-200">
+                          +{searchThreatBonus[option.id]}%
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-2 rounded-2xl border border-white/10 bg-black/30 p-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="font-mono text-[9px] uppercase tracking-[0.24em] text-zinc-500">{t('Search Protocol', 'Protocolo de Busca')}</p>
+                      <p className="mt-1 font-orbitron text-sm font-black uppercase text-white">
+                        LVL {option.upgradeLevel} / {MAX_SEARCH_UPGRADE_LEVEL}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-mono text-[9px] uppercase tracking-widest text-emerald-200">+{option.resourceBonusPercent}% {t('Resources', 'Recursos')}</p>
+                      <p className="mt-1 font-mono text-[9px] uppercase tracking-widest text-red-200">+{option.upgradeThreatBonus}% {t('Risk', 'Risco')}</p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => upgradeSearch(option.id)}
+                    disabled={option.upgradeLevel >= MAX_SEARCH_UPGRADE_LEVEL || qc < option.upgradeCost}
+                    className="mt-3 w-full rounded-xl border border-white/10 bg-white/10 px-3 py-2 font-orbitron text-[10px] font-black uppercase tracking-[0.2em] text-white transition-all hover:border-emerald-300/50 hover:bg-emerald-300 hover:text-black disabled:cursor-not-allowed disabled:border-zinc-700 disabled:bg-zinc-900 disabled:text-zinc-600"
+                  >
+                    {option.upgradeLevel >= MAX_SEARCH_UPGRADE_LEVEL
+                      ? 'MAX'
+                      : `${t('Upgrade', 'Melhorar')} · ${formatValue(option.upgradeCost)} QC`}
+                  </button>
+                </div>
+
+                <div className="mt-2 rounded-2xl border border-white/10 bg-black/35 p-3">
                   <p className="font-mono text-[10px] uppercase tracking-[0.28em] text-zinc-500">{t('Recovered Supplies', 'Suprimentos Recuperados')}</p>
                   <div className="mt-3 flex flex-wrap gap-2">
                     {(Object.entries(option.rewards) as Array<[ColonySupplyId, number]>).map(([key, value]) => (
@@ -1598,15 +2816,67 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
                   </div>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => runSearch(option.rewards, option.title)}
-                  className="mt-4 rounded-2xl border border-white/10 bg-white/10 px-4 py-3 font-orbitron text-[12px] font-black uppercase tracking-[0.22em] text-white transition-all hover:border-cyan-300/50 hover:bg-cyan-300 hover:text-black"
-                >
-                  {t('Start Search', 'Iniciar Busca')}
-                </button>
+                <div className="mt-auto grid grid-cols-3 gap-1.5">
+                  {searchSlots.map(slot => (
+                    <button
+                      key={`${option.id}-start-${slot.slotIndex}`}
+                      type="button"
+                      onClick={() => handleRunSearch(option, slot.slotIndex)}
+                      disabled={Boolean(slot.activeSearch)}
+                      className={`rounded-2xl border px-2 py-3 font-orbitron text-[11px] font-black uppercase tracking-[0.14em] transition-all disabled:cursor-not-allowed disabled:border-zinc-700 disabled:bg-zinc-900 disabled:text-zinc-600 ${slot.style}`}
+                    >
+                      {slot.activeSearch ? formatSearchTime(searchRemainingSeconds[slot.searchKey] || 0) : `Start ${slot.slotIndex + 1}`}
+                    </button>
+                  ))}
+                </div>
               </div>
-            ))}
+            );})}
+
+            <div className="flex min-h-0 flex-col rounded-2xl border border-red-400/40 bg-red-400/10 p-5 text-red-300">
+              <div className="mb-4 flex items-start justify-between gap-3">
+                <div>
+                  <p className="font-mono text-[10px] uppercase tracking-[0.28em] opacity-80">{t('Aerial Defense', 'Defesa Aérea')}</p>
+                  <h4 className="mt-2 font-orbitron text-xl font-black uppercase leading-tight text-white">{t('Defense Hangar', 'Hangar de Defesa')}</h4>
+                </div>
+                <div className="rounded-2xl border border-white/10 bg-black/35 p-3">
+                  <Shield size={24} />
+                </div>
+              </div>
+
+              <p className="text-sm leading-relaxed text-zinc-300">
+                {t(
+                  'Open the Horizon hangar to configure battle cards, specials, ship attributes, and pending defenses.',
+                  'Abra o hangar da Horizon para configurar cartas de batalha, especiais, atributos da nave e defesas pendentes.'
+                )}
+              </p>
+
+              <div className="mt-4 grid grid-cols-2 gap-2">
+                <div className="rounded-xl border border-red-300/25 bg-black/35 p-3">
+                  <p className="font-mono text-[9px] uppercase tracking-[0.22em] text-red-200/70">{t('Threats', 'Ameaças')}</p>
+                  <p className="mt-1 font-orbitron text-xl font-black text-white">{pendingDefenseThreats.length}</p>
+                </div>
+                <div className="rounded-xl border border-red-300/25 bg-black/35 p-3">
+                  <p className="font-mono text-[9px] uppercase tracking-[0.22em] text-red-200/70">{t('Battle Cards', 'Cartas')}</p>
+                  <p className="mt-1 font-orbitron text-xl font-black text-white">{ownedBattleCards.length}</p>
+                </div>
+                <div className="rounded-xl border border-red-300/25 bg-black/35 p-3">
+                  <p className="font-mono text-[9px] uppercase tracking-[0.22em] text-red-200/70">{t('Damage', 'Dano')}</p>
+                  <p className="mt-1 font-orbitron text-xl font-black text-white">{battleShipStats.damage}</p>
+                </div>
+                <div className="rounded-xl border border-red-300/25 bg-black/35 p-3">
+                  <p className="font-mono text-[9px] uppercase tracking-[0.22em] text-red-200/70">{t('Shield', 'Escudo')}</p>
+                  <p className="mt-1 font-orbitron text-xl font-black text-white">{battleShipStats.shield}</p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowDefenseHangar(true)}
+                className="mt-auto rounded-2xl border border-red-300/40 bg-red-300/20 px-4 py-3 font-orbitron text-[12px] font-black uppercase tracking-[0.22em] text-white transition-all hover:bg-red-300 hover:text-black"
+              >
+                {t('Open Hangar', 'Abrir Hangar')}
+              </button>
+            </div>
           </div>
         </div>
       )}

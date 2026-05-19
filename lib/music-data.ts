@@ -1,4 +1,10 @@
-import { Track } from '@/hooks/useJukebox';
+export interface Track {
+  id: string;
+  title: string;
+  url: string;
+  duration?: string;
+  origin?: string;
+}
 
 export interface RouteTheme {
   id: string;

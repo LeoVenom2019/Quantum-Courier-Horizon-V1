@@ -10,6 +10,17 @@ const PLAYER_HEIGHT = 48;
 const ITEM_SIZE = 24;
 const PHASE_DURATION = 50000; // 50 seconds
 const ACCEL_INTERVAL = 10000; // 10 seconds
+const MAX_HEALTH = 100;
+const HEAL_AMOUNT = 22;
+const MAX_HEALS_PER_PHASE = 2;
+
+const MISS_DAMAGE = {
+    common: 4,
+    blue: 6,
+    purple: 8,
+    rare: 10,
+    black: 12
+};
 
 const PHASES = [
     { name: 'STREET', pt: 'RUA', minScore: 500, variant: 'default', bg: '#1a1a1a' },
@@ -32,6 +43,7 @@ let gameState = {
     phase: 0,
     score: 0,
     cumulativeScore: 0,
+    health: MAX_HEALTH,
     phaseStartTime: 0,
     lastSpawnTime: 0,
     lastAccelTime: 0,
@@ -47,6 +59,7 @@ let gameState = {
     keys: {},
     // New states
     bonusSpawned: false,
+    healsSpawned: 0,
     bombSpawned: false,
     immobilized: false,
     immobilizedTimer: 0,
@@ -70,6 +83,9 @@ const scoreEl = document.getElementById('score');
 const highScoreEl = document.getElementById('high-score');
 const timerEl = document.getElementById('timer');
 const comboEl = document.getElementById('combo-multiplier');
+const healthFillEl = document.getElementById('health-fill');
+const healthValueEl = document.getElementById('health-value');
+const healthBoxEl = document.querySelector('.health-box');
 const phaseNameEl = document.getElementById('phase-name');
 const phaseNumberEl = document.getElementById('phase-number');
 const overlay = document.getElementById('overlay');
@@ -128,6 +144,7 @@ function startPhase(phaseIdx) {
     gameState.combo = 0;
     gameState.multiplier = 1.0;
     gameState.bonusSpawned = false;
+    gameState.healsSpawned = 0;
     gameState.bombSpawned = false;
     gameState.immobilized = false;
     gameState.immobilizedTimer = 0;
@@ -150,6 +167,7 @@ function startPhase(phaseIdx) {
 
 function restartGame() {
     gameState.cumulativeScore = 0;
+    gameState.health = MAX_HEALTH;
     startPhase(0);
 }
 
@@ -178,6 +196,10 @@ function updateUI() {
 
     phaseNameEl.innerText = PHASES[gameState.phase].name;
     phaseNumberEl.innerText = `${(gameState.phase + 1).toString().padStart(2, '0')}/04`;
+    const healthPercent = Math.max(0, Math.min(100, gameState.health));
+    healthFillEl.style.width = `${healthPercent}%`;
+    healthValueEl.innerText = `${Math.round(healthPercent)}%`;
+    healthBoxEl.classList.toggle('low', healthPercent <= 30);
     
     const remaining = Math.max(0, Math.ceil((PHASE_DURATION - (Date.now() - gameState.phaseStartTime)) / 1000));
     timerEl.innerText = remaining;
@@ -202,6 +224,10 @@ function spawnItem() {
     if (!gameState.bonusSpawned && progress > 0.4 && Math.random() > 0.95) {
         itemType = { type: 'bonus', color: '#10b981', pts: 0, glow: true, weight: 0 };
         gameState.bonusSpawned = true;
+    }
+    else if (gameState.healsSpawned < MAX_HEALS_PER_PHASE && progress > 0.18 && Math.random() > 0.965) {
+        itemType = { type: 'heal', color: '#22c55e', pts: 0, glow: true, weight: 0 };
+        gameState.healsSpawned++;
     } 
     // Check if we should spawn BOMB (exactly 1 per phase, usually second half)
     else if (!gameState.bombSpawned && progress > 0.6 && Math.random() > 0.95) {
@@ -415,6 +441,14 @@ function collectItem(item) {
         return;
     }
 
+    if (item.type === 'heal') {
+        const before = gameState.health;
+        gameState.health = Math.min(MAX_HEALTH, gameState.health + HEAL_AMOUNT);
+        spawnParticles(player.x + PLAYER_WIDTH/2, player.y + PLAYER_HEIGHT/2, '#22c55e', 48);
+        createScorePopup(player.x, player.y - 20, `+${Math.round(gameState.health - before)} LIFE`, '#22c55e');
+        return;
+    }
+
     gameState.combo++;
     gameState.multiplier = 1.0 + (Math.floor(gameState.combo / 5) * 0.1);
     
@@ -440,21 +474,27 @@ function missItem(item) {
     // Reset combo growth but don't reset score
     gameState.combo = 0;
     gameState.multiplier = 1.0;
+    const damage = MISS_DAMAGE[item.type] || 0;
+    if (damage <= 0) return;
+
+    gameState.health = Math.max(0, gameState.health - damage);
+    gameState.screenShake = Math.max(gameState.screenShake, 6);
+    createScorePopup(item.x, CANVAS_HEIGHT - 28, `-${damage} LIFE`, '#ff4b2b');
+
+    if (gameState.health <= 0) {
+        finishByDeath();
+    }
 }
 
 function endPhase() {
     gameState.active = false;
     gameState.cumulativeScore += gameState.score;
-    
-    // Check progression
-    const minRequired = PHASES[gameState.phase].minScore;
-    const progress = Math.min(1.0, gameState.cumulativeScore / minRequired);
-    const passed = gameState.cumulativeScore >= minRequired;
+    const passed = true;
     
     overlay.classList.remove('hidden');
     phaseResultsEl.classList.remove('hidden');
     phaseScoreValEl.innerText = gameState.score;
-    progressFillEl.style.width = `${progress * 100}%`;
+    progressFillEl.style.width = '100%';
     
     const pbContainer = document.querySelector('.progress-bar-bg');
     if (passed) {
@@ -483,21 +523,50 @@ function endPhase() {
         highScoreEl.innerText = gameState.highScore.toString().padStart(5, '0');
     }
 
-    // Final transmission
     window.parent.postMessage({ 
-        type: 'GAME_COMPLETE', 
+        type: 'SCORE_UPDATE', 
         gameId: 'neo-catcher', 
         score: gameState.cumulativeScore 
     }, '*');
 }
 
-function showFinalResults(victory) {
+function finishByDeath() {
+    if (!gameState.active) return;
+    gameState.active = false;
+    const totalScore = gameState.cumulativeScore + gameState.score;
+    if (totalScore > gameState.highScore) {
+        gameState.highScore = totalScore;
+        localStorage.setItem('neo_catcher_high_score', gameState.highScore);
+        highScoreEl.innerText = gameState.highScore.toString().padStart(5, '0');
+    }
+    window.parent.postMessage({
+        type: 'SCORE_UPDATE',
+        gameId: 'neo-catcher',
+        score: totalScore
+    }, '*');
+    showFinalResults(false, totalScore);
+}
+
+function showFinalResults(victory, overrideScore) {
     phaseResultsEl.classList.add('hidden');
     finalResultsEl.classList.remove('hidden');
-    document.getElementById('final-score').innerText = gameState.cumulativeScore;
+    const finalScore = overrideScore ?? gameState.cumulativeScore;
+    document.getElementById('final-score').innerText = finalScore;
     
     nextBtn.classList.add('hidden');
     restartBtn.classList.remove('hidden');
+
+    window.QCHArcadeResults.show({
+        gameId: 'neo-catcher',
+        victory,
+        score: finalScore,
+        stats: [
+            { label: 'Total Score', value: finalScore },
+            { label: 'Phase', value: `${gameState.phase + 1}/4` },
+            { label: 'Life', value: `${Math.round(gameState.health)}%` },
+            { label: 'Record', value: gameState.highScore },
+        ],
+    });
 }
 
 function spawnParticles(x, y, color, count) {
@@ -576,6 +645,14 @@ function draw() {
             ctx.moveTo(item.x + item.size/2, item.y);
             ctx.lineTo(item.x + item.size, item.y - 5);
             ctx.stroke();
+        } else if (item.type === 'heal') {
+            ctx.fillStyle = '#22c55e';
+            ctx.beginPath();
+            ctx.arc(item.x + item.size/2, item.y + item.size/2, item.size/2, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = '#ecfdf5';
+            ctx.fillRect(item.x + item.size/2 - 3, item.y + 5, 6, item.size - 10);
+            ctx.fillRect(item.x + 5, item.y + item.size/2 - 3, item.size - 10, 6);
         } else if (item.type === 'bonus') {
             // Bonus item appearance
             ctx.fillStyle = '#10b981';

@@ -1,20 +1,25 @@
 import type { Metadata } from 'next';
-import { Exo_2, Inter, Audiowide } from 'next/font/google';
+import localFont from 'next/font/local';
 import './globals.css';
 
-const exo2 = Exo_2({
-  subsets: ['latin', 'latin-ext'],
+const exo2 = localFont({
+  src: '../public/fonts/Exo2-Variable.ttf',
+  weight: '100 900',
+  display: 'swap',
   variable: '--font-orbitron',
 });
 
-const audiowide = Audiowide({
+const audiowide = localFont({
+  src: '../public/fonts/Audiowide-Regular.ttf',
   weight: '400',
-  subsets: ['latin'],
+  display: 'swap',
   variable: '--font-title',
 });
 
-const inter = Inter({
-  subsets: ['latin', 'latin-ext'],
+const inter = localFont({
+  src: '../public/fonts/Inter-Variable.ttf',
+  weight: '100 900',
+  display: 'swap',
   variable: '--font-sans',
 });
 

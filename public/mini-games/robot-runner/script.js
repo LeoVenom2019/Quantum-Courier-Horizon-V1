@@ -10,6 +10,7 @@ const dangerOverlay = document.getElementById('danger-overlay');
 const TILE_SIZE = 25;
 const BOOST_MAX = 100;
 const BOOST_DURATION = 2500;
+const BOOST_GHOST_SLOW_FACTOR = 0.25;
 const POWER_DURATION = 8000;
 const GHOST_RESPAWN_TIME = 3000;
 
@@ -126,6 +127,7 @@ class Particle {
 
 // Game State
 let currentPhase = 0;
+let activeMap = [];
 let score = 0;
 let lives = 3;
 let gameState = 'MENU';
@@ -163,7 +165,8 @@ const GHOST_SPAWN_INTERVAL = 2000; // 2 seconds between spawns
 // Initialize
 function initLevel(phase) {
     currentPhase = phase % 3;
-    const map = LabyrinthMaps[currentPhase];
+    activeMap = LabyrinthMaps[currentPhase].map(row => [...row]);
+    const map = activeMap;
     
     player.gridX = 1;
     player.gridY = 10;
@@ -273,7 +276,7 @@ function update(dt) {
 
 function handlePlayerMovement(ts) {
     const baseSpeed = player.speed * TILE_SIZE;
-    const moveSpeed = (player.isBoosting ? baseSpeed * 2.5 : baseSpeed) * ts;
+    const moveSpeed = baseSpeed * ts;
     
     let remaining = moveSpeed;
     const epsilon = 0.01;
@@ -347,7 +350,7 @@ function handlePlayerMovement(ts) {
 function checkItemCollection() {
     const gx = Math.round(player.x / TILE_SIZE);
     const gy = Math.round(player.y / TILE_SIZE);
-    const map = LabyrinthMaps[currentPhase];
+    const map = activeMap;
 
     if (gy < 0 || gy >= map.length || gx < 0 || gx >= map[0].length) return;
 
@@ -400,6 +403,25 @@ function notifyParentOfScore() {
     }, '*');
 }
 
+function finishGameOver() {
+    const elapsed = Date.now() - startTime;
+    totalTime += elapsed;
+    gameState = 'GAMEOVER';
+    document.getElementById('game-over-score').innerText = score.toString();
+    document.getElementById('game-over-time').innerText = formatTimer(totalTime);
+    localStorage.setItem('robot_runner_high_score', Math.max(Number(localStorage.getItem('robot_runner_high_score')) || 0, score));
+    window.QCHArcadeResults.show({
+        gameId: 'robot-runner',
+        victory: false,
+        score,
+        stats: [
+            { label: 'Score Final', value: score },
+            { label: 'Tempo Total', value: formatTimer(totalTime) },
+            { label: 'Fase', value: currentPhase + 1 },
+        ],
+    });
+}
+
 function checkGhostCollisions() {
     if (gameState !== 'PLAYING') return false;
     let collisionDetected = false;
@@ -421,9 +443,7 @@ function checkGhostCollisions() {
                 spawnParticles(player.x + TILE_SIZE/2, player.y + TILE_SIZE/2, '#FF0000', 50);
 
                 if (lives <= 0) {
-                    gameState = 'GAMEOVER'; 
-                    notifyParentOfScore();
-                    document.getElementById('game-over').classList.remove('hidden');
+                    finishGameOver();
                 } else {
                     resetPositions();
                 }
@@ -439,7 +459,7 @@ function checkGhostCollisions() {
 }
 
 function canMove(gx, gy) {
-    const map = LabyrinthMaps[currentPhase];
+    const map = activeMap;
     if (gy < 0 || gy >= map.length || gx < 0 || gx >= map[0].length) return false;
     return map[gy][gx] !== 1;
 }
@@ -458,8 +478,11 @@ function handleGhostAI(ts) {
                 // Safety Check: Don't respawn on top of player or too close
                 if (dist(ghost.spawnX, ghost.spawnY, player.gridX, player.gridY) > 6) {
                     ghost.dead = false;
+                    ghost.gridX = ghost.spawnX;
+                    ghost.gridY = ghost.spawnY;
                     ghost.x = ghost.spawnX * TILE_SIZE;
                     ghost.y = ghost.spawnY * TILE_SIZE;
+                    ghost.dir = { x: 0, y: 0 };
                 } else {
                     // Try again in 500ms
                     ghost.respawnTimer = 500;
@@ -468,43 +491,69 @@ function handleGhostAI(ts) {
             return;
         }
 
-        const moveSpeed = ghost.speed * TILE_SIZE * ts;
-        const atX = Math.abs(ghost.x % TILE_SIZE) < moveSpeed;
-        const atY = Math.abs(ghost.y % TILE_SIZE) < moveSpeed;
+        const slowFactor = player.isBoosting ? BOOST_GHOST_SLOW_FACTOR : 1;
+        let remaining = ghost.speed * TILE_SIZE * ts * slowFactor;
+        const epsilon = 0.01;
 
-        if (atX && atY) {
-            const gx = Math.round(ghost.x / TILE_SIZE);
-            const gy = Math.round(ghost.y / TILE_SIZE);
-            ghost.gridX = gx;
-            ghost.gridY = gy;
-            ghost.x = gx * TILE_SIZE;
-            ghost.y = gy * TILE_SIZE;
+        while (remaining > 0) {
+            const tx = ghost.gridX * TILE_SIZE;
+            const ty = ghost.gridY * TILE_SIZE;
+            const atX = Math.abs(ghost.x - tx) < epsilon;
+            const atY = Math.abs(ghost.y - ty) < epsilon;
 
-            const possible = [{x:1,y:0}, {x:-1,y:0}, {x:0,y:1}, {x:0,y:-1}].filter(d => 
-                canMove(gx + d.x, gy + d.y) && !(d.x === -ghost.dir.x && d.y === -ghost.dir.y)
-            );
+            if (atX && atY) {
+                ghost.x = tx;
+                ghost.y = ty;
 
-            if (possible.length > 0) {
-                if (player.isPowered) {
-                    possible.sort((a,b) => dist(gx+b.x, gy+b.y, player.gridX, player.gridY) - dist(gx+a.x, gy+a.y, player.gridX, player.gridY));
-                } else {
-                    if (ghost.behavior === 'CHASE') {
-                        possible.sort((a,b) => dist(gx+a.x, gy+a.y, player.gridX, player.gridY) - dist(gx+b.x, gy+b.y, player.gridX, player.gridY));
+                const possible = [{x:1,y:0}, {x:-1,y:0}, {x:0,y:1}, {x:0,y:-1}].filter(d =>
+                    canMove(ghost.gridX + d.x, ghost.gridY + d.y) && !(d.x === -ghost.dir.x && d.y === -ghost.dir.y)
+                );
+
+                if (possible.length > 0) {
+                    if (player.isPowered) {
+                        possible.sort((a,b) => dist(ghost.gridX+b.x, ghost.gridY+b.y, player.gridX, player.gridY) - dist(ghost.gridX+a.x, ghost.gridY+a.y, player.gridX, player.gridY));
+                    } else if (ghost.behavior === 'CHASE') {
+                        possible.sort((a,b) => dist(ghost.gridX+a.x, ghost.gridY+a.y, player.gridX, player.gridY) - dist(ghost.gridX+b.x, ghost.gridY+b.y, player.gridX, player.gridY));
                     } else if (ghost.behavior === 'AMBUSH') {
-                        const tx = player.gridX + player.dir.x * 2;
-                        const ty = player.gridY + player.dir.y * 2;
-                        possible.sort((a,b) => dist(gx+a.x, gy+a.y, tx, ty) - dist(gx+b.x, gy+b.y, tx, ty));
+                        const ambushX = player.gridX + player.dir.x * 2;
+                        const ambushY = player.gridY + player.dir.y * 2;
+                        possible.sort((a,b) => dist(ghost.gridX+a.x, ghost.gridY+a.y, ambushX, ambushY) - dist(ghost.gridX+b.x, ghost.gridY+b.y, ambushX, ambushY));
                     } else {
                         possible.sort(() => Math.random() - 0.5);
                     }
+                    ghost.dir = possible[0];
+                } else {
+                    const reverse = { x: -ghost.dir.x, y: -ghost.dir.y };
+                    ghost.dir = canMove(ghost.gridX + reverse.x, ghost.gridY + reverse.y) ? reverse : { x: 0, y: 0 };
                 }
-                ghost.dir = possible[0];
+
+                if (ghost.dir.x === 0 && ghost.dir.y === 0) break;
+                ghost.gridX += ghost.dir.x;
+                ghost.gridY += ghost.dir.y;
+            }
+
+            const targetX = ghost.gridX * TILE_SIZE;
+            const targetY = ghost.gridY * TILE_SIZE;
+            const dx = targetX - ghost.x;
+            const dy = targetY - ghost.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+
+            if (distance <= epsilon) {
+                ghost.x = targetX;
+                ghost.y = targetY;
+                break;
+            }
+
+            if (remaining >= distance) {
+                ghost.x = targetX;
+                ghost.y = targetY;
+                remaining -= distance;
             } else {
-                ghost.dir = { x: -ghost.dir.x, y: -ghost.dir.y };
+                ghost.x += (dx / distance) * remaining;
+                ghost.y += (dy / distance) * remaining;
+                remaining = 0;
             }
         }
-        ghost.x += ghost.dir.x * moveSpeed;
-        ghost.y += ghost.dir.y * moveSpeed;
     });
 }
 
@@ -531,20 +580,35 @@ function findSafeSpawn(map, px, py, minDist) {
 }
 
 function checkLevelWin() {
-    if (!LabyrinthMaps[currentPhase].flat().some(t => t === 2 || t === 3)) {
-        gameState = 'LEVEL_COMPLETE'; totalTime += (Date.now() - startTime);
+    if (!activeMap.flat().some(t => t === 2 || t === 3)) {
+        const phaseTime = Date.now() - startTime;
+        gameState = 'LEVEL_COMPLETE'; totalTime += phaseTime;
+        notifyParentOfScore();
+
         if (currentPhase < 2) {
             document.getElementById('level-complete').classList.remove('hidden');
             document.getElementById('complete-title').innerText = `ROTA 4 - FASE ${currentPhase + 1} OK`;
+            document.getElementById('stats-score').innerText = score.toString();
+            document.getElementById('stats-time').innerText = formatTimer(phaseTime);
         } else victory();
     }
 }
 
 function victory() {
-    gameState = 'VICTORY'; document.getElementById('victory-screen').classList.remove('hidden');
+    gameState = 'VICTORY';
     document.getElementById('final-score').innerText = score;
     document.getElementById('final-time').innerText = formatTimer(totalTime);
-    localStorage.setItem('robot_runner_high_score', score);
+    localStorage.setItem('robot_runner_high_score', Math.max(Number(localStorage.getItem('robot_runner_high_score')) || 0, score));
+    window.QCHArcadeResults.show({
+        gameId: 'robot-runner',
+        victory: true,
+        score,
+        stats: [
+            { label: 'Score Final', value: score },
+            { label: 'Tempo Total', value: formatTimer(totalTime) },
+            { label: 'Fases', value: '3/3' },
+        ],
+    });
 }
 
 function updateHUD(elapsed) { document.getElementById('time-display').innerText = formatTimer(elapsed); }
@@ -577,7 +641,7 @@ function draw() {
     }
 
     // Walls & Pellets
-    const map = LabyrinthMaps[currentPhase];
+    const map = activeMap;
     const glowPulse = 5 + Math.sin(Date.now() / 200) * 5;
     for (let r = 0; r < map.length; r++) {
         for (let c = 0; c < map[r].length; c++) {
@@ -674,7 +738,7 @@ document.getElementById('next-btn').onclick = () => {
 };
 document.getElementById('retry-btn').onclick = () => {
     document.getElementById('game-over').classList.add('hidden');
-    gameState = 'PLAYING'; lives = 3; score = 0; displayedScore = 0; startTime = Date.now(); initLevel(currentPhase);
+    gameState = 'PLAYING'; lives = 3; score = 0; displayedScore = 0; totalTime = 0; startTime = Date.now(); initLevel(currentPhase);
     document.getElementById('score-display').innerText = '000000';
     updateLivesUI();
 };

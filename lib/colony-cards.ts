@@ -2,11 +2,29 @@ import { Cpu, Factory, Music, School, Shield, Utensils } from 'lucide-react';
 
 export type ColonySectorId = 'happiness' | 'health' | 'economy' | 'security' | 'technology' | 'culture';
 export type ColonyCardSlot = 'leadership' | 'infrastructure' | 'culture';
-export type BattleCardSlot = 'weapon' | 'armor' | 'core' | 'tactic';
+export type BattleCardSlot = 'weapon' | 'armor' | 'core' | 'tactic' | 'auxiliary' | 'protocol';
 export type ColonyCardAnySlot = ColonyCardSlot | BattleCardSlot;
-export type ColonyCardClass = 'political' | 'battle';
-export type ColonyCardRarity = 'common' | 'rare' | 'epic' | 'legendary';
-export type BattleCardStat = 'damagePercent' | 'defensePercent' | 'critChance' | 'critDamage' | 'specialCooldownPercent';
+export type ColonyCardClass = 'political' | 'battle' | 'wildcard';
+export type ColonyCardRarity = 'common' | 'rare' | 'epic' | 'legendary' | 'mythic' | 'wildcard';
+export type ElementalDamageType = 'ice' | 'electric' | 'fire';
+export type CombatStatusId = 'slow' | 'shocked' | 'burning';
+export type BattleCardStat =
+  | 'damagePercent'
+  | 'healthPercent'
+  | 'shieldPercent'
+  | 'critChance'
+  | 'critDamage'
+  | 'iceDamagePercent'
+  | 'electricDamagePercent'
+  | 'fireDamagePercent'
+  | 'bonusDamageVsSlowPercent'
+  | 'bonusDamageVsShockedPercent'
+  | 'bonusDamageVsBurningPercent'
+  | 'slowEnemyDamageReductionPercent'
+  | 'shockedEnemySkipChance'
+  | 'burningDamageOverTimePercent'
+  | 'specialCooldownPercent'
+  | 'defensePercent';
 
 export interface ColonyCardEffect {
   sector: ColonySectorId;
@@ -18,10 +36,17 @@ export interface BattleCardEffect {
   value: number;
 }
 
+export interface ArcadeWildcardPerk {
+  id: string;
+  label: Record<'en' | 'pt', string>;
+  description: Record<'en' | 'pt', string>;
+  value: string;
+}
+
 export interface ColonyCard {
   id: string;
   cardClass?: ColonyCardClass;
-  slot: ColonyCardAnySlot;
+  slot?: ColonyCardAnySlot;
   rarity: ColonyCardRarity;
   name: Record<'en' | 'pt', string>;
   role: Record<'en' | 'pt', string>;
@@ -29,16 +54,132 @@ export interface ColonyCard {
   effects?: ColonyCardEffect[];
   battleEffects?: BattleCardEffect[];
   unlocksArcadeId?: string;
+  arcadePerk?: ArcadeWildcardPerk;
 }
 
 export const POLITICAL_CARD_SLOTS: ColonyCardSlot[] = ['leadership', 'infrastructure', 'culture'];
-export const BATTLE_CARD_SLOTS: BattleCardSlot[] = ['weapon', 'armor', 'core', 'tactic'];
+export const BATTLE_CARD_SLOTS: BattleCardSlot[] = ['weapon', 'armor', 'core', 'tactic', 'auxiliary', 'protocol'];
 
 export const getCardClass = (card: ColonyCard): ColonyCardClass => card.cardClass || 'political';
 export const isPoliticalCard = (card: ColonyCard): card is ColonyCard & { slot: ColonyCardSlot } => getCardClass(card) === 'political';
 export const isBattleCard = (card: ColonyCard): card is ColonyCard & { slot: BattleCardSlot } => getCardClass(card) === 'battle';
-export const getPoliticalEffects = (card: ColonyCard): ColonyCardEffect[] => card.effects || [];
-export const getBattleEffects = (card: ColonyCard): BattleCardEffect[] => card.battleEffects || [];
+export const isWildcardCard = (card: ColonyCard) => getCardClass(card) === 'wildcard';
+
+export type ColonyCardLevels = Record<string, number>;
+export const MAX_COLONY_CARD_LEVEL = 10;
+export const MAX_HORIZON_LEVEL = 50;
+export const getCardLevel = (cardId?: string, levels: ColonyCardLevels = {}) => (
+  Math.max(1, Math.min(MAX_COLONY_CARD_LEVEL, Number(levels[cardId || '']) || 1))
+);
+
+export const getHorizonLevelFromXp = (xp = 0) => {
+  let level = 1;
+  let remainingXp = Math.max(0, Math.floor(xp));
+
+  while (level < MAX_HORIZON_LEVEL) {
+    const needed = getHorizonXpForNextLevel(level);
+    if (remainingXp < needed) break;
+    remainingXp -= needed;
+    level += 1;
+  }
+
+  return { level, currentXp: remainingXp, nextXp: level >= MAX_HORIZON_LEVEL ? 0 : getHorizonXpForNextLevel(level) };
+};
+
+export const getHorizonXpForNextLevel = (level: number) => (
+  Math.round(420 + Math.max(1, level) * 90 + Math.pow(Math.max(1, level), 1.35) * 42)
+);
+
+export const getPoliticalEffects = (card: ColonyCard, levels: ColonyCardLevels = {}): ColonyCardEffect[] => {
+  const levelBonus = (getCardLevel(card.id, levels) - 1) * 2;
+  return (card.effects || []).map(effect => ({
+    ...effect,
+    value: effect.value + levelBonus,
+  }));
+};
+
+export const getBattleEffects = (card: ColonyCard, levels: ColonyCardLevels = {}): BattleCardEffect[] => {
+  const multiplier = 1 + (getCardLevel(card.id, levels) - 1) * 0.1;
+  return (card.battleEffects || []).map(effect => ({
+    ...effect,
+    value: Math.round(effect.value * multiplier),
+  }));
+};
+
+export const getArcadeWildcardPerks = (cardIds: string[] = [], arcadeId?: string) => {
+  const owned = new Set(cardIds);
+  return COLONY_CARD_CATALOG
+    .filter(card => owned.has(card.id))
+    .filter(card => isWildcardCard(card))
+    .filter(card => !arcadeId || card.unlocksArcadeId === arcadeId)
+    .map(card => card.arcadePerk)
+    .filter(Boolean) as ArcadeWildcardPerk[];
+};
+
+const CARD_UPGRADE_BASE_COST: Record<ColonyCardRarity, number> = {
+  common: 15000,
+  rare: 35000,
+  epic: 80000,
+  legendary: 180000,
+  mythic: 350000,
+  wildcard: 0,
+};
+
+export const getCardUpgradeCost = (card: ColonyCard, level = 1) => (
+  level >= MAX_COLONY_CARD_LEVEL ? 0 : Math.round(CARD_UPGRADE_BASE_COST[card.rarity] * level)
+);
+
+export const CARD_BACKGROUND_BY_RARITY: Record<ColonyCardRarity, string> = {
+  common: '/assets/rota4/cards/1_background_c.webp',
+  rare: '/assets/rota4/cards/2_background_r.webp',
+  epic: '/assets/rota4/cards/3_background_e.webp',
+  legendary: '/assets/rota4/cards/4_background_l.webp',
+  mythic: '/assets/rota4/cards/5_background_m.webp',
+  wildcard: '/assets/rota4/cards/6_background_j.webp',
+};
+
+export const getCardBackgroundImage = (rarity: ColonyCardRarity) => CARD_BACKGROUND_BY_RARITY[rarity];
+
+export const ELEMENTAL_BATTLE_STATS: Record<ElementalDamageType, BattleCardStat> = {
+  ice: 'iceDamagePercent',
+  electric: 'electricDamagePercent',
+  fire: 'fireDamagePercent',
+};
+export const TRINITY_REACTOR_CARD_ID = 'battle-orange-trinity';
+
+export const unlocksElementalSynergy = (card?: ColonyCard) => card?.id === TRINITY_REACTOR_CARD_ID;
+
+export const getBattleCardElementTypes = (card: ColonyCard): ElementalDamageType[] => {
+  if (!isBattleCard(card)) return [];
+  return (Object.entries(ELEMENTAL_BATTLE_STATS) as Array<[ElementalDamageType, BattleCardStat]>)
+    .filter(([, stat]) => getBattleEffects(card).some(effect => effect.stat === stat && effect.value !== 0))
+    .map(([element]) => element);
+};
+
+export const canEquipBattleCardWithElementRule = (
+  card: ColonyCard,
+  equippedCards: ColonyCard[]
+) => {
+  if (unlocksElementalSynergy(card) || equippedCards.some(unlocksElementalSynergy)) {
+    return {
+      allowed: true,
+      element: undefined,
+      candidateElements: getBattleCardElementTypes(card),
+      equippedElements: Array.from(new Set(equippedCards.flatMap(getBattleCardElementTypes))),
+    };
+  }
+
+  const candidateElements = getBattleCardElementTypes(card);
+  const equippedElements = equippedCards.flatMap(getBattleCardElementTypes);
+  const uniqueElements = Array.from(new Set([...equippedElements, ...candidateElements]));
+
+  return {
+    allowed: uniqueElements.length <= 1,
+    element: uniqueElements[0] as ElementalDamageType | undefined,
+    candidateElements,
+    equippedElements: Array.from(new Set(equippedElements)),
+  };
+};
 
 export const SECTOR_CONFIG: Record<ColonySectorId, {
   label: Record<'en' | 'pt', string>;
@@ -55,12 +196,135 @@ export const SECTOR_CONFIG: Record<ColonySectorId, {
 
 export const BATTLE_STAT_CONFIG: Record<BattleCardStat, {
   label: Record<'en' | 'pt', string>;
+  category: 'core' | 'elemental' | 'conditional' | 'legacy';
+  unit: 'percent' | 'chance';
 }> = {
-  damagePercent: { label: { en: 'Damage', pt: 'Dano' } },
-  defensePercent: { label: { en: 'Defense', pt: 'Defesa' } },
-  critChance: { label: { en: 'Crit Chance', pt: 'Chance Crítica' } },
-  critDamage: { label: { en: 'Crit Damage', pt: 'Dano Crítico' } },
-  specialCooldownPercent: { label: { en: 'Special Cooldown', pt: 'Recarga Especial' } },
+  damagePercent: { label: { en: 'Damage', pt: 'Dano' }, category: 'core', unit: 'percent' },
+  healthPercent: { label: { en: 'Health', pt: 'Vida' }, category: 'core', unit: 'percent' },
+  shieldPercent: { label: { en: 'Shield', pt: 'Escudo' }, category: 'core', unit: 'percent' },
+  critChance: { label: { en: 'Crit Chance', pt: 'Chance Crítica' }, category: 'core', unit: 'chance' },
+  critDamage: { label: { en: 'Crit Damage', pt: 'Dano Crítico' }, category: 'core', unit: 'percent' },
+  iceDamagePercent: { label: { en: 'Ice Damage', pt: 'Dano Gélido' }, category: 'elemental', unit: 'percent' },
+  electricDamagePercent: { label: { en: 'Electric Damage', pt: 'Dano Elétrico' }, category: 'elemental', unit: 'percent' },
+  fireDamagePercent: { label: { en: 'Fire Damage', pt: 'Dano de Fogo' }, category: 'elemental', unit: 'percent' },
+  bonusDamageVsSlowPercent: { label: { en: 'Damage vs Slow', pt: 'Dano vs Lentos' }, category: 'conditional', unit: 'percent' },
+  bonusDamageVsShockedPercent: { label: { en: 'Damage vs Shocked', pt: 'Dano vs Eletrificados' }, category: 'conditional', unit: 'percent' },
+  bonusDamageVsBurningPercent: { label: { en: 'Damage vs Burning', pt: 'Dano vs Em Chamas' }, category: 'conditional', unit: 'percent' },
+  slowEnemyDamageReductionPercent: { label: { en: 'Slow Damage Reduction', pt: 'Redução de Dano Lento' }, category: 'conditional', unit: 'percent' },
+  shockedEnemySkipChance: { label: { en: 'Shock Skip Chance', pt: 'Falha por Choque' }, category: 'conditional', unit: 'chance' },
+  burningDamageOverTimePercent: { label: { en: 'Burn DoT', pt: 'Dano Contínuo de Fogo' }, category: 'conditional', unit: 'percent' },
+  specialCooldownPercent: { label: { en: 'Special Cooldown', pt: 'Recarga Especial' }, category: 'core', unit: 'percent' },
+  defensePercent: { label: { en: 'Defense', pt: 'Defesa' }, category: 'legacy', unit: 'percent' },
+};
+
+export interface BattleShipBaseStats {
+  damage: number;
+  health: number;
+  shield: number;
+  critChance: number;
+  critMultiplier: number;
+}
+
+export interface BattleShipComputedStats extends BattleShipBaseStats {
+  baseDamageBonusPercent: number;
+  healthBonusPercent: number;
+  shieldBonusPercent: number;
+  critDamageBonusPercent: number;
+  elementalDamage: Record<ElementalDamageType, number>;
+  elementalBonusPercent: Record<ElementalDamageType, number>;
+  conditionalBonuses: {
+    bonusDamageVsSlowPercent: number;
+    bonusDamageVsShockedPercent: number;
+    bonusDamageVsBurningPercent: number;
+    slowEnemyDamageReductionPercent: number;
+    shockedEnemySkipChance: number;
+    burningDamageOverTimePercent: number;
+  };
+  specialCooldownReductionPercent: number;
+}
+
+export const BASE_BATTLE_SHIP_STATS: BattleShipBaseStats = {
+  damage: 100,
+  health: 1000,
+  shield: 400,
+  critChance: 5,
+  critMultiplier: 3,
+};
+
+export const createEmptyBattleStatTotals = (): Record<BattleCardStat, number> => (
+  (Object.keys(BATTLE_STAT_CONFIG) as BattleCardStat[]).reduce((acc, stat) => {
+    acc[stat] = 0;
+    return acc;
+  }, {} as Record<BattleCardStat, number>)
+);
+
+export const calculateBattleStatTotals = (
+  cards: ColonyCard[],
+  levels: ColonyCardLevels = {}
+): Record<BattleCardStat, number> => {
+  const totals = createEmptyBattleStatTotals();
+  cards.forEach(card => {
+    getBattleEffects(card, levels).forEach(effect => {
+      totals[effect.stat] = (totals[effect.stat] || 0) + effect.value;
+    });
+  });
+  return totals;
+};
+
+export const calculateBattleShipStats = (
+  cards: ColonyCard[],
+  baseStats: BattleShipBaseStats = BASE_BATTLE_SHIP_STATS,
+  levels: ColonyCardLevels = {},
+  horizonLevel = 1
+): BattleShipComputedStats => {
+  const horizonMultiplier = 1 + Math.max(0, horizonLevel - 1) * 0.05;
+  const scaledBaseStats: BattleShipBaseStats = {
+    damage: Math.round(baseStats.damage * horizonMultiplier),
+    health: Math.round(baseStats.health * horizonMultiplier),
+    shield: Math.round(baseStats.shield * horizonMultiplier),
+    critChance: baseStats.critChance * horizonMultiplier,
+    critMultiplier: baseStats.critMultiplier * horizonMultiplier,
+  };
+  const totals = calculateBattleStatTotals(cards, levels);
+  const baseDamageBonusPercent = totals.damagePercent + totals.defensePercent;
+  const healthBonusPercent = totals.healthPercent;
+  const shieldBonusPercent = totals.shieldPercent;
+  const critDamageBonusPercent = totals.critDamage;
+  const damage = Math.round(scaledBaseStats.damage * (1 + baseDamageBonusPercent / 100));
+  const health = Math.round(scaledBaseStats.health * (1 + healthBonusPercent / 100));
+  const shield = Math.round(scaledBaseStats.shield * (1 + shieldBonusPercent / 100));
+  const critMultiplier = scaledBaseStats.critMultiplier * (1 + critDamageBonusPercent / 100);
+
+  return {
+    damage,
+    health,
+    shield,
+    critChance: scaledBaseStats.critChance + totals.critChance,
+    critMultiplier,
+    baseDamageBonusPercent,
+    healthBonusPercent,
+    shieldBonusPercent,
+    critDamageBonusPercent,
+    elementalDamage: {
+      ice: Math.round(damage * (totals.iceDamagePercent / 100)),
+      electric: Math.round(damage * (totals.electricDamagePercent / 100)),
+      fire: Math.round(damage * (totals.fireDamagePercent / 100)),
+    },
+    elementalBonusPercent: {
+      ice: totals.iceDamagePercent,
+      electric: totals.electricDamagePercent,
+      fire: totals.fireDamagePercent,
+    },
+    conditionalBonuses: {
+      bonusDamageVsSlowPercent: totals.bonusDamageVsSlowPercent,
+      bonusDamageVsShockedPercent: totals.bonusDamageVsShockedPercent,
+      bonusDamageVsBurningPercent: totals.bonusDamageVsBurningPercent,
+      slowEnemyDamageReductionPercent: totals.slowEnemyDamageReductionPercent,
+      shockedEnemySkipChance: totals.shockedEnemySkipChance,
+      burningDamageOverTimePercent: totals.burningDamageOverTimePercent,
+    },
+    specialCooldownReductionPercent: totals.specialCooldownPercent,
+  };
 };
 
 export const DEFAULT_COLONY_SECTORS: Record<ColonySectorId, number> = {
@@ -77,7 +341,131 @@ export const DEFAULT_OWNED_COLONY_CARD_IDS = [
   'orbital-engineer',
   'civic-mediator',
   'arcade-salto-espacial',
+  'battle-white-spark',
+  'battle-iron-pulse',
 ];
+
+export const STARTER_BATTLE_CARD_IDS = [
+  'battle-white-spark',
+  'battle-iron-pulse',
+];
+
+export const normalizeOwnedColonyCardIds = (ids?: string[]) => {
+  const validIds = new Set(COLONY_CARD_CATALOG.map(card => card.id));
+  return Array.from(new Set([
+    ...DEFAULT_OWNED_COLONY_CARD_IDS,
+    ...((ids || []).filter(id => validIds.has(id))),
+  ]));
+};
+
+export const BATTLE_CARD_ATTRIBUTE_COUNT: Record<ColonyCardRarity, number> = {
+  common: 2,
+  rare: 3,
+  epic: 4,
+  legendary: 5,
+  mythic: 6,
+  wildcard: 0,
+};
+
+export const BATTLE_CARD_DROP_CHANCE: Record<ColonyCardRarity, number> = {
+  common: 55,
+  rare: 30,
+  epic: 12,
+  legendary: 3,
+  mythic: 0,
+  wildcard: 0,
+};
+
+export const ARCADE_CARD_REWARD_CHANCE = 35;
+
+export type ArcadeCardRewardRule = {
+  gameId: string;
+  minimumScore: number;
+  scoreMode: 'points' | 'remainingSeconds';
+};
+
+export const ARCADE_CARD_REWARD_RULES: Record<string, ArcadeCardRewardRule> = {
+  'salto-espacial': {
+    gameId: 'salto-espacial',
+    minimumScore: 4000,
+    scoreMode: 'points',
+  },
+  'ruptura-estelar': {
+    gameId: 'ruptura-estelar',
+    minimumScore: 10000,
+    scoreMode: 'points',
+  },
+  'danger-zoom-zones': {
+    gameId: 'danger-zoom-zones',
+    minimumScore: 300,
+    scoreMode: 'remainingSeconds',
+  },
+  'grid-collapse': {
+    gameId: 'grid-collapse',
+    minimumScore: 10000,
+    scoreMode: 'points',
+  },
+  'robot-runner': {
+    gameId: 'robot-runner',
+    minimumScore: 5000,
+    scoreMode: 'points',
+  },
+  'neo-catcher': {
+    gameId: 'neo-catcher',
+    minimumScore: 15000,
+    scoreMode: 'points',
+  },
+};
+
+export const rollBattleCardRarity = (
+  random = Math.random,
+  legendaryBonusPercent = 0
+): ColonyCardRarity => {
+  const legendaryChance = Math.min(60, Math.max(0, BATTLE_CARD_DROP_CHANCE.legendary + legendaryBonusPercent));
+  const roll = random() * 100;
+
+  if (roll < legendaryChance) return 'legendary';
+
+  const nonLegendaryRoll = random() * (
+    BATTLE_CARD_DROP_CHANCE.common +
+    BATTLE_CARD_DROP_CHANCE.rare +
+    BATTLE_CARD_DROP_CHANCE.epic
+  );
+  let cursor = 0;
+
+  for (const rarity of ['common', 'rare', 'epic'] as ColonyCardRarity[]) {
+    cursor += BATTLE_CARD_DROP_CHANCE[rarity];
+    if (nonLegendaryRoll <= cursor) return rarity;
+  }
+
+  return 'common';
+};
+
+export const rollBattleCardReward = (
+  ownedIds: string[] = [],
+  random = Math.random,
+  legendaryBonusPercent = 0
+) => {
+  const owned = new Set(ownedIds);
+  const preferredRarity = rollBattleCardRarity(random, legendaryBonusPercent);
+  const battleCards = COLONY_CARD_CATALOG.filter(card => isBattleCard(card) && !owned.has(card.id));
+  const sameRarity = battleCards.filter(card => card.rarity === preferredRarity);
+  const pool = sameRarity.length > 0 ? sameRarity : battleCards;
+
+  if (pool.length === 0) return null;
+
+  return pool[Math.floor(random() * pool.length)];
+};
+
+export const rollAnyMissingColonyCardReward = (
+  ownedIds: string[] = [],
+  random = Math.random
+) => {
+  const owned = new Set(ownedIds);
+  const pool = COLONY_CARD_CATALOG.filter(card => !owned.has(card.id));
+  if (pool.length === 0) return null;
+  return pool[Math.floor(random() * pool.length)];
+};
 
 export const COLONY_CARD_CATALOG: ColonyCard[] = [
   {
@@ -130,100 +518,218 @@ export const COLONY_CARD_CATALOG: ColonyCard[] = [
   },
   {
     id: 'arcade-salto-espacial',
-    slot: 'culture',
-    rarity: 'legendary',
-    name: { en: 'Arcade Charter: Space Jump', pt: 'Carta Fliperama: Salto Espacial' },
+    cardClass: 'wildcard',
+    rarity: 'wildcard',
+    name: { en: 'Wildcard: Space Jump', pt: 'Curinga: Salto Espacial' },
     role: { en: 'Unlocks Space Jump', pt: 'Desbloqueia Salto Espacial' },
     lore: {
       en: 'The first public arcade cabinet approved for New Earth morale recovery.',
       pt: 'O primeiro fliperama público aprovado para recuperar o moral da Nova Terra.',
     },
-    effects: [
-      { sector: 'culture', value: 16 },
-      { sector: 'happiness', value: 8 },
-    ],
+    arcadePerk: {
+      id: 'space-jump-score-boost',
+      label: { en: 'Score Bonus', pt: 'Pontuação Bônus' },
+      description: { en: 'Space Jump score is multiplied during the run.', pt: 'A pontuação do Salto Espacial é multiplicada durante a partida.' },
+      value: '1.5x',
+    },
     unlocksArcadeId: 'salto-espacial',
   },
   {
     id: 'arcade-ruptura-estelar',
-    slot: 'culture',
-    rarity: 'epic',
-    name: { en: 'Arcade Charter: Stellar Rupture', pt: 'Carta Fliperama: Ruptura Estelar' },
+    cardClass: 'wildcard',
+    rarity: 'wildcard',
+    name: { en: 'Wildcard: Stellar Rupture', pt: 'Curinga: Ruptura Estelar' },
     role: { en: 'Unlocks Stellar Rupture', pt: 'Desbloqueia Ruptura Estelar' },
     lore: {
       en: 'A combat simulator reframed as civic courage training.',
       pt: 'Um simulador de combate convertido em treinamento de coragem cívica.',
     },
-    effects: [
-      { sector: 'security', value: 8 },
-      { sector: 'culture', value: 8 },
-    ],
+    arcadePerk: {
+      id: 'stellar-rupture-shield-charge',
+      label: { en: 'Emergency Shield', pt: 'Escudo Emergencial' },
+      description: { en: 'Stellar Rupture starts with one short protection charge.', pt: 'Ruptura Estelar começa com uma carga curta de proteção.' },
+      value: '+1',
+    },
     unlocksArcadeId: 'ruptura-estelar',
   },
   {
     id: 'arcade-danger-zoom-zones',
-    slot: 'culture',
-    rarity: 'rare',
-    name: { en: 'Arcade Charter: Danger Zoom Zones', pt: 'Carta Fliperama: Danger Zoom Zones' },
+    cardClass: 'wildcard',
+    rarity: 'wildcard',
+    name: { en: 'Wildcard: Danger Zoom Zones', pt: 'Curinga: Danger Zoom Zones' },
     role: { en: 'Unlocks Danger Zoom Zones', pt: 'Desbloqueia Danger Zoom Zones' },
     lore: {
       en: 'A pressure game that teaches pattern recognition under stress.',
       pt: 'Um jogo de pressão que ensina leitura de padrões sob estresse.',
     },
-    effects: [
-      { sector: 'technology', value: 7 },
-      { sector: 'security', value: 5 },
-    ],
+    arcadePerk: {
+      id: 'danger-zoom-extra-time',
+      label: { en: 'Extra Time', pt: 'Tempo Extra' },
+      description: { en: 'Danger Zoom Zones begins with a small timer reserve.', pt: 'Danger Zoom Zones começa com uma pequena reserva de tempo.' },
+      value: '+10s',
+    },
     unlocksArcadeId: 'danger-zoom-zones',
   },
   {
     id: 'arcade-grid-collapse',
-    slot: 'culture',
-    rarity: 'rare',
-    name: { en: 'Arcade Charter: Grid Collapse', pt: 'Carta Fliperama: Grid Collapse' },
+    cardClass: 'wildcard',
+    rarity: 'wildcard',
+    name: { en: 'Wildcard: Grid Collapse', pt: 'Curinga: Grid Collapse' },
     role: { en: 'Unlocks Grid Collapse', pt: 'Desbloqueia Grid Collapse' },
     lore: {
       en: 'Puzzle discipline dressed as a glowing cabinet.',
       pt: 'Disciplina lógica vestida como um gabinete luminoso.',
     },
-    effects: [
-      { sector: 'technology', value: 10 },
-      { sector: 'culture', value: 3 },
-    ],
+    arcadePerk: {
+      id: 'grid-collapse-line-bonus',
+      label: { en: 'Line Bonus', pt: 'Bônus de Linha' },
+      description: { en: 'The first completed line in Grid Collapse grants bonus points.', pt: 'A primeira linha completa em Grid Collapse concede pontos bônus.' },
+      value: '+500',
+    },
     unlocksArcadeId: 'grid-collapse',
   },
   {
     id: 'arcade-robot-runner',
-    slot: 'culture',
-    rarity: 'epic',
-    name: { en: 'Arcade Charter: Robot Runner', pt: 'Carta Fliperama: Robot Runner' },
+    cardClass: 'wildcard',
+    rarity: 'wildcard',
+    name: { en: 'Wildcard: Robot Runner', pt: 'Curinga: Robot Runner' },
     role: { en: 'Unlocks Robot Runner', pt: 'Desbloqueia Robot Runner' },
     lore: {
       en: 'A cheerful maze that quietly improves robot empathy protocols.',
       pt: 'Um labirinto alegre que melhora protocolos de empatia robótica.',
     },
-    effects: [
-      { sector: 'happiness', value: 6 },
-      { sector: 'technology', value: 6 },
-      { sector: 'culture', value: 6 },
-    ],
+    arcadePerk: {
+      id: 'robot-runner-extra-life',
+      label: { en: 'Extra Life', pt: 'Vida Extra' },
+      description: { en: 'Robot Runner starts with one additional life.', pt: 'Robot Runner começa com uma vida adicional.' },
+      value: '+1',
+    },
     unlocksArcadeId: 'robot-runner',
   },
   {
     id: 'arcade-neo-catcher',
-    slot: 'culture',
-    rarity: 'legendary',
-    name: { en: 'Arcade Charter: Neo Catcher', pt: 'Carta Fliperama: Neo Catcher' },
+    cardClass: 'wildcard',
+    rarity: 'wildcard',
+    name: { en: 'Wildcard: Neo Catcher', pt: 'Curinga: Neo Catcher' },
     role: { en: 'Unlocks Neo Catcher', pt: 'Desbloqueia Neo Catcher' },
     lore: {
       en: 'A preservation ritual disguised as a game of falling lights.',
       pt: 'Um ritual de preservação disfarçado de jogo de luzes em queda.',
     },
-    effects: [
-      { sector: 'culture', value: 14 },
-      { sector: 'happiness', value: 6 },
-      { sector: 'health', value: 4 },
-    ],
+    arcadePerk: {
+      id: 'neo-catcher-heal-chance',
+      label: { en: 'Repair Chance', pt: 'Chance de Reparo' },
+      description: { en: 'Neo Catcher has a higher chance to spawn repair powerups.', pt: 'Neo Catcher tem chance maior de gerar powerups de reparo.' },
+      value: '+12%',
+    },
+    unlocksArcadeId: 'neo-catcher',
+  },
+  {
+    id: 'wildcard-salto-espacial-second-chance',
+    cardClass: 'wildcard',
+    rarity: 'wildcard',
+    name: { en: 'Wildcard: Cosmic Spare Hull', pt: 'Curinga: Casco Reserva Cósmico' },
+    role: { en: 'Space Jump passive perk', pt: 'Perk passivo do Salto Espacial' },
+    lore: {
+      en: 'A backup hull authorization stamped for the most stubborn pilots.',
+      pt: 'Uma autorização de casco reserva carimbada para pilotos teimosos.',
+    },
+    arcadePerk: {
+      id: 'space-jump-extra-life',
+      label: { en: 'Extra Life', pt: 'Vida Extra' },
+      description: { en: 'Space Jump starts with one emergency life.', pt: 'Salto Espacial começa com uma vida emergencial.' },
+      value: '+1',
+    },
+    unlocksArcadeId: 'salto-espacial',
+  },
+  {
+    id: 'wildcard-ruptura-estelar-overdrive',
+    cardClass: 'wildcard',
+    rarity: 'wildcard',
+    name: { en: 'Wildcard: Overdrive Spark', pt: 'Curinga: Centelha Overdrive' },
+    role: { en: 'Stellar Rupture passive perk', pt: 'Perk passivo da Ruptura Estelar' },
+    lore: {
+      en: 'A tiny illegal capacitor that wakes up before the battle does.',
+      pt: 'Um pequeno capacitor ilegal que acorda antes da batalha.',
+    },
+    arcadePerk: {
+      id: 'stellar-rupture-start-overdrive',
+      label: { en: 'Initial Overdrive', pt: 'Overdrive Inicial' },
+      description: { en: 'Stellar Rupture begins with a partial overdrive charge.', pt: 'Ruptura Estelar começa com carga parcial de overdrive.' },
+      value: '+20%',
+    },
+    unlocksArcadeId: 'ruptura-estelar',
+  },
+  {
+    id: 'wildcard-danger-zoom-safe-scan',
+    cardClass: 'wildcard',
+    rarity: 'wildcard',
+    name: { en: 'Wildcard: Blue Scan Permit', pt: 'Curinga: Permissão Scan Azul' },
+    role: { en: 'Danger Zoom Zones passive perk', pt: 'Perk passivo do Danger Zoom Zones' },
+    lore: {
+      en: 'A tiny permission slip that tells one mistake to stay quiet.',
+      pt: 'Uma autorização mínima que manda um erro ficar quieto.',
+    },
+    arcadePerk: {
+      id: 'danger-zoom-forgive-error',
+      label: { en: 'Forgiven Error', pt: 'Erro Perdoado' },
+      description: { en: 'Danger Zoom Zones forgives the first wrong scan or disarm.', pt: 'Danger Zoom Zones perdoa o primeiro scan ou desarme errado.' },
+      value: '1x',
+    },
+    unlocksArcadeId: 'danger-zoom-zones',
+  },
+  {
+    id: 'wildcard-grid-collapse-preview',
+    cardClass: 'wildcard',
+    rarity: 'wildcard',
+    name: { en: 'Wildcard: Prism Queue', pt: 'Curinga: Fila Prisma' },
+    role: { en: 'Grid Collapse passive perk', pt: 'Perk passivo do Grid Collapse' },
+    lore: {
+      en: 'A preview lens that makes corrupted pieces feel slightly less smug.',
+      pt: 'Uma lente de previsão que deixa peças corrompidas menos convencidas.',
+    },
+    arcadePerk: {
+      id: 'grid-collapse-next-piece-preview',
+      label: { en: 'Extra Preview', pt: 'Prévia Extra' },
+      description: { en: 'Grid Collapse can show one additional upcoming piece.', pt: 'Grid Collapse pode mostrar uma peça futura adicional.' },
+      value: '+1',
+    },
+    unlocksArcadeId: 'grid-collapse',
+  },
+  {
+    id: 'wildcard-robot-runner-slow-aura',
+    cardClass: 'wildcard',
+    rarity: 'wildcard',
+    name: { en: 'Wildcard: Rubber Clock', pt: 'Curinga: Relógio Elástico' },
+    role: { en: 'Robot Runner passive perk', pt: 'Perk passivo do Robot Runner' },
+    lore: {
+      en: 'A cheerful timing bug officially reclassified as accessibility.',
+      pt: 'Um erro simpático de tempo oficialmente reclassificado como acessibilidade.',
+    },
+    arcadePerk: {
+      id: 'robot-runner-ghost-slow',
+      label: { en: 'Enemy Slow', pt: 'Inimigos Lentos' },
+      description: { en: 'Robot Runner enemies are slightly slower during special slow motion.', pt: 'Os inimigos de Robot Runner ficam um pouco mais lentos durante a câmera lenta.' },
+      value: '+8%',
+    },
+    unlocksArcadeId: 'robot-runner',
+  },
+  {
+    id: 'wildcard-neo-catcher-combo-guard',
+    cardClass: 'wildcard',
+    rarity: 'wildcard',
+    name: { en: 'Wildcard: Combo Safety Net', pt: 'Curinga: Rede de Combo' },
+    role: { en: 'Neo Catcher passive perk', pt: 'Perk passivo do Neo Catcher' },
+    lore: {
+      en: 'A soft protocol that catches the streak right before pride drops it.',
+      pt: 'Um protocolo macio que segura a sequência antes do orgulho derrubar.',
+    },
+    arcadePerk: {
+      id: 'neo-catcher-combo-save',
+      label: { en: 'Combo Guard', pt: 'Proteção de Combo' },
+      description: { en: 'Neo Catcher preserves the combo once when a valid object is missed.', pt: 'Neo Catcher preserva o combo uma vez quando um objeto válido é perdido.' },
+      value: '1x',
+    },
     unlocksArcadeId: 'neo-catcher',
   },
   {
@@ -304,9 +810,461 @@ export const COLONY_CARD_CATALOG: ColonyCard[] = [
       { sector: 'technology', value: 4 },
     ],
   },
+  {
+    id: 'battle-white-spark',
+    cardClass: 'battle',
+    slot: 'weapon',
+    rarity: 'common',
+    name: { en: 'White Spark Coil', pt: 'Bobina Faísca Branca' },
+    role: { en: 'Starter battle card', pt: 'Carta de batalha inicial' },
+    lore: {
+      en: 'A clean ignition coil used by the first New Earth patrol ships.',
+      pt: 'Uma bobina de ignição limpa usada pelas primeiras patrulhas da Nova Terra.',
+    },
+    battleEffects: [
+      { stat: 'damagePercent', value: 10 },
+      { stat: 'electricDamagePercent', value: 15 },
+    ],
+  },
+  {
+    id: 'battle-iron-pulse',
+    cardClass: 'battle',
+    slot: 'armor',
+    rarity: 'common',
+    name: { en: 'Iron Pulse Plating', pt: 'Blindagem Pulso de Ferro' },
+    role: { en: 'Starter battle card', pt: 'Carta de batalha inicial' },
+    lore: {
+      en: 'Basic hull reinforcement with a stubborn shield pulse.',
+      pt: 'Reforço básico de casco com um pulso de escudo teimoso.',
+    },
+    battleEffects: [
+      { stat: 'healthPercent', value: 12 },
+      { stat: 'shieldPercent', value: 10 },
+    ],
+  },
+  {
+    id: 'battle-white-trigger',
+    cardClass: 'battle',
+    slot: 'weapon',
+    rarity: 'common',
+    name: { en: 'White Trigger Array', pt: 'Matriz Gatilho Branco' },
+    role: { en: 'Stable fire discipline', pt: 'Disciplina de disparo estável' },
+    lore: {
+      en: 'Old targeting discipline rebuilt for young colony pilots.',
+      pt: 'Velha disciplina de mira reconstruída para pilotos jovens da colônia.',
+    },
+    battleEffects: [
+      { stat: 'damagePercent', value: 8 },
+      { stat: 'critChance', value: 3 },
+    ],
+  },
+  {
+    id: 'battle-white-bulwark',
+    cardClass: 'battle',
+    slot: 'armor',
+    rarity: 'common',
+    name: { en: 'White Bulwark Plate', pt: 'Placa Baluarte Branca' },
+    role: { en: 'Starter survivability', pt: 'Sobrevivência inicial' },
+    lore: {
+      en: 'Simple plating that buys one more breath before the hull screams.',
+      pt: 'Blindagem simples que compra mais um fôlego antes do casco gritar.',
+    },
+    battleEffects: [
+      { stat: 'healthPercent', value: 10 },
+      { stat: 'shieldPercent', value: 8 },
+    ],
+  },
+  {
+    id: 'battle-white-cinder',
+    cardClass: 'battle',
+    slot: 'core',
+    rarity: 'common',
+    name: { en: 'White Cinder Cell', pt: 'Célula Brasa Branca' },
+    role: { en: 'Starter fire output', pt: 'Dano de fogo inicial' },
+    lore: {
+      en: 'A modest heat cell that leaves orange scars in the air.',
+      pt: 'Uma célula térmica modesta que deixa cicatrizes laranja no ar.',
+    },
+    battleEffects: [
+      { stat: 'damagePercent', value: 6 },
+      { stat: 'fireDamagePercent', value: 18 },
+    ],
+  },
+  {
+    id: 'battle-white-rime',
+    cardClass: 'battle',
+    slot: 'tactic',
+    rarity: 'common',
+    name: { en: 'White Rime Protocol', pt: 'Protocolo Geada Branca' },
+    role: { en: 'Starter ice control', pt: 'Controle gélido inicial' },
+    lore: {
+      en: 'A tiny cold routine that makes hostile engines hesitate.',
+      pt: 'Uma pequena rotina fria que faz motores hostis hesitarem.',
+    },
+    battleEffects: [
+      { stat: 'iceDamagePercent', value: 18 },
+      { stat: 'bonusDamageVsSlowPercent', value: 8 },
+    ],
+  },
+  {
+    id: 'battle-white-capacitor',
+    cardClass: 'battle',
+    slot: 'core',
+    rarity: 'common',
+    name: { en: 'White Capacitor', pt: 'Capacitor Branco' },
+    role: { en: 'Shield tuning', pt: 'Ajuste de escudo' },
+    lore: {
+      en: 'A light capacitor that keeps the first shield layer awake.',
+      pt: 'Um capacitor leve que mantém a primeira camada de escudo acordada.',
+    },
+    battleEffects: [
+      { stat: 'shieldPercent', value: 14 },
+      { stat: 'electricDamagePercent', value: 10 },
+    ],
+  },
+  {
+    id: 'battle-white-needle',
+    cardClass: 'battle',
+    slot: 'weapon',
+    rarity: 'common',
+    name: { en: 'White Needle Lens', pt: 'Lente Agulha Branca' },
+    role: { en: 'Critical starter', pt: 'Crítico inicial' },
+    lore: {
+      en: 'A narrow lens that rewards pilots who wait half a second longer.',
+      pt: 'Uma lente estreita que recompensa pilotos que esperam meio segundo a mais.',
+    },
+    battleEffects: [
+      { stat: 'critChance', value: 4 },
+      { stat: 'critDamage', value: 20 },
+    ],
+  },
+  {
+    id: 'battle-blue-arc',
+    cardClass: 'battle',
+    slot: 'weapon',
+    rarity: 'rare',
+    name: { en: 'Blue Arc Emitter', pt: 'Emissor Arco Azul' },
+    role: { en: 'Electric pressure', pt: 'Pressão elétrica' },
+    lore: {
+      en: 'Turns standard fire into pale lightning stitched across the target.',
+      pt: 'Transforma disparos comuns em relâmpagos claros costurados no alvo.',
+    },
+    battleEffects: [
+      { stat: 'damagePercent', value: 14 },
+      { stat: 'critChance', value: 4 },
+      { stat: 'electricDamagePercent', value: 35 },
+    ],
+  },
+  {
+    id: 'battle-frost-halo',
+    cardClass: 'battle',
+    slot: 'core',
+    rarity: 'rare',
+    name: { en: 'Frost Halo Core', pt: 'Núcleo Halo Gélido' },
+    role: { en: 'Ice control', pt: 'Controle gélido' },
+    lore: {
+      en: 'A cold reactor ring that slows hostile movement before impact.',
+      pt: 'Um anel de reator frio que desacelera movimentos hostis antes do impacto.',
+    },
+    battleEffects: [
+      { stat: 'shieldPercent', value: 16 },
+      { stat: 'iceDamagePercent', value: 30 },
+      { stat: 'bonusDamageVsSlowPercent', value: 18 },
+    ],
+  },
+  {
+    id: 'battle-blue-shock-net',
+    cardClass: 'battle',
+    slot: 'tactic',
+    rarity: 'rare',
+    name: { en: 'Blue Shock Net', pt: 'Rede de Choque Azul' },
+    role: { en: 'Shock control', pt: 'Controle por choque' },
+    lore: {
+      en: 'A bright net of probability that interrupts hostile attack rhythm.',
+      pt: 'Uma rede brilhante de probabilidade que interrompe o ritmo de ataque inimigo.',
+    },
+    battleEffects: [
+      { stat: 'electricDamagePercent', value: 28 },
+      { stat: 'shockedEnemySkipChance', value: 10 },
+      { stat: 'bonusDamageVsShockedPercent', value: 18 },
+    ],
+  },
+  {
+    id: 'battle-blue-glacier-plate',
+    cardClass: 'battle',
+    slot: 'armor',
+    rarity: 'rare',
+    name: { en: 'Blue Glacier Plate', pt: 'Placa Geleira Azul' },
+    role: { en: 'Cold defense', pt: 'Defesa gélida' },
+    lore: {
+      en: 'Armor that cools faster than panic can spread.',
+      pt: 'Uma blindagem que resfria mais rápido do que o pânico consegue se espalhar.',
+    },
+    battleEffects: [
+      { stat: 'healthPercent', value: 14 },
+      { stat: 'shieldPercent', value: 18 },
+      { stat: 'iceDamagePercent', value: 22 },
+    ],
+  },
+  {
+    id: 'battle-blue-cinder-vector',
+    cardClass: 'battle',
+    slot: 'weapon',
+    rarity: 'rare',
+    name: { en: 'Blue Cinder Vector', pt: 'Vetor Brasa Azul' },
+    role: { en: 'Fire criticals', pt: 'Críticos de fogo' },
+    lore: {
+      en: 'A heat vector that turns clean shots into burning fractures.',
+      pt: 'Um vetor térmico que transforma tiros limpos em fraturas flamejantes.',
+    },
+    battleEffects: [
+      { stat: 'damagePercent', value: 12 },
+      { stat: 'critChance', value: 4 },
+      { stat: 'fireDamagePercent', value: 30 },
+    ],
+  },
+  {
+    id: 'battle-blue-guardian-loop',
+    cardClass: 'battle',
+    slot: 'core',
+    rarity: 'rare',
+    name: { en: 'Blue Guardian Loop', pt: 'Laço Guardião Azul' },
+    role: { en: 'Shield economy', pt: 'Economia de escudo' },
+    lore: {
+      en: 'A defensive loop that keeps shield pressure from collapsing all at once.',
+      pt: 'Um laço defensivo que impede o escudo de colapsar de uma vez só.',
+    },
+    battleEffects: [
+      { stat: 'shieldPercent', value: 28 },
+      { stat: 'healthPercent', value: 8 },
+      { stat: 'specialCooldownPercent', value: 6 },
+    ],
+  },
+  {
+    id: 'battle-blue-fracture-sight',
+    cardClass: 'battle',
+    slot: 'tactic',
+    rarity: 'rare',
+    name: { en: 'Blue Fracture Sight', pt: 'Mira Fratura Azul' },
+    role: { en: 'Critical precision', pt: 'Precisão crítica' },
+    lore: {
+      en: 'Shows the pilot where the armor already wants to break.',
+      pt: 'Mostra ao piloto onde a blindagem já quer quebrar.',
+    },
+    battleEffects: [
+      { stat: 'critChance', value: 6 },
+      { stat: 'critDamage', value: 45 },
+      { stat: 'damagePercent', value: 8 },
+    ],
+  },
+  {
+    id: 'battle-blue-ember-field',
+    cardClass: 'battle',
+    slot: 'core',
+    rarity: 'rare',
+    name: { en: 'Blue Ember Field', pt: 'Campo Brasa Azul' },
+    role: { en: 'Burn follow-up', pt: 'Pressão contra chamas' },
+    lore: {
+      en: 'A contained burn field that teaches the ship to punish ignition.',
+      pt: 'Um campo de combustão contido que ensina a nave a punir ignição.',
+    },
+    battleEffects: [
+      { stat: 'fireDamagePercent', value: 24 },
+      { stat: 'burningDamageOverTimePercent', value: 12 },
+      { stat: 'bonusDamageVsBurningPercent', value: 18 },
+    ],
+  },
+  {
+    id: 'battle-violet-inferno',
+    cardClass: 'battle',
+    slot: 'tactic',
+    rarity: 'epic',
+    name: { en: 'Violet Inferno Doctrine', pt: 'Doutrina Inferno Violeta' },
+    role: { en: 'Fire aggression', pt: 'Agressão incendiária' },
+    lore: {
+      en: 'A combat script that leaves burning vectors in every evasive path.',
+      pt: 'Um roteiro de combate que deixa vetores em chamas em cada rota de evasão.',
+    },
+    battleEffects: [
+      { stat: 'damagePercent', value: 18 },
+      { stat: 'critDamage', value: 60 },
+      { stat: 'fireDamagePercent', value: 45 },
+      { stat: 'burningDamageOverTimePercent', value: 20 },
+    ],
+  },
+  {
+    id: 'battle-violet-storm-lattice',
+    cardClass: 'battle',
+    slot: 'weapon',
+    rarity: 'epic',
+    name: { en: 'Violet Storm Lattice', pt: 'Malha Tempestade Violeta' },
+    role: { en: 'Electric burst build', pt: 'Build de explosão elétrica' },
+    lore: {
+      en: 'A lattice that makes every shot look like the sky tearing open.',
+      pt: 'Uma malha que faz cada disparo parecer o céu se rasgando.',
+    },
+    battleEffects: [
+      { stat: 'damagePercent', value: 16 },
+      { stat: 'electricDamagePercent', value: 55 },
+      { stat: 'shockedEnemySkipChance', value: 12 },
+      { stat: 'bonusDamageVsShockedPercent', value: 30 },
+    ],
+  },
+  {
+    id: 'battle-violet-absolute-zero',
+    cardClass: 'battle',
+    slot: 'core',
+    rarity: 'epic',
+    name: { en: 'Violet Absolute Zero', pt: 'Zero Absoluto Violeta' },
+    role: { en: 'Slow punishment', pt: 'Punição contra lentidão' },
+    lore: {
+      en: 'The reactor does not freeze enemies. It convinces time to do it.',
+      pt: 'O reator não congela inimigos. Ele convence o tempo a fazer isso.',
+    },
+    battleEffects: [
+      { stat: 'iceDamagePercent', value: 50 },
+      { stat: 'bonusDamageVsSlowPercent', value: 36 },
+      { stat: 'slowEnemyDamageReductionPercent', value: 18 },
+      { stat: 'shieldPercent', value: 18 },
+    ],
+  },
+  {
+    id: 'battle-violet-war-heart',
+    cardClass: 'battle',
+    slot: 'armor',
+    rarity: 'epic',
+    name: { en: 'Violet War Heart', pt: 'Coração de Guerra Violeta' },
+    role: { en: 'Heavy survival', pt: 'Sobrevivência pesada' },
+    lore: {
+      en: 'A stubborn heart for ships expected to return with missing paint.',
+      pt: 'Um coração teimoso para naves que devem voltar sem parte da pintura.',
+    },
+    battleEffects: [
+      { stat: 'healthPercent', value: 30 },
+      { stat: 'shieldPercent', value: 26 },
+      { stat: 'damagePercent', value: 10 },
+      { stat: 'critDamage', value: 35 },
+    ],
+  },
+  {
+    id: 'battle-violet-triple-spark',
+    cardClass: 'battle',
+    slot: 'tactic',
+    rarity: 'epic',
+    name: { en: 'Violet Triple Spark', pt: 'Tripla Faísca Violeta' },
+    role: { en: 'Hybrid elemental pressure', pt: 'Pressão elemental híbrida' },
+    lore: {
+      en: 'Three unstable vectors braided into a doctrine no instructor recommends.',
+      pt: 'Três vetores instáveis trançados em uma doutrina que nenhum instrutor recomenda.',
+    },
+    battleEffects: [
+      { stat: 'electricDamagePercent', value: 30 },
+      { stat: 'fireDamagePercent', value: 30 },
+      { stat: 'iceDamagePercent', value: 30 },
+      { stat: 'critChance', value: 5 },
+    ],
+  },
+  {
+    id: 'battle-violet-execution-clock',
+    cardClass: 'battle',
+    slot: 'weapon',
+    rarity: 'epic',
+    name: { en: 'Violet Execution Clock', pt: 'Relógio de Execução Violeta' },
+    role: { en: 'Critical finisher', pt: 'Finalização crítica' },
+    lore: {
+      en: 'Ticks only when the target is about to become a statistic.',
+      pt: 'Só marca o tempo quando o alvo está prestes a virar estatística.',
+    },
+    battleEffects: [
+      { stat: 'damagePercent', value: 14 },
+      { stat: 'critChance', value: 8 },
+      { stat: 'critDamage', value: 85 },
+      { stat: 'specialCooldownPercent', value: 8 },
+    ],
+  },
+  {
+    id: 'battle-orange-trinity',
+    cardClass: 'battle',
+    slot: 'core',
+    rarity: 'mythic',
+    name: { en: 'Trinity Dawn Reactor', pt: 'Reator Aurora Trina' },
+    role: { en: 'Elemental command', pt: 'Comando elemental' },
+    lore: {
+      en: 'A forbidden reactor that makes fire, frost, and lightning agree for one shot.',
+      pt: 'Um reator proibido que faz fogo, gelo e raio concordarem por um disparo.',
+    },
+    battleEffects: [
+      { stat: 'damagePercent', value: 22 },
+      { stat: 'critChance', value: 6 },
+      { stat: 'electricDamagePercent', value: 35 },
+      { stat: 'fireDamagePercent', value: 35 },
+      { stat: 'iceDamagePercent', value: 35 },
+    ],
+  },
+  {
+    id: 'battle-orange-worldbreaker',
+    cardClass: 'battle',
+    slot: 'weapon',
+    rarity: 'legendary',
+    name: { en: 'Worldbreaker Lens', pt: 'Lente Quebra-Mundo' },
+    role: { en: 'Pure annihilation', pt: 'Aniquilação pura' },
+    lore: {
+      en: 'A lens that refuses to treat armor as a serious argument.',
+      pt: 'Uma lente que se recusa a tratar blindagem como argumento sério.',
+    },
+    battleEffects: [
+      { stat: 'damagePercent', value: 34 },
+      { stat: 'critChance', value: 9 },
+      { stat: 'critDamage', value: 130 },
+      { stat: 'fireDamagePercent', value: 45 },
+      { stat: 'bonusDamageVsBurningPercent', value: 40 },
+    ],
+  },
+  {
+    id: 'battle-orange-aegis-star',
+    cardClass: 'battle',
+    slot: 'armor',
+    rarity: 'legendary',
+    name: { en: 'Aegis Star Mantle', pt: 'Manto Estrela Aegis' },
+    role: { en: 'Legendary survival', pt: 'Sobrevivência lendária' },
+    lore: {
+      en: 'A defensive mantle bright enough to make monsters choose easier prey.',
+      pt: 'Um manto defensivo brilhante o suficiente para monstros escolherem presas mais fáceis.',
+    },
+    battleEffects: [
+      { stat: 'healthPercent', value: 42 },
+      { stat: 'shieldPercent', value: 48 },
+      { stat: 'iceDamagePercent', value: 35 },
+      { stat: 'slowEnemyDamageReductionPercent', value: 24 },
+      { stat: 'specialCooldownPercent', value: 12 },
+    ],
+  },
+  {
+    id: 'battle-orange-tempest-crown',
+    cardClass: 'battle',
+    slot: 'tactic',
+    rarity: 'legendary',
+    name: { en: 'Tempest Crown', pt: 'Coroa da Tempestade' },
+    role: { en: 'Shock commander', pt: 'Comando elétrico' },
+    lore: {
+      en: 'A crown for pilots who prefer the enemy never finishing its thought.',
+      pt: 'Uma coroa para pilotos que preferem que o inimigo nunca termine o pensamento.',
+    },
+    battleEffects: [
+      { stat: 'damagePercent', value: 24 },
+      { stat: 'electricDamagePercent', value: 70 },
+      { stat: 'shockedEnemySkipChance', value: 22 },
+      { stat: 'bonusDamageVsShockedPercent', value: 55 },
+      { stat: 'critChance', value: 7 },
+    ],
+  },
 ];
 
 export const getCardById = (id?: string) => COLONY_CARD_CATALOG.find(card => card.id === id);
+
+export const BATTLE_CARD_REWARD_POOL = COLONY_CARD_CATALOG
+  .filter(card => isBattleCard(card))
+  .map(card => card.id);
 
 export const getOwnedArcadeIdsFromCards = (cardIds: string[]) => {
   const unlocked = new Set<string>();
@@ -318,20 +1276,28 @@ export const getOwnedArcadeIdsFromCards = (cardIds: string[]) => {
 };
 
 export const getCardStyle = (rarity: ColonyCardRarity, cardClass: ColonyCardClass = 'political') => {
+  if (cardClass === 'wildcard' || rarity === 'wildcard') {
+    return 'border-fuchsia-200/90 bg-gradient-to-br from-cyan-300/18 via-fuchsia-400/16 to-amber-300/18 shadow-[0_0_38px_rgba(34,211,238,0.24),0_0_42px_rgba(217,70,239,0.18)]';
+  }
+
   if (cardClass === 'battle') {
     switch (rarity) {
+      case 'mythic':
+        return 'border-rose-200/90 bg-gradient-to-br from-rose-300/22 via-zinc-950 to-amber-300/16 shadow-[0_0_36px_rgba(244,114,182,0.28)]';
       case 'legendary':
-        return 'border-red-300/75 bg-gradient-to-br from-red-500/20 via-zinc-950 to-amber-500/10 shadow-[0_0_30px_rgba(248,113,113,0.22)]';
+        return 'border-orange-300/80 bg-gradient-to-br from-orange-400/20 via-zinc-950 to-amber-500/12 shadow-[0_0_30px_rgba(251,146,60,0.24)]';
       case 'epic':
-        return 'border-rose-300/75 bg-gradient-to-br from-rose-500/18 via-zinc-950 to-orange-500/10 shadow-[0_0_28px_rgba(251,113,133,0.2)]';
+        return 'border-violet-300/80 bg-gradient-to-br from-violet-400/20 via-zinc-950 to-fuchsia-500/12 shadow-[0_0_28px_rgba(168,85,247,0.24)]';
       case 'rare':
-        return 'border-orange-300/75 bg-gradient-to-br from-orange-500/16 via-zinc-950 to-red-500/10 shadow-[0_0_26px_rgba(251,146,60,0.18)]';
+        return 'border-sky-300/80 bg-gradient-to-br from-sky-400/18 via-zinc-950 to-blue-500/12 shadow-[0_0_26px_rgba(56,189,248,0.22)]';
       default:
-        return 'border-red-500/60 bg-gradient-to-br from-red-500/10 via-zinc-950 to-white/5 shadow-[0_0_18px_rgba(239,68,68,0.12)]';
+        return 'border-white/75 bg-gradient-to-br from-white/16 via-zinc-950 to-cyan-300/8 shadow-[0_0_20px_rgba(255,255,255,0.16)]';
     }
   }
 
   switch (rarity) {
+    case 'mythic':
+      return 'border-rose-200/80 bg-gradient-to-br from-rose-300/18 via-zinc-950 to-amber-300/12 shadow-[0_0_34px_rgba(244,114,182,0.22)]';
     case 'legendary':
       return 'border-amber-300/70 bg-gradient-to-br from-amber-300/15 via-zinc-950 to-emerald-400/10 shadow-[0_0_28px_rgba(251,191,36,0.18)]';
     case 'epic':

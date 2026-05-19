@@ -868,15 +868,17 @@ function drawPlayer() {
 function gameOver() {
     gameActive = false;
     finalScoreElement.innerText = score.toLocaleString('pt-BR');
-    overlay.classList.remove('hidden');
     localStorage.setItem('ruptura_estelar_high_score', Math.max(score, parseInt(localStorage.getItem('ruptura_estelar_high_score')) || 0).toString());
-    
-    // Final score update on game over
-    window.parent.postMessage({ 
-        type: 'GAME_COMPLETE', 
-        gameId: 'ruptura-estelar', 
-        score: score 
-    }, '*');
+
+    window.QCHArcadeResults.show({
+        gameId: 'ruptura-estelar',
+        victory: score >= 5000,
+        score,
+        stats: [
+            { label: 'Score Final', value: score },
+            { label: 'Alvo', value: '5000' },
+        ],
+    });
 }
 
 function gameLoop() {

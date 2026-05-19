@@ -20,11 +20,13 @@ const ColoniesTab = memo(({
 }: ColoniesTabProps) => {
   const { 
     language, 
+    economy,
     earth, 
     missions,
     colonies, 
     setColonies,
     playSfx,
+    formatValue,
     dispatch
   } = useDashboard();
 
@@ -49,9 +51,21 @@ const ColoniesTab = memo(({
         historyStats={missions.historyStats}
         unlockedAchievements={missions.unlockedAchievements}
         playSfx={playSfx}
+        qc={economy.qc}
+        formatValue={formatValue}
+        onEarnQC={(amount) => {
+          dispatch({ type: 'EARN_QC', payload: { amount, source: 'battle' } });
+          dispatch({ type: 'UPDATE_HISTORY', payload: { tier: 'NewEarth', field: 'qcFromBattles', amount } });
+          dispatch({ type: 'UPDATE_HISTORY', payload: { tier: 'NewEarth', field: 'qcTotalAcquired', amount } });
+        }}
+        onSpendQC={(amount) => {
+          dispatch({ type: 'SPEND_QC', payload: { amount } });
+        }}
       />
     </motion.div>
   );
 });
+
+ColoniesTab.displayName = 'ColoniesTab';
 
 export default ColoniesTab;

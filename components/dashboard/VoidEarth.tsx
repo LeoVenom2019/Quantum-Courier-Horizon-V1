@@ -18,7 +18,7 @@ const VoidEarth: React.FC<VoidEarthProps> = ({
   setShowRestorationModal,
   playSfx
 }) => {
-  const totalProgress = Object.values(earthReconstructionProgress).reduce((a, b) => a + b, 0) / 5;
+  const totalProgress = Object.values(earthReconstructionProgress || {}).reduce((a, b) => a + b, 0) / 5;
   const isComplete = totalProgress >= 100;
 
   const resourceNodes = [
@@ -136,7 +136,7 @@ const VoidEarth: React.FC<VoidEarthProps> = ({
       <div className="w-[64%] h-full min-h-0 overflow-hidden">
         <div className="grid grid-cols-2 grid-rows-3 gap-3 h-full">
           {resourceNodes.map(node => {
-            const progress = earthReconstructionProgress[node.id];
+            const progress = earthReconstructionProgress?.[node.id] ?? 0;
             const isNodeComplete = progress >= 100;
             return (
               <div key={node.id} className={`glass-panel border p-4 rounded-xl flex flex-col justify-between transition-all relative overflow-hidden min-h-0 ${isNodeComplete ? 'border-emerald-500/40 bg-emerald-500/5 shadow-[0_0_18px_rgba(16,185,129,0.08)]' : `border-white/10 ${node.bg} hover:border-white/20`}`}>

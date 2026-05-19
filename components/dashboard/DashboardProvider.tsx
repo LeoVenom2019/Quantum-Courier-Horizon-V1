@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useMemo, ReactNode, useCallback, useState, useEffect } from 'react';
 import { SaveManager } from '../../lib/save-manager';
+import { GameStorage } from '../../lib/game-storage';
 import { RouteStats } from '@/lib/game-state/types';
 
 import { 
@@ -2122,7 +2123,7 @@ export const DashboardProvider = ({
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
-  }, [economy, progression, mining, combat, missions, earth, game]);
+  }, [economy, progression, mining, combat, missions, earth, game, colonies]);
 
   const importGameData = React.useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -2138,6 +2139,7 @@ export const DashboardProvider = ({
         const structuredState = SaveManager.loadSave(rawData);
         if (structuredState) {
           dispatch({ type: 'LOAD_SAVE', payload: structuredState });
+          GameStorage.save(rawData, 'time_travel_save');
           window.location.reload();
         }
       } catch (err) {

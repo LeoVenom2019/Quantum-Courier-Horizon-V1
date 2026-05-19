@@ -935,6 +935,9 @@ const MenuButton = ({ label, icon: Icon, onClick, disabled = false, theme = 'cya
 export default function GameHome() {
   useEffect(() => {
     const handleError = (event: ErrorEvent) => {
+      // Prevent Next.js Error Overlay and browser default logging
+      event.preventDefault();
+
       // Basic diagnostic info
       const errorMsg = `[Global Error] ${event.message || 'Unknown error'} at ${event.filename || 'unknown'}:${event.lineno || 0}:${event.colno || 0}`;
       console.error(errorMsg, event.error);
@@ -950,6 +953,9 @@ export default function GameHome() {
     };
 
     const handleRejection = (event: PromiseRejectionEvent) => {
+      // Prevent Next.js Error Overlay and browser default logging
+      event.preventDefault();
+
       const reason = event.reason;
       
       // Filter out common harmless browser-level rejections
@@ -962,10 +968,16 @@ export default function GameHome() {
         return;
       }
 
+      // Filter or handle DOM Event objects to prevent circular/empty logs
+      if (reason instanceof Event) {
+        console.warn("[Promise Rejection Filtered - DOM Event]", reason);
+        return;
+      }
+
       // Log detailed rejection info
       console.error("UNHANDLED_REJECTION:", {
         reason: reason,
-        message: reason?.message || "No message",
+        message: reason?.message || (reason ? String(reason) : "No message"),
         stack: reason?.stack || "No stack",
         type: typeof reason
       });
@@ -1136,6 +1148,15 @@ export default function GameHome() {
 
   // Hydration fix: Load from localStorage after mount
   useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.get('restore') === 'true') {
+        localStorage.clear();
+        window.location.href = '/';
+        return;
+      }
+    }
+
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsMounted(true);
     
@@ -1287,8 +1308,20 @@ export default function GameHome() {
     const data = {
       time_travel_save: await GameStorage.load('time_travel_save'),
       game_theme_index: await GameStorage.load('game_theme_index'),
+      colony_cards_data: await GameStorage.load('colony_cards_data'),
+      colony_card_levels: await GameStorage.load('colony_card_levels'),
+      colony_search_upgrade_levels: await GameStorage.load('colony_search_upgrade_levels'),
+      colony_active_search: await GameStorage.load('colony_active_search'),
+      colony_search_threat_bonus: await GameStorage.load('colony_search_threat_bonus'),
+      horizon_ship_xp: await GameStorage.load('horizon_ship_xp'),
+      route4_defense_battle_level: await GameStorage.load('route4_defense_battle_level'),
+      battle_cards_loadout: await GameStorage.load('battle_cards_loadout'),
+      battle_card_legendary_pity: await GameStorage.load('battle_card_legendary_pity'),
+      colony_supplies_data: await GameStorage.load('colony_supplies_data'),
+      defense_special_loadout: await GameStorage.load('defense_special_loadout'),
+      colony_defense_threats: await GameStorage.load('colony_defense_threats'),
       export_date: new Date().toISOString(),
-      version: '1.0'
+      version: '1.2'
     };
 
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
@@ -1313,6 +1346,18 @@ export default function GameHome() {
         const data = JSON.parse(e.target?.result as string);
         if (data.time_travel_save) await GameStorage.save(data.time_travel_save, 'time_travel_save');
         if (data.game_theme_index !== undefined) await GameStorage.save(data.game_theme_index, 'game_theme_index');
+        if (data.colony_cards_data) await GameStorage.save(data.colony_cards_data, 'colony_cards_data');
+        if (data.colony_card_levels) await GameStorage.save(data.colony_card_levels, 'colony_card_levels');
+        if (data.colony_search_upgrade_levels) await GameStorage.save(data.colony_search_upgrade_levels, 'colony_search_upgrade_levels');
+        if (data.colony_active_search) await GameStorage.save(data.colony_active_search, 'colony_active_search');
+        if (data.colony_search_threat_bonus) await GameStorage.save(data.colony_search_threat_bonus, 'colony_search_threat_bonus');
+        if (data.horizon_ship_xp !== undefined) await GameStorage.save(data.horizon_ship_xp, 'horizon_ship_xp');
+        if (data.route4_defense_battle_level !== undefined) await GameStorage.save(data.route4_defense_battle_level, 'route4_defense_battle_level');
+        if (data.battle_cards_loadout) await GameStorage.save(data.battle_cards_loadout, 'battle_cards_loadout');
+        if (data.battle_card_legendary_pity !== undefined) await GameStorage.save(data.battle_card_legendary_pity, 'battle_card_legendary_pity');
+        if (data.colony_supplies_data) await GameStorage.save(data.colony_supplies_data, 'colony_supplies_data');
+        if (data.defense_special_loadout) await GameStorage.save(data.defense_special_loadout, 'defense_special_loadout');
+        if (data.colony_defense_threats) await GameStorage.save(data.colony_defense_threats, 'colony_defense_threats');
         
         playSfx('click');
         setTimeout(() => window.location.reload(), 500);

@@ -286,23 +286,16 @@ function formatTime(seconds) {
 function endGame(win) {
     gameStatus = 'over';
     clearInterval(timerInterval);
-    overlay.classList.remove('hidden');
+    if (overlay) overlay.classList.add('hidden');
+    const remainingTime = Math.max(0, timer);
+    const currentFinish = formatTime(remainingTime);
     
     if (win) {
         statusText.innerText = 'MISSION ACCOMPLISHED';
         statusText.style.color = 'var(--color-green)';
         statusText.style.textShadow = '0 0 20px var(--color-green)';
         
-        const remainingTime = Math.max(0, timer);
-        const currentFinish = formatTime(remainingTime);
         currentTimeDisplay.innerText = currentFinish;
-        
-        // Final score update on win
-        window.parent.postMessage({ 
-            type: 'GAME_COMPLETE', 
-            gameId: 'danger-zoom-zones', 
-            score: remainingTime 
-        }, '*');
 
         if (bestTime === '--:--' || remainingTime > parseTime(bestTime)) {
             bestTime = currentFinish;
@@ -315,8 +308,19 @@ function endGame(win) {
         statusText.innerText = 'CRITICAL FAILURE';
         statusText.style.color = 'var(--color-red)';
         statusText.style.textShadow = '0 0 20px var(--color-red)';
-        if (currentTimeDisplay) currentTimeDisplay.innerText = '--:--';
+        if (currentTimeDisplay) currentTimeDisplay.innerText = currentFinish;
     }
+
+    window.QCHArcadeResults.show({
+        gameId: 'danger-zoom-zones',
+        victory: win,
+        score: remainingTime,
+        stats: [
+            { label: 'Tempo Restante', value: currentFinish },
+            { label: 'Bombas Desarmadas', value: `${foundMines}/${TOTAL_MINES}` },
+            { label: 'Kits', value: disarmers },
+        ],
+    });
 }
 
 function parseTime(timeStr) {

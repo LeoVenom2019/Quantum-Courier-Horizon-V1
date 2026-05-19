@@ -63,6 +63,36 @@ let screenShake = 0;
 let displayedScore = 0;
 let lineFlash = []; // Array of {y, life, color}
 let activeEvent = null; // {type: 'GRID COLLAPSE', life: 1.0}
+const SFX_BASE = '/assets/games/flipers_sfx';
+const SFX = {
+    rotate: `${SFX_BASE}/grid_collapse_change.ogg`,
+    drop: `${SFX_BASE}/grid_collapse_go_down.ogg`,
+    match: {
+        1: `${SFX_BASE}/grid_collapse_match_1.ogg`,
+        2: `${SFX_BASE}/grid_collapse_match_2.ogg`,
+        3: `${SFX_BASE}/grid_collapse_match_3.ogg`,
+        4: `${SFX_BASE}/grid_collapse_match_4.ogg`,
+    },
+};
+const audioCache = new Map();
+
+function playSfx(path, volume = 0.65) {
+    if (!path) return;
+
+    try {
+        if (!audioCache.has(path)) {
+            const audio = new Audio(path);
+            audio.preload = 'auto';
+            audioCache.set(path, audio);
+        }
+
+        const sound = audioCache.get(path).cloneNode();
+        sound.volume = volume;
+        sound.play().catch(() => {});
+    } catch (error) {
+        // Audio can be blocked until user interaction; gameplay must keep running.
+    }
+}
 
 function createGrid() {
     return Array.from({ length: ROWS }, () => Array(COLS).fill(0));
@@ -184,6 +214,7 @@ function playerRotate() {
             return;
         }
     }
+    playSfx(SFX.rotate, 0.55);
 }
 
 function playerDrop() {
@@ -208,6 +239,8 @@ function playerDrop() {
         arenaSweep(currentPiece.type);
         spawnPiece();
         updateScore();
+    } else {
+        playSfx(SFX.drop, 0.5);
     }
     dropCounter = 0;
 }
@@ -323,6 +356,10 @@ function executeClearing(affectedY, linesInSweep, lastPieceType) {
     }
 
     linesCleared += cleared;
+    if (cleared > 0) {
+        playSfx(SFX.match[Math.min(cleared, 4)], 0.7);
+    }
+
     if (cleared > 0 && cleared < 4) {
         screenShake = 5 * cleared;
         if (cleared === 1) spawnTextEffect("SINGLE", canvas.width/2, canvas.height/2, '#fff');
@@ -370,14 +407,18 @@ function handleGameOver() {
     gameOver = true;
     gameActive = false;
     finalScoreElement.innerText = score.toString().padStart(5, '0');
-    overlay.classList.remove('hidden');
-    
-    // Final score update on game over
-    window.parent.postMessage({ 
-        type: 'GAME_COMPLETE', 
-        gameId: 'grid-collapse', 
-        score: score 
-    }, '*');
+
+    window.QCHArcadeResults.show({
+        gameId: 'grid-collapse',
+        victory: score >= 15000,
+        score,
+        stats: [
+            { label: 'Final Data Score', value: score },
+            { label: 'Target', value: '15000' },
+            { label: 'Lines', value: lines },
+            { label: 'Level', value: level },
+        ],
+    });
 }
 
 function spawnScoreFloater(value, x, y) {

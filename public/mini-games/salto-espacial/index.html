@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Salto Espacial</title>
     <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="../shared/arcade-results.css">
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
 </head>
 <body>
@@ -15,8 +16,8 @@
                 <span id="score">00000</span>
             </div>
             <div class="hud-item">
-                <span class="label">STATUS</span>
-                <span id="game-status" class="status-active">ACTIVE</span>
+                <span class="label">CONTROLS</span>
+                <span id="controls-display">WASD / ARROWS</span>
             </div>
             <button id="exit-btn">EXIT</button>
         </div>
@@ -34,10 +35,9 @@
             </div>
         </div>
 
-        <div id="controls-hint">
-            WASD or ARROWS to NAVIGATE
-        </div>
+        <div id="controls-hint">COLLECT CORES · AVOID WALLS · DO NOT CROSS YOUR TRAIL</div>
     </div>
+    <script src="../shared/arcade-results.js"></script>
     <script src="script.js"></script>
 </body>
 </html>
