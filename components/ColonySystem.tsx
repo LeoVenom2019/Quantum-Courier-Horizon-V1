@@ -596,6 +596,21 @@ const PanelHeader = ({
 
 const CardEffectPills = ({ card, language, cardLevels = {} }: { card: ColonyCard; language: 'en' | 'pt'; cardLevels?: ColonyCardLevels }) => (
   <div className="mt-3 flex flex-wrap gap-1.5">
+    {card.passiveBonuses?.constructorsAllColonies ? (
+      <span className="rounded-full border border-cyan-300/60 bg-zinc-950/90 px-2 py-0.5 text-[10px] font-mono text-cyan-100 shadow-[0_0_10px_rgba(0,0,0,0.45)]">
+        +{card.passiveBonuses.constructorsAllColonies} {language === 'pt' ? 'Robôs Construtores' : 'Builder Robots'}
+      </span>
+    ) : null}
+    {card.passiveBonuses?.allSectorBonus ? (
+      <span className="rounded-full border border-emerald-300/60 bg-zinc-950/90 px-2 py-0.5 text-[10px] font-mono text-emerald-200 shadow-[0_0_10px_rgba(0,0,0,0.45)]">
+        +{card.passiveBonuses.allSectorBonus} {language === 'pt' ? 'Todas as Colônias' : 'All Colonies'}
+      </span>
+    ) : null}
+    {card.passiveBonuses?.constructionSpeedPercent ? (
+      <span className="rounded-full border border-amber-300/60 bg-zinc-950/90 px-2 py-0.5 text-[10px] font-mono text-amber-100 shadow-[0_0_10px_rgba(0,0,0,0.45)]">
+        +{card.passiveBonuses.constructionSpeedPercent}% {language === 'pt' ? 'Velocidade de Construção' : 'Construction Speed'}
+      </span>
+    ) : null}
     {getPoliticalEffects(card, cardLevels).map(effect => (
       <span
         key={`${card.id}-${effect.sector}`}
@@ -1020,6 +1035,7 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
   const [showConfirmAllocate, setShowConfirmAllocate] = useState(false);
   const [colonySupplies, setColonySupplies] = useState<ColonySupplies>(DEFAULT_COLONY_SUPPLIES);
   const [ownedCardIds, setOwnedCardIds] = useState<string[]>(DEFAULT_OWNED_COLONY_CARD_IDS);
+  const [isOwnedCardsLoaded, setIsOwnedCardsLoaded] = useState(false);
   const [managementPanel, setManagementPanel] = useState<'status' | 'council' | 'claims'>('status');
   const [cardEvent, setCardEvent] = useState<ColonyCard | null>(null);
   const [cardFeedback, setCardFeedback] = useState<string | null>(null);
@@ -1039,7 +1055,9 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
   const [isDefenseBattleLevelLoaded, setIsDefenseBattleLevelLoaded] = useState(false);
   const [lastSearchReport, setLastSearchReport] = useState<string | null>(null);
   const [battleLoadout, setBattleLoadout] = useState<BattleLoadout>({});
+  const [isBattleLoadoutLoaded, setIsBattleLoadoutLoaded] = useState(false);
   const [selectedSpecialIds, setSelectedSpecialIds] = useState<DefenseSpecialId[]>(['apocalypse-laser', 'hellfire-barrage']);
+  const [isDefenseSpecialLoadoutLoaded, setIsDefenseSpecialLoadoutLoaded] = useState(false);
   const [pendingDefenseThreats, setPendingDefenseThreats] = useState<PendingDefenseThreat[]>([]);
   const [activeDefenseThreat, setActiveDefenseThreat] = useState<PendingDefenseThreat | null>(null);
   const [showDefenseHangar, setShowDefenseHangar] = useState(false);
@@ -1074,6 +1092,7 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
       const normalized = normalizeOwnedColonyCardIds(Array.isArray(saved) && saved.length > 0 ? saved : DEFAULT_OWNED_COLONY_CARD_IDS);
       setOwnedCardIds(normalized);
       GameStorage.save(normalized, 'colony_cards_data');
+      setIsOwnedCardsLoaded(true);
     });
     return () => { mounted = false; };
   }, []);
@@ -1214,6 +1233,7 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
         });
         setBattleLoadout(next);
       }
+      setIsBattleLoadoutLoaded(true);
     });
     return () => { mounted = false; };
   }, []);
@@ -1226,6 +1246,7 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
         const valid = saved.filter(id => DEFENSE_SPECIALS.some(special => special.id === id)) as DefenseSpecialId[];
         setSelectedSpecialIds(valid.slice(0, 2));
       }
+      setIsDefenseSpecialLoadoutLoaded(true);
     });
     return () => { mounted = false; };
   }, []);
@@ -1250,9 +1271,9 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
   }, []);
 
   useEffect(() => {
-    if (!isLoaded) return;
+    if (!isLoaded || !isOwnedCardsLoaded) return;
     GameStorage.save(ownedCardIds, 'colony_cards_data');
-  }, [ownedCardIds, isLoaded]);
+  }, [ownedCardIds, isLoaded, isOwnedCardsLoaded]);
 
   useEffect(() => {
     if (!isLoaded || !isSuppliesLoaded) return;
@@ -1295,14 +1316,14 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
   }, [defenseBattleLevel, isLoaded, isDefenseBattleLevelLoaded]);
 
   useEffect(() => {
-    if (!isLoaded) return;
+    if (!isLoaded || !isBattleLoadoutLoaded) return;
     GameStorage.save(battleLoadout, 'battle_cards_loadout');
-  }, [battleLoadout, isLoaded]);
+  }, [battleLoadout, isLoaded, isBattleLoadoutLoaded]);
 
   useEffect(() => {
-    if (!isLoaded) return;
+    if (!isLoaded || !isDefenseSpecialLoadoutLoaded) return;
     GameStorage.save(selectedSpecialIds, 'defense_special_loadout');
-  }, [selectedSpecialIds, isLoaded]);
+  }, [selectedSpecialIds, isLoaded, isDefenseSpecialLoadoutLoaded]);
 
   useEffect(() => {
     if (!isLoaded || !isThreatsLoaded) return;
@@ -1502,6 +1523,18 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
   const selectedCardNavigationLabel = selectedCardNavigationList.length > 1 && selectedCardNavigationIndex >= 0
     ? `${selectedCardNavigationIndex + 1}/${selectedCardNavigationList.length}`
     : undefined;
+  const ownedPassiveBonuses = useMemo(() => (
+    ownedCards.reduce((acc, card) => {
+      if (!isPoliticalCard(card)) return acc;
+      acc.constructorsAllColonies += card.passiveBonuses?.constructorsAllColonies || 0;
+      acc.allSectorBonus += card.passiveBonuses?.allSectorBonus || 0;
+      acc.constructionSpeedPercent += card.passiveBonuses?.constructionSpeedPercent || 0;
+      return acc;
+    }, { constructorsAllColonies: 0, allSectorBonus: 0, constructionSpeedPercent: 0 })
+  ), [ownedCards]);
+  const getEffectiveConstructors = useCallback((colony: Colony) => (
+    colony.constructors + ownedPassiveBonuses.constructorsAllColonies
+  ), [ownedPassiveBonuses.constructorsAllColonies]);
 
   useEffect(() => {
     if (battleCardCodexPage < battleCardCodexPageCount) return;
@@ -1518,6 +1551,11 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
   const effectiveSectors = useMemo(() => {
     if (!activeColony) return DEFAULT_COLONY_SECTORS;
     const next = { ...DEFAULT_COLONY_SECTORS, ...(activeColony.sectors || {}) };
+    if (ownedPassiveBonuses.allSectorBonus > 0) {
+      (Object.keys(next) as ColonySectorId[]).forEach(sector => {
+        next[sector] = Math.min(100, Math.max(0, next[sector] + ownedPassiveBonuses.allSectorBonus));
+      });
+    }
     equippedCards.forEach(card => {
       if (!isPoliticalCard(card)) return;
       getPoliticalEffects(card, cardLevels).forEach(effect => {
@@ -1525,7 +1563,7 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
       });
     });
     return next;
-  }, [activeColony, equippedCards, cardLevels]);
+  }, [activeColony, equippedCards, cardLevels, ownedPassiveBonuses.allSectorBonus]);
 
   // Construction Progress Logic
   useEffect(() => {
@@ -1557,7 +1595,8 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
           // Base factor is 10 for balancing
           const tickSeconds = 1;
           const speedFactor = con.assignedConstructors / 10; 
-          const increment = (100 / config.baseTime) * speedFactor * tickSeconds;
+          const passiveSpeedMultiplier = 1 + ownedPassiveBonuses.constructionSpeedPercent / 100;
+          const increment = (100 / config.baseTime) * speedFactor * passiveSpeedMultiplier * tickSeconds;
           
           const newProgress = Math.min(100, con.progress + increment);
           const isNowAtLevelComplete = newProgress >= 100;
@@ -1765,7 +1804,7 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
     if (!construction || construction.level >= 10) return;
 
     const totalAssigned = colony.constructions.reduce((sum, con) => sum + con.assignedConstructors, 0);
-    const available = colony.constructors - totalAssigned;
+    const available = getEffectiveConstructors(colony) - totalAssigned;
 
     let finalDelta = delta;
     
@@ -1941,7 +1980,8 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
   if (!activeColony) return null;
 
   const totalAssignedConstructors = activeColony.constructions.reduce((sum, c) => sum + c.assignedConstructors, 0);
-  const availableConstructors = activeColony.constructors - totalAssignedConstructors;
+  const effectiveConstructors = getEffectiveConstructors(activeColony);
+  const availableConstructors = effectiveConstructors - totalAssignedConstructors;
   const landSearchLevel = searchUpgradeLevels.land || 0;
   const seaSearchLevel = searchUpgradeLevels.sea || 0;
   const landSearchRewards = applySearchUpgradeRewards({ materials: 18, food: 12, biomass: 6, meds: 3 }, landSearchLevel);
@@ -2432,7 +2472,7 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
             <div className="rounded-xl border border-cyan-400/20 bg-black/45 p-3">
               <p className="font-mono text-[10px] uppercase tracking-[0.24em] text-cyan-300/70">{t('Available Constructors', 'Construtores Disponíveis')}</p>
               <div className="mt-2 flex items-center justify-between gap-3">
-                <h3 className="font-orbitron text-base font-black text-cyan-300">{availableConstructors} / {activeColony.constructors}</h3>
+                <h3 className="font-orbitron text-base font-black text-cyan-300">{availableConstructors} / {effectiveConstructors}</h3>
                 <Bot className="h-5 w-5 text-cyan-300/50" />
               </div>
             </div>
@@ -2463,71 +2503,6 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
                   <Users className="h-5 w-5 text-emerald-300/50" />
                 )}
               </div>
-            </div>
-          </div>
-
-          <div className="grid shrink-0 grid-cols-1 gap-3 lg:grid-cols-[1.25fr_1fr]">
-            <div className="grid grid-cols-2 gap-2 xl:grid-cols-3">
-              {(Object.keys(SECTOR_CONFIG) as ColonySectorId[]).map(sectorId => {
-                const config = SECTOR_CONFIG[sectorId];
-                const value = effectiveSectors[sectorId];
-                const baseValue = activeColony.sectors?.[sectorId] ?? DEFAULT_COLONY_SECTORS[sectorId];
-                const delta = value - baseValue;
-                const isCritical = value < 45;
-                return (
-                  <div key={sectorId} className="rounded-xl border border-white/10 bg-black/45 px-3 py-2">
-                    <div className="mb-1.5 flex items-center justify-between gap-2">
-                      <div className="flex min-w-0 items-center gap-2">
-                        <config.icon size={13} className={config.color} />
-                        <span className="truncate font-orbitron text-[10px] font-black uppercase tracking-wider text-zinc-300">{config.label[language]}</span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        {delta !== 0 && (
-                          <span className={`font-mono text-[9px] ${delta > 0 ? 'text-emerald-300' : 'text-red-300'}`}>
-                            {delta > 0 ? '+' : ''}{delta}
-                          </span>
-                        )}
-                        <span className={`font-orbitron text-[12px] font-black ${isCritical ? 'text-red-300' : 'text-white'}`}>{value}</span>
-                      </div>
-                    </div>
-                    <div className="h-1 rounded-full bg-zinc-800">
-                      <div
-                        className={`h-full rounded-full ${isCritical ? 'bg-red-400' : value >= 70 ? 'bg-emerald-400' : 'bg-cyan-400'}`}
-                        style={{ width: `${value}%` }}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            <div className="grid grid-cols-3 gap-2">
-              {(['leadership', 'infrastructure', 'culture'] as ColonyCardSlot[]).map(slot => {
-                const card = getCardById(activeColony.equippedCards?.[slot]);
-                return (
-                  <button
-                    key={slot}
-                    type="button"
-                    onClick={() => card && openCardDetails(card, 'remove', slot)}
-                    className={`relative overflow-hidden rounded-xl border p-3 text-left transition-all ${
-                      card
-                        ? `${getCardStyle(card.rarity, getCardClass(card))} hover:scale-[1.01]`
-                        : 'border-dashed border-amber-300/25 bg-black/35'
-                    }`}
-                  >
-                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_0%,rgba(255,255,255,0.12),transparent_38%)] opacity-60" />
-                    <div className="relative z-10">
-                      <p className="font-mono text-[9px] uppercase tracking-[0.22em] text-amber-200/70">{slot}</p>
-                      <p className={`mt-2 min-h-[32px] font-orbitron text-[12px] font-black uppercase leading-tight ${card ? 'text-white' : 'text-zinc-600'}`}>
-                        {card ? card.name[language] : t('Empty slot', 'Slot vazio')}
-                      </p>
-                      <p className="mt-2 font-mono text-[9px] uppercase tracking-widest text-zinc-500">
-                        {card ? t('Inspect', 'Inspecionar') : t('Equip in Cards tab', 'Equipe na aba Cartas')}
-                      </p>
-                    </div>
-                  </button>
-                );
-              })}
             </div>
           </div>
 

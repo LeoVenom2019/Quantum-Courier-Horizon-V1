@@ -19,6 +19,47 @@ const ENEMY_SPAWN_INTERVAL_MAX = 80;
 const OVERDRIVE_THRESHOLD = 50; 
 const BASE_OVERDRIVE_DURATION = 400; // frames
 
+function getArcadePerks() {
+    try {
+        return JSON.parse(localStorage.getItem('qch_arcade_perks_ruptura-estelar') || '[]');
+    } catch (error) {
+        return [];
+    }
+}
+
+function hasArcadePerk(perkId) {
+    return getArcadePerks().some(perk => perk && perk.id === perkId);
+}
+
+const HAS_EMERGENCY_SHIELD = hasArcadePerk('stellar-rupture-shield-charge');
+const HAS_SCORE_MULTIPLIER = hasArcadePerk('stellar-rupture-score-multiplier');
+const SFX_BASE = '/assets/games/flipers_sfx';
+const SFX = {
+    playerShot: `${SFX_BASE}/ruptura_estelar_player_shot.ogg`,
+    bossShot: `${SFX_BASE}/ruptura_estelar_boss_shot.ogg`,
+    enemyExplosion: `${SFX_BASE}/ruptura_estelar_enemy_explosion.ogg`,
+    playerExplosion: `${SFX_BASE}/ruptura_estelar_player_explosion.ogg`,
+};
+const audioCache = new Map();
+
+function playSfx(path, volume = 0.55) {
+    if (!path) return;
+
+    try {
+        if (!audioCache.has(path)) {
+            const audio = new Audio(path);
+            audio.preload = 'auto';
+            audioCache.set(path, audio);
+        }
+
+        const sound = audioCache.get(path).cloneNode();
+        sound.volume = volume;
+        sound.play().catch(() => {});
+    } catch (error) {
+        // Audio can be blocked until user interaction; gameplay must keep running.
+    }
+}
+
 // State
 let score = 0;
 let gameActive = false;
@@ -31,6 +72,7 @@ let framesCount = 0;
 let shakeTime = 0;
 let screenFlash = 0;
 let redFlash = 0; // Boss warning flash
+let emergencyShieldCharges = HAS_EMERGENCY_SHIELD ? 1 : 0;
 
 // New Systems
 let playerLevel = 1;
@@ -109,6 +151,7 @@ function init() {
     shakeTime = 0;
     screenFlash = 0;
     redFlash = 0;
+    emergencyShieldCharges = HAS_EMERGENCY_SHIELD ? 1 : 0;
     
     playerLevel = 1;
     xp = 0;
@@ -152,8 +195,9 @@ function updateScore(val) {
 
 function updateStatus() {
     let levelText = `NÍVEL ${playerLevel} ${playerLevel === 4 ? 'MAX' : ''}`;
+    const shieldText = emergencyShieldCharges > 0 ? ' - ESCUDO 1' : '';
     if (overdriveActive) {
-        statusElement.innerText = `OVERDRIVE ACTIVE - ${levelText}`;
+        statusElement.innerText = `OVERDRIVE ACTIVE - ${levelText}${shieldText}`;
         statusElement.className = 'status-overdrive active';
         
         // Dynamic color for overdrive status text
@@ -165,12 +209,12 @@ function updateStatus() {
              statusElement.style.textShadow = '0 0 10px #fff, 0 0 20px #000';
         }
     } else if (overdriveValue >= OVERDRIVE_THRESHOLD) {
-        statusElement.innerText = `OVERDRIVE READY - ${levelText}`;
+        statusElement.innerText = `OVERDRIVE READY - ${levelText}${shieldText}`;
         statusElement.className = 'status-overdrive ready';
         statusElement.style.color = '';
         statusElement.style.textShadow = '';
     } else {
-        statusElement.innerText = `SISTEMA NORMAL - ${levelText}`;
+        statusElement.innerText = `SISTEMA NORMAL - ${levelText}${shieldText}`;
         statusElement.className = 'status-normal';
         statusElement.style.color = '';
         statusElement.style.textShadow = '';
@@ -312,6 +356,7 @@ function fireAuto() {
         const bX = player.x + 20;
         const bY = player.y;
         const isExplosive = playerLevel === 4;
+        playSfx(SFX.playerShot, overdriveActive ? 0.315 : 0.375);
         
         // Multi-shot based on Level and Overdrive
         if (overdriveActive) {
@@ -436,7 +481,9 @@ function update() {
         // Beam collision (slightly larger hitbox for lasers to feel fair/dangerous)
         if (checkCollision({ x: eb.x, y: eb.y, width: 30, height: 12 }, player)) {
             spawnExplosion(player.x, player.y, COLOR_CYAN, 50);
-            gameOver();
+            if (!absorbPlayerHit(player.x, player.y)) gameOver();
+            enemyBullets.splice(i, 1);
+            continue;
         }
 
         if (eb.x < -100 || eb.x > WIDTH + 100 || eb.y < -100 || eb.y > HEIGHT + 100) {
@@ -517,6 +564,12 @@ function update() {
         if (e.x < -150) enemies.splice(i, 1);
 
         if (checkCollision(player, e)) {
+            if (absorbPlayerHit(e.x, e.y)) {
+                playSfx(SFX.enemyExplosion, 0.68);
+                spawnExplosion(e.x, e.y, e.color, 22);
+                enemies.splice(i, 1);
+                continue;
+            }
             gameOver();
         }
 
@@ -540,11 +593,12 @@ function update() {
                     comboTimer = COMBO_MAX_TIME;
                     const comboBonus = comboCount * 20;
 
+                    playSfx(SFX.enemyExplosion, e.isBoss ? 0.82 : 0.7);
                     spawnExplosion(e.x, e.y, e.color, 30, b.explosive || e.isBoss);
                     enemies.splice(i, 1);
                     
                     const killScore = (e.isBoss ? 2000 : 100) + comboBonus;
-                    updateScore(score + killScore);
+                    addKillScore(killScore);
                     xp += e.isBoss ? 500 : 50;
                     
                     if (!overdriveActive) {
@@ -633,6 +687,7 @@ function deactivateOverdrive() {
 function spawnBossLaser(e) {
     const angle = Math.atan2(player.y - e.y, player.x - e.x);
     const speed = 7; // Similar to kamikaze
+    playSfx(SFX.bossShot, 0.58);
     enemyBullets.push({
         x: e.x - e.width/2,
         y: e.y,
@@ -828,6 +883,22 @@ function drawPlayer() {
     }
     
     const pulse = Math.sin(player.pulse) * 4;
+
+    if (emergencyShieldCharges > 0) {
+        ctx.save();
+        ctx.globalAlpha = 0.58 + Math.sin(framesCount * 0.08) * 0.16;
+        ctx.strokeStyle = COLOR_CYAN;
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.ellipse(0, 0, 42 + pulse, 30 + pulse * 0.4, 0, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.globalAlpha = 0.16;
+        ctx.fillStyle = COLOR_CYAN;
+        ctx.beginPath();
+        ctx.ellipse(0, 0, 46 + pulse, 33 + pulse * 0.4, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+    }
     
     ctx.shadowBlur = (overdriveActive ? (playerLevel === 4 ? 40 : 30) : 20) + pulse;
     ctx.shadowColor = shipColor === '#111' ? '#fff' : shipColor;
@@ -866,6 +937,8 @@ function drawPlayer() {
 }
 
 function gameOver() {
+    if (!gameActive) return;
+    playSfx(SFX.playerExplosion, 0.82);
     gameActive = false;
     finalScoreElement.innerText = score.toLocaleString('pt-BR');
     localStorage.setItem('ruptura_estelar_high_score', Math.max(score, parseInt(localStorage.getItem('ruptura_estelar_high_score')) || 0).toString());
@@ -879,6 +952,22 @@ function gameOver() {
             { label: 'Alvo', value: '5000' },
         ],
     });
+}
+
+function addKillScore(baseScore) {
+    const multiplier = HAS_SCORE_MULTIPLIER ? 1.5 : 1;
+    updateScore(score + Math.round(baseScore * multiplier));
+}
+
+function absorbPlayerHit(x = player.x, y = player.y) {
+    if (emergencyShieldCharges <= 0) return false;
+
+    emergencyShieldCharges--;
+    screenFlash = 4;
+    shakeTime = 10;
+    spawnExplosion(x, y, COLOR_CYAN, 28);
+    updateStatus();
+    return true;
 }
 
 function gameLoop() {

@@ -8,6 +8,49 @@
 
 import { COLONY_SAVE_STORAGE_KEYS, type ColonySaveStorageKey } from './save-manager';
 
+const SUPPLEMENTAL_LEGACY_KEYS: Partial<Record<ColonySaveStorageKey, string>> = {
+  colonies_data: 'colonies',
+  colony_cards_data: 'ownedCardIds',
+  colony_card_levels: 'cardLevels',
+  colony_search_upgrade_levels: 'searchUpgradeLevels',
+  colony_active_search: 'activeSearches',
+  colony_search_threat_bonus: 'searchThreatBonus',
+  horizon_ship_xp: 'horizonShipXp',
+  route4_defense_battle_level: 'defenseBattleLevel',
+  battle_cards_loadout: 'battleLoadout',
+  battle_card_legendary_pity: 'legendaryBattleCardPity',
+  colony_supplies_data: 'supplies',
+  defense_special_loadout: 'defenseSpecialLoadout',
+  colony_defense_threats: 'pendingDefenseThreats',
+  arcade_card_reward_milestones: 'arcadeCardRewardMilestones',
+};
+
+const mergeSupplementalSaveValue = (key: ColonySaveStorageKey, localValue: any, mainValue: any): any => {
+  if (mainValue === null || mainValue === undefined) return localValue;
+  if (localValue === null || localValue === undefined) return mainValue;
+
+  if (key === 'colony_cards_data') {
+    const merged = new Set<string>();
+    if (Array.isArray(mainValue)) mainValue.forEach(id => typeof id === 'string' && merged.add(id));
+    if (Array.isArray(localValue)) localValue.forEach(id => typeof id === 'string' && merged.add(id));
+    return Array.from(merged);
+  }
+
+  if (key === 'route4_defense_battle_level') {
+    return Math.max(1, Math.floor(Number(localValue) || 1), Math.floor(Number(mainValue) || 1));
+  }
+
+  if (key === 'colony_card_levels') {
+    const merged: Record<string, number> = { ...(mainValue || {}) };
+    Object.entries(localValue || {}).forEach(([cardId, level]) => {
+      merged[cardId] = Math.max(Number(merged[cardId]) || 0, Number(level) || 0);
+    });
+    return merged;
+  }
+
+  return localValue;
+};
+
 const getSupplementalSaveFromMainSave = (mainSave: any, key: ColonySaveStorageKey): any | null => {
   if (!mainSave || typeof mainSave !== 'object') return null;
 
@@ -18,21 +61,11 @@ const getSupplementalSaveFromMainSave = (mainSave: any, key: ColonySaveStorageKe
     return colonySystem.storage[key];
   }
 
-  const legacyMap: Partial<Record<ColonySaveStorageKey, string>> = {
-    colony_cards_data: 'ownedCardIds',
-    colony_card_levels: 'cardLevels',
-    colony_search_upgrade_levels: 'searchUpgradeLevels',
-    colony_active_search: 'activeSearches',
-    colony_search_threat_bonus: 'searchThreatBonus',
-    horizon_ship_xp: 'horizonShipXp',
-    route4_defense_battle_level: 'defenseBattleLevel',
-    battle_cards_loadout: 'battleLoadout',
-    battle_card_legendary_pity: 'legendaryBattleCardPity',
-    colony_supplies_data: 'supplies',
-    defense_special_loadout: 'defenseSpecialLoadout',
-    colony_defense_threats: 'pendingDefenseThreats',
-  };
-  const legacyKey = legacyMap[key];
+  const legacyKey = SUPPLEMENTAL_LEGACY_KEYS[key];
+
+  if (key === 'colonies_data' && Array.isArray(mainSave.earth_reconstruction?.colonies)) {
+    return mainSave.earth_reconstruction.colonies;
+  }
 
   return legacyKey && Object.prototype.hasOwnProperty.call(colonySystem, legacyKey)
     ? colonySystem[legacyKey]
@@ -75,6 +108,27 @@ export const GameStorage = {
       const serializedData = JSON.stringify(data);
       localStorage.setItem(key, serializedData);
 
+      if (COLONY_SAVE_STORAGE_KEYS.includes(key as ColonySaveStorageKey)) {
+        const mainSaveRaw = localStorage.getItem('time_travel_save');
+        if (mainSaveRaw) {
+          const supplementalKey = key as ColonySaveStorageKey;
+          const mainSave = JSON.parse(mainSaveRaw);
+          const previous = getSupplementalSaveFromMainSave(mainSave, supplementalKey);
+          const merged = mergeSupplementalSaveValue(supplementalKey, data, previous);
+          const legacyKey = SUPPLEMENTAL_LEGACY_KEYS[supplementalKey];
+
+          mainSave.colony_system = mainSave.colony_system && typeof mainSave.colony_system === 'object'
+            ? mainSave.colony_system
+            : {};
+          mainSave.colony_system.storage = mainSave.colony_system.storage && typeof mainSave.colony_system.storage === 'object'
+            ? mainSave.colony_system.storage
+            : {};
+          mainSave.colony_system.storage[supplementalKey] = merged;
+          if (legacyKey) mainSave.colony_system[legacyKey] = merged;
+          localStorage.setItem('time_travel_save', JSON.stringify(mainSave));
+        }
+      }
+
       // 2. Background Sync to Server API (Cloud Save)
       // Only for main gameplay saves
       if (key === 'time_travel_save' || key === 'speed_run_save') {
@@ -106,22 +160,26 @@ export const GameStorage = {
         return null;
       }
 
+      const isColonySupplementalKey = COLONY_SAVE_STORAGE_KEYS.includes(key as ColonySaveStorageKey);
+
       // 1. Try LocalStorage first
       const serializedData = localStorage.getItem(key);
+      const parsedLocalData = serializedData ? JSON.parse(serializedData) : null;
 
-      if (serializedData) {
-        return JSON.parse(serializedData);
-      }
-
-      if (COLONY_SAVE_STORAGE_KEYS.includes(key as ColonySaveStorageKey)) {
+      if (isColonySupplementalKey) {
         const mainSave = localStorage.getItem('time_travel_save');
         if (mainSave) {
           const supplemental = getSupplementalSaveFromMainSave(JSON.parse(mainSave), key as ColonySaveStorageKey);
-          if (supplemental !== null) {
-            localStorage.setItem(key, JSON.stringify(supplemental));
-            return supplemental;
+          const merged = mergeSupplementalSaveValue(key as ColonySaveStorageKey, parsedLocalData, supplemental);
+          if (merged !== null && merged !== undefined) {
+            localStorage.setItem(key, JSON.stringify(merged));
+            return merged;
           }
         }
+      }
+
+      if (serializedData) {
+        return parsedLocalData;
       }
 
       // 2. Fallback to AppData API if LocalStorage is empty (ONLY for main save)
@@ -139,14 +197,15 @@ export const GameStorage = {
         }
       }
 
-      if (COLONY_SAVE_STORAGE_KEYS.includes(key as ColonySaveStorageKey)) {
+      if (isColonySupplementalKey) {
         const response = await fetch(`/api/save?key=time_travel_save&t=${Date.now()}`, { cache: 'no-store' });
         if (response.ok) {
           const result = await response.json();
           const supplemental = getSupplementalSaveFromMainSave(result.data, key as ColonySaveStorageKey);
-          if (supplemental !== null) {
-            localStorage.setItem(key, JSON.stringify(supplemental));
-            return supplemental;
+          const merged = mergeSupplementalSaveValue(key as ColonySaveStorageKey, parsedLocalData, supplemental);
+          if (merged !== null && merged !== undefined) {
+            localStorage.setItem(key, JSON.stringify(merged));
+            return merged;
           }
         }
       }

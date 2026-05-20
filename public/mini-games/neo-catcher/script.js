@@ -14,6 +14,22 @@ const MAX_HEALTH = 100;
 const HEAL_AMOUNT = 22;
 const MAX_HEALS_PER_PHASE = 2;
 
+function getArcadePerks() {
+    try {
+        return JSON.parse(localStorage.getItem('qch_arcade_perks_neo-catcher') || '[]');
+    } catch (error) {
+        return [];
+    }
+}
+
+function hasArcadePerk(perkId) {
+    return getArcadePerks().some(perk => perk && perk.id === perkId);
+}
+
+const HAS_CATCH_RANGE = hasArcadePerk('neo-catcher-catch-range');
+const HAS_DAMAGE_DODGE = hasArcadePerk('neo-catcher-damage-dodge');
+const BASE_CATCH_RANGE_BOOST = HAS_CATCH_RANGE ? 1.2 : 1.0;
+
 const MISS_DAMAGE = {
     common: 4,
     blue: 6,
@@ -63,7 +79,7 @@ let gameState = {
     bombSpawned: false,
     immobilized: false,
     immobilizedTimer: 0,
-    catchRangeBoost: 1.0,
+    catchRangeBoost: BASE_CATCH_RANGE_BOOST,
     playerPulse: 0, // For collection feedback
     playerThrust: 0 // For movement feedback
 };
@@ -148,7 +164,7 @@ function startPhase(phaseIdx) {
     gameState.bombSpawned = false;
     gameState.immobilized = false;
     gameState.immobilizedTimer = 0;
-    gameState.catchRangeBoost = 1.0;
+    gameState.catchRangeBoost = BASE_CATCH_RANGE_BOOST;
     
     initBackgroundParticles();
     
@@ -476,6 +492,12 @@ function missItem(item) {
     gameState.multiplier = 1.0;
     const damage = MISS_DAMAGE[item.type] || 0;
     if (damage <= 0) return;
+
+    if (HAS_DAMAGE_DODGE && Math.random() < 0.2) {
+        gameState.screenShake = Math.max(gameState.screenShake, 4);
+        createScorePopup(item.x, CANVAS_HEIGHT - 28, 'DANO EVITADO', '#67e8f9', 0.9);
+        return;
+    }
 
     gameState.health = Math.max(0, gameState.health - damage);
     gameState.screenShake = Math.max(gameState.screenShake, 6);

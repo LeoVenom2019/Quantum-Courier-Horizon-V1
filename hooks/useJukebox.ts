@@ -16,8 +16,16 @@ const isAbortAudioError = (error: unknown) => (
   error instanceof DOMException && error.name === 'AbortError'
 );
 
+const isPlaybackGateError = (error: unknown) => (
+  error instanceof DOMException && error.name === 'NotAllowedError'
+);
+
 const reportAudioError = (label: string, error: unknown) => {
   if (isAbortAudioError(error)) return;
+  if (isPlaybackGateError(error)) {
+    console.debug(`[Jukebox] ${label}: waiting for user audio gesture`);
+    return;
+  }
   const message = error instanceof Error ? error.message : String(error);
   console.warn(`[Jukebox] ${label}:`, message);
 };
@@ -54,6 +62,24 @@ export function useJukebox(onPlayStateChange?: (isPlaying: boolean) => void) {
   const [isLoaded, setIsLoaded] = useState(false);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const pendingGesturePlaybackRef = useRef(false);
+
+  const requestPlayback = useCallback((label: string) => {
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    audio.play()
+      .then(() => {
+        pendingGesturePlaybackRef.current = false;
+        console.log(`[Jukebox] Playback started successfully`);
+      })
+      .catch(error => {
+        if (isPlaybackGateError(error)) {
+          pendingGesturePlaybackRef.current = true;
+        }
+        reportAudioError(label, error);
+      });
+  }, []);
 
   // Initialize audio element once
   useEffect(() => {
@@ -112,10 +138,10 @@ export function useJukebox(onPlayStateChange?: (isPlaying: boolean) => void) {
       audioRef.current.pause();
       setIsPlaying(false);
     } else {
-      audioRef.current.play().catch(error => reportAudioError('Manual playback failed', error));
+      requestPlayback('Manual playback failed');
       setIsPlaying(true);
     }
-  }, [isPlaying, playlist.length]);
+  }, [isPlaying, playlist.length, requestPlayback]);
 
   const playNext = useCallback(() => {
     if (playlist.length === 0) return;
@@ -181,11 +207,29 @@ export function useJukebox(onPlayStateChange?: (isPlaying: boolean) => void) {
 
   const stop = useCallback(() => {
     setIsPlaying(false);
+    pendingGesturePlaybackRef.current = false;
     if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current.currentTime = 0;
     }
   }, []);
+
+  useEffect(() => {
+    if (!isPlaying) return;
+
+    const retryAfterGesture = () => {
+      if (!pendingGesturePlaybackRef.current) return;
+      requestPlayback('Gesture playback retry failed');
+    };
+
+    window.addEventListener('pointerdown', retryAfterGesture, true);
+    window.addEventListener('keydown', retryAfterGesture, true);
+
+    return () => {
+      window.removeEventListener('pointerdown', retryAfterGesture, true);
+      window.removeEventListener('keydown', retryAfterGesture, true);
+    };
+  }, [isPlaying, requestPlayback]);
 
   // Handle track changes
   useEffect(() => {
@@ -203,15 +247,13 @@ export function useJukebox(onPlayStateChange?: (isPlaying: boolean) => void) {
       }
       
       if (isPlaying) {
-        audioRef.current.play()
-          .then(() => console.log(`[Jukebox] Playback started successfully`))
-          .catch(error => reportAudioError('Playback failed', error));
+        requestPlayback('Playback failed');
       } else {
         audioRef.current.pause();
         console.log(`[Jukebox] Playback paused`);
       }
     }
-  }, [currentTrackIndex, playlist, isPlaying, isLoaded]);
+  }, [currentTrackIndex, playlist, isPlaying, isLoaded, requestPlayback]);
 
   return useMemo(() => ({
     playlist,

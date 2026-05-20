@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import localFont from 'next/font/local';
 import './globals.css';
+import { RuntimeEventGuard } from '@/components/RuntimeEventGuard';
 
 const exo2 = localFont({
   src: '../public/fonts/Exo2-Variable.ttf',
@@ -34,6 +35,7 @@ export default function RootLayout({children}: {children: React.ReactNode}) {
   return (
     <html lang="pt-BR" className={`${exo2.variable} ${inter.variable} ${audiowide.variable}`}>
       <body suppressHydrationWarning className="bg-black text-white font-sans overflow-hidden">
+        <RuntimeEventGuard />
         <GameProvider>
           {children}
         </GameProvider>

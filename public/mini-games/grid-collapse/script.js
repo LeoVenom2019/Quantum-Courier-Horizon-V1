@@ -20,6 +20,35 @@ canvas.height = ROWS * BLOCK_SIZE;
 nextCanvas.width = 4 * BLOCK_SIZE;
 nextCanvas.height = 4 * BLOCK_SIZE;
 
+function getArcadePerks() {
+    try {
+        return JSON.parse(localStorage.getItem('qch_arcade_perks_grid-collapse') || '[]');
+    } catch (error) {
+        return [];
+    }
+}
+
+function hasArcadePerk(perkId) {
+    return getArcadePerks().some(perk => perk && perk.id === perkId);
+}
+
+const HAS_LINE_BONUS = hasArcadePerk('grid-collapse-line-bonus');
+const HAS_EXTRA_PREVIEW = hasArcadePerk('grid-collapse-next-piece-preview');
+let nextCanvas2 = null;
+let nextCtx2 = null;
+
+if (HAS_EXTRA_PREVIEW && nextCanvas?.parentElement) {
+    const preview = document.createElement('canvas');
+    preview.id = 'nextCanvas2';
+    preview.width = 4 * BLOCK_SIZE;
+    preview.height = 4 * BLOCK_SIZE;
+    preview.className = 'extra-preview-canvas';
+    nextCanvas.parentElement.classList.add('has-extra-preview');
+    nextCanvas.parentElement.appendChild(preview);
+    nextCanvas2 = preview;
+    nextCtx2 = preview.getContext('2d');
+}
+
 // Colors for Tetriminos
 const COLORS = {
     I: '#00f2ff',
@@ -48,6 +77,7 @@ const SHAPES = {
 let grid = createGrid();
 let currentPiece = null;
 let nextPiece = null;
+let secondNextPiece = null;
 let score = 0;
 let level = 1;
 let linesCleared = 0;
@@ -67,6 +97,9 @@ const SFX_BASE = '/assets/games/flipers_sfx';
 const SFX = {
     rotate: `${SFX_BASE}/grid_collapse_change.ogg`,
     drop: `${SFX_BASE}/grid_collapse_go_down.ogg`,
+    explosion: `${SFX_BASE}/grid_collapse_explosion.ogg`,
+    perfect: `${SFX_BASE}/grid_collapse_perfect.ogg`,
+    misfit: `${SFX_BASE}/grid_collapse_misfit.ogg`,
     match: {
         1: `${SFX_BASE}/grid_collapse_match_1.ogg`,
         2: `${SFX_BASE}/grid_collapse_match_2.ogg`,
@@ -115,8 +148,12 @@ function spawnPiece() {
     if (!nextPiece) {
         nextPiece = createRandomPiece();
     }
+    if (HAS_EXTRA_PREVIEW && !secondNextPiece) {
+        secondNextPiece = createRandomPiece();
+    }
     currentPiece = nextPiece;
-    nextPiece = createRandomPiece();
+    nextPiece = HAS_EXTRA_PREVIEW ? secondNextPiece : createRandomPiece();
+    secondNextPiece = HAS_EXTRA_PREVIEW ? createRandomPiece() : null;
 
     currentPiece.pos.x = Math.floor(COLS / 2) - Math.floor(currentPiece.shape[0].length / 2);
     currentPiece.pos.y = 0;
@@ -186,9 +223,16 @@ function merge(grid, piece) {
     if (createdHole) {
         screenShake = 12;
         spawnExplosion(piece.pos.x * BLOCK_SIZE + 45, piece.pos.y * BLOCK_SIZE + 15, '#ff4b2b', 15);
-        spawnTextEffect("MISFIT", piece.pos.x * BLOCK_SIZE + 45, piece.pos.y * BLOCK_SIZE, '#ff4b2b');
+        playSfx(SFX.misfit, 0.68);
+        spawnTextEffect("MISFIT", piece.pos.x * BLOCK_SIZE + 45, piece.pos.y * BLOCK_SIZE, '#ff3b30', {
+            size: 23,
+            shake: 3,
+        });
     } else {
-        spawnTextEffect("PERFECT", piece.pos.x * BLOCK_SIZE + 45, piece.pos.y * BLOCK_SIZE, COLORS[piece.type]);
+        playSfx(SFX.perfect, 0.72);
+        spawnTextEffect("PERFECT", piece.pos.x * BLOCK_SIZE + 45, piece.pos.y * BLOCK_SIZE, '#22c55e', {
+            size: 25,
+        });
         screenShake = 3;
     }
 
@@ -254,6 +298,7 @@ function playerMove(dir) {
 
 function triggerBomb(x, y) {
     const radius = 2;
+    playSfx(SFX.explosion, 0.8);
     spawnExplosion(x * BLOCK_SIZE + BLOCK_SIZE/2, y * BLOCK_SIZE + BLOCK_SIZE/2, '#fff', 40);
     screenShake = 20;
 
@@ -346,7 +391,7 @@ function executeClearing(affectedY, linesInSweep, lastPieceType) {
             ++y;
             cleared++;
             
-            const points = rowCount * 100;
+            const points = rowCount * 100 + (HAS_LINE_BONUS ? 500 : 0);
             score += points;
             spawnScoreFloater(points, 150, (y-cleared) * BLOCK_SIZE);
             rowCount *= 2;
@@ -406,17 +451,20 @@ function updateScore() {
 function handleGameOver() {
     gameOver = true;
     gameActive = false;
+    const finalScore = Number(score) || 0;
+    const finalLines = Number(linesCleared) || 0;
+    const finalLevel = Number(level) || 1;
     finalScoreElement.innerText = score.toString().padStart(5, '0');
 
     window.QCHArcadeResults.show({
         gameId: 'grid-collapse',
-        victory: score >= 15000,
-        score,
+        victory: finalScore >= 15000,
+        score: finalScore,
         stats: [
-            { label: 'Final Data Score', value: score },
+            { label: 'Final Data Score', value: finalScore },
             { label: 'Target', value: '15000' },
-            { label: 'Lines', value: lines },
-            { label: 'Level', value: level },
+            { label: 'Lines', value: finalLines },
+            { label: 'Level', value: finalLevel },
         ],
     });
 }
@@ -455,7 +503,7 @@ function spawnExplosion(x, y, color, count = 10) {
     }
 }
 
-function spawnTextEffect(text, x, y, color) {
+function spawnTextEffect(text, x, y, color, options = {}) {
     // Simple enough for canvas draw
     particles.push({
         type: 'text',
@@ -464,7 +512,8 @@ function spawnTextEffect(text, x, y, color) {
         vy: -1,
         life: 1.5,
         color,
-        size: 16
+        size: options.size || 16,
+        shake: options.shake || 0
     });
 }
 
@@ -653,7 +702,9 @@ function draw() {
             ctx.textAlign = 'center';
             ctx.shadowBlur = 10;
             ctx.shadowColor = p.color;
-            ctx.fillText(p.text, p.x, p.y);
+            const shakeX = p.shake ? (Math.random() - 0.5) * p.shake * p.life : 0;
+            const shakeY = p.shake ? (Math.random() - 0.5) * p.shake * p.life : 0;
+            ctx.fillText(p.text, p.x + shakeX, p.y + shakeY);
             p.y += p.vy;
         } else if (p.type === 'flash') {
             ctx.globalAlpha = Math.max(0, p.life);
@@ -688,29 +739,33 @@ function draw() {
     ctx.restore();
     ctx.globalAlpha = 1;
 
-    // Next piece
-    nextCtx.fillStyle = '#111';
-    nextCtx.fillRect(0, 0, nextCanvas.width, nextCanvas.height);
-    
-    // Border for next piece box
-    nextCtx.strokeStyle = 'rgba(0, 242, 255, 0.2)';
-    nextCtx.lineWidth = 2;
-    nextCtx.strokeRect(5, 5, nextCanvas.width-10, nextCanvas.height-10);
-
-    if (nextPiece) {
-        nextPiece.shape.forEach((row, y) => {
-            row.forEach((value, x) => {
-                if (value !== 0) {
-                    // Centering tweaks
-                    let ox = 1;
-                    let oy = 1;
-                    if (nextPiece.type === 'I') oy = 1.5;
-                    if (nextPiece.type === 'O') ox = 1;
-                    drawBlock(nextCtx, x + ox, y + oy, nextPiece.type, BLOCK_SIZE * 0.7);
-                }
-            });
-        });
+    drawPreviewPiece(nextCtx, nextCanvas, nextPiece);
+    if (HAS_EXTRA_PREVIEW && nextCtx2 && nextCanvas2) {
+        drawPreviewPiece(nextCtx2, nextCanvas2, secondNextPiece);
     }
+}
+
+function drawPreviewPiece(targetCtx, targetCanvas, piece) {
+    targetCtx.fillStyle = '#111';
+    targetCtx.fillRect(0, 0, targetCanvas.width, targetCanvas.height);
+    
+    targetCtx.strokeStyle = 'rgba(0, 242, 255, 0.2)';
+    targetCtx.lineWidth = 2;
+    targetCtx.strokeRect(5, 5, targetCanvas.width - 10, targetCanvas.height - 10);
+
+    if (!piece) return;
+
+    piece.shape.forEach((row, y) => {
+        row.forEach((value, x) => {
+            if (value !== 0) {
+                let ox = 1;
+                let oy = 1;
+                if (piece.type === 'I') oy = 1.5;
+                if (piece.type === 'O') ox = 1;
+                drawBlock(targetCtx, x + ox, y + oy, piece.type, BLOCK_SIZE * 0.7);
+            }
+        });
+    });
 }
 
 function update(time = 0) {

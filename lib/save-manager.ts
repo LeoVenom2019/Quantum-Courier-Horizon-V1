@@ -1,6 +1,7 @@
-export const CURRENT_SAVE_VERSION = "1.2.0";
+export const CURRENT_SAVE_VERSION = "1.2.2";
 
 export const COLONY_SAVE_STORAGE_KEYS = [
+  'colonies_data',
   'colony_cards_data',
   'colony_card_levels',
   'colony_search_upgrade_levels',
@@ -13,6 +14,7 @@ export const COLONY_SAVE_STORAGE_KEYS = [
   'colony_supplies_data',
   'defense_special_loadout',
   'colony_defense_threats',
+  'arcade_card_reward_milestones',
 ] as const;
 
 export type ColonySaveStorageKey = typeof COLONY_SAVE_STORAGE_KEYS[number];
@@ -20,6 +22,7 @@ export type ColonySaveStorageKey = typeof COLONY_SAVE_STORAGE_KEYS[number];
 const MAX_PENDING_DEFENSE_THREATS = 2;
 
 export interface ColonySystemSaveData {
+  colonies: any[];
   ownedCardIds: string[];
   cardLevels: Record<string, number>;
   searchUpgradeLevels: Record<'land' | 'sea', number>;
@@ -33,6 +36,7 @@ export interface ColonySystemSaveData {
   supplies: Record<string, number>;
   defenseSpecialLoadout: string[];
   pendingDefenseThreats: any[];
+  arcadeCardRewardMilestones: Record<string, any>;
   storage: Partial<Record<ColonySaveStorageKey, any>>;
 }
 
@@ -74,6 +78,7 @@ const getFlatOrStorageValue = (flatData: any, flatKey: string, storageKey: Colon
 };
 
 const createColonySystemSave = (flatData: any): ColonySystemSaveData => {
+  const colonies = getFlatOrStorageValue(flatData, 'colonies', 'colonies_data', []);
   const ownedCardIds = getFlatOrStorageValue(flatData, 'colonyCardIds', 'colony_cards_data', []);
   const cardLevels = getFlatOrStorageValue(flatData, 'colonyCardLevels', 'colony_card_levels', {});
   const searchUpgradeLevels = getFlatOrStorageValue(flatData, 'colonySearchUpgradeLevels', 'colony_search_upgrade_levels', { land: 0, sea: 0 });
@@ -86,11 +91,13 @@ const createColonySystemSave = (flatData: any): ColonySystemSaveData => {
   const supplies = getFlatOrStorageValue(flatData, 'colonySupplies', 'colony_supplies_data', {});
   const defenseSpecialLoadout = getFlatOrStorageValue(flatData, 'defenseSpecialLoadout', 'defense_special_loadout', []);
   const pendingDefenseThreats = getFlatOrStorageValue(flatData, 'colonyDefenseThreats', 'colony_defense_threats', []);
+  const arcadeCardRewardMilestones = getFlatOrStorageValue(flatData, 'arcadeCardRewardMilestones', 'arcade_card_reward_milestones', {});
   const normalizedPendingDefenseThreats = Array.isArray(pendingDefenseThreats)
     ? pendingDefenseThreats.filter(threat => threat?.status === 'pending').slice(0, MAX_PENDING_DEFENSE_THREATS)
     : [];
 
   return {
+    colonies: Array.isArray(colonies) ? colonies : [],
     ownedCardIds: Array.isArray(ownedCardIds) ? ownedCardIds : [],
     cardLevels: cardLevels && typeof cardLevels === 'object' ? cardLevels : {},
     searchUpgradeLevels: {
@@ -110,7 +117,9 @@ const createColonySystemSave = (flatData: any): ColonySystemSaveData => {
     supplies: supplies && typeof supplies === 'object' ? supplies : {},
     defenseSpecialLoadout: Array.isArray(defenseSpecialLoadout) ? defenseSpecialLoadout : [],
     pendingDefenseThreats: normalizedPendingDefenseThreats,
+    arcadeCardRewardMilestones: arcadeCardRewardMilestones && typeof arcadeCardRewardMilestones === 'object' ? arcadeCardRewardMilestones : {},
     storage: {
+      colonies_data: Array.isArray(colonies) ? colonies : [],
       colony_cards_data: Array.isArray(ownedCardIds) ? ownedCardIds : [],
       colony_card_levels: cardLevels && typeof cardLevels === 'object' ? cardLevels : {},
       colony_search_upgrade_levels: searchUpgradeLevels && typeof searchUpgradeLevels === 'object' ? searchUpgradeLevels : { land: 0, sea: 0 },
@@ -123,6 +132,7 @@ const createColonySystemSave = (flatData: any): ColonySystemSaveData => {
       colony_supplies_data: supplies && typeof supplies === 'object' ? supplies : {},
       defense_special_loadout: Array.isArray(defenseSpecialLoadout) ? defenseSpecialLoadout : [],
       colony_defense_threats: normalizedPendingDefenseThreats,
+      arcade_card_reward_milestones: arcadeCardRewardMilestones && typeof arcadeCardRewardMilestones === 'object' ? arcadeCardRewardMilestones : {},
     },
   };
 };

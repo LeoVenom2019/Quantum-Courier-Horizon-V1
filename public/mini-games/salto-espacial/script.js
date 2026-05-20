@@ -16,6 +16,21 @@ const COLOR_HEAD = '#06b6d4';
 const COLOR_BG = '#000000';
 const SOUND_DEAD = '/assets/games/flipers_sfx/snake_dead.ogg';
 
+function getArcadePerks() {
+    try {
+        return JSON.parse(localStorage.getItem('qch_arcade_perks_salto-espacial') || '[]');
+    } catch (error) {
+        return [];
+    }
+}
+
+function hasArcadePerk(perkId) {
+    return getArcadePerks().some(perk => perk && perk.id === perkId);
+}
+
+const HAS_SCORE_BOOST = hasArcadePerk('space-jump-score-boost');
+const HAS_EXTRA_LIFE = hasArcadePerk('space-jump-extra-life');
+
 const SNAKE_COLOR_STAGES = [
     { minLength: 0, color: '#06b6d4', trail: 'rgba(6, 182, 212, 0.2)', body: [6, 182, 212] },
     { minLength: 9, color: '#10b981', trail: 'rgba(16, 185, 129, 0.22)', body: [16, 185, 129] },
@@ -70,6 +85,8 @@ let lastTickTime = 0;
 let tickSpeed = 160; 
 let requestID = null;
 let highScore = parseInt(localStorage.getItem('salto_espacial_high_score')) || 0;
+let emergencyLives = HAS_EXTRA_LIFE ? 1 : 0;
+let recoveryCountdownUntil = 0;
 
 // Visual systems
 let stars = [];
@@ -123,6 +140,8 @@ function init() {
     direction = 'RIGHT';
     nextDirection = 'RIGHT';
     score = 0;
+    emergencyLives = HAS_EXTRA_LIFE ? 1 : 0;
+    recoveryCountdownUntil = 0;
     tickSpeed = 160;
     updateScore(0);
     spawnFood();
@@ -156,6 +175,11 @@ function spawnFood() {
         if (!onSnake) break;
     }
     food = newFood;
+}
+
+function addScore(basePoints) {
+    const multiplier = HAS_SCORE_BOOST ? 1.5 : 1;
+    updateScore(score + Math.round(basePoints * multiplier));
 }
 
 function playSound(path, volume = 0.75) {
@@ -227,6 +251,47 @@ function handleInput(e) {
     if ((key === 'ArrowRight' || key === 'd' || key === 'D') && direction !== 'LEFT') nextDirection = 'RIGHT';
 }
 
+function rebuildSnakeInSafeZone() {
+    const length = Math.max(3, snake.length);
+    const safeHead = { x: Math.floor(COLS * 0.35), y: Math.floor(ROWS * 0.5) };
+    const rebuilt = [];
+
+    rebuilt.push({ x: safeHead.x, y: safeHead.y, px: safeHead.x, py: safeHead.y });
+
+    for (let i = 1; i < length; i++) {
+        const rowOffset = Math.floor((i - 1) / 8);
+        const colOffset = (i - 1) % 8;
+        const y = Math.min(ROWS - 4, safeHead.y + 1 + rowOffset);
+        const directionMod = rowOffset % 2 === 0 ? -1 : 1;
+        const x = Math.max(3, Math.min(COLS - 4, safeHead.x + directionMod * colOffset));
+        rebuilt.push({ x, y, px: x, py: y });
+    }
+
+    snake = rebuilt;
+    direction = 'RIGHT';
+    nextDirection = 'RIGHT';
+}
+
+function consumeEmergencyLife() {
+    if (emergencyLives <= 0) return false;
+
+    emergencyLives--;
+    playSound(SOUND_DEAD, 0.45);
+    rebuildSnakeInSafeZone();
+    recoveryCountdownUntil = performance.now() + 3000;
+    lastTickTime = performance.now();
+    spawnBurst(
+        snake[0].x * CELL_SIZE + CELL_SIZE / 2,
+        snake[0].y * CELL_SIZE + CELL_SIZE / 2,
+        '#22d3ee',
+        36,
+        1.8,
+        54,
+        4
+    );
+    return true;
+}
+
 function updateHighScore() {
     if (score > highScore) {
         highScore = score;
@@ -236,6 +301,7 @@ function updateHighScore() {
 
 function update() {
     if (!gameActive) return;
+    if (recoveryCountdownUntil > performance.now()) return;
 
     direction = nextDirection;
     
@@ -256,13 +322,13 @@ function update() {
 
     // Collision detection: Walls
     if (nextX < 0 || nextX >= COLS || nextY < 0 || nextY >= ROWS) {
-        gameOver();
+        if (!consumeEmergencyLife()) gameOver();
         return;
     }
 
     // Collision detection: Self
     if (snake.some(segment => segment.x === nextX && segment.y === nextY)) {
-        gameOver();
+        if (!consumeEmergencyLife()) gameOver();
         return;
     }
 
@@ -270,7 +336,7 @@ function update() {
     if (nextX === food.x && nextY === food.y) {
         const foodType = food.type || FOOD_TYPES[0];
         playTakeSound(foodType);
-        updateScore(score + foodType.score);
+        addScore(foodType.score);
         spawnParticle(
             food.x * CELL_SIZE + CELL_SIZE / 2,
             food.y * CELL_SIZE + CELL_SIZE / 2,
@@ -328,6 +394,34 @@ function draw(interp) {
 
     // Draw Snake Trail (Rastro energético)
     drawSnake(interp);
+
+    drawWildcardHud();
+}
+
+function drawWildcardHud() {
+    if (HAS_EXTRA_LIFE || recoveryCountdownUntil > performance.now()) {
+        ctx.save();
+        ctx.font = '700 11px Orbitron, monospace';
+        ctx.textAlign = 'left';
+        ctx.fillStyle = emergencyLives > 0 ? '#22d3ee' : 'rgba(148, 163, 184, 0.65)';
+        ctx.fillText(`RESERVA: ${emergencyLives}`, 16, canvas.height - 18);
+        ctx.restore();
+    }
+
+    if (recoveryCountdownUntil > performance.now()) {
+        const remaining = Math.max(1, Math.ceil((recoveryCountdownUntil - performance.now()) / 1000));
+        ctx.save();
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.38)';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.textAlign = 'center';
+        ctx.font = '900 42px Orbitron, monospace';
+        ctx.fillStyle = '#f8fafc';
+        ctx.fillText(String(remaining), canvas.width / 2, canvas.height - 58);
+        ctx.font = '700 11px Orbitron, monospace';
+        ctx.fillStyle = '#22d3ee';
+        ctx.fillText('SAFE ZONE', canvas.width / 2, canvas.height - 28);
+        ctx.restore();
+    }
 }
 
 function drawStars() {

@@ -22,9 +22,49 @@ interface MiniGamesProps {
 
 const GAMES_PER_PAGE = 4;
 const WILDCARD_CARDS_PER_PAGE = 9;
+const ARCADE_BACKGROUND_SRC = '/assets/games/arcade_background.webp';
 const WILDCARD_ICON_SRC = '/assets/rota4/cards/joker_ico.webp';
 const WILDCARD_CARD_BACKGROUND_SRC = '/assets/rota4/cards/6_background_j.webp';
 const arcadeUiSoundCache = new Map<string, HTMLAudioElement>();
+
+const ARCADE_GLOW_THEMES: Record<string, { primary: string; secondary: string; halo: string; visual: 'sci-fi' | 'war' | 'puzzle' | 'nebula' }> = {
+  'salto-espacial': {
+    primary: '#1d9bff',
+    secondary: '#00d5ff',
+    halo: 'rgba(29,155,255,0.44)',
+    visual: 'nebula',
+  },
+  'ruptura-estelar': {
+    primary: '#a855f7',
+    secondary: '#d946ef',
+    halo: 'rgba(168,85,247,0.42)',
+    visual: 'war',
+  },
+  'danger-zoom-zones': {
+    primary: '#39ff14',
+    secondary: '#00d084',
+    halo: 'rgba(57,255,20,0.38)',
+    visual: 'sci-fi',
+  },
+  'grid-collapse': {
+    primary: '#f8e71c',
+    secondary: '#fbbf24',
+    halo: 'rgba(248,231,28,0.38)',
+    visual: 'puzzle',
+  },
+  'robot-runner': {
+    primary: '#f8fafc',
+    secondary: '#94a3b8',
+    halo: 'rgba(248,250,252,0.34)',
+    visual: 'sci-fi',
+  },
+  'neo-catcher': {
+    primary: '#ff2d55',
+    secondary: '#ef4444',
+    halo: 'rgba(255,45,85,0.38)',
+    visual: 'nebula',
+  },
+};
 
 const playArcadeUiSound = (src: string) => {
   if (typeof Audio === 'undefined') return;
@@ -235,10 +275,41 @@ export const MiniGames: React.FC<MiniGamesProps> = ({ onGameSelect, language }) 
       </div>
 
       {/* Grid Container */}
-      <div className="flex-1 flex flex-col justify-center overflow-hidden relative pb-6">
-        {/* Floor Effect Grounding the Cabinets */}
-        <div className="absolute bottom-20 left-0 right-0 h-40 bg-gradient-to-t from-cyan-500/5 to-transparent pointer-events-none" />
-        <div className="absolute bottom-20 left-12 right-12 h-[1px] bg-gradient-to-r from-transparent via-cyan-500/20 to-transparent pointer-events-none" />
+      <div className="relative flex-1 overflow-hidden rounded-[1.75rem] border border-white/5 bg-black/70 pb-6 shadow-[inset_0_0_80px_rgba(0,0,0,0.72)]">
+        <img
+          src={ARCADE_BACKGROUND_SRC}
+          alt=""
+          aria-hidden="true"
+          className="absolute inset-0 h-full w-full object-cover opacity-80"
+          draggable={false}
+        />
+        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(1,5,15,0.18),rgba(0,0,0,0.10)_42%,rgba(0,0,0,0.55)),radial-gradient(circle_at_50%_18%,rgba(255,255,255,0.08),transparent_46%)]" />
+        <div
+          aria-hidden="true"
+          className="absolute left-0 top-8 bottom-8 w-[9%] pointer-events-none opacity-90"
+          style={{
+            background: 'linear-gradient(90deg, rgba(34,211,238,0.34), rgba(217,70,239,0.18) 28%, rgba(250,204,21,0.08) 54%, transparent 100%)',
+            filter: 'blur(10px)',
+          }}
+        />
+        <div
+          aria-hidden="true"
+          className="absolute right-0 top-8 bottom-8 w-[9%] pointer-events-none opacity-90"
+          style={{
+            background: 'linear-gradient(270deg, rgba(250,204,21,0.22), rgba(217,70,239,0.2) 32%, rgba(34,211,238,0.16) 58%, transparent 100%)',
+            filter: 'blur(10px)',
+          }}
+        />
+        <div
+          aria-hidden="true"
+          className="absolute inset-y-10 left-0 w-px bg-gradient-to-b from-transparent via-cyan-200/70 to-transparent shadow-[0_0_18px_rgba(34,211,238,0.62)]"
+        />
+        <div
+          aria-hidden="true"
+          className="absolute inset-y-10 right-0 w-px bg-gradient-to-b from-transparent via-fuchsia-200/70 to-transparent shadow-[0_0_18px_rgba(217,70,239,0.62)]"
+        />
+        <div className="absolute inset-x-0 bottom-0 h-36 bg-gradient-to-t from-black/68 to-transparent pointer-events-none" />
+        <div className="absolute bottom-20 left-12 right-12 h-[1px] bg-gradient-to-r from-transparent via-cyan-200/24 to-transparent pointer-events-none" />
 
         <AnimatePresence mode="wait">
           <motion.div 
@@ -251,21 +322,24 @@ export const MiniGames: React.FC<MiniGamesProps> = ({ onGameSelect, language }) 
             style={{ width: '100%', height: '610px' }}
           >
             {currentGames.map((game) => {
-              // Theme mapping for arcade cards
-              const themes: Record<string, { primary: string, secondary: string, visual: 'sci-fi' | 'war' | 'puzzle' | 'nebula' }> = {
-                'salto-espacial': { primary: '#06b6d4', secondary: '#0891b2', visual: 'nebula' },
-                'ruptura-estelar': { primary: '#ef4444', secondary: '#b91c1c', visual: 'war' },
-                'danger-zoom-zones': { primary: '#00ff9d', secondary: '#059669', visual: 'sci-fi' },
-                'grid-collapse': { primary: '#fbbf24', secondary: '#92400e', visual: 'sci-fi' },
-                'robot-runner': { primary: '#38bdf8', secondary: '#0ea5e9', visual: 'sci-fi' },
-                'neo-catcher': { primary: '#00f2ff', secondary: '#0891b2', visual: 'nebula' }
-              };
-              const theme = themes[game.id] || { primary: '#06b6d4', secondary: '#0891b2', visual: 'sci-fi' };
+              const theme = ARCADE_GLOW_THEMES[game.id] || ARCADE_GLOW_THEMES['salto-espacial'];
               const isUnlockedByCard = unlockedArcadeIds.has(game.id);
 
               return (
                 <div key={game.id} className="flex flex-col items-center gap-2 w-full max-w-[280px] mx-auto group/cabinet">
                   <div className="relative w-full">
+                    <div
+                      aria-hidden="true"
+                      className="absolute -inset-x-8 top-10 bottom-12 rounded-[40%] blur-[46px] opacity-70 transition-opacity duration-500 group-hover/cabinet:opacity-100"
+                      style={{
+                        background: `radial-gradient(circle at 50% 42%, ${theme.halo}, transparent 64%)`,
+                      }}
+                    />
+                    <div
+                      aria-hidden="true"
+                      className="absolute inset-x-8 bottom-0 h-28 rounded-[50%] blur-2xl opacity-55 transition-transform duration-500 group-hover/cabinet:scale-110"
+                      style={{ background: theme.halo }}
+                    />
                     <ArcadeCard
                       titulo={game.name[language]}
                       descricao={game.description[language]}
@@ -283,7 +357,7 @@ export const MiniGames: React.FC<MiniGamesProps> = ({ onGameSelect, language }) 
                   
                   {/* Cabinet ID Tag */}
                   <div className="flex items-center gap-3 px-3 py-1 bg-black/40 border border-white/10 rounded-full group-hover/cabinet:border-cyan-500/50 transition-colors">
-                    <div className="w-1.5 h-1.5 rounded-full bg-cyan-500 animate-pulse" />
+                    <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: theme.primary, boxShadow: `0 0 12px ${theme.primary}` }} />
                     <span className="font-mono text-[9px] text-slate-400 uppercase tracking-widest">
                       UNIT CASE #{String(MINI_GAMES_CONFIG.indexOf(game) + 1).padStart(2, '0')}
                     </span>
@@ -576,13 +650,13 @@ export const MiniGames: React.FC<MiniGamesProps> = ({ onGameSelect, language }) 
                   )}
                   {selectedGameInfo.id === 'ruptura-estelar' && (
                     language === 'pt'
-                      ? 'Defenda o setor contra ondas de invasores. Destrua inimigos para carregar seu sistema de OVERDRIVE. Quando ativo, seu poder de fogo e velocidade aumentam drasticamente. Use ESPAÇO para disparar e desvie de impactos fatais.'
-                      : 'Defend the sector against waves of invaders. Destroy enemies to charge your OVERDRIVE system. When active, your firepower and speed increase drastically. Use SPACE to fire and dodge fatal impacts.'
+                      ? 'Defenda o setor contra ondas de invasores. Destrua inimigos para carregar seu sistema de OVERDRIVE. Quando ativo, seu poder de fogo e velocidade aumentam drasticamente. Desvie de impactos fatais.'
+                      : 'Defend the sector against waves of invaders. Destroy enemies to charge your OVERDRIVE system. When active, your firepower and speed increase drastically. Dodge fatal impacts.'
                   )}
                   {selectedGameInfo.id === 'danger-zoom-zones' && (
                     language === 'pt'
-                      ? 'Desarme as minas espaciais antes que o tempo se esgote. Clique para selecionar uma zona: use um DESARMADOR (S) se suspeitar de uma mina, ou faça um SCAN (N) se achar seguro. Desarmes corretos dão bônus de tempo e combos, mas erros custam kits ou tempo vital.'
-                      : 'Disarm space mines before time runs out. Click to select a zone: use a DISARMER (S) if you suspect a mine, or do a SCAN (N) if you think it\'s safe. Correct disarms grant time bonuses and combos, but errors cost kits or vital time.'
+                      ? 'Desarme as minas espaciais antes que o tempo se esgote. Clique para selecionar uma zona: use um DESARMADOR (S) se suspeitar de uma mina, ou faça um SCAN (N) se achar seguro. Cada decisão consome uma chance, e bombas reveladas sem desarme custam tempo vital.'
+                      : 'Disarm space mines before time runs out. Click to select a zone: use a DISARMER (S) if you suspect a mine, or do a SCAN (N) if you think it is safe. Each decision consumes one chance, and bombs revealed without disarming cost vital time.'
                   )}
                   {selectedGameInfo.id === 'grid-collapse' && (
                     language === 'pt'

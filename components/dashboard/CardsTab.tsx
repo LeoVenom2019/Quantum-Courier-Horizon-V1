@@ -27,7 +27,6 @@ import {
   ColonyCardAnySlot,
   ColonyCardClass,
   ColonyCardSlot,
-  ColonySectorId,
   getCardById,
   getBattleEffects,
   getCardBackgroundImage,
@@ -125,6 +124,21 @@ const CardEffectPills = ({ card, language, cardLevels = {} }: { card: ColonyCard
 
   return (
     <div className="flex flex-wrap gap-1.5">
+      {cardClass === 'political' && card.passiveBonuses?.constructorsAllColonies ? (
+        <span className="rounded-full border border-cyan-300/60 bg-zinc-950/90 px-2 py-0.5 text-[10px] font-mono text-cyan-100 shadow-[0_0_10px_rgba(0,0,0,0.45)]">
+          +{card.passiveBonuses.constructorsAllColonies} {language === 'pt' ? 'Robôs Construtores' : 'Builder Robots'}
+        </span>
+      ) : null}
+      {cardClass === 'political' && card.passiveBonuses?.allSectorBonus ? (
+        <span className="rounded-full border border-emerald-300/60 bg-zinc-950/90 px-2 py-0.5 text-[10px] font-mono text-emerald-200 shadow-[0_0_10px_rgba(0,0,0,0.45)]">
+          +{card.passiveBonuses.allSectorBonus} {language === 'pt' ? 'Todas as Colônias' : 'All Colonies'}
+        </span>
+      ) : null}
+      {cardClass === 'political' && card.passiveBonuses?.constructionSpeedPercent ? (
+        <span className="rounded-full border border-amber-300/60 bg-zinc-950/90 px-2 py-0.5 text-[10px] font-mono text-amber-100 shadow-[0_0_10px_rgba(0,0,0,0.45)]">
+          +{card.passiveBonuses.constructionSpeedPercent}% {language === 'pt' ? 'Velocidade de Construção' : 'Construction Speed'}
+        </span>
+      ) : null}
       {effects.map(effect => {
         const key = 'sector' in effect ? effect.sector : effect.stat;
         const value = effect.value;
@@ -374,17 +388,6 @@ const CardsTab = memo(function CardsTab() {
     return () => window.clearTimeout(timer);
   }, [activeSection, classFilter]);
 
-  const bestEffectiveSectors = useMemo(() => {
-    const sectorIds = Object.keys(SECTOR_CONFIG) as ColonySectorId[];
-    return colonies.reduce((best, colony: Colony) => {
-      const current = getColonyEffectiveSectors(colony, cardLevels);
-      sectorIds.forEach(sectorId => {
-        best[sectorId] = Math.max(best[sectorId], current[sectorId]);
-      });
-      return best;
-    }, { ...DEFAULT_COLONY_SECTORS });
-  }, [colonies, cardLevels]);
-
   const ownedCards = useMemo(() => (
     ownedCardIds
       .map(id => getCardById(id))
@@ -411,8 +414,6 @@ const CardsTab = memo(function CardsTab() {
       })
       .filter(Boolean) as { slot: BattleCardSlot; card: ColonyCard }[]
   ), [battleLoadout]);
-
-  const filterByClass = (card: ColonyCard) => classFilter === 'all' || getCardClass(card) === classFilter;
 
   const getRequirement = (card: ColonyCard) => {
     return {
@@ -623,12 +624,25 @@ const CardsTab = memo(function CardsTab() {
     { id: 'equipped' as const, label: tl(lang, 'Equipped Cards', 'Cartas Equipadas'), icon: BadgeCheck },
   ];
 
-  const filteredOwnedCards = ownedCards.filter(filterByClass);
-  const filteredCatalog = COLONY_CARD_CATALOG.filter(filterByClass);
-  const filteredPoliticalEquippedRecords = classFilter === 'battle' ? [] : politicalEquippedRecords;
-  const filteredBattleEquippedRecords = classFilter === 'political' || classFilter === 'wildcard' ? [] : battleEquippedRecords;
+  const effectiveClassFilter = activeSection === 'equipped' && classFilter === 'wildcard' ? 'all' : classFilter;
+  const availableClassFilters = activeSection === 'equipped'
+    ? [
+      { id: 'all' as const, label: tl(lang, 'All', 'Todas') },
+      { id: 'political' as const, label: tl(lang, 'Political', 'Políticas') },
+      { id: 'battle' as const, label: tl(lang, 'Battle', 'Batalha') },
+    ]
+    : [
+      { id: 'all' as const, label: tl(lang, 'All', 'Todas') },
+      { id: 'political' as const, label: tl(lang, 'Political', 'Políticas') },
+      { id: 'battle' as const, label: tl(lang, 'Battle', 'Batalha') },
+      { id: 'wildcard' as const, label: tl(lang, 'Wildcard', 'Curinga') },
+    ];
+  const filteredOwnedCards = ownedCards.filter(card => effectiveClassFilter === 'all' || getCardClass(card) === effectiveClassFilter);
+  const filteredCatalog = COLONY_CARD_CATALOG.filter(card => effectiveClassFilter === 'all' || getCardClass(card) === effectiveClassFilter);
+  const filteredPoliticalEquippedRecords = effectiveClassFilter === 'battle' ? [] : politicalEquippedRecords;
+  const filteredBattleEquippedRecords = effectiveClassFilter === 'political' ? [] : battleEquippedRecords;
   const equippedItems = [
-    ...(classFilter === 'wildcard' ? [] : filteredPoliticalEquippedRecords.map(record => ({ kind: 'political' as const, ...record }))),
+    ...filteredPoliticalEquippedRecords.map(record => ({ kind: 'political' as const, ...record })),
     ...filteredBattleEquippedRecords.map(record => ({ kind: 'battle' as const, ...record })),
   ];
 
@@ -714,19 +728,14 @@ const CardsTab = memo(function CardsTab() {
             <h3 className="font-orbitron text-lg font-black uppercase text-white">{sectionTitle}</h3>
           </div>
           <div className="flex items-center gap-2">
-            <div className="grid grid-cols-4 gap-1 rounded-xl border border-white/10 bg-black/35 p-1">
-              {([
-                { id: 'all' as const, label: tl(lang, 'All', 'Todas') },
-                { id: 'political' as const, label: tl(lang, 'Political', 'Políticas') },
-                { id: 'battle' as const, label: tl(lang, 'Battle', 'Batalha') },
-                { id: 'wildcard' as const, label: tl(lang, 'Wildcard', 'Curinga') },
-              ]).map(filter => (
+            <div className={`grid gap-1 rounded-xl border border-white/10 bg-black/35 p-1 ${activeSection === 'equipped' ? 'grid-cols-3' : 'grid-cols-4'}`}>
+              {availableClassFilters.map(filter => (
                 <button
                   key={filter.id}
                   type="button"
                   onClick={() => setClassFilter(filter.id)}
                   className={`rounded-lg px-2 py-1 font-orbitron text-[9px] font-black uppercase tracking-widest transition-all ${
-                    classFilter === filter.id
+                    effectiveClassFilter === filter.id
                       ? filter.id === 'wildcard'
                         ? 'bg-fuchsia-300 text-black'
                         : filter.id === 'battle'
@@ -762,44 +771,6 @@ const CardsTab = memo(function CardsTab() {
             </button>
           </div>
         </div>
-
-        {activeSection === 'equipped' && (
-          <div className="mb-3 grid shrink-0 gap-3 xl:grid-cols-2">
-            <div className="rounded-2xl border border-cyan-300/20 bg-cyan-300/5 p-3">
-              <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.28em] text-cyan-200">{tl(lang, 'Political Cards Equipped', 'Cartas Políticas Equipadas')}</p>
-              <div className="grid grid-cols-2 gap-2 md:grid-cols-3">
-                {(Object.keys(SECTOR_CONFIG) as ColonySectorId[]).map(sectorId => {
-                  const config = SECTOR_CONFIG[sectorId];
-                  return (
-                    <div key={sectorId} className="rounded-lg border border-white/10 bg-black/30 px-2 py-1.5">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="truncate text-[9px] font-mono uppercase tracking-wider text-zinc-500">{config.label[lang]}</span>
-                        <span className="font-orbitron text-[11px] font-black text-white">{bestEffectiveSectors[sectorId]}</span>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-red-300/20 bg-red-300/5 p-3">
-              <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.28em] text-red-200">{tl(lang, 'Battle Cards Equipped', 'Cartas de Batalha Equipadas')}</p>
-              <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
-                {BATTLE_CARD_SLOTS.map(slot => {
-                  const card = getCardById(battleLoadout[slot]);
-                  return (
-                    <div key={slot} className="rounded-lg border border-white/10 bg-black/30 px-2 py-1.5">
-                      <p className="truncate text-[9px] font-mono uppercase tracking-wider text-zinc-500">{SLOT_LABEL[slot][lang]}</p>
-                      <p className={`mt-1 truncate font-orbitron text-[10px] font-black uppercase ${card ? 'text-red-100' : 'text-zinc-600'}`}>
-                        {card ? card.name[lang] : tl(lang, 'Empty', 'Vazio')}
-                      </p>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        )}
 
         <div className="grid flex-1 auto-rows-fr grid-cols-1 gap-3 overflow-hidden md:grid-cols-2 xl:grid-cols-4">
           {activeSection === 'owned' && (pageItems as ColonyCard[]).map(card => (

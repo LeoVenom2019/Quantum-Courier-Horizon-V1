@@ -43,6 +43,12 @@ export interface ArcadeWildcardPerk {
   value: string;
 }
 
+export interface PoliticalPassiveBonuses {
+  constructorsAllColonies?: number;
+  allSectorBonus?: number;
+  constructionSpeedPercent?: number;
+}
+
 export interface ColonyCard {
   id: string;
   cardClass?: ColonyCardClass;
@@ -55,10 +61,12 @@ export interface ColonyCard {
   battleEffects?: BattleCardEffect[];
   unlocksArcadeId?: string;
   arcadePerk?: ArcadeWildcardPerk;
+  passiveBonuses?: PoliticalPassiveBonuses;
 }
 
 export const POLITICAL_CARD_SLOTS: ColonyCardSlot[] = ['leadership', 'infrastructure', 'culture'];
 export const BATTLE_CARD_SLOTS: BattleCardSlot[] = ['weapon', 'armor', 'core', 'tactic', 'auxiliary', 'protocol'];
+export const NIKOLA_ENEAS_CARD_ID = 'political-mythic-nikola-eneas';
 
 export const getCardClass = (card: ColonyCard): ColonyCardClass => card.cardClass || 'political';
 export const isPoliticalCard = (card: ColonyCard): card is ColonyCard & { slot: ColonyCardSlot } => getCardClass(card) === 'political';
@@ -382,6 +390,7 @@ export type ArcadeCardRewardRule = {
   gameId: string;
   minimumScore: number;
   scoreMode: 'points' | 'remainingSeconds';
+  requiresVictory?: boolean;
 };
 
 export const ARCADE_CARD_REWARD_RULES: Record<string, ArcadeCardRewardRule> = {
@@ -397,8 +406,9 @@ export const ARCADE_CARD_REWARD_RULES: Record<string, ArcadeCardRewardRule> = {
   },
   'danger-zoom-zones': {
     gameId: 'danger-zoom-zones',
-    minimumScore: 300,
+    minimumScore: 0,
     scoreMode: 'remainingSeconds',
+    requiresVictory: true,
   },
   'grid-collapse': {
     gameId: 'grid-collapse',
@@ -472,7 +482,7 @@ export const COLONY_CARD_CATALOG: ColonyCard[] = [
     id: 'mayor-agronomist',
     slot: 'leadership',
     rarity: 'common',
-    name: { en: 'Agronomist Mayor', pt: 'Prefeita Agrônoma' },
+    name: { en: 'Greenhouse Warden', pt: 'Guardiã das Estufas' },
     role: { en: 'Food and public health', pt: 'Alimento e saúde pública' },
     lore: {
       en: 'Turns survival logistics into stable daily life.',
@@ -488,7 +498,7 @@ export const COLONY_CARD_CATALOG: ColonyCard[] = [
     id: 'orbital-engineer',
     slot: 'infrastructure',
     rarity: 'rare',
-    name: { en: 'Orbital Engineer', pt: 'Engenheiro Orbital' },
+    name: { en: 'Low-Ring Engineer', pt: 'Engenheira do Anel Baixo' },
     role: { en: 'Industrial planning', pt: 'Planejamento industrial' },
     lore: {
       en: 'Reads the colony like a machine that still remembers people.',
@@ -504,7 +514,7 @@ export const COLONY_CARD_CATALOG: ColonyCard[] = [
     id: 'civic-mediator',
     slot: 'leadership',
     rarity: 'epic',
-    name: { en: 'Civic Mediator', pt: 'Mediadora Cívica' },
+    name: { en: 'Living Council Voice', pt: 'Voz do Conselho Vivo' },
     role: { en: 'Social balance', pt: 'Equilíbrio social' },
     lore: {
       en: 'Keeps tired families, builders, and councils at the same table.',
@@ -514,6 +524,146 @@ export const COLONY_CARD_CATALOG: ColonyCard[] = [
       { sector: 'happiness', value: 10 },
       { sector: 'security', value: 7 },
       { sector: 'culture', value: 6 },
+    ],
+  },
+  {
+    id: NIKOLA_ENEAS_CARD_ID,
+    slot: 'leadership',
+    rarity: 'mythic',
+    name: { en: 'Aurora Patriarch', pt: 'Patriarca da Aurora' },
+    role: { en: 'Founding civil command', pt: 'Comando civil fundador' },
+    lore: {
+      en: 'He did not promise paradise. He brought the blueprint and asked who still had courage.',
+      pt: 'Não prometeu paraíso. Trouxe a planta e perguntou quem ainda tinha coragem.',
+    },
+    passiveBonuses: {
+      constructorsAllColonies: 500,
+      allSectorBonus: 10,
+    },
+  },
+  {
+    id: 'political-mythic-dawn-architect',
+    slot: 'infrastructure',
+    rarity: 'mythic',
+    name: { en: 'Dawn Architect', pt: 'Arquiteta da Alvorada' },
+    role: { en: 'Acceleration doctrine', pt: 'Doutrina de aceleração' },
+    lore: {
+      en: 'When the colony asks for time, she answers with machines, shifts, and impossible order.',
+      pt: 'Quando a colônia pede tempo, ela responde com máquinas, turnos e uma ordem impossível.',
+    },
+    passiveBonuses: {
+      constructorsAllColonies: 300,
+      constructionSpeedPercent: 15,
+    },
+  },
+  {
+    id: 'political-legendary-green-dome-senator',
+    slot: 'leadership',
+    rarity: 'legendary',
+    name: { en: 'Green Dome Senator', pt: 'Senadora das Cúpulas Verdes' },
+    role: { en: 'Habitable city pact', pt: 'Pacto de cidade habitável' },
+    lore: {
+      en: 'Her laws make air, food, and dignity part of the same budget.',
+      pt: 'Suas leis colocam ar, comida e dignidade no mesmo orçamento.',
+    },
+    effects: [
+      { sector: 'health', value: 14 },
+      { sector: 'happiness', value: 10 },
+      { sector: 'economy', value: 6 },
+    ],
+  },
+  {
+    id: 'political-legendary-glass-foundry-marshal',
+    slot: 'infrastructure',
+    rarity: 'legendary',
+    name: { en: 'Glass Foundry Marshal', pt: 'Marechal das Forjas de Vidro' },
+    role: { en: 'Industrial discipline', pt: 'Disciplina industrial' },
+    lore: {
+      en: 'Turns raw ruins into factories that look too clean to be desperate.',
+      pt: 'Transforma ruínas brutas em fábricas limpas demais para parecerem desespero.',
+    },
+    effects: [
+      { sector: 'economy', value: 16 },
+      { sector: 'technology', value: 10 },
+      { sector: 'security', value: 4 },
+    ],
+  },
+  {
+    id: 'political-epic-civil-pact-judge',
+    slot: 'leadership',
+    rarity: 'epic',
+    name: { en: 'Civil Pact Judge', pt: 'Juíza do Pacto Civil' },
+    role: { en: 'Order without fear', pt: 'Ordem sem medo' },
+    lore: {
+      en: 'She settles disputes before they become factions.',
+      pt: 'Resolve disputas antes que elas virem facções.',
+    },
+    effects: [
+      { sector: 'security', value: 9 },
+      { sector: 'happiness', value: 6 },
+      { sector: 'culture', value: 5 },
+    ],
+  },
+  {
+    id: 'political-epic-water-ledger-keeper',
+    slot: 'infrastructure',
+    rarity: 'epic',
+    name: { en: 'Water Ledger Keeper', pt: 'Guardião do Livro das Águas' },
+    role: { en: 'Scarcity logistics', pt: 'Logística de escassez' },
+    lore: {
+      en: 'Every liter has a name, a route, and a reason to arrive.',
+      pt: 'Cada litro tem nome, rota e motivo para chegar.',
+    },
+    effects: [
+      { sector: 'health', value: 8 },
+      { sector: 'economy', value: 7 },
+      { sector: 'technology', value: 4 },
+    ],
+  },
+  {
+    id: 'political-epic-genesis-choirmaster',
+    slot: 'culture',
+    rarity: 'epic',
+    name: { en: 'Genesis Choirmaster', pt: 'Regente de Genesis' },
+    role: { en: 'Public morale', pt: 'Moral popular' },
+    lore: {
+      en: 'When the generators fail, people still remember the song.',
+      pt: 'Quando os geradores falham, o povo ainda lembra a canção.',
+    },
+    effects: [
+      { sector: 'culture', value: 11 },
+      { sector: 'happiness', value: 8 },
+      { sector: 'health', value: 2 },
+    ],
+  },
+  {
+    id: 'political-common-reservoir-inspector',
+    slot: 'infrastructure',
+    rarity: 'common',
+    name: { en: 'Reservoir Inspector', pt: 'Fiscal dos Reservatórios' },
+    role: { en: 'Basic sanitation', pt: 'Saneamento básico' },
+    lore: {
+      en: 'The first civilization is a clean pipe no one notices.',
+      pt: 'A primeira civilização é um cano limpo que ninguém percebe.',
+    },
+    effects: [
+      { sector: 'health', value: 7 },
+      { sector: 'economy', value: 2 },
+    ],
+  },
+  {
+    id: 'political-common-shelter-teacher',
+    slot: 'culture',
+    rarity: 'common',
+    name: { en: 'Shelter Teacher', pt: 'Professora dos Abrigos' },
+    role: { en: 'First lessons', pt: 'Primeiras aulas' },
+    lore: {
+      en: 'She teaches children to count seeds, stars, and exits.',
+      pt: 'Ensina as crianças a contar sementes, estrelas e saídas.',
+    },
+    effects: [
+      { sector: 'culture', value: 6 },
+      { sector: 'happiness', value: 3 },
     ],
   },
   {
@@ -547,7 +697,7 @@ export const COLONY_CARD_CATALOG: ColonyCard[] = [
     arcadePerk: {
       id: 'stellar-rupture-shield-charge',
       label: { en: 'Emergency Shield', pt: 'Escudo Emergencial' },
-      description: { en: 'Stellar Rupture starts with one short protection charge.', pt: 'Ruptura Estelar começa com uma carga curta de proteção.' },
+      description: { en: 'Stellar Rupture starts with one visible shield charge that absorbs one hit.', pt: 'Ruptura Estelar começa com um escudo visual que absorve um dano.' },
       value: '+1',
     },
     unlocksArcadeId: 'ruptura-estelar',
@@ -565,8 +715,8 @@ export const COLONY_CARD_CATALOG: ColonyCard[] = [
     arcadePerk: {
       id: 'danger-zoom-extra-time',
       label: { en: 'Extra Time', pt: 'Tempo Extra' },
-      description: { en: 'Danger Zoom Zones begins with a small timer reserve.', pt: 'Danger Zoom Zones começa com uma pequena reserva de tempo.' },
-      value: '+10s',
+      description: { en: 'Danger Zoom Zones begins with a stronger timer reserve.', pt: 'Danger Zoom Zones começa com uma reserva de tempo mais forte.' },
+      value: '+20s',
     },
     unlocksArcadeId: 'danger-zoom-zones',
   },
@@ -583,7 +733,7 @@ export const COLONY_CARD_CATALOG: ColonyCard[] = [
     arcadePerk: {
       id: 'grid-collapse-line-bonus',
       label: { en: 'Line Bonus', pt: 'Bônus de Linha' },
-      description: { en: 'The first completed line in Grid Collapse grants bonus points.', pt: 'A primeira linha completa em Grid Collapse concede pontos bônus.' },
+      description: { en: 'Every completed line in Grid Collapse grants bonus points.', pt: 'Cada linha completa em Grid Collapse concede pontos bônus.' },
       value: '+500',
     },
     unlocksArcadeId: 'grid-collapse',
@@ -617,10 +767,10 @@ export const COLONY_CARD_CATALOG: ColonyCard[] = [
       pt: 'Um ritual de preservação disfarçado de jogo de luzes em queda.',
     },
     arcadePerk: {
-      id: 'neo-catcher-heal-chance',
-      label: { en: 'Repair Chance', pt: 'Chance de Reparo' },
-      description: { en: 'Neo Catcher has a higher chance to spawn repair powerups.', pt: 'Neo Catcher tem chance maior de gerar powerups de reparo.' },
-      value: '+12%',
+      id: 'neo-catcher-catch-range',
+      label: { en: 'Robot Reach', pt: 'Alcance do Robô' },
+      description: { en: 'Neo Catcher robot catches objects with a wider area.', pt: 'O robô de Neo Catcher captura objetos em uma área maior.' },
+      value: '+20%',
     },
     unlocksArcadeId: 'neo-catcher',
   },
@@ -643,20 +793,20 @@ export const COLONY_CARD_CATALOG: ColonyCard[] = [
     unlocksArcadeId: 'salto-espacial',
   },
   {
-    id: 'wildcard-ruptura-estelar-overdrive',
+    id: 'wildcard-ruptura-estelar-score-multiplier',
     cardClass: 'wildcard',
     rarity: 'wildcard',
     name: { en: 'Wildcard: Overdrive Spark', pt: 'Curinga: Centelha Overdrive' },
     role: { en: 'Stellar Rupture passive perk', pt: 'Perk passivo da Ruptura Estelar' },
     lore: {
-      en: 'A tiny illegal capacitor that wakes up before the battle does.',
-      pt: 'Um pequeno capacitor ilegal que acorda antes da batalha.',
+      en: 'A tiny illegal capacitor that makes every takedown count harder.',
+      pt: 'Um pequeno capacitor ilegal que faz cada inimigo vencido valer mais.',
     },
     arcadePerk: {
-      id: 'stellar-rupture-start-overdrive',
-      label: { en: 'Initial Overdrive', pt: 'Overdrive Inicial' },
-      description: { en: 'Stellar Rupture begins with a partial overdrive charge.', pt: 'Ruptura Estelar começa com carga parcial de overdrive.' },
-      value: '+20%',
+      id: 'stellar-rupture-score-multiplier',
+      label: { en: 'Score Multiplier', pt: 'Pontuação Máxima' },
+      description: { en: 'Every enemy defeated in Stellar Rupture grants 1.5x score.', pt: 'Cada inimigo vencido em Ruptura Estelar concede 1.5x da pontuação padrão.' },
+      value: '1.5x',
     },
     unlocksArcadeId: 'ruptura-estelar',
   },
@@ -672,8 +822,8 @@ export const COLONY_CARD_CATALOG: ColonyCard[] = [
     },
     arcadePerk: {
       id: 'danger-zoom-forgive-error',
-      label: { en: 'Forgiven Error', pt: 'Erro Perdoado' },
-      description: { en: 'Danger Zoom Zones forgives the first wrong scan or disarm.', pt: 'Danger Zoom Zones perdoa o primeiro scan ou desarme errado.' },
+      label: { en: 'Anti-Bomb Shield', pt: 'Escudo Anti Bomba' },
+      description: { en: 'Danger Zoom Zones blocks the first bomb mistake once per run.', pt: 'Danger Zoom Zones bloqueia o primeiro erro com bomba uma vez por partida.' },
       value: '1x',
     },
     unlocksArcadeId: 'danger-zoom-zones',
@@ -709,8 +859,8 @@ export const COLONY_CARD_CATALOG: ColonyCard[] = [
     arcadePerk: {
       id: 'robot-runner-ghost-slow',
       label: { en: 'Enemy Slow', pt: 'Inimigos Lentos' },
-      description: { en: 'Robot Runner enemies are slightly slower during special slow motion.', pt: 'Os inimigos de Robot Runner ficam um pouco mais lentos durante a câmera lenta.' },
-      value: '+8%',
+      description: { en: 'Robot Runner enemies are 10% slower during the run.', pt: 'Os inimigos de Robot Runner ficam 10% mais lentos durante a partida.' },
+      value: '+10%',
     },
     unlocksArcadeId: 'robot-runner',
   },
@@ -725,10 +875,10 @@ export const COLONY_CARD_CATALOG: ColonyCard[] = [
       pt: 'Um protocolo macio que segura a sequência antes do orgulho derrubar.',
     },
     arcadePerk: {
-      id: 'neo-catcher-combo-save',
-      label: { en: 'Combo Guard', pt: 'Proteção de Combo' },
-      description: { en: 'Neo Catcher preserves the combo once when a valid object is missed.', pt: 'Neo Catcher preserva o combo uma vez quando um objeto válido é perdido.' },
-      value: '1x',
+      id: 'neo-catcher-damage-dodge',
+      label: { en: 'Damage Dodge', pt: 'Chance Sem Dano' },
+      description: { en: 'Neo Catcher has a 20% chance to ignore damage when an object falls.', pt: 'Neo Catcher tem 20% de chance de não sofrer dano quando um objeto cai.' },
+      value: '20%',
     },
     unlocksArcadeId: 'neo-catcher',
   },
@@ -736,7 +886,7 @@ export const COLONY_CARD_CATALOG: ColonyCard[] = [
     id: 'legacy-solar-quartermaster',
     slot: 'infrastructure',
     rarity: 'rare',
-    name: { en: 'Solar Quartermaster', pt: 'Intendente Solar' },
+    name: { en: 'First Route Quartermaster', pt: 'Intendente da Primeira Rota' },
     role: { en: 'Chapter 1 legacy logistics', pt: 'Logística legado do Capítulo 1' },
     lore: {
       en: 'The old Solar Routes taught this office how to move hope before it expires.',
@@ -751,7 +901,7 @@ export const COLONY_CARD_CATALOG: ColonyCard[] = [
     id: 'legacy-interstellar-envoy',
     slot: 'leadership',
     rarity: 'epic',
-    name: { en: 'Interstellar Envoy', pt: 'Enviada Interestelar' },
+    name: { en: 'Long Bridge Envoy', pt: 'Emissária das Pontes Longas' },
     role: { en: 'Chapter 2 diplomatic memory', pt: 'Memória diplomática do Capítulo 2' },
     lore: {
       en: 'Knows which colony will fracture before the first argument becomes public.',
@@ -767,7 +917,7 @@ export const COLONY_CARD_CATALOG: ColonyCard[] = [
     id: 'legacy-void-veteran',
     slot: 'leadership',
     rarity: 'legendary',
-    name: { en: 'Void Veteran', pt: 'Veterana do Vazio' },
+    name: { en: 'Silent War Veteran', pt: 'Veterana da Guerra Silenciosa' },
     role: { en: 'Chapter 3 survival command', pt: 'Comando de sobrevivência do Capítulo 3' },
     lore: {
       en: 'After the Void, panic sounds slow.',
@@ -783,7 +933,7 @@ export const COLONY_CARD_CATALOG: ColonyCard[] = [
     id: 'legacy-perfect-route-planner',
     slot: 'infrastructure',
     rarity: 'epic',
-    name: { en: 'Perfect Route Planner', pt: 'Planejadora de Rotas Perfeitas' },
+    name: { en: 'Return Cartographer', pt: 'Cartógrafa do Retorno' },
     role: { en: 'Precision logistics', pt: 'Logística de precisão' },
     lore: {
       en: 'Turns impossible schedules into civic confidence.',
@@ -798,7 +948,7 @@ export const COLONY_CARD_CATALOG: ColonyCard[] = [
     id: 'legacy-civic-archive',
     slot: 'culture',
     rarity: 'legendary',
-    name: { en: 'Civic Archive', pt: 'Arquivo Cívico' },
+    name: { en: 'Living Memory Archive', pt: 'Arquivo da Memória Viva' },
     role: { en: 'Campaign memory', pt: 'Memória da campanha' },
     lore: {
       en: 'A living archive of every route that made New Earth possible.',
@@ -815,7 +965,7 @@ export const COLONY_CARD_CATALOG: ColonyCard[] = [
     cardClass: 'battle',
     slot: 'weapon',
     rarity: 'common',
-    name: { en: 'White Spark Coil', pt: 'Bobina Faísca Branca' },
+    name: { en: 'First Ignition Wire', pt: 'Fio da Primeira Ignição' },
     role: { en: 'Starter battle card', pt: 'Carta de batalha inicial' },
     lore: {
       en: 'A clean ignition coil used by the first New Earth patrol ships.',
@@ -831,7 +981,7 @@ export const COLONY_CARD_CATALOG: ColonyCard[] = [
     cardClass: 'battle',
     slot: 'armor',
     rarity: 'common',
-    name: { en: 'Iron Pulse Plating', pt: 'Blindagem Pulso de Ferro' },
+    name: { en: 'Oathbound Hull', pt: 'Casco do Juramento' },
     role: { en: 'Starter battle card', pt: 'Carta de batalha inicial' },
     lore: {
       en: 'Basic hull reinforcement with a stubborn shield pulse.',
@@ -847,7 +997,7 @@ export const COLONY_CARD_CATALOG: ColonyCard[] = [
     cardClass: 'battle',
     slot: 'weapon',
     rarity: 'common',
-    name: { en: 'White Trigger Array', pt: 'Matriz Gatilho Branco' },
+    name: { en: 'Skyward Redemption', pt: 'Redenção Aérea' },
     role: { en: 'Stable fire discipline', pt: 'Disciplina de disparo estável' },
     lore: {
       en: 'Old targeting discipline rebuilt for young colony pilots.',
@@ -863,7 +1013,7 @@ export const COLONY_CARD_CATALOG: ColonyCard[] = [
     cardClass: 'battle',
     slot: 'armor',
     rarity: 'common',
-    name: { en: 'White Bulwark Plate', pt: 'Placa Baluarte Branca' },
+    name: { en: 'First Light Wall', pt: 'Muralha da Primeira Luz' },
     role: { en: 'Starter survivability', pt: 'Sobrevivência inicial' },
     lore: {
       en: 'Simple plating that buys one more breath before the hull screams.',
@@ -879,7 +1029,7 @@ export const COLONY_CARD_CATALOG: ColonyCard[] = [
     cardClass: 'battle',
     slot: 'core',
     rarity: 'common',
-    name: { en: 'White Cinder Cell', pt: 'Célula Brasa Branca' },
+    name: { en: 'Founding Ember Cell', pt: 'Brasa de Fundação' },
     role: { en: 'Starter fire output', pt: 'Dano de fogo inicial' },
     lore: {
       en: 'A modest heat cell that leaves orange scars in the air.',
@@ -895,7 +1045,7 @@ export const COLONY_CARD_CATALOG: ColonyCard[] = [
     cardClass: 'battle',
     slot: 'tactic',
     rarity: 'common',
-    name: { en: 'White Rime Protocol', pt: 'Protocolo Geada Branca' },
+    name: { en: 'Cold Decree', pt: 'Decreto de Gelo' },
     role: { en: 'Starter ice control', pt: 'Controle gélido inicial' },
     lore: {
       en: 'A tiny cold routine that makes hostile engines hesitate.',
@@ -911,7 +1061,7 @@ export const COLONY_CARD_CATALOG: ColonyCard[] = [
     cardClass: 'battle',
     slot: 'core',
     rarity: 'common',
-    name: { en: 'White Capacitor', pt: 'Capacitor Branco' },
+    name: { en: 'Vigil Pulse', pt: 'Pulso de Vigília' },
     role: { en: 'Shield tuning', pt: 'Ajuste de escudo' },
     lore: {
       en: 'A light capacitor that keeps the first shield layer awake.',
@@ -927,7 +1077,7 @@ export const COLONY_CARD_CATALOG: ColonyCard[] = [
     cardClass: 'battle',
     slot: 'weapon',
     rarity: 'common',
-    name: { en: 'White Needle Lens', pt: 'Lente Agulha Branca' },
+    name: { en: 'Quiet Needle Sight', pt: 'Mira da Agulha Silenciosa' },
     role: { en: 'Critical starter', pt: 'Crítico inicial' },
     lore: {
       en: 'A narrow lens that rewards pilots who wait half a second longer.',
@@ -943,7 +1093,7 @@ export const COLONY_CARD_CATALOG: ColonyCard[] = [
     cardClass: 'battle',
     slot: 'weapon',
     rarity: 'rare',
-    name: { en: 'Blue Arc Emitter', pt: 'Emissor Arco Azul' },
+    name: { en: 'Oath Arc', pt: 'Arco Juramentado' },
     role: { en: 'Electric pressure', pt: 'Pressão elétrica' },
     lore: {
       en: 'Turns standard fire into pale lightning stitched across the target.',
@@ -960,7 +1110,7 @@ export const COLONY_CARD_CATALOG: ColonyCard[] = [
     cardClass: 'battle',
     slot: 'core',
     rarity: 'rare',
-    name: { en: 'Frost Halo Core', pt: 'Núcleo Halo Gélido' },
+    name: { en: 'Boreal Halo', pt: 'Halo Boreal' },
     role: { en: 'Ice control', pt: 'Controle gélido' },
     lore: {
       en: 'A cold reactor ring that slows hostile movement before impact.',
@@ -977,7 +1127,7 @@ export const COLONY_CARD_CATALOG: ColonyCard[] = [
     cardClass: 'battle',
     slot: 'tactic',
     rarity: 'rare',
-    name: { en: 'Blue Shock Net', pt: 'Rede de Choque Azul' },
+    name: { en: 'Rhythmbreaker Mesh', pt: 'Malha Quebra-Ritmo' },
     role: { en: 'Shock control', pt: 'Controle por choque' },
     lore: {
       en: 'A bright net of probability that interrupts hostile attack rhythm.',
@@ -994,7 +1144,7 @@ export const COLONY_CARD_CATALOG: ColonyCard[] = [
     cardClass: 'battle',
     slot: 'armor',
     rarity: 'rare',
-    name: { en: 'Blue Glacier Plate', pt: 'Placa Geleira Azul' },
+    name: { en: 'Winter Plate', pt: 'Placa de Inverno' },
     role: { en: 'Cold defense', pt: 'Defesa gélida' },
     lore: {
       en: 'Armor that cools faster than panic can spread.',
@@ -1011,7 +1161,7 @@ export const COLONY_CARD_CATALOG: ColonyCard[] = [
     cardClass: 'battle',
     slot: 'weapon',
     rarity: 'rare',
-    name: { en: 'Blue Cinder Vector', pt: 'Vetor Brasa Azul' },
+    name: { en: 'Incandescent Vector', pt: 'Vetor Incandescente' },
     role: { en: 'Fire criticals', pt: 'Críticos de fogo' },
     lore: {
       en: 'A heat vector that turns clean shots into burning fractures.',
@@ -1028,7 +1178,7 @@ export const COLONY_CARD_CATALOG: ColonyCard[] = [
     cardClass: 'battle',
     slot: 'core',
     rarity: 'rare',
-    name: { en: 'Blue Guardian Loop', pt: 'Laço Guardião Azul' },
+    name: { en: 'Sentinel Loop', pt: 'Laço Sentinela' },
     role: { en: 'Shield economy', pt: 'Economia de escudo' },
     lore: {
       en: 'A defensive loop that keeps shield pressure from collapsing all at once.',
@@ -1045,7 +1195,7 @@ export const COLONY_CARD_CATALOG: ColonyCard[] = [
     cardClass: 'battle',
     slot: 'tactic',
     rarity: 'rare',
-    name: { en: 'Blue Fracture Sight', pt: 'Mira Fratura Azul' },
+    name: { en: 'Faultline Sight', pt: 'Mira Linha de Falha' },
     role: { en: 'Critical precision', pt: 'Precisão crítica' },
     lore: {
       en: 'Shows the pilot where the armor already wants to break.',
@@ -1062,7 +1212,7 @@ export const COLONY_CARD_CATALOG: ColonyCard[] = [
     cardClass: 'battle',
     slot: 'core',
     rarity: 'rare',
-    name: { en: 'Blue Ember Field', pt: 'Campo Brasa Azul' },
+    name: { en: 'Afterburn Field', pt: 'Campo Pós-Chama' },
     role: { en: 'Burn follow-up', pt: 'Pressão contra chamas' },
     lore: {
       en: 'A contained burn field that teaches the ship to punish ignition.',
@@ -1079,7 +1229,7 @@ export const COLONY_CARD_CATALOG: ColonyCard[] = [
     cardClass: 'battle',
     slot: 'tactic',
     rarity: 'epic',
-    name: { en: 'Violet Inferno Doctrine', pt: 'Doutrina Inferno Violeta' },
+    name: { en: 'Ash Psalm', pt: 'Salmo das Cinzas' },
     role: { en: 'Fire aggression', pt: 'Agressão incendiária' },
     lore: {
       en: 'A combat script that leaves burning vectors in every evasive path.',
@@ -1097,7 +1247,7 @@ export const COLONY_CARD_CATALOG: ColonyCard[] = [
     cardClass: 'battle',
     slot: 'weapon',
     rarity: 'epic',
-    name: { en: 'Violet Storm Lattice', pt: 'Malha Tempestade Violeta' },
+    name: { en: 'Stormglass Lattice', pt: 'Malha Vidro-Tempestade' },
     role: { en: 'Electric burst build', pt: 'Build de explosão elétrica' },
     lore: {
       en: 'A lattice that makes every shot look like the sky tearing open.',
@@ -1115,7 +1265,7 @@ export const COLONY_CARD_CATALOG: ColonyCard[] = [
     cardClass: 'battle',
     slot: 'core',
     rarity: 'epic',
-    name: { en: 'Violet Absolute Zero', pt: 'Zero Absoluto Violeta' },
+    name: { en: 'Still Winter Core', pt: 'Núcleo Inverno Imóvel' },
     role: { en: 'Slow punishment', pt: 'Punição contra lentidão' },
     lore: {
       en: 'The reactor does not freeze enemies. It convinces time to do it.',
@@ -1133,7 +1283,7 @@ export const COLONY_CARD_CATALOG: ColonyCard[] = [
     cardClass: 'battle',
     slot: 'armor',
     rarity: 'epic',
-    name: { en: 'Violet War Heart', pt: 'Coração de Guerra Violeta' },
+    name: { en: 'Last Stand Heart', pt: 'Coração da Última Linha' },
     role: { en: 'Heavy survival', pt: 'Sobrevivência pesada' },
     lore: {
       en: 'A stubborn heart for ships expected to return with missing paint.',
@@ -1151,7 +1301,7 @@ export const COLONY_CARD_CATALOG: ColonyCard[] = [
     cardClass: 'battle',
     slot: 'tactic',
     rarity: 'epic',
-    name: { en: 'Violet Triple Spark', pt: 'Tripla Faísca Violeta' },
+    name: { en: 'Threefold Rift', pt: 'Fenda Tríplice' },
     role: { en: 'Hybrid elemental pressure', pt: 'Pressão elemental híbrida' },
     lore: {
       en: 'Three unstable vectors braided into a doctrine no instructor recommends.',
@@ -1169,7 +1319,7 @@ export const COLONY_CARD_CATALOG: ColonyCard[] = [
     cardClass: 'battle',
     slot: 'weapon',
     rarity: 'epic',
-    name: { en: 'Violet Execution Clock', pt: 'Relógio de Execução Violeta' },
+    name: { en: 'Final Second Clock', pt: 'Relógio do Último Segundo' },
     role: { en: 'Critical finisher', pt: 'Finalização crítica' },
     lore: {
       en: 'Ticks only when the target is about to become a statistic.',
@@ -1187,7 +1337,7 @@ export const COLONY_CARD_CATALOG: ColonyCard[] = [
     cardClass: 'battle',
     slot: 'core',
     rarity: 'mythic',
-    name: { en: 'Trinity Dawn Reactor', pt: 'Reator Aurora Trina' },
+    name: { en: 'Aurora Trina Reactor', pt: 'Reator Aurora Trina' },
     role: { en: 'Elemental command', pt: 'Comando elemental' },
     lore: {
       en: 'A forbidden reactor that makes fire, frost, and lightning agree for one shot.',
@@ -1206,7 +1356,7 @@ export const COLONY_CARD_CATALOG: ColonyCard[] = [
     cardClass: 'battle',
     slot: 'weapon',
     rarity: 'legendary',
-    name: { en: 'Worldbreaker Lens', pt: 'Lente Quebra-Mundo' },
+    name: { en: 'Noonfall Lens', pt: 'Lente Queda do Meio-Dia' },
     role: { en: 'Pure annihilation', pt: 'Aniquilação pura' },
     lore: {
       en: 'A lens that refuses to treat armor as a serious argument.',
@@ -1225,7 +1375,7 @@ export const COLONY_CARD_CATALOG: ColonyCard[] = [
     cardClass: 'battle',
     slot: 'armor',
     rarity: 'legendary',
-    name: { en: 'Aegis Star Mantle', pt: 'Manto Estrela Aegis' },
+    name: { en: 'Aegis Star Mantle', pt: 'Manto da Estrela-Égide' },
     role: { en: 'Legendary survival', pt: 'Sobrevivência lendária' },
     lore: {
       en: 'A defensive mantle bright enough to make monsters choose easier prey.',
@@ -1244,7 +1394,7 @@ export const COLONY_CARD_CATALOG: ColonyCard[] = [
     cardClass: 'battle',
     slot: 'tactic',
     rarity: 'legendary',
-    name: { en: 'Tempest Crown', pt: 'Coroa da Tempestade' },
+    name: { en: 'Crown of Unfinished Thunder', pt: 'Coroa do Trovão Inacabado' },
     role: { en: 'Shock commander', pt: 'Comando elétrico' },
     lore: {
       en: 'A crown for pilots who prefer the enemy never finishing its thought.',

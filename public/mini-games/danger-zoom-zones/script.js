@@ -5,6 +5,50 @@ const TOTAL_MINES = 16;
 const INITIAL_DISARMERS = 18;
 const INITIAL_TIME = 240; // 4 minutes
 
+function getArcadePerks() {
+    try {
+        return JSON.parse(localStorage.getItem('qch_arcade_perks_danger-zoom-zones') || '[]');
+    } catch (error) {
+        return [];
+    }
+}
+
+function hasArcadePerk(perkId) {
+    return getArcadePerks().some(perk => perk && perk.id === perkId);
+}
+
+const HAS_EXTRA_TIME = hasArcadePerk('danger-zoom-extra-time');
+const HAS_ANTI_BOMB_SHIELD = hasArcadePerk('danger-zoom-forgive-error');
+const SFX_BASE = '/assets/games/flipers_sfx';
+const SFX = {
+    bombExplosion: `${SFX_BASE}/danger_zoom_zones_bomb_explosion.ogg`,
+    choose: `${SFX_BASE}/danger_zoom_zones_choose.ogg`,
+    closeWindow: `${SFX_BASE}/danger_zoom_zones_close_window.ogg`,
+    closeNoBomb: `${SFX_BASE}/danger_zoom_zones_close_nobomb.ogg`,
+    disarm: `${SFX_BASE}/danger_zoom_zones_disarm.ogg`,
+    firstClean: `${SFX_BASE}/danger_zoom_zones_firstclean.ogg`,
+    noBomb: `${SFX_BASE}/danger_zoom_zones_no_bomb.ogg`,
+};
+const audioCache = new Map();
+
+function playSfx(path, volume = 0.65) {
+    if (!path) return;
+
+    try {
+        if (!audioCache.has(path)) {
+            const audio = new Audio(path);
+            audio.preload = 'auto';
+            audioCache.set(path, audio);
+        }
+
+        const sound = audioCache.get(path).cloneNode();
+        sound.volume = volume;
+        sound.play().catch(() => {});
+    } catch (error) {
+        // Audio can be blocked until user interaction; gameplay must keep running.
+    }
+}
+
 // Game State
 let grid = [];
 let mines = [];
@@ -16,6 +60,7 @@ let timerInterval = null;
 let currentCell = null;
 let combo = 0;
 let bestTime = '--:--';
+let antiBombShieldCharges = HAS_ANTI_BOMB_SHIELD ? 1 : 0;
 
 try {
     bestTime = localStorage.getItem('danger-zoom-best') || '--:--';
@@ -43,10 +88,11 @@ function init() {
     gridContainer.innerHTML = '';
     grid = [];
     mines = [];
-    timer = INITIAL_TIME;
+    timer = INITIAL_TIME + (HAS_EXTRA_TIME ? 20 : 0);
     disarmers = INITIAL_DISARMERS;
     foundMines = 0;
     combo = 0;
+    antiBombShieldCharges = HAS_ANTI_BOMB_SHIELD ? 1 : 0;
     gameStatus = 'waiting';
     updateDisplays();
     if (bestTimeDisplay) bestTimeDisplay.innerText = formatTime(bestTime);
@@ -164,31 +210,58 @@ function handleCellClick(r, c) {
     currentCell = { r, c };
     modalKits.innerText = disarmers;
     modal.classList.remove('hidden');
+    playSfx(SFX.choose, 0.58);
 }
 
-function revealCell(r, c) {
-    if (r < 0 || r >= ROWS || c < 0 || c >= COLS || grid[r][c].revealed || grid[r][c].disarmed) return;
+function revealCell(r, c, options = {}) {
+    if (gameStatus === 'over' || r < 0 || r >= ROWS || c < 0 || c >= COLS || grid[r][c].revealed || grid[r][c].disarmed) return;
 
     const cell = grid[r][c];
     cell.revealed = true;
     cell.el.classList.add('revealed', 'ripple');
     
     if (cell.mine) {
+        if (antiBombShieldCharges > 0) {
+            antiBombShieldCharges--;
+            cell.disarmed = true;
+            cell.el.classList.add('disarmed', 'ripple');
+            cell.el.innerHTML = '🛡';
+            foundMines++;
+            spawnTextEffect("ANTI-BOMB SHIELD", cell.el);
+            updateDisplays();
+            if (foundMines === TOTAL_MINES) endGame(true);
+            return;
+        }
         cell.el.classList.add('mine');
         cell.el.innerHTML = '💣';
+        disarmers = Math.max(0, disarmers - 1);
         timer = Math.max(0, timer - 20);
         combo = 0;
         spawnExplosionEffect(r, c);
         foundMines++;
+        updateDisplays();
+        if (foundMines === TOTAL_MINES) {
+            endGame(true);
+        } else if (disarmers <= 0) {
+            endGame(false);
+        }
+        return;
     } else {
+        if (options.manualNoBomb) {
+            playSfx(SFX.closeNoBomb, 0.64);
+        }
         if (cell.neighborCount > 0) {
             cell.el.innerText = cell.neighborCount;
             cell.el.dataset.val = cell.neighborCount;
         } else {
+            if (!options.cascadeSoundPlayed) {
+                playSfx(SFX.firstClean, 0.62);
+                options.cascadeSoundPlayed = true;
+            }
             // Cascade
             for (let dr = -1; dr <= 1; dr++) {
                 for (let dc = -1; dc <= 1; dc++) {
-                    revealCell(r + dr, c + dc);
+                    revealCell(r + dr, c + dc, options);
                 }
             }
         }
@@ -198,12 +271,17 @@ function revealCell(r, c) {
 }
 
 function disarmCell(r, c) {
-    if (disarmers <= 0) return;
+    if (gameStatus === 'over') return;
+    if (disarmers <= 0) {
+        endGame(false);
+        return;
+    }
     
     disarmers--;
     const cell = grid[r][c];
     
     if (cell.mine) {
+        playSfx(SFX.disarm, 0.72);
         cell.disarmed = true;
         cell.el.classList.add('disarmed', 'ripple');
         cell.el.innerHTML = '⚡';
@@ -211,18 +289,19 @@ function disarmCell(r, c) {
         timer += 20;
         combo++;
         
-        if (combo >= 2) {
-            const bonus = Math.floor((combo === 2 ? 5 : (combo === 3 ? 10 : 15)) * 0.5);
-            timer += bonus;
-            if (combo >= 4) spawnTextEffect("CHAIN DISARM", cell.el);
-        }
+        if (combo >= 4) spawnTextEffect("CHAIN DISARM", cell.el);
     } else {
+        playSfx(SFX.noBomb, 0.68);
         combo = 0;
         revealCell(r, c);
     }
     
     updateDisplays();
-    if (foundMines === TOTAL_MINES) endGame(true);
+    if (foundMines === TOTAL_MINES) {
+        endGame(true);
+    } else if (disarmers <= 0) {
+        endGame(false);
+    }
 }
 
 function updateDisplays() {
@@ -331,6 +410,7 @@ function parseTime(timeStr) {
 
 // Effects
 function spawnExplosionEffect(r, c) {
+    playSfx(SFX.bombExplosion, 0.78);
     gridContainer.classList.add('shake');
     setTimeout(() => gridContainer.classList.remove('shake'), 400);
 }
@@ -367,6 +447,7 @@ const modalCloseBtn = document.getElementById('modal-close');
 if (modalCloseBtn) {
     modalCloseBtn.addEventListener('click', () => {
         modal.classList.add('hidden');
+        playSfx(SFX.closeWindow, 0.55);
     });
 }
 
@@ -382,7 +463,7 @@ const btnReveal = document.getElementById('btn-reveal');
 if (btnReveal) {
     btnReveal.addEventListener('click', () => {
         modal.classList.add('hidden');
-        if (currentCell) revealCell(currentCell.r, currentCell.c);
+        if (currentCell) revealCell(currentCell.r, currentCell.c, { manualNoBomb: true });
     });
 }
 
@@ -411,9 +492,10 @@ window.addEventListener('keydown', (e) => {
         if (currentCell) disarmCell(currentCell.r, currentCell.c);
     } else if (e.key.toUpperCase() === 'N') {
         modal.classList.add('hidden');
-        if (currentCell) revealCell(currentCell.r, currentCell.c);
+        if (currentCell) revealCell(currentCell.r, currentCell.c, { manualNoBomb: true });
     } else if (e.key === 'Escape') {
         modal.classList.add('hidden');
+        playSfx(SFX.closeWindow, 0.55);
     }
 });
 

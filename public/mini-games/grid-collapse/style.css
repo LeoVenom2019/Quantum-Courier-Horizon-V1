@@ -90,15 +90,32 @@ body {
 }
 
 .next-piece-container {
-    height: 100px;
+    min-height: 100px;
     display: flex;
+    flex-direction: column;
     justify-content: center;
     align-items: center;
+    gap: 6px;
     background: rgba(0, 0, 0, 0.4);
     border-radius: 8px;
     border: 1px solid rgba(0, 242, 255, 0.2);
     position: relative;
     overflow: hidden;
+}
+
+.next-piece-container.has-extra-preview {
+    height: 190px;
+}
+
+.next-piece-container canvas {
+    width: 92px;
+    height: 92px;
+}
+
+.next-piece-container .extra-preview-canvas {
+    width: 78px;
+    height: 78px;
+    opacity: 0.72;
 }
 
 .next-piece-container::after {

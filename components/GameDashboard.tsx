@@ -117,6 +117,7 @@ import {
   ARCADE_CARD_REWARD_RULES,
   ColonyCard,
   getBattleEffects,
+  getArcadeWildcardPerks,
   getCardBackgroundImage,
   getCardClass,
   getPoliticalEffects,
@@ -631,6 +632,7 @@ const DashboardContent = memo(({
   const lastPregnancyYearRef = React.useRef(0);
   const isColoniesOpenRef = React.useRef(false);
   const earthEventTimerRef = React.useRef(Math.random() * 120 + 120);
+  const coloniesRef = React.useRef(colonies);
   const extractionCycleProgressRef = React.useRef<any>(null);
   const hasWonEliminateEnemiesRoute3Ref = React.useRef(false);
   const robotRepairProgressRef = React.useRef(robotRepairProgress);
@@ -730,6 +732,10 @@ const DashboardContent = memo(({
   useEffect(() => {
     autoSkipRandomBattlesRef.current = autoSkipRandomBattles;
   }, [autoSkipRandomBattles]);
+
+  useEffect(() => {
+    coloniesRef.current = colonies;
+  }, [colonies]);
 
 
   // 3. Missions, Achievements & History
@@ -1855,11 +1861,12 @@ const DashboardContent = memo(({
     return true;
   }, [addLog, language, playSfx]);
 
-  const evaluateArcadeCardReward = useCallback(async (gameId: string, score: number, isFinal: boolean) => {
+  const evaluateArcadeCardReward = useCallback(async (gameId: string, score: number, isFinal: boolean, victory?: boolean) => {
     if (routeTierRef.current !== 'Earth') return;
     if (!isFinal) return;
     const rule = ARCADE_CARD_REWARD_RULES[gameId];
     if (!rule || score < rule.minimumScore) return;
+    if (rule.requiresVictory && victory !== true) return;
 
     const savedMilestones = await GameStorage.load('arcade_card_reward_milestones');
     const milestones: Record<string, boolean> = savedMilestones && typeof savedMilestones === 'object' ? savedMilestones : {};
@@ -1921,7 +1928,7 @@ const DashboardContent = memo(({
         const gameId = event.data.gameId;
         const score = Number(event.data.score) || 0;
         const isFinalScore = event.data.type === 'GAME_COMPLETE' || event.data.final === true;
-        evaluateArcadeCardReward(gameId, score, isFinalScore);
+        evaluateArcadeCardReward(gameId, score, isFinalScore, event.data.victory);
         setArcadeScores(prev => {
           // Check if this game is time-based (where lower is better)
           // For now, all current games are "higher is better" either by points or remaining time
@@ -2124,6 +2131,7 @@ const DashboardContent = memo(({
       temperature: temperatureRef.current,
       hydrosphere: hydrosphereRef.current,
       biosphere: biosphereRef.current,
+      colonies: coloniesRef.current,
       unlockedVoidAircraft: unlockedVoidAircraftRef.current,
       voidAircraftConstruction: voidAircraftConstructionRef.current,
       voidAutoShipmentUnlocked: voidAutoShipmentUnlockedRef.current,
@@ -3790,7 +3798,14 @@ const DashboardContent = memo(({
   // Auto-Save and Load Colonies
   useEffect(() => {
     const loadColonies = async () => {
-      const saved = await GameStorage.load('colonies_data');
+      const mainSave = await GameStorage.load('time_travel_save');
+      const embeddedColonies =
+        mainSave?.colony_system?.storage?.colonies_data
+        ?? mainSave?.colony_system?.colonies
+        ?? mainSave?.earth_reconstruction?.colonies;
+      const saved = Array.isArray(embeddedColonies)
+        ? embeddedColonies
+        : await GameStorage.load('colonies_data');
       setColonies(cleanColoniesData(saved || [], language as any));
     };
     loadColonies();
@@ -7066,9 +7081,21 @@ const DashboardContent = memo(({
                       </div>
                     ) : (
                       <MiniGames
-                        onGameSelect={(id) => {
+                        onGameSelect={async (id) => {
                           if (!isArcadeUnlocked) return;
                           arcadeRewardSessionRef.current[id] = { guaranteedAwarded: false, chanceRolled: false };
+                          try {
+                            const savedCards = await GameStorage.load('colony_cards_data');
+                            const ownedIds = normalizeOwnedColonyCardIds(Array.isArray(savedCards) ? savedCards : undefined);
+                            const perks = getArcadeWildcardPerks(ownedIds, id);
+                            try {
+                              window.localStorage.setItem(`qch_arcade_perks_${id}`, JSON.stringify(perks));
+                            } catch (error) {
+                              console.warn('Unable to persist arcade wildcard perks', error);
+                            }
+                          } catch (error) {
+                            console.warn('Unable to prepare arcade wildcard perks', error);
+                          }
                           setActiveMiniGameId(id);
                           addLog(`${language === 'pt' ? 'Iniciando' : 'Starting'} ${id}...`, 'info');
                         }}

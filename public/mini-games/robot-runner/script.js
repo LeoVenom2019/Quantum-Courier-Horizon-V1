@@ -14,6 +14,48 @@ const BOOST_GHOST_SLOW_FACTOR = 0.25;
 const POWER_DURATION = 8000;
 const GHOST_RESPAWN_TIME = 3000;
 
+function getArcadePerks() {
+    try {
+        return JSON.parse(localStorage.getItem('qch_arcade_perks_robot-runner') || '[]');
+    } catch (error) {
+        return [];
+    }
+}
+
+function hasArcadePerk(perkId) {
+    return getArcadePerks().some(perk => perk && perk.id === perkId);
+}
+
+const HAS_EXTRA_LIFE = hasArcadePerk('robot-runner-extra-life');
+const HAS_GHOST_SLOW = hasArcadePerk('robot-runner-ghost-slow');
+const STARTING_LIVES = 3 + (HAS_EXTRA_LIFE ? 1 : 0);
+const WILDCARD_GHOST_SPEED_FACTOR = HAS_GHOST_SLOW ? 0.9 : 1;
+const SFX_BASE = '/assets/games/flipers_sfx';
+const SFX = {
+    powerUp: `${SFX_BASE}/robot_runner_power_up.ogg`,
+    lostLife: `${SFX_BASE}/robot_runner_lost_life.ogg`,
+    slow: `${SFX_BASE}/robot_runner_slow.ogg`,
+};
+const audioCache = new Map();
+
+function playSfx(path, volume = 0.65) {
+    if (!path) return;
+
+    try {
+        if (!audioCache.has(path)) {
+            const audio = new Audio(path);
+            audio.preload = 'auto';
+            audioCache.set(path, audio);
+        }
+
+        const sound = audioCache.get(path).cloneNode();
+        sound.volume = volume;
+        sound.play().catch(() => {});
+    } catch (error) {
+        // Audio can be blocked until user interaction; gameplay must keep running.
+    }
+}
+
 // Visual Effects State
 const particles = [];
 const trails = [];
@@ -129,7 +171,7 @@ class Particle {
 let currentPhase = 0;
 let activeMap = [];
 let score = 0;
-let lives = 3;
+let lives = STARTING_LIVES;
 let gameState = 'MENU';
 let startTime = 0;
 let totalTime = 0;
@@ -363,6 +405,7 @@ function checkItemCollection() {
         map[gy][gx] = 0; score += 50; player.boost = Math.min(100, player.boost + 15);
         notifyParentOfScore();
         spawnParticles(player.x + TILE_SIZE/2, player.y + TILE_SIZE/2, THEMES[currentPhase].power, 15);
+        playSfx(SFX.powerUp, 0.72);
         player.isPowered = true; player.powerTimer = POWER_DURATION;
         ghosts.forEach(g => g.frightened = true);
         updateBoostBar(); checkLevelWin();
@@ -439,6 +482,7 @@ function checkGhostCollisions() {
             } else { 
                 lives--;
                 updateLivesUI();
+                playSfx(SFX.lostLife, 0.78);
                 screenShake = 20;
                 spawnParticles(player.x + TILE_SIZE/2, player.y + TILE_SIZE/2, '#FF0000', 50);
 
@@ -492,7 +536,7 @@ function handleGhostAI(ts) {
         }
 
         const slowFactor = player.isBoosting ? BOOST_GHOST_SLOW_FACTOR : 1;
-        let remaining = ghost.speed * TILE_SIZE * ts * slowFactor;
+        let remaining = ghost.speed * TILE_SIZE * ts * slowFactor * WILDCARD_GHOST_SPEED_FACTOR;
         const epsilon = 0.01;
 
         while (remaining > 0) {
@@ -720,6 +764,7 @@ window.addEventListener('keydown', e => {
         case ' ': 
             if (player.boost >= 100 && !player.isBoosting) { 
                 player.boost = 0; player.isBoosting = true; player.boostTimer = BOOST_DURATION; updateBoostBar(); screenShake = 5;
+                playSfx(SFX.slow, 0.76);
             } 
             break;
     }
@@ -727,7 +772,7 @@ window.addEventListener('keydown', e => {
 
 document.getElementById('start-btn').onclick = () => {
     document.getElementById('start-screen').classList.add('hidden');
-    gameState = 'PLAYING'; score = 0; lives = 3; displayedScore = 0; totalTime = 0; startTime = Date.now(); 
+    gameState = 'PLAYING'; score = 0; lives = STARTING_LIVES; displayedScore = 0; totalTime = 0; startTime = Date.now(); 
     document.getElementById('score-display').innerText = '000000';
     updateLivesUI();
     initLevel(0);
@@ -738,7 +783,7 @@ document.getElementById('next-btn').onclick = () => {
 };
 document.getElementById('retry-btn').onclick = () => {
     document.getElementById('game-over').classList.add('hidden');
-    gameState = 'PLAYING'; lives = 3; score = 0; displayedScore = 0; totalTime = 0; startTime = Date.now(); initLevel(currentPhase);
+    gameState = 'PLAYING'; lives = STARTING_LIVES; score = 0; displayedScore = 0; totalTime = 0; startTime = Date.now(); initLevel(currentPhase);
     document.getElementById('score-display').innerText = '000000';
     updateLivesUI();
 };

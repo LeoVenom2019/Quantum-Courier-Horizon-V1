@@ -1267,7 +1267,7 @@ export default function GameHome() {
       setTimeout(() => setIsShaking(false), 500);
 
       GameStorage.markReset(10000);
-      const keys = ['time_travel_save', 'speed_run_save', 'colonies_data', 'history_data', 'game_theme_index', 'qch_settings'];
+      const keys = ['time_travel_save', 'speed_run_save', 'colonies_data', 'history_data', 'game_theme_index', 'qch_settings', 'arcade_card_reward_milestones'];
       for (const key of keys) {
         await GameStorage.remove(key);
         localStorage.removeItem(key);
@@ -1308,6 +1308,7 @@ export default function GameHome() {
     const data = {
       time_travel_save: await GameStorage.load('time_travel_save'),
       game_theme_index: await GameStorage.load('game_theme_index'),
+      colonies_data: await GameStorage.load('colonies_data'),
       colony_cards_data: await GameStorage.load('colony_cards_data'),
       colony_card_levels: await GameStorage.load('colony_card_levels'),
       colony_search_upgrade_levels: await GameStorage.load('colony_search_upgrade_levels'),
@@ -1320,6 +1321,7 @@ export default function GameHome() {
       colony_supplies_data: await GameStorage.load('colony_supplies_data'),
       defense_special_loadout: await GameStorage.load('defense_special_loadout'),
       colony_defense_threats: await GameStorage.load('colony_defense_threats'),
+      arcade_card_reward_milestones: await GameStorage.load('arcade_card_reward_milestones'),
       export_date: new Date().toISOString(),
       version: '1.2'
     };
@@ -1346,6 +1348,7 @@ export default function GameHome() {
         const data = JSON.parse(e.target?.result as string);
         if (data.time_travel_save) await GameStorage.save(data.time_travel_save, 'time_travel_save');
         if (data.game_theme_index !== undefined) await GameStorage.save(data.game_theme_index, 'game_theme_index');
+        if (data.colonies_data) await GameStorage.save(data.colonies_data, 'colonies_data');
         if (data.colony_cards_data) await GameStorage.save(data.colony_cards_data, 'colony_cards_data');
         if (data.colony_card_levels) await GameStorage.save(data.colony_card_levels, 'colony_card_levels');
         if (data.colony_search_upgrade_levels) await GameStorage.save(data.colony_search_upgrade_levels, 'colony_search_upgrade_levels');
@@ -1358,6 +1361,7 @@ export default function GameHome() {
         if (data.colony_supplies_data) await GameStorage.save(data.colony_supplies_data, 'colony_supplies_data');
         if (data.defense_special_loadout) await GameStorage.save(data.defense_special_loadout, 'defense_special_loadout');
         if (data.colony_defense_threats) await GameStorage.save(data.colony_defense_threats, 'colony_defense_threats');
+        if (data.arcade_card_reward_milestones) await GameStorage.save(data.arcade_card_reward_milestones, 'arcade_card_reward_milestones');
         
         playSfx('click');
         setTimeout(() => window.location.reload(), 500);
