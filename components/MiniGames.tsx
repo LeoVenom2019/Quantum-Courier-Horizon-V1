@@ -2,10 +2,11 @@
 
 import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Gamepad2, Play, Info, X, ChevronLeft, ChevronRight, Sparkles } from 'lucide-react';
+import { Clock, Gamepad2, Play, Info, X, ChevronLeft, ChevronRight, Sparkles, Trophy } from 'lucide-react';
 import { MINI_GAMES_CONFIG } from '@/lib/mini-games-config';
 import ArcadeCard from './ArcadeCard';
 import { GameStorage } from '@/lib/game-storage';
+import { preloadAssetGroupPassive } from '@/lib/asset-preloader';
 import {
   COLONY_CARD_CATALOG,
   ColonyCard,
@@ -18,6 +19,7 @@ import {
 interface MiniGamesProps {
   onGameSelect: (id: string) => void;
   language: 'pt' | 'en';
+  arcadeScores?: Record<string, number>;
 }
 
 const GAMES_PER_PAGE = 4;
@@ -79,14 +81,20 @@ const playArcadeUiSound = (src: string) => {
   instance.play().catch(() => {});
 };
 
-export const MiniGames: React.FC<MiniGamesProps> = ({ onGameSelect, language }) => {
+export const MiniGames: React.FC<MiniGamesProps> = ({ onGameSelect, language, arcadeScores = {} }) => {
   const [selectedGameInfo, setSelectedGameInfo] = React.useState<typeof MINI_GAMES_CONFIG[number] | null>(null);
   const [highScore, setHighScore] = React.useState<number>(0);
   const [currentPage, setCurrentPage] = React.useState(0);
+  const [scorePanelIndex, setScorePanelIndex] = React.useState(0);
   const [wildcardPage, setWildcardPage] = React.useState(0);
   const [showWildcardCards, setShowWildcardCards] = React.useState(false);
   const [selectedWildcardCard, setSelectedWildcardCard] = React.useState<ColonyCard | null>(null);
   const [ownedCardIds, setOwnedCardIds] = React.useState<string[]>(DEFAULT_OWNED_COLONY_CARD_IDS);
+
+  React.useEffect(() => {
+    preloadAssetGroupPassive('arcades');
+    preloadAssetGroupPassive('card-frames');
+  }, []);
 
   const totalPages = Math.ceil(MINI_GAMES_CONFIG.length / GAMES_PER_PAGE);
   const unlockedArcadeIds = React.useMemo(() => getOwnedArcadeIdsFromCards(ownedCardIds), [ownedCardIds]);
@@ -105,6 +113,46 @@ export const MiniGames: React.FC<MiniGamesProps> = ({ onGameSelect, language }) 
   const selectedWildcardIndex = selectedWildcardCard
     ? wildcardCards.findIndex(card => card.id === selectedWildcardCard.id)
     : -1;
+
+  const formatArcadePoints = (value: number) => (
+    value > 0 ? value.toLocaleString(language === 'pt' ? 'pt-BR' : 'en-US') : '--'
+  );
+
+  const formatArcadeTime = (seconds: number) => {
+    if (!Number.isFinite(seconds) || seconds <= 0) return '--:--';
+    const minutes = Math.floor(seconds / 60);
+    const remainder = Math.floor(seconds % 60);
+    return `${String(minutes).padStart(2, '0')}:${String(remainder).padStart(2, '0')}`;
+  };
+
+  const scorePanelItems = React.useMemo(() => (
+    MINI_GAMES_CONFIG.map(game => {
+      const savedScore = typeof window === 'undefined'
+        ? 0
+        : Number(localStorage.getItem(`${game.id.replace(/-/g, '_')}_high_score`) || 0);
+      const bestScore = Math.max(Number(arcadeScores[game.id]) || 0, savedScore || 0);
+      const savedTime = typeof window === 'undefined' ? null : localStorage.getItem('danger-zoom-best');
+      const isTimeRecord = game.id === 'danger-zoom-zones';
+
+      return {
+        id: game.id,
+        name: game.name[language],
+        label: isTimeRecord ? (language === 'pt' ? 'Melhor tempo' : 'Best time') : (language === 'pt' ? 'Recorde' : 'High score'),
+        value: isTimeRecord ? (savedTime || formatArcadeTime(bestScore)) : formatArcadePoints(bestScore),
+        Icon: isTimeRecord ? Clock : Trophy,
+        color: ARCADE_GLOW_THEMES[game.id]?.primary || '#22d3ee',
+      };
+    })
+  ), [arcadeScores, language]);
+
+  React.useEffect(() => {
+    const timer = window.setInterval(() => {
+      setScorePanelIndex(prev => (prev + 1) % Math.max(1, scorePanelItems.length));
+    }, 3600);
+    return () => window.clearInterval(timer);
+  }, [scorePanelItems.length]);
+
+  const activeScorePanelItem = scorePanelItems[scorePanelIndex % Math.max(1, scorePanelItems.length)];
 
   const openWildcardCollection = () => {
     setWildcardPage(0);
@@ -208,8 +256,8 @@ export const MiniGames: React.FC<MiniGamesProps> = ({ onGameSelect, language }) 
       className="flex flex-col gap-4 h-full"
     >
       {/* Header section */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-2">
-        <div>
+      <div className="grid grid-cols-1 items-center gap-4 mb-2 lg:grid-cols-[minmax(270px,1fr)_minmax(320px,380px)_minmax(360px,1fr)]">
+        <div className="justify-self-start">
           <h2 className="text-3xl font-orbitron font-black uppercase tracking-tighter flex items-center gap-3">
             <Gamepad2 className="w-8 h-8 text-cyan-400 animate-controller-glow" />
             <span className="animate-gaming-rgb">{language === 'pt' ? 'FLIPERAMAS' : 'ARCADE CENTER'}</span>
@@ -219,7 +267,52 @@ export const MiniGames: React.FC<MiniGamesProps> = ({ onGameSelect, language }) 
           </p>
         </div>
         
-        <div className="flex items-center gap-6">
+        <div className="hidden justify-self-center lg:block">
+          {activeScorePanelItem && (
+            <div className="min-w-[310px] max-w-[380px] overflow-hidden rounded-2xl border border-cyan-300/25 bg-black/50 px-4 py-2 shadow-[0_0_28px_rgba(34,211,238,0.12)]">
+              <div className="flex items-center gap-3">
+                <div
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border bg-white/5"
+                  style={{ borderColor: `${activeScorePanelItem.color}66`, color: activeScorePanelItem.color }}
+                >
+                  <activeScorePanelItem.Icon className="h-5 w-5" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="font-mono text-[8px] uppercase tracking-[0.32em] text-slate-500">
+                    {language === 'pt' ? 'Painel de Recordes' : 'Records Panel'}
+                  </p>
+                  <AnimatePresence mode="wait">
+                    <motion.div
+                      key={activeScorePanelItem.id}
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -8 }}
+                      transition={{ duration: 0.25 }}
+                      className="mt-0.5 flex items-end justify-between gap-3"
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate font-orbitron text-[11px] font-black uppercase tracking-widest text-white">
+                          {activeScorePanelItem.name}
+                        </p>
+                        <p className="font-mono text-[8px] uppercase tracking-[0.2em] text-cyan-200/70">
+                          {activeScorePanelItem.label}
+                        </p>
+                      </div>
+                      <p
+                        className="shrink-0 font-orbitron text-lg font-black tracking-widest"
+                        style={{ color: activeScorePanelItem.color, textShadow: `0 0 14px ${activeScorePanelItem.color}55` }}
+                      >
+                        {activeScorePanelItem.value}
+                      </p>
+                    </motion.div>
+                  </AnimatePresence>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="flex items-center justify-end gap-6">
           <button
             type="button"
             onClick={openWildcardCollection}

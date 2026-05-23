@@ -35,6 +35,7 @@ import {
   getCardStyle,
   getCardUpgradeCost,
   getPoliticalEffects,
+  getPoliticalPassiveBonuses,
   MAX_COLONY_CARD_LEVEL,
   canEquipBattleCardWithElementRule,
   getBattleCardElementTypes,
@@ -45,6 +46,7 @@ import {
   TRINITY_REACTOR_CARD_ID,
 } from '@/lib/colony-cards';
 import { MINI_GAMES_CONFIG } from '@/lib/mini-games-config';
+import { preloadAssetGroupPassive } from '@/lib/asset-preloader';
 import { Colony } from '../ColonySystem';
 import { useDashboard } from './DashboardProvider';
 
@@ -121,22 +123,23 @@ const CardEffectPills = ({ card, language, cardLevels = {} }: { card: ColonyCard
   const politicalEffects = getPoliticalEffects(card, cardLevels);
   const battleEffects = getBattleEffects(card, cardLevels);
   const effects = cardClass === 'battle' ? battleEffects : politicalEffects;
+  const passiveBonuses = getPoliticalPassiveBonuses(card, cardLevels);
 
   return (
     <div className="flex flex-wrap gap-1.5">
-      {cardClass === 'political' && card.passiveBonuses?.constructorsAllColonies ? (
+      {cardClass === 'political' && passiveBonuses.constructorsAllColonies ? (
         <span className="rounded-full border border-cyan-300/60 bg-zinc-950/90 px-2 py-0.5 text-[10px] font-mono text-cyan-100 shadow-[0_0_10px_rgba(0,0,0,0.45)]">
-          +{card.passiveBonuses.constructorsAllColonies} {language === 'pt' ? 'Robôs Construtores' : 'Builder Robots'}
+          +{passiveBonuses.constructorsAllColonies} {language === 'pt' ? 'Robôs Construtores' : 'Builder Robots'}
         </span>
       ) : null}
-      {cardClass === 'political' && card.passiveBonuses?.allSectorBonus ? (
+      {cardClass === 'political' && passiveBonuses.allSectorBonus ? (
         <span className="rounded-full border border-emerald-300/60 bg-zinc-950/90 px-2 py-0.5 text-[10px] font-mono text-emerald-200 shadow-[0_0_10px_rgba(0,0,0,0.45)]">
-          +{card.passiveBonuses.allSectorBonus} {language === 'pt' ? 'Todas as Colônias' : 'All Colonies'}
+          +{passiveBonuses.allSectorBonus} {language === 'pt' ? 'Todas as Colônias' : 'All Colonies'}
         </span>
       ) : null}
-      {cardClass === 'political' && card.passiveBonuses?.constructionSpeedPercent ? (
+      {cardClass === 'political' && passiveBonuses.constructionSpeedPercent ? (
         <span className="rounded-full border border-amber-300/60 bg-zinc-950/90 px-2 py-0.5 text-[10px] font-mono text-amber-100 shadow-[0_0_10px_rgba(0,0,0,0.45)]">
-          +{card.passiveBonuses.constructionSpeedPercent}% {language === 'pt' ? 'Velocidade de Construção' : 'Construction Speed'}
+          +{passiveBonuses.constructionSpeedPercent}% {language === 'pt' ? 'Velocidade de Construção' : 'Construction Speed'}
         </span>
       ) : null}
       {effects.map(effect => {
@@ -323,6 +326,10 @@ const CardsTab = memo(function CardsTab() {
   const [activeSection, setActiveSection] = useState<'owned' | 'codex' | 'equipped'>('owned');
   const [classFilter, setClassFilter] = useState<CardClassFilter>('all');
   const [page, setPage] = useState(0);
+
+  useEffect(() => {
+    preloadAssetGroupPassive('card-frames');
+  }, []);
 
   useEffect(() => {
     let mounted = true;
@@ -693,7 +700,10 @@ const CardsTab = memo(function CardsTab() {
       exit={{ opacity: 0, x: -20 }}
       className="flex h-full min-h-0 flex-col gap-3 overflow-hidden"
     >
-      <div className="shrink-0 rounded-2xl border border-emerald-400/20 bg-black/40 p-3">
+      <div
+        className="shrink-0 rounded-2xl border border-emerald-400/20 bg-black/40 bg-cover bg-center p-3"
+        style={{ backgroundImage: "linear-gradient(rgba(0, 0, 0, 0.28), rgba(0, 0, 0, 0.42)), url('/assets/texturas/textura_cards_cap4.webp')" }}
+      >
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div className="min-w-0">
             <p className="font-mono text-[10px] uppercase tracking-[0.35em] text-emerald-300">{tl(lang, 'Chapter 4 Collection', 'Coleção do Capítulo 4')}</p>
@@ -705,7 +715,10 @@ const CardsTab = memo(function CardsTab() {
               <button
                 key={tab.id}
                 type="button"
-                onClick={() => setActiveSection(tab.id)}
+                onClick={() => {
+                  playSfx('view_card');
+                  setActiveSection(tab.id);
+                }}
                 className={`flex items-center justify-center gap-2 rounded-xl px-3 py-2 text-[10px] font-orbitron font-black uppercase tracking-widest transition-all ${
                   activeSection === tab.id
                     ? 'bg-emerald-300 text-black shadow-[0_0_18px_rgba(52,211,153,0.22)]'
@@ -721,7 +734,10 @@ const CardsTab = memo(function CardsTab() {
         </div>
       </div>
 
-      <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-cyan-300/20 bg-zinc-950/70 p-4">
+      <section
+        className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-cyan-300/20 bg-zinc-950/70 bg-cover bg-center p-4"
+        style={{ backgroundImage: "linear-gradient(rgba(3, 7, 18, 0.34), rgba(3, 7, 18, 0.58)), url('/assets/texturas/textura_cards_background_cap4.webp')" }}
+      >
         <div className="mb-4 flex shrink-0 items-start justify-between gap-3">
           <div>
             <p className="font-mono text-[10px] uppercase tracking-[0.28em] text-cyan-300">{sectionEyebrow}</p>
@@ -733,7 +749,10 @@ const CardsTab = memo(function CardsTab() {
                 <button
                   key={filter.id}
                   type="button"
-                  onClick={() => setClassFilter(filter.id)}
+                  onClick={() => {
+                    playSfx('view_card');
+                    setClassFilter(filter.id);
+                  }}
                   className={`rounded-lg px-2 py-1 font-orbitron text-[9px] font-black uppercase tracking-widest transition-all ${
                     effectiveClassFilter === filter.id
                       ? filter.id === 'wildcard'
@@ -754,7 +773,11 @@ const CardsTab = memo(function CardsTab() {
             <button
               type="button"
               disabled={!canGoPrev}
-              onClick={() => setPage(prev => Math.max(0, prev - 1))}
+              onClick={() => {
+                if (!canGoPrev) return;
+                playSfx('view_card');
+                setPage(prev => Math.max(0, prev - 1));
+              }}
               className="rounded-xl border border-white/10 bg-white/5 p-2 text-cyan-200 transition-all hover:bg-white/10 disabled:cursor-not-allowed disabled:text-zinc-700"
               aria-label={tl(lang, 'Previous page', 'Página anterior')}
             >
@@ -763,7 +786,11 @@ const CardsTab = memo(function CardsTab() {
             <button
               type="button"
               disabled={!canGoNext}
-              onClick={() => setPage(prev => Math.min(totalPages - 1, prev + 1))}
+              onClick={() => {
+                if (!canGoNext) return;
+                playSfx('view_card');
+                setPage(prev => Math.min(totalPages - 1, prev + 1));
+              }}
               className="rounded-xl border border-white/10 bg-white/5 p-2 text-cyan-200 transition-all hover:bg-white/10 disabled:cursor-not-allowed disabled:text-zinc-700"
               aria-label={tl(lang, 'Next page', 'Próxima página')}
             >

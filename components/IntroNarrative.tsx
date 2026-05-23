@@ -7,6 +7,12 @@ import { Rocket, ShieldCheck, ArrowRight, X, Sparkles } from 'lucide-react';
 import { SpaceAmbience } from './SpaceAmbience';
 import { BobbyBlueCharacter, BobbyBlueVariant } from './BobbyBlueCharacter';
 import { useSFX } from '@/hooks/useSFX';
+import {
+  getAssetGroupsSummary,
+  getRecommendedAssetGroupsForRoute,
+  preloadAssetGroups,
+  subscribeAssetPreloader,
+} from '@/lib/asset-preloader';
 
 const STORY_TEXT = [
   {
@@ -155,7 +161,7 @@ export const IntroNarrative = ({
   setPlayerName,
   sfxOn
 }: { 
-  onComplete: () => void; 
+  onComplete: () => void | Promise<void>; 
   onCancel: () => void;
   language: Language;
   playerName: string;
@@ -174,16 +180,8 @@ export const IntroNarrative = ({
   const [showAlienMessage, setShowAlienMessage] = useState(false);
   const [showFullAlienGlitch, setShowFullAlienGlitch] = useState(false);
   const loadingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  const LOADING_STEPS = [
-    { progress: 10, en: "Initializing systems...", pt: "Inicializando sistemas..." },
-    { progress: 25, en: "Loading neural modules...", pt: "Carregando módulos neurais..." },
-    { progress: 40, en: "Calibrating quantum engineering...", pt: "Calibrando engenharia quântica..." },
-    { progress: 60, en: "Verifying security levels...", pt: "Verificando níveis de segurança..." },
-    { progress: 80, en: "Scanning possible delivery routes...", pt: "Escaneando rotas de entrega..." },
-    { progress: 95, en: "Establishing link...", pt: "Estabelecendo link..." },
-    { progress: 100, en: "Ready.", pt: "Pronto." }
-  ];
+  const loadingRunRef = useRef(0);
+  const loadingUnsubscribeRef = useRef<(() => void) | null>(null);
 
   const currentText = STORY_TEXT[index] ? t(language, STORY_TEXT[index].en, STORY_TEXT[index].pt) : "";
   const displayedText = currentText.slice(0, charCount);
@@ -222,6 +220,9 @@ export const IntroNarrative = ({
       if (loadingTimeoutRef.current) {
         clearTimeout(loadingTimeoutRef.current);
       }
+      loadingUnsubscribeRef.current?.();
+      loadingUnsubscribeRef.current = null;
+      loadingRunRef.current += 1;
     };
   }, []);
 
@@ -248,6 +249,44 @@ export const IntroNarrative = ({
     }, 2500);
   };
 
+  const runRealIntroLoading = async () => {
+    const runId = loadingRunRef.current + 1;
+    loadingRunRef.current = runId;
+    const groups = getRecommendedAssetGroupsForRoute('Solar');
+
+    const updateLoadingState = () => {
+      const summary = getAssetGroupsSummary(groups);
+      const progress = Math.max(summary.total > 0 ? 4 : 100, Math.round(summary.progress * 100));
+      setLoadingProgress(progress);
+      setLoadingStatus(
+        progress >= 100
+          ? t(language, "Ready.", "Pronto.")
+          : t(language, "Preparing Solar Route assets...", "Preparando assets das Rotas Solares...")
+      );
+    };
+
+    updateLoadingState();
+    loadingUnsubscribeRef.current?.();
+    loadingUnsubscribeRef.current = subscribeAssetPreloader(updateLoadingState);
+
+    try {
+      await preloadAssetGroups(groups);
+      if (loadingRunRef.current !== runId) return;
+      updateLoadingState();
+      await onComplete();
+    } catch {
+      if (loadingRunRef.current !== runId) return;
+      setLoadingStatus(t(language, "Ready.", "Pronto."));
+      setLoadingProgress(100);
+      await onComplete();
+    } finally {
+      if (loadingRunRef.current === runId) {
+        loadingUnsubscribeRef.current?.();
+        loadingUnsubscribeRef.current = null;
+      }
+    }
+  };
+
   const handleConfirmName = () => {
     if (playerName.toLowerCase().trim() === 'alien' && !isLoading) {
       setPlayerName(''); // Immediately clear the name to prevent bypass
@@ -257,21 +296,7 @@ export const IntroNarrative = ({
     if (playerName.trim() && !isLoading) {
       playSfx('login_start', { volume: 0.8 });
       setIsLoading(true);
-      let stepIndex = 0;
-      
-      const updateLoading = () => {
-        if (stepIndex < LOADING_STEPS.length) {
-          const step = LOADING_STEPS[stepIndex];
-          setLoadingProgress(step.progress);
-          setLoadingStatus(t(language, step.en, step.pt));
-          stepIndex++;
-          loadingTimeoutRef.current = setTimeout(updateLoading, 800 + Math.random() * 1200);
-        } else {
-          onComplete();
-        }
-      };
-      
-      updateLoading();
+      runRealIntroLoading();
     }
   };
 
@@ -353,6 +378,9 @@ export const IntroNarrative = ({
                         clearTimeout(loadingTimeoutRef.current);
                         loadingTimeoutRef.current = null;
                       }
+                      loadingUnsubscribeRef.current?.();
+                      loadingUnsubscribeRef.current = null;
+                      loadingRunRef.current += 1;
                       setIsLoading(false);
                       onCancel();
                     }}

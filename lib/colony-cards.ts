@@ -106,6 +106,23 @@ export const getPoliticalEffects = (card: ColonyCard, levels: ColonyCardLevels =
   }));
 };
 
+export const getPoliticalPassiveBonuses = (card: ColonyCard, levels: ColonyCardLevels = {}): PoliticalPassiveBonuses => {
+  const multiplier = 1 + (getCardLevel(card.id, levels) - 1) * 0.1;
+  const passiveBonuses = card.passiveBonuses || {};
+
+  return {
+    constructorsAllColonies: passiveBonuses.constructorsAllColonies
+      ? Math.round(passiveBonuses.constructorsAllColonies * multiplier)
+      : undefined,
+    allSectorBonus: passiveBonuses.allSectorBonus
+      ? Math.round(passiveBonuses.allSectorBonus * multiplier)
+      : undefined,
+    constructionSpeedPercent: passiveBonuses.constructionSpeedPercent
+      ? Math.round(passiveBonuses.constructionSpeedPercent * multiplier)
+      : undefined,
+  };
+};
+
 export const getBattleEffects = (card: ColonyCard, levels: ColonyCardLevels = {}): BattleCardEffect[] => {
   const multiplier = 1 + (getCardLevel(card.id, levels) - 1) * 0.1;
   return (card.battleEffects || []).map(effect => ({

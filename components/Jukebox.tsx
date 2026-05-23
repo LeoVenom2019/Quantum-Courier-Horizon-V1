@@ -1,6 +1,6 @@
 import React, { useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Play, Pause, SkipBack, SkipForward, Repeat, Shuffle, Volume2, Music, X, Activity } from 'lucide-react';
+import { Play, Pause, SkipBack, SkipForward, Repeat, Shuffle, Music, X, Activity } from 'lucide-react';
 import { Track } from '@/hooks/useJukebox';
 
 interface JukeboxProps {
@@ -99,7 +99,7 @@ export function Jukebox({
   playlist,
   currentTrackIndex,
   isPlaying,
-  volume,
+  volume: _volume,
   isLoop,
   isShuffle,
   setVolume,
@@ -113,6 +113,16 @@ export function Jukebox({
   currentTrack
 }: JukeboxProps) {
   const tl = (en: string, pt: string) => language === 'pt' ? pt : en;
+  const toggleShuffleMode = () => {
+    const nextShuffle = !isShuffle;
+    setIsShuffle(nextShuffle);
+    if (nextShuffle) setIsLoop(false);
+  };
+  const toggleLoopMode = () => {
+    const nextLoop = !isLoop;
+    setIsLoop(nextLoop);
+    if (nextLoop) setIsShuffle(false);
+  };
 
   return (
     <>
@@ -134,9 +144,10 @@ export function Jukebox({
               <div className="absolute inset-0 opacity-10 pointer-events-none" 
                    style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, rgba(6,182,212,0.3) 1px, transparent 0)', backgroundSize: '24px 24px' }} />
               
-              <div className="bg-slate-900/90 rounded-[22px] p-8 relative z-10 flex flex-col flex-1 overflow-hidden">
+              <div className="bg-slate-900/90 rounded-[22px] p-8 relative z-10 flex flex-col flex-1 overflow-hidden bg-[url('/images/ui/jukebox_background.webp')] bg-cover bg-center">
+                <div className="absolute inset-0 bg-slate-950/55 pointer-events-none" />
                 {/* Header */}
-                <div className="flex justify-between items-center mb-6 border-b border-white/5 pb-4">
+                <div className="relative z-10 flex justify-between items-center mb-6 border-b border-white/5 pb-4">
                   <div className="flex items-center gap-3">
                     <div className="relative">
                       <Music className="w-6 h-6 text-cyan-400" />
@@ -164,7 +175,7 @@ export function Jukebox({
                 </div>
 
                 {/* Main Player Display */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 flex-1 overflow-hidden">
+                <div className="relative z-10 grid grid-cols-1 lg:grid-cols-2 gap-8 flex-1 overflow-hidden">
                   {/* Left Side: Visualizer & Controls */}
                   <div className="flex flex-col">
                     <div className="relative mb-6">
@@ -208,18 +219,17 @@ export function Jukebox({
                     </div>
 
                     <div className="space-y-6">
-                      <div className="flex items-center justify-center gap-6">
+                      <div className="grid w-full grid-cols-[40px_40px_64px_40px_40px] items-center justify-center gap-3">
                         <motion.button 
                           whileHover={{ scale: 1.1 }}
                           whileTap={{ scale: 0.9 }}
-                          onClick={() => setIsShuffle(!isShuffle)}
-                          className={`p-2.5 rounded-xl border transition-all ${isShuffle ? 'bg-cyan-500/20 border-cyan-500 text-cyan-400 shadow-[0_0_15px_rgba(6,182,212,0.3)]' : 'bg-white/5 border-white/10 text-slate-500 hover:border-white/20'}`}
+                          onClick={toggleShuffleMode}
+                          className={`flex h-10 w-10 items-center justify-center rounded-xl border transition-all ${isShuffle ? 'bg-cyan-500/20 border-cyan-500 text-cyan-400 shadow-[0_0_15px_rgba(6,182,212,0.3)]' : 'bg-white/5 border-white/10 text-slate-500 hover:border-white/20'}`}
                         >
                           <Shuffle className="w-4 h-4" />
                         </motion.button>
 
-                        <div className="flex items-center gap-4">
-                          <button onClick={playPrev} className="p-2 text-slate-400 hover:text-cyan-400 transition-colors">
+                          <button onClick={playPrev} className="flex h-10 w-10 items-center justify-center text-slate-400 hover:text-cyan-400 transition-colors">
                             <SkipBack className="w-6 h-6" />
                           </button>
                           
@@ -236,28 +246,20 @@ export function Jukebox({
                             {isPlaying ? <Pause className="w-8 h-8" /> : <Play className="w-8 h-8 ml-1" />}
                           </motion.button>
 
-                          <button onClick={playNext} className="p-2 text-slate-400 hover:text-cyan-400 transition-colors">
+                          <button onClick={playNext} className="flex h-10 w-10 items-center justify-center text-slate-400 hover:text-cyan-400 transition-colors">
                             <SkipForward className="w-6 h-6" />
                           </button>
-                        </div>
 
                         <motion.button 
                           whileHover={{ scale: 1.1 }}
                           whileTap={{ scale: 0.9 }}
-                          onClick={() => setIsLoop(!isLoop)}
-                          className={`p-2.5 rounded-xl border transition-all ${isLoop ? 'bg-orange-500/20 border-orange-500 text-orange-400 shadow-[0_0_15px_rgba(249,115,22,0.3)]' : 'bg-white/5 border-white/10 text-slate-500 hover:border-white/20'}`}
+                          onClick={toggleLoopMode}
+                          className={`flex h-10 w-10 items-center justify-center rounded-xl border transition-all ${isLoop ? 'bg-orange-500/20 border-orange-500 text-orange-400 shadow-[0_0_15px_rgba(249,115,22,0.3)]' : 'bg-white/5 border-white/10 text-slate-500 hover:border-white/20'}`}
                         >
                           <Repeat className="w-4 h-4" />
                         </motion.button>
                       </div>
 
-                      <div className="flex items-center gap-4 bg-black/40 rounded-xl p-3 border border-white/5">
-                        <Volume2 className="w-4 h-4 text-cyan-500" />
-                        <div className="flex-1 h-1.5 bg-slate-800 rounded-full overflow-hidden">
-                          <div className="h-full bg-cyan-500/50" style={{ width: `${volume * 100}%` }} />
-                        </div>
-                        <span className="text-[9px] font-mono text-slate-500 uppercase tracking-widest">{tl('MASTERED', 'MASTER')}</span>
-                      </div>
                     </div>
                   </div>
 

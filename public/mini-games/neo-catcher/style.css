@@ -110,6 +110,26 @@ body {
     box-shadow: 0 0 18px rgba(255, 75, 43, 0.85);
 }
 
+.extra-life-box {
+    border-color: rgba(248, 113, 113, 0.35);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 0 18px rgba(239, 68, 68, 0.12), inset 0 0 20px rgba(239, 68, 68, 0.08);
+}
+
+.extra-life-box label {
+    color: #fca5a5;
+}
+
+#extra-life-count {
+    color: #fecaca;
+    text-shadow: 0 0 16px rgba(239, 68, 68, 0.8);
+}
+
+.heart-icon {
+    color: #ef4444;
+    font-family: Arial, sans-serif;
+    text-shadow: 0 0 12px rgba(239, 68, 68, 0.9);
+}
+
 .main-screen {
     position: relative;
     background: #000;

@@ -8,11 +8,31 @@ const CANVAS_HEIGHT = 600;
 const PLAYER_WIDTH = 64;
 const PLAYER_HEIGHT = 48;
 const ITEM_SIZE = 24;
-const PHASE_DURATION = 50000; // 50 seconds
+const PHASE_DURATION = 65000; // 65 seconds
 const ACCEL_INTERVAL = 10000; // 10 seconds
-const MAX_HEALTH = 100;
-const HEAL_AMOUNT = 22;
-const MAX_HEALS_PER_PHASE = 2;
+const MAX_HEALTH = 200;
+const NEXT_PHASE_HEAL_AMOUNT = 100;
+const HEAL_AMOUNT = 40;
+const EXTRA_LIFE_HEALTH = 100;
+const EXTRA_LIFE_DROP_CHANCE = 0.05;
+const BOMB_STUN_DURATION = 1000;
+const RANGE_BONUS_COLOR = '#ec4899';
+const SFX_BASE_PATH = '/assets/games/flipers_sfx';
+const sfxCache = new Map();
+
+function playSfx(name, volume = 0.72) {
+    if (typeof Audio === 'undefined') return;
+    const src = `${SFX_BASE_PATH}/${name}.ogg`;
+    let audio = sfxCache.get(src);
+    if (!audio) {
+        audio = new Audio(src);
+        audio.preload = 'auto';
+        sfxCache.set(src, audio);
+    }
+    const instance = audio.cloneNode(true);
+    instance.volume = volume;
+    instance.play().catch(() => {});
+}
 
 function getArcadePerks() {
     try {
@@ -31,19 +51,37 @@ const HAS_DAMAGE_DODGE = hasArcadePerk('neo-catcher-damage-dodge');
 const BASE_CATCH_RANGE_BOOST = HAS_CATCH_RANGE ? 1.2 : 1.0;
 
 const MISS_DAMAGE = {
-    common: 4,
-    blue: 6,
-    purple: 8,
-    rare: 10,
-    black: 12
+    common: 3,
+    blue: 4,
+    purple: 6,
+    rare: 7,
+    black: 9
 };
 
 const PHASES = [
-    { name: 'STREET', pt: 'RUA', minScore: 500, variant: 'default', bg: '#1a1a1a' },
-    { name: 'BEACH', pt: 'PRAIA', minScore: 1200, variant: 'wind', bg: '#0ea5e9' },
-    { name: 'BRIDGE', pt: 'PONTE', minScore: 2200, variant: 'irregular', bg: '#38bdf8' },
-    { name: 'VOLCANO', pt: 'VULCÃO', minScore: 3500, variant: 'volcanic', bg: '#7f1d1d' }
+    { name: 'STREET', pt: 'RUA', minScore: 500, variant: 'default', bg: '#1a1a1a', bgSrc: '/assets/games/neo_catcher/neo_catcher_street_background.webp' },
+    { name: 'BEACH', pt: 'PRAIA', minScore: 1200, variant: 'wind', bg: '#0ea5e9', bgSrc: '/assets/games/neo_catcher/neo_catcher_beach_background.webp' },
+    { name: 'BRIDGE', pt: 'PONTE', minScore: 2200, variant: 'irregular', bg: '#38bdf8', bgSrc: '/assets/games/neo_catcher/neo_catcher_bridge_background.webp' },
+    { name: 'VOLCANO', pt: 'VULCÃO', minScore: 3500, variant: 'volcanic', bg: '#7f1d1d', bgSrc: '/assets/games/neo_catcher/neo_catcher_volcano_background.webp' }
 ];
+
+const phaseBackgroundImages = {};
+PHASES.forEach(phase => {
+    const image = new Image();
+    image.src = phase.bgSrc;
+    phaseBackgroundImages[phase.name] = image;
+});
+
+function getPhaseDisplayName(phase) {
+    return `${phase.name.charAt(0)}${phase.name.slice(1).toLowerCase()}`;
+}
+
+function getPhaseSpeedProgressMultiplier(progress) {
+    if (progress < 0.25) return 0.8;
+    if (progress < 0.5) return 0.85;
+    if (progress < 0.75) return 0.9;
+    return 1.0;
+}
 
 const ITEMS = [
     { type: 'common', color: '#00f2ff', weight: 60, pts: 10, glow: false },
@@ -75,7 +113,9 @@ let gameState = {
     keys: {},
     // New states
     bonusSpawned: false,
-    healsSpawned: 0,
+    extraLifeSpawned: false,
+    extraLifeDropProgress: null,
+    extraLives: 0,
     bombSpawned: false,
     immobilized: false,
     immobilizedTimer: 0,
@@ -102,6 +142,7 @@ const comboEl = document.getElementById('combo-multiplier');
 const healthFillEl = document.getElementById('health-fill');
 const healthValueEl = document.getElementById('health-value');
 const healthBoxEl = document.querySelector('.health-box');
+const extraLifeCountEl = document.getElementById('extra-life-count');
 const phaseNameEl = document.getElementById('phase-name');
 const phaseNumberEl = document.getElementById('phase-number');
 const overlay = document.getElementById('overlay');
@@ -160,7 +201,8 @@ function startPhase(phaseIdx) {
     gameState.combo = 0;
     gameState.multiplier = 1.0;
     gameState.bonusSpawned = false;
-    gameState.healsSpawned = 0;
+    gameState.extraLifeSpawned = false;
+    gameState.extraLifeDropProgress = Math.random() < EXTRA_LIFE_DROP_CHANCE ? 0.18 + Math.random() * 0.64 : null;
     gameState.bombSpawned = false;
     gameState.immobilized = false;
     gameState.immobilizedTimer = 0;
@@ -173,8 +215,8 @@ function startPhase(phaseIdx) {
     
     // Announcement
     announcementEl.classList.remove('hidden');
-    phaseTitleEl.innerText = `PHASE ${phaseIdx + 1}`;
-    phaseDescEl.innerText = PHASES[phaseIdx].name;
+    phaseTitleEl.innerText = `Level ${phaseIdx + 1} - ${getPhaseDisplayName(PHASES[phaseIdx])}`;
+    phaseDescEl.innerText = '';
     
     setTimeout(() => announcementEl.classList.add('hidden'), 3000);
     
@@ -184,11 +226,13 @@ function startPhase(phaseIdx) {
 function restartGame() {
     gameState.cumulativeScore = 0;
     gameState.health = MAX_HEALTH;
+    gameState.extraLives = 0;
     startPhase(0);
 }
 
 function nextPhase() {
     if (gameState.phase < PHASES.length - 1) {
+        gameState.health = Math.min(MAX_HEALTH, gameState.health + NEXT_PHASE_HEAL_AMOUNT);
         startPhase(gameState.phase + 1);
     }
 }
@@ -212,10 +256,11 @@ function updateUI() {
 
     phaseNameEl.innerText = PHASES[gameState.phase].name;
     phaseNumberEl.innerText = `${(gameState.phase + 1).toString().padStart(2, '0')}/04`;
-    const healthPercent = Math.max(0, Math.min(100, gameState.health));
+    const healthPercent = Math.max(0, Math.min(100, (gameState.health / MAX_HEALTH) * 100));
     healthFillEl.style.width = `${healthPercent}%`;
     healthValueEl.innerText = `${Math.round(healthPercent)}%`;
     healthBoxEl.classList.toggle('low', healthPercent <= 30);
+    extraLifeCountEl.innerHTML = `<span class="heart-icon">♥</span> ${gameState.extraLives}`;
     
     const remaining = Math.max(0, Math.ceil((PHASE_DURATION - (Date.now() - gameState.phaseStartTime)) / 1000));
     timerEl.innerText = remaining;
@@ -236,14 +281,21 @@ function spawnItem() {
     
     let itemType;
     
+    if (
+        gameState.extraLifeDropProgress !== null &&
+        !gameState.extraLifeSpawned &&
+        progress >= gameState.extraLifeDropProgress
+    ) {
+        itemType = { type: 'extra-life', color: '#ef4444', pts: 0, glow: true, weight: 0 };
+        gameState.extraLifeSpawned = true;
+    }
     // Check if we should spawn BONUS (exactly 1 per phase, usually around middle)
-    if (!gameState.bonusSpawned && progress > 0.4 && Math.random() > 0.95) {
-        itemType = { type: 'bonus', color: '#10b981', pts: 0, glow: true, weight: 0 };
+    else if (!gameState.bonusSpawned && progress > 0.4 && Math.random() > 0.95) {
+        itemType = { type: 'bonus', color: RANGE_BONUS_COLOR, pts: 0, glow: true, weight: 0 };
         gameState.bonusSpawned = true;
     }
-    else if (gameState.healsSpawned < MAX_HEALS_PER_PHASE && progress > 0.18 && Math.random() > 0.965) {
+    else if (progress > 0.12 && Math.random() > 0.94) {
         itemType = { type: 'heal', color: '#22c55e', pts: 0, glow: true, weight: 0 };
-        gameState.healsSpawned++;
     } 
     // Check if we should spawn BOMB (exactly 1 per phase, usually second half)
     else if (!gameState.bombSpawned && progress > 0.6 && Math.random() > 0.95) {
@@ -271,7 +323,7 @@ function spawnItem() {
         type: itemType.type,
         color: itemType.color,
         pts: Math.floor((itemType.pts || 0) * gameState.valueFactor),
-        speed: (3 + Math.random() * 2) * gameState.speedFactor,
+        speed: (3 + Math.random() * 2) * gameState.speedFactor * getPhaseSpeedProgressMultiplier(progress),
         size: ITEM_SIZE,
         vx: 0, // Horizontal velocity
         wiggle: 0,
@@ -441,8 +493,9 @@ function collectItem(item) {
     const comboBonus = Math.min(20, Math.floor(gameState.combo / 2));
     
     if (item.type === 'bomb') {
+        playSfx('neo_catcher_bomb', 0.78);
         gameState.immobilized = true;
-        gameState.immobilizedTimer = 2000;
+        gameState.immobilizedTimer = BOMB_STUN_DURATION;
         gameState.combo = 0;
         gameState.multiplier = 1.0;
         spawnParticles(player.x + PLAYER_WIDTH/2, player.y + PLAYER_HEIGHT/2, '#ff4b2b', 40);
@@ -452,17 +505,31 @@ function collectItem(item) {
 
     if (item.type === 'bonus') {
         gameState.catchRangeBoost += 0.1;
-        spawnParticles(player.x + PLAYER_WIDTH/2, player.y + PLAYER_HEIGHT/2, '#10b981', 40);
-        createScorePopup(player.x, player.y - 20, "RANGE UP!", '#10b981');
+        spawnParticles(player.x + PLAYER_WIDTH/2, player.y + PLAYER_HEIGHT/2, RANGE_BONUS_COLOR, 40);
+        createScorePopup(player.x, player.y - 20, "RANGE UP!", RANGE_BONUS_COLOR);
         return;
     }
 
     if (item.type === 'heal') {
+        playSfx('neo_catcher_heall', 0.76);
         const before = gameState.health;
         gameState.health = Math.min(MAX_HEALTH, gameState.health + HEAL_AMOUNT);
         spawnParticles(player.x + PLAYER_WIDTH/2, player.y + PLAYER_HEIGHT/2, '#22c55e', 48);
         createScorePopup(player.x, player.y - 20, `+${Math.round(gameState.health - before)} LIFE`, '#22c55e');
         return;
+    }
+
+    if (item.type === 'extra-life') {
+        gameState.extraLives++;
+        spawnParticles(player.x + PLAYER_WIDTH/2, player.y + PLAYER_HEIGHT/2, '#ef4444', 58);
+        createScorePopup(player.x, player.y - 20, "+1 EXTRA LIFE", '#ef4444');
+        return;
+    }
+
+    if (item.type === 'black') {
+        playSfx('neo_catcher_black', 0.78);
+    } else if (item.type === 'blue' || item.type === 'purple' || item.type === 'rare') {
+        playSfx('neo_catcher_3_colors', 0.7);
     }
 
     gameState.combo++;
@@ -487,6 +554,7 @@ function collectItem(item) {
 }
 
 function missItem(item) {
+    playSfx('neo_catcher_miss', 0.6);
     // Reset combo growth but don't reset score
     gameState.combo = 0;
     gameState.multiplier = 1.0;
@@ -504,8 +572,27 @@ function missItem(item) {
     createScorePopup(item.x, CANVAS_HEIGHT - 28, `-${damage} LIFE`, '#ff4b2b');
 
     if (gameState.health <= 0) {
-        finishByDeath();
+        useExtraLifeOrFinish();
     }
+}
+
+function useExtraLifeOrFinish() {
+    if (gameState.extraLives > 0) {
+        gameState.extraLives--;
+        gameState.health = EXTRA_LIFE_HEALTH;
+        gameState.combo = 0;
+        gameState.multiplier = 1.0;
+        gameState.immobilized = false;
+        gameState.immobilizedTimer = 0;
+        gameState.items = [];
+        gameState.screenShake = Math.max(gameState.screenShake, 12);
+        spawnParticles(player.x + PLAYER_WIDTH/2, player.y + PLAYER_HEIGHT/2, '#ef4444', 70);
+        createScorePopup(player.x, player.y - 34, "EXTRA LIFE!", '#ef4444', 1.1);
+        updateUI();
+        return;
+    }
+
+    finishByDeath();
 }
 
 function endPhase() {
@@ -584,8 +671,8 @@ function showFinalResults(victory, overrideScore) {
         score: finalScore,
         stats: [
             { label: 'Total Score', value: finalScore },
-            { label: 'Phase', value: `${gameState.phase + 1}/4` },
-            { label: 'Life', value: `${Math.round(gameState.health)}%` },
+            { label: `Level - ${getPhaseDisplayName(PHASES[gameState.phase])}`, value: `${gameState.phase + 1}/4` },
+            { label: 'Life', value: `${Math.round((gameState.health / MAX_HEALTH) * 100)}%` },
             { label: 'Record', value: gameState.highScore },
         ],
     });
@@ -667,6 +754,13 @@ function draw() {
             ctx.moveTo(item.x + item.size/2, item.y);
             ctx.lineTo(item.x + item.size, item.y - 5);
             ctx.stroke();
+        } else if (item.type === 'extra-life') {
+            ctx.fillStyle = '#ef4444';
+            ctx.font = `bold ${Math.floor(item.size * 1.2)}px Arial`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('♥', item.x + item.size / 2, item.y + item.size / 2 + 1);
+            ctx.textBaseline = 'alphabetic';
         } else if (item.type === 'heal') {
             ctx.fillStyle = '#22c55e';
             ctx.beginPath();
@@ -677,7 +771,7 @@ function draw() {
             ctx.fillRect(item.x + 5, item.y + item.size/2 - 3, item.size - 10, 6);
         } else if (item.type === 'bonus') {
             // Bonus item appearance
-            ctx.fillStyle = '#10b981';
+            ctx.fillStyle = RANGE_BONUS_COLOR;
             ctx.beginPath();
             ctx.arc(item.x + item.size/2, item.y + item.size/2, item.size/2, 0, Math.PI * 2);
             ctx.fill();
@@ -734,13 +828,20 @@ function draw() {
 function drawBackground() {
     const phase = PHASES[gameState.phase];
     const now = Date.now();
+    const bgImage = phaseBackgroundImages[phase.name];
     
-    // Base color with slight vertical gradient shift
-    const baseGrad = ctx.createLinearGradient(0, 0, 0, CANVAS_HEIGHT);
-    baseGrad.addColorStop(0, phase.bg);
-    baseGrad.addColorStop(1, '#000000');
-    ctx.fillStyle = baseGrad;
-    ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+    if (bgImage && bgImage.complete && bgImage.naturalWidth > 0) {
+        ctx.drawImage(bgImage, 0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.16)';
+        ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+    } else {
+        // Fallback while the phase artwork finishes loading.
+        const baseGrad = ctx.createLinearGradient(0, 0, 0, CANVAS_HEIGHT);
+        baseGrad.addColorStop(0, phase.bg);
+        baseGrad.addColorStop(1, '#000000');
+        ctx.fillStyle = baseGrad;
+        ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+    }
 
     // Subtle Grid with parallax shift
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.02)';
@@ -831,9 +932,9 @@ function drawPlayer() {
     if (gameState.catchRangeBoost > 1.0) {
         const effectiveWidth = PLAYER_WIDTH * gameState.catchRangeBoost;
         const offset = (effectiveWidth - PLAYER_WIDTH) / 2;
-        ctx.fillStyle = `rgba(16, 185, 129, ${0.15 + Math.sin(Date.now() / 300) * 0.05})`;
+        ctx.fillStyle = `rgba(236, 72, 153, ${0.15 + Math.sin(Date.now() / 300) * 0.05})`;
         ctx.fillRect(-offset, 0, effectiveWidth, PLAYER_HEIGHT);
-        ctx.strokeStyle = '#10b981';
+        ctx.strokeStyle = RANGE_BONUS_COLOR;
         ctx.lineWidth = 1;
         ctx.setLineDash([5, 5]);
         ctx.strokeRect(-offset, 0, effectiveWidth, PLAYER_HEIGHT);

@@ -16,9 +16,35 @@ import { GameStorage } from '@/lib/game-storage';
 import { SaveManager } from '@/lib/save-manager';
 import { Language, t } from '@/lib/i18n';
 import { ThemeColor, GAME_THEMES } from '@/lib/game-data';
+import {
+  areAssetGroupsReady,
+  getAssetGroupsSummary,
+  getRecommendedAssetGroupsForRoute,
+  preloadAssetGroups,
+  preloadAssetGroupsPassive,
+  subscribeAssetPreloader,
+  type AssetGroupId,
+  type AssetPreloadSummary,
+} from '@/lib/asset-preloader';
 
 // Helper for random positions
 const getRandom = (min: number, max: number) => Math.random() * (max - min) + min;
+
+const getAssetGroupsForSavedRoute = (saved: any): AssetGroupId[] => {
+  try {
+    const data = saved ? SaveManager.loadSave(saved) : null;
+    const routeTier = data?.progression?.routeTier || data?.routeTier || 'Solar';
+    return getRecommendedAssetGroupsForRoute(routeTier);
+  } catch {
+    return getRecommendedAssetGroupsForRoute('Solar');
+  }
+};
+
+const preloadAssetsForSavedRoute = (saved: any) => {
+  preloadAssetGroupsPassive(getAssetGroupsForSavedRoute(saved));
+};
+
+const wait = (ms: number) => new Promise(resolve => window.setTimeout(resolve, ms));
 
 interface ConstellationStar {
   name: string;
@@ -346,6 +372,7 @@ const DEPTH_LAYERS = [
 
 const SpaceTraffic = () => {
   const [ships, setShips] = useState<any[]>([]);
+  const spawnTimerRef = useRef<number | null>(null);
   
   const generateShip = React.useCallback((id: number) => {
     const side = Math.floor(Math.random() * 4);
@@ -390,14 +417,29 @@ const SpaceTraffic = () => {
     };
   }, []);
 
-  useEffect(() => {
-    // Initial batch of ships - Increased for more density across layers
-    setShips(Array.from({ length: 15 }).map((_, i) => generateShip(i)));
+  const scheduleNextShip = React.useCallback((delay = getRandom(2500, 7000)) => {
+    if (spawnTimerRef.current) {
+      window.clearTimeout(spawnTimerRef.current);
+    }
+    spawnTimerRef.current = window.setTimeout(() => {
+      setShips([generateShip(Date.now())]);
+      spawnTimerRef.current = null;
+    }, delay);
   }, [generateShip]);
 
+  useEffect(() => {
+    scheduleNextShip(getRandom(1200, 4200));
+    return () => {
+      if (spawnTimerRef.current) {
+        window.clearTimeout(spawnTimerRef.current);
+      }
+    };
+  }, [scheduleNextShip]);
+
   const handleComplete = React.useCallback((id: number) => {
-    setShips(prev => prev.map(s => s.id === id ? generateShip(id) : s));
-  }, [generateShip]);
+    setShips(prev => prev.filter(ship => ship.id !== id));
+    scheduleNextShip();
+  }, [scheduleNextShip]);
 
   return (
     <>
@@ -1021,6 +1063,8 @@ export default function GameHome() {
     saveTheme().catch(() => {});
   }, [currentThemeIndex]);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [showNewCampaignConfirm, setShowNewCampaignConfirm] = useState(false);
+  const [pendingNewCampaignReset, setPendingNewCampaignReset] = useState(false);
   const [hasSave, setHasSave] = useState(false);
   const [showAchievements, setShowAchievements] = useState(false);
   const [showJukeboxModal, setShowJukeboxModal] = useState(false);
@@ -1031,6 +1075,7 @@ export default function GameHome() {
   const [localRecords, setLocalRecords] = useState<{ name: string; time: number; date: string }[]>([]);
   const [isMounted, setIsMounted] = useState(false);
   const [randomVisual, setRandomVisual] = useState<React.ReactNode | null>(null);
+  const [continuePreload, setContinuePreload] = useState<AssetPreloadSummary | null>(null);
 
   useEffect(() => {
     if (view === 'landing') {
@@ -1168,6 +1213,7 @@ export default function GameHome() {
           try {
             // Use SaveManager to handle both legacy (flat) and modular (structured) saves
             const data = SaveManager.loadSave(saved);
+            preloadAssetsForSavedRoute(saved);
             
             // Map structured state back to local UI states
             setPlayerName(data.system?.playerName || data.playerName || '');
@@ -1212,6 +1258,8 @@ export default function GameHome() {
               setAchievementProgress(data.achievementProgress);
             }
           } catch (e) {}
+        } else {
+          preloadAssetGroupsPassive(getRecommendedAssetGroupsForRoute('Solar'));
         }
 
 
@@ -1227,20 +1275,87 @@ export default function GameHome() {
   
 
 
+  const resetStorageKeys = ['time_travel_save', 'speed_run_save', 'colonies_data', 'history_data', 'game_theme_index', 'qch_settings', 'arcade_card_reward_milestones'];
+
+  const clearProgressStorage = async (options?: { allowImmediateSave?: boolean }) => {
+    GameStorage.markReset(10000);
+    for (const key of resetStorageKeys) {
+      await GameStorage.remove(key);
+      localStorage.removeItem(key);
+    }
+    localStorage.clear();
+    sessionStorage.clear();
+    GameStorage.markReset(options?.allowImmediateSave ? 0 : 10000);
+  };
+
+  const resetLocalProgressState = (options?: { keepPlayerName?: boolean }) => {
+    setHasSave(false);
+    if (!options?.keepPlayerName) {
+      setPlayerName('');
+    }
+    setIsRoute2Unlocked(false);
+    setUnlockedAchievements([]);
+    setAchievementProgress({});
+    setLocalRecords([]);
+    setCurrentThemeIndex(0);
+    updateSettings({
+      masterMusicOn: true,
+      masterMusicVolume: 0.5,
+      masterSfxOn: true,
+      masterSfxVolume: 0.5,
+    });
+  };
+
   const handleStartGame = () => {
+    if (hasSave) {
+      setShowNewCampaignConfirm(true);
+      return;
+    }
+    setPendingNewCampaignReset(false);
+    setPlayerName('');
+    setView('narrative');
+  };
+
+  const handleConfirmNewCampaign = () => {
+    playSfx('aba_click');
+    setShowNewCampaignConfirm(false);
+    setPendingNewCampaignReset(true);
+    setPlayerName('');
     setView('narrative');
   };
 
   const handleContinue = async () => {
+    if (continuePreload) return;
     const saved = await GameStorage.load('time_travel_save');
     if (saved) {
+      const groups = getAssetGroupsForSavedRoute(saved);
+      const needsPreloadPause = !areAssetGroupsReady(groups);
+      let unsubscribe: (() => void) | undefined;
+
       try {
         const data = saved;
         if (data.playerName) {
           setPlayerName(data.playerName);
         }
+
+        if (needsPreloadPause) {
+          const updatePreloadState = () => setContinuePreload(getAssetGroupsSummary(groups));
+          updatePreloadState();
+          unsubscribe = subscribeAssetPreloader(updatePreloadState);
+          await Promise.race([
+            preloadAssetGroups(groups),
+            wait(1800),
+          ]);
+        } else {
+          preloadAssetsForSavedRoute(saved);
+        }
+
+        unsubscribe?.();
+        setContinuePreload(null);
         setView('game');
       } catch (e) {
+        unsubscribe?.();
+        setContinuePreload(null);
         console.error("Failed to load save", e);
       }
     }
@@ -1266,34 +1381,13 @@ export default function GameHome() {
       setIsShaking(true);
       setTimeout(() => setIsShaking(false), 500);
 
-      GameStorage.markReset(10000);
-      const keys = ['time_travel_save', 'speed_run_save', 'colonies_data', 'history_data', 'game_theme_index', 'qch_settings', 'arcade_card_reward_milestones'];
-      for (const key of keys) {
-        await GameStorage.remove(key);
-        localStorage.removeItem(key);
-      }
-      localStorage.clear();
-      GameStorage.markReset(10000);
-      
-      // Reset all local states reactively
-      setHasSave(false);
-      setPlayerName('');
-      setIsRoute2Unlocked(false);
-      setUnlockedAchievements([]);
-      setAchievementProgress({});
-      setLocalRecords([]);
-      setCurrentThemeIndex(0); // Reset to default Cyan theme
-      
-      // Reset sound settings to defaults
-      updateSettings({
-        masterMusicOn: true,
-        masterMusicVolume: 0.5,
-        masterSfxOn: true,
-        masterSfxVolume: 0.5,
-      });
+      await clearProgressStorage();
+      resetLocalProgressState();
 
       // Close modals
       setShowResetConfirm(false);
+      setShowNewCampaignConfirm(false);
+      setPendingNewCampaignReset(false);
       setShowOptions(false);
       
       console.log("Progress reset successfully without reload.");
@@ -1385,8 +1479,20 @@ export default function GameHome() {
     >
       {view === 'narrative' ? (
         <IntroNarrative 
-          onComplete={() => setView('game')} 
-          onCancel={() => setView('landing')}
+          onComplete={async () => {
+            if (pendingNewCampaignReset) {
+              const confirmedPlayerName = playerName;
+              await clearProgressStorage({ allowImmediateSave: true });
+              resetLocalProgressState({ keepPlayerName: true });
+              setPlayerName(confirmedPlayerName);
+              setPendingNewCampaignReset(false);
+            }
+            setView('game');
+          }} 
+          onCancel={() => {
+            setPendingNewCampaignReset(false);
+            setView('landing');
+          }}
           language={language} 
           playerName={playerName}
           setPlayerName={setPlayerName}
@@ -1444,12 +1550,7 @@ export default function GameHome() {
           {/* Background Elements (Vacuum Focus) */}
           <StarField theme={theme} />
           
-          {/* Meteors */}
-          <Meteor delay={2} theme={theme} />
-          <Meteor delay={7} theme={theme} />
-          <Meteor delay={12} theme={theme} />
-          
-          {/* Animated Ships */}
+          {/* Animated traffic */}
           <SpaceTraffic />
 
           {/* Random Visual Event (Stripped of Glows) */}
@@ -1551,7 +1652,7 @@ export default function GameHome() {
                   playSfx('aba_click');
                   handleContinue();
                 }} 
-                disabled={!hasSave}
+                disabled={!hasSave || Boolean(continuePreload)}
                 theme={theme}
               />
               <MenuButton label={tl('CAMPAIGN', 'CAMPANHA')} icon={Rocket} onClick={() => { playSfx('aba_click'); handleStartGame(); }} theme={theme} />
@@ -1563,6 +1664,62 @@ export default function GameHome() {
           </div>
         </>
       )}
+
+      <AnimatePresence>
+        {continuePreload && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[95] flex items-center justify-center bg-black/55 backdrop-blur-sm"
+          >
+            <motion.div
+              initial={{ scale: 0.96, y: 14 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.96, y: 14 }}
+              className="flex flex-col items-center"
+            >
+              <div className={`relative grid h-24 w-24 place-items-center rounded-full border ${theme === 'cyan' ? 'border-cyan-300/35 shadow-[0_0_30px_rgba(34,211,238,0.28)]' : 'border-orange-300/35 shadow-[0_0_30px_rgba(249,115,22,0.24)]'} bg-black/70`}>
+                <motion.div
+                  animate={{ rotate: 360 }}
+                  transition={{ duration: 1.4, repeat: Infinity, ease: 'linear' }}
+                  className={`absolute -inset-2 rounded-full border-2 border-transparent ${theme === 'cyan' ? 'border-t-cyan-300 border-r-cyan-300/40' : 'border-t-orange-300 border-r-orange-300/40'}`}
+                />
+                <div className="h-20 w-20 overflow-hidden rounded-full bg-black">
+                  <img
+                    src="/images/bobby_blue/bobby_loader.webp"
+                    alt="Bobby Blue"
+                    className="h-full w-full object-cover"
+                    draggable={false}
+                  />
+                </div>
+              </div>
+              <div className="mt-4 text-center">
+                <p className={`font-orbitron text-sm font-black uppercase tracking-[0.42em] ${theme === 'cyan' ? 'text-cyan-100' : 'text-orange-100'}`}>
+                  Loading
+                </p>
+                <div className="mt-2 flex justify-center gap-1">
+                  {[0, 1, 2].map(dot => (
+                    <motion.span
+                      key={dot}
+                      animate={{ opacity: [0.25, 1, 0.25], y: [0, -2, 0] }}
+                      transition={{ duration: 0.8, repeat: Infinity, delay: dot * 0.12 }}
+                      className={`h-1.5 w-1.5 rounded-full ${theme === 'cyan' ? 'bg-cyan-300' : 'bg-orange-300'}`}
+                    />
+                  ))}
+                </div>
+                <div className="mt-3 h-1 w-32 overflow-hidden rounded-full bg-white/10">
+                  <motion.div
+                    className={`h-full ${theme === 'cyan' ? 'bg-cyan-300' : 'bg-orange-300'}`}
+                    animate={{ width: `${Math.round(continuePreload.progress * 100)}%` }}
+                    transition={{ duration: 0.2 }}
+                  />
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Options Modal */}
       <AnimatePresence>
@@ -1577,8 +1734,9 @@ export default function GameHome() {
               initial={{ scale: 0.9, y: 20 }}
               animate={{ scale: 1, y: 0 }}
               exit={{ scale: 0.9, y: 20 }}
-              className="w-full max-w-md bg-slate-900 border-2 border-cyan-500 rounded-2xl p-8 relative overflow-hidden"
+              className="w-full max-w-md bg-slate-900 border-2 border-cyan-500 rounded-2xl p-8 relative overflow-hidden bg-[url('/images/ui/options_background.webp')] bg-cover bg-center"
             >
+              <div className="absolute inset-0 bg-slate-950/58 pointer-events-none" />
               {/* Scanline Effect */}
               <div className="absolute inset-0 overflow-hidden pointer-events-none">
                 <div className="w-full h-1 bg-cyan-500/5 absolute top-0 animate-[scan_4s_linear_infinite]" />
@@ -1586,16 +1744,16 @@ export default function GameHome() {
 
               <button 
                 onClick={() => setShowOptions(false)}
-                className="absolute top-4 right-4 text-cyan-500 hover:text-pink-500 transition-colors"
+                className="absolute top-4 right-4 z-10 text-cyan-500 hover:text-pink-500 transition-colors"
               >
                 <X className="w-6 h-6" />
               </button>
 
-              <h2 className="text-2xl font-orbitron font-bold text-white mb-8 tracking-widest border-b border-cyan-500/30 pb-4">
+              <h2 className="relative z-10 text-2xl font-orbitron font-bold text-white mb-8 tracking-widest border-b border-cyan-500/30 pb-4">
                 {tl('OPTIONS', 'OPÇÕES')}
               </h2>
 
-              <div className="space-y-8">
+              <div className="relative z-10 space-y-8">
                 {/* Horizon Radio - Master Audio Control */}
                 <div className="space-y-3 p-4 bg-cyan-500/5 border border-cyan-500/20 rounded-xl relative overflow-hidden group">
                   <div className="absolute inset-0 bg-gradient-to-r from-cyan-500/10 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000" />
@@ -1673,6 +1831,58 @@ export default function GameHome() {
                     <Trash2 className="w-4 h-4" /> {tl('RESET PROGRESS', 'RESETAR PROGRESSO')}
                   </button>
                 </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* New Campaign Confirmation Modal */}
+      <AnimatePresence>
+        {showNewCampaignConfirm && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[120] flex items-center justify-center bg-black/95 backdrop-blur-xl p-4"
+          >
+            <motion.div
+              initial={{ scale: 0.9, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.9, y: 20 }}
+              className="w-full max-w-md glass-panel neon-border-rose rounded-2xl p-8 relative overflow-hidden"
+            >
+              <div className="absolute inset-0 bg-gradient-to-b from-rose-500/10 to-transparent pointer-events-none" />
+              
+              <h2 className="text-2xl font-orbitron font-bold text-white mb-6 tracking-widest text-center neon-text-rose">
+                {tl('NEW CAMPAIGN', 'NOVA CAMPANHA')}
+              </h2>
+
+              <div className="space-y-4 text-center mb-8">
+                <p className="text-rose-400 font-orbitron text-base leading-relaxed">
+                  {tl(
+                    'Starting a new Campaign may delete your saved game or previous game. Proceed?',
+                    'Iniciar uma nova Campanha, poderá apagar seu jogo salvo ou seu jogo anterior, prosseguir?'
+                  )}
+                </p>
+              </div>
+
+              <div className="flex flex-col gap-3">
+                <button 
+                  onClick={handleConfirmNewCampaign}
+                  className="w-full py-4 bg-rose-600 text-white font-orbitron font-bold tracking-widest rounded-lg hover:bg-white hover:text-rose-600 transition-all uppercase"
+                >
+                  {tl('PROCEED', 'PROSSEGUIR')}
+                </button>
+                <button 
+                  onClick={() => {
+                    playSfx('aba_click');
+                    setShowNewCampaignConfirm(false);
+                  }}
+                  className="w-full py-3 text-white/40 font-orbitron text-base hover:text-white transition-colors uppercase"
+                >
+                  {tl('CANCEL', 'CANCELAR')}
+                </button>
               </div>
             </motion.div>
           </motion.div>

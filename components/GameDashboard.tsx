@@ -134,6 +134,7 @@ import VoidWarCore from './dashboard/VoidWarCore';
 import VoidMap from './dashboard/VoidMap';
 import MissionsTab from './dashboard/MissionsTab';
 import { ROUTE_THEMES, ARCADE_THEMES, getRandomTrackForRoute } from '@/lib/music-data';
+import { getRecommendedAssetGroupsForRoute, preloadAssetGroupPassive, preloadAssetGroupsPassive } from '@/lib/asset-preloader';
 import RoutesTab from './dashboard/RoutesTab';
 import AutoTab from './dashboard/AutoTab';
 import HistoryTab from './dashboard/HistoryTab';
@@ -482,6 +483,7 @@ const DashboardContent = memo(({
 
   const [activeMiniGameId, setActiveMiniGameId] = useState<string | null>(null);
   const [arcadeCardReward, setArcadeCardReward] = useState<ColonyCard | null>(null);
+  const [arcadeTabWarning, setArcadeTabWarning] = useState<string | null>(null);
   const [achievementNotification, setAchievementNotification] = useState<Achievement | null>(null);
   const [showRoute3Ending, setShowRoute3Ending] = useState(false);
   const [route3EndingStep, setRoute3EndingStep] = useState(0);
@@ -511,6 +513,10 @@ const DashboardContent = memo(({
   const [showCaptureInfo, setShowCaptureInfo] = useState(false);
   const [showRoute2Confirm, setShowRoute2Confirm] = useState(false);
   const [isFirstInvasionBattle, setIsFirstInvasionBattle] = useState(false);
+  const [route4DefenseThreatAlert, setRoute4DefenseThreatAlert] = useState<{ title: string; remainingSeconds: number } | null>(null);
+  const [openRoute4DefenseRequest, setOpenRoute4DefenseRequest] = useState(0);
+  const [abandonRoute4DefenseRequest, setAbandonRoute4DefenseRequest] = useState(0);
+  const [pendingArcadeDefenseGameId, setPendingArcadeDefenseGameId] = useState<string | null>(null);
 
   const isInterstellar = useMemo(() => routeTier === 'Interstellar', [routeTier]);
   const isVoid = useMemo(() => routeTier === 'Void', [routeTier]);
@@ -519,6 +525,25 @@ const DashboardContent = memo(({
     () => !isVoid && !activeBattle && !['fighting', 'won', 'lost'].includes(voidBattleStatus),
     [isVoid, activeBattle, voidBattleStatus]
   );
+
+  useEffect(() => {
+    preloadAssetGroupsPassive(getRecommendedAssetGroupsForRoute(routeTier));
+  }, [routeTier]);
+
+  useEffect(() => {
+    if (activeTab === 'mini_games') {
+      preloadAssetGroupPassive('arcades');
+      preloadAssetGroupPassive('card-frames');
+    }
+    if (activeTab === 'cards') {
+      preloadAssetGroupPassive('card-frames');
+    }
+    if (activeTab === 'colonies') {
+      preloadAssetGroupPassive('route4-colonies');
+      preloadAssetGroupPassive('route4-battle');
+      preloadAssetGroupPassive('card-frames');
+    }
+  }, [activeTab]);
 
   const [selectedReward, setSelectedReward] = useState<{
     level: number;
@@ -971,6 +996,71 @@ const DashboardContent = memo(({
   }, [routeTier]);
 
   const { playSfx, stopSfx } = useSFX(sfxOn);
+
+  const launchArcadeGame = useCallback(async (id: string) => {
+    if (!isArcadeUnlocked) return;
+    arcadeRewardSessionRef.current[id] = { guaranteedAwarded: false, chanceRolled: false };
+    try {
+      const savedCards = await GameStorage.load('colony_cards_data');
+      const ownedIds = normalizeOwnedColonyCardIds(Array.isArray(savedCards) ? savedCards : undefined);
+      const perks = getArcadeWildcardPerks(ownedIds, id);
+      try {
+        window.localStorage.setItem(`qch_arcade_perks_${id}`, JSON.stringify(perks));
+      } catch (error) {
+        console.warn('Unable to persist arcade wildcard perks', error);
+      }
+    } catch (error) {
+      console.warn('Unable to prepare arcade wildcard perks', error);
+    }
+    setActiveMiniGameId(id);
+    addLog(`${language === 'pt' ? 'Iniciando' : 'Starting'} ${id}...`, 'info');
+  }, [addLog, isArcadeUnlocked, language]);
+
+  const handleArcadeGameSelect = useCallback(async (id: string) => {
+    if (!isArcadeUnlocked) return;
+    if (route4DefenseThreatAlert) {
+      setPendingArcadeDefenseGameId(id);
+      playSfx('warning_gaming');
+      return;
+    }
+    await launchArcadeGame(id);
+  }, [isArcadeUnlocked, launchArcadeGame, playSfx, route4DefenseThreatAlert]);
+
+  const confirmArcadeOverDefense = useCallback(async () => {
+    if (!pendingArcadeDefenseGameId) return;
+    const gameId = pendingArcadeDefenseGameId;
+    setPendingArcadeDefenseGameId(null);
+    setAbandonRoute4DefenseRequest(prev => prev + 1);
+    addLog(language === 'pt'
+      ? 'Defesa abandonada para entrar no fliperama. Resultado: derrota.'
+      : 'Defense abandoned to enter the arcade. Result: defeat.',
+      'warning'
+    );
+    await launchArcadeGame(gameId);
+  }, [addLog, language, launchArcadeGame, pendingArcadeDefenseGameId]);
+
+  const goToRoute4DefenseFromArcadePrompt = useCallback(() => {
+    setPendingArcadeDefenseGameId(null);
+    setActiveTab('colonies');
+    setOpenRoute4DefenseRequest(prev => prev + 1);
+    playSfx('battle_click');
+  }, [playSfx, setActiveTab]);
+
+  const handleDashboardTabChange = useCallback((tab: string) => {
+    if (activeMiniGameIdRef.current && tab !== activeTabRef.current) {
+      setArcadeTabWarning('Saia do fliperama antes de trocar de aba');
+      playSfx('warning_gaming');
+      window.setTimeout(() => setArcadeTabWarning(null), 2400);
+      return;
+    }
+
+    if (tab === 'routes' || tab === 'routes2') {
+      playSfx('laser_up');
+    } else {
+      playSfx('aba_click');
+    }
+    setActiveTab(tab as any);
+  }, [playSfx, setActiveTab]);
 
 
   const setQc = useCallback((val: number | ((prev: number) => number)) => {
@@ -6801,6 +6891,11 @@ const DashboardContent = memo(({
                     totalHumanPopulation={totalHumanPopulation}
                     earthBiodiversity={earthBiodiversity}
                     earthEvents={earthEvents}
+                    defenseThreatAlert={route4DefenseThreatAlert}
+                    onDefenseThreatAlertClick={() => {
+                      setActiveTab('colonies');
+                      setOpenRoute4DefenseRequest(prev => prev + 1);
+                    }}
                     formatValue={formatValue}
                   />
                 ) : (
@@ -6997,12 +7092,7 @@ const DashboardContent = memo(({
                     <button
                       key={tab}
                       onClick={() => {
-                        if (tab === 'routes' || tab === 'routes2') {
-                          playSfx('laser_up');
-                        } else {
-                          playSfx('aba_click');
-                        }
-                        setActiveTab(tab as any);
+                        handleDashboardTabChange(tab);
                       }}
                       className={`flex-1 px-2 py-2.5 font-orbitron text-[15px] tracking-widest uppercase transition-all border-b-2 whitespace-nowrap relative ${isActive
                           ? `${themeBorder} ${isVoid ? 'text-purple-100 drop-shadow-[0_0_15px_rgba(192,132,252,1)]' : themeText} ${themeBg} ${isVoid ? 'neon-text-purple' : ''}`
@@ -7047,7 +7137,7 @@ const DashboardContent = memo(({
                 </motion.div>
               )}
               <AnimatePresence mode="wait">
-                {activeTab === 'mini_games' && isArcadeUnlocked && (
+                {activeTab === 'mini_games' && isEarth && isArcadeUnlocked && (
                   <motion.div
                     key="mini_games"
                     initial={{ opacity: 0, x: 20 }}
@@ -7065,10 +7155,14 @@ const DashboardContent = memo(({
                             </span>
                           </div>
                           <button
-                            onClick={() => setActiveMiniGameId(null)}
-                            className="px-4 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 rounded font-orbitron text-base tracking-widest transition-all"
+                            onClick={() => {
+                              setActiveMiniGameId(null);
+                              addLog(language === 'pt' ? 'Fliperama encerrado. Partida contabilizada como derrota.' : 'Arcade closed. Run counted as a defeat.', 'warning');
+                            }}
+                            className="flex h-9 w-9 items-center justify-center rounded-full border border-red-500/35 bg-red-500/10 text-red-300 transition-all hover:bg-red-500/20 hover:text-red-100"
+                            title={language === 'pt' ? 'Encerrar partida' : 'End run'}
                           >
-                            {language === 'pt' ? 'SAIR' : 'EXIT'}
+                            <X className="h-5 w-5" />
                           </button>
                         </div>
                         <div className="flex-1 bg-black rounded-xl overflow-hidden border border-white/10 shadow-2xl relative">
@@ -7081,48 +7175,34 @@ const DashboardContent = memo(({
                       </div>
                     ) : (
                       <MiniGames
-                        onGameSelect={async (id) => {
-                          if (!isArcadeUnlocked) return;
-                          arcadeRewardSessionRef.current[id] = { guaranteedAwarded: false, chanceRolled: false };
-                          try {
-                            const savedCards = await GameStorage.load('colony_cards_data');
-                            const ownedIds = normalizeOwnedColonyCardIds(Array.isArray(savedCards) ? savedCards : undefined);
-                            const perks = getArcadeWildcardPerks(ownedIds, id);
-                            try {
-                              window.localStorage.setItem(`qch_arcade_perks_${id}`, JSON.stringify(perks));
-                            } catch (error) {
-                              console.warn('Unable to persist arcade wildcard perks', error);
-                            }
-                          } catch (error) {
-                            console.warn('Unable to prepare arcade wildcard perks', error);
-                          }
-                          setActiveMiniGameId(id);
-                          addLog(`${language === 'pt' ? 'Iniciando' : 'Starting'} ${id}...`, 'info');
-                        }}
+
+                        onGameSelect={handleArcadeGameSelect}
                         language={language as 'pt' | 'en'}
+                        arcadeScores={arcadeScores}
                       />
                     )}
                   </motion.div>
                 )}
 
                 {(activeTab === 'routes' || activeTab === 'routes2') && !isVoid && !isEarth && (
-                  <RoutesTab />
+                  <RoutesTab key="routes_tab" />
                 )}
 
-                {activeTab === 'missions' && (
-                  <MissionsTab />
+                {activeTab === 'missions' && !isVoid && !isEarth && (
+                  <MissionsTab key="missions_tab" />
                 )}
 
-                {activeTab === 'auto' && (
-                  <AutoTab />
+                {activeTab === 'auto' && !isVoid && !isEarth && (
+                  <AutoTab key="auto_tab" />
                 )}
 
-                {activeTab === 'mining' && (
-                  <MiningTab />
+                {activeTab === 'mining' && !isVoid && !isEarth && (
+                  <MiningTab key="mining_tab" />
                 )}
 
-                {activeTab === 'aircraft' && (
+                {activeTab === 'aircraft' && !isVoid && !isEarth && (
                   <AircraftTab
+                    key="aircraft_tab"
                     renderBattleLevelTab={() => (
                       <BattleLevelTab
                         setSelectedReward={setSelectedReward}
@@ -7139,12 +7219,12 @@ const DashboardContent = memo(({
                   />
                 )}
 
-                {activeTab === 'technology' && (
-                  <TechnologyTab />
+                {activeTab === 'technology' && !isVoid && !isEarth && (
+                  <TechnologyTab key="technology_tab" />
                 )}
 
-                {activeTab === 'upgrades' && (
-                  <UpgradesTab />
+                {activeTab === 'upgrades' && !isVoid && !isEarth && (
+                  <UpgradesTab key="upgrades_tab" />
                 )}
 
                 {activeTab === 'exit' && (
@@ -7191,12 +7271,13 @@ const DashboardContent = memo(({
                   </motion.div>
                 )}
 
-                {activeTab === 'void_aircraft' && (
-                  <VoidAircraftTab />
+                {activeTab === 'void_aircraft' && isVoid && (
+                  <VoidAircraftTab key="void_aircraft_tab" />
                 )}
 
-                {activeTab === 'void_battle' && (
+                {activeTab === 'void_battle' && isVoid && (
                   <VoidBattleTab
+                    key="void_battle_tab"
                     isVoid={isVoid}
                     isRobotRepaired={isRobotRepaired}
                     setShowBattleShipUpgradeModal={setShowBattleShipUpgradeModal}
@@ -7216,7 +7297,7 @@ const DashboardContent = memo(({
                   />
                 )}
 
-                {activeTab === 'void_war' && (
+                {activeTab === 'void_war' && isVoid && (
                   <motion.div
                     key="void_war"
                     initial={{ opacity: 0, x: 20 }}
@@ -7228,17 +7309,23 @@ const DashboardContent = memo(({
                   </motion.div>
                 )}
 
-                {activeTab === 'colonies' && (
-                  <ColoniesTab
-                    addEarthYears={addEarthYears}
-                    isColoniesOpenRef={isColoniesOpenRef}
-                    handleBuildingComplete={handleBuildingComplete}
-                    setEarthProjectBoostCount={setEarthProjectBoostCount}
-                  />
+                {isEarth && (
+                  <div className={activeTab === 'colonies' ? 'contents' : 'hidden'} key="colonies_tab_wrapper">
+                    <ColoniesTab
+                      addEarthYears={addEarthYears}
+                      isColoniesOpenRef={isColoniesOpenRef}
+                      handleBuildingComplete={handleBuildingComplete}
+                      setEarthProjectBoostCount={setEarthProjectBoostCount}
+                      onDefenseThreatAlertChange={setRoute4DefenseThreatAlert}
+                      openDefenseRequest={openRoute4DefenseRequest}
+                      abandonDefenseRequest={abandonRoute4DefenseRequest}
+                      defenseAlertsPaused={Boolean(activeMiniGameId)}
+                    />
+                  </div>
                 )}
 
-                {activeTab === 'cards' && (
-                  <CardsTab />
+                {activeTab === 'cards' && isEarth && (
+                  <CardsTab key="cards_tab" />
                 )}
 
                 {activeTab === 'void_earth' && (
@@ -7249,24 +7336,62 @@ const DashboardContent = memo(({
                       animate={{ opacity: 1, x: 0 }}
                       exit={{ opacity: 0, x: -20 }}
                       transition={{ duration: 0.3 }}
-                      className="h-full overflow-hidden rounded-3xl border border-cyan-300/20 bg-black/35 p-6"
+                      className="relative h-full overflow-hidden rounded-3xl border border-cyan-300/20 bg-black/35 bg-cover bg-center"
+                      style={{ backgroundImage: "url('/assets/rota4/new_land_map.webp')" }}
                     >
-                      <div className="flex h-full min-h-[360px] flex-col justify-center rounded-2xl border border-dashed border-cyan-300/20 bg-cyan-300/[0.03] p-8 text-center">
-                        <p className="font-mono text-[10px] uppercase tracking-[0.38em] text-cyan-200/75">
-                          {language === 'pt' ? 'Nova Terra' : 'New Earth'}
-                        </p>
-                        <h2 className="mt-3 font-orbitron text-2xl font-black uppercase text-white">
-                          {language === 'pt' ? 'Conteúdo exclusivo em preparação' : 'Exclusive content in preparation'}
-                        </h2>
-                        <p className="mx-auto mt-3 max-w-2xl text-sm leading-relaxed text-zinc-400">
-                          {language === 'pt'
-                            ? 'Esta aba da Rota 4 foi limpa para receber uma experiência própria da Nova Terra.'
-                            : 'This Route 4 tab was cleared to receive a dedicated New Earth experience.'}
-                        </p>
+                      <style>{`
+                        @keyframes newEarthRadarPulse {
+                          0% { transform: translate(-50%, -50%) scale(0.55); opacity: 0.85; }
+                          70% { transform: translate(-50%, -50%) scale(2.15); opacity: 0; }
+                          100% { transform: translate(-50%, -50%) scale(2.15); opacity: 0; }
+                        }
+                        @keyframes newEarthRadarDot {
+                          0%, 100% { box-shadow: 0 0 10px rgba(16,185,129,0.85), 0 0 22px rgba(16,185,129,0.35); }
+                          50% { box-shadow: 0 0 16px rgba(52,211,153,0.95), 0 0 34px rgba(52,211,153,0.46); }
+                        }
+                        @keyframes newEarthDangerDot {
+                          0%, 100% { box-shadow: 0 0 10px rgba(248,113,113,0.85), 0 0 22px rgba(239,68,68,0.35); }
+                          50% { box-shadow: 0 0 16px rgba(252,165,165,0.95), 0 0 34px rgba(239,68,68,0.48); }
+                        }
+                      `}</style>
+                      <div className="absolute inset-0 bg-gradient-to-b from-black/25 via-black/10 to-black/55" />
+                      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_38%,transparent_0%,rgba(0,0,0,0.28)_72%)]" />
+                      <div className="pointer-events-none absolute inset-6 z-10 rounded-2xl border border-cyan-300/20 bg-black/10 backdrop-blur-[0.5px]" />
+                      <div className="absolute inset-0 z-20">
+                        {[
+                          { id: 'gaia', label: 'GAIA', left: '28.8%', top: '37.1%', tone: 'green' },
+                          { id: 'genesis', label: 'GENESIS', left: '56.3%', top: '58.0%', tone: 'green' },
+                          { id: 'elysium', label: 'ELYSIUM', left: '65.3%', top: '37.1%', tone: 'green' },
+                          { id: 'eden', label: 'EDEN', left: '39.3%', top: '65.6%', tone: 'green' },
+                          { id: 'zona-glacial', label: 'ZONA GLACIAL', left: '45.3%', top: '10.5%', tone: 'red' },
+                          { id: 'oceano-abissal', label: 'OCEANO ABISSAL', left: '13.8%', top: '42.1%', tone: 'red' },
+                          { id: 'ruinas-europeias', label: 'RUÍNAS EUROPÉIAS', left: '51.3%', top: '38.0%', tone: 'red' },
+                          { id: 'cemiterio-navios', label: 'CEMITÉRIO DE NAVIOS', left: '45.3%', top: '69.3%', tone: 'red' },
+                          { id: 'continente-esquecido', label: 'CONTINENTE ESQUECIDO', left: '80.5%', top: '77.0%', tone: 'red' },
+                        ].map((marker) => (
+                          <div
+                            key={marker.id}
+                            className="absolute"
+                            style={{ left: marker.left, top: marker.top }}
+                          >
+                            <span
+                              className={`absolute left-0 top-0 h-8 w-8 rounded-full border ${marker.tone === 'red' ? 'border-red-300/70' : 'border-emerald-300/70'}`}
+                              style={{ animation: 'newEarthRadarPulse 2.2s ease-out infinite' }}
+                            />
+                            <span
+                              className={`absolute left-0 top-0 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full border ${marker.tone === 'red' ? 'border-red-100/80 bg-red-400/85' : 'border-emerald-100/80 bg-emerald-300/85'}`}
+                              style={{ animation: `${marker.tone === 'red' ? 'newEarthDangerDot' : 'newEarthRadarDot'} 2.2s ease-in-out infinite` }}
+                            />
+                            <span className={`absolute left-4 top-[-1.15rem] whitespace-nowrap rounded-full border bg-black/45 px-2 py-0.5 font-mono text-[8px] font-bold uppercase tracking-[0.22em] ${marker.tone === 'red' ? 'border-red-300/20 text-red-100 shadow-[0_0_14px_rgba(239,68,68,0.18)]' : 'border-emerald-300/20 text-emerald-100 shadow-[0_0_14px_rgba(16,185,129,0.18)]'}`}>
+                              {marker.label}
+                            </span>
+                          </div>
+                        ))}
                       </div>
                     </motion.div>
                   ) : (
                     <VoidEarth
+                      key="void_earth_tab"
                       earthReconstructionProgress={earthReconstructionProgress}
                       language={language}
                       t={t}
@@ -7282,18 +7407,21 @@ const DashboardContent = memo(({
 
               </AnimatePresence>
 
-              {/* Void Map - Smart Standby (Always mounted to prevent video reload flicker) */}
-              <div className={activeTab === 'void_map' ? 'h-full flex flex-col overflow-hidden' : 'hidden'}>
+              {/* Void Map */}
+              {isVoid && activeTab === 'void_map' && (
+              <div className="h-full flex flex-col overflow-hidden">
                 <motion.div
                   key="void_map_persistent"
                   initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: activeTab === 'void_map' ? 1 : 0, x: activeTab === 'void_map' ? 0 : 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
                   transition={{ duration: 0.3 }}
                   className="h-full flex flex-col overflow-hidden"
                 >
                   <VoidMapTab />
                 </motion.div>
               </div>
+              )}
             </div>
 
             {/* Bottom Navigation for Mobile/Tablet */}
@@ -7339,8 +7467,7 @@ const DashboardContent = memo(({
                   <button
                     key={item.id}
                     onClick={() => {
-                      playSfx('aba_click');
-                      setActiveTab(item.id as any);
+                      handleDashboardTabChange(item.id);
                     }}
                     className={`flex flex-col items-center gap-1 p-2 transition-all rounded-lg relative ${isActive
                         ? (isInterstellar ? 'bg-orange-500/20 text-orange-400' : isVoid ? 'bg-purple-500/20 text-purple-100 drop-shadow-[0_0_15px_rgba(192,132,252,1)] neon-text-purple' : 'bg-cyan-500/20 text-cyan-400')
@@ -7934,6 +8061,73 @@ const DashboardContent = memo(({
               <div className="absolute -top-2 -right-2 w-6 h-6 bg-cyan-500 rounded-full flex items-center justify-center animate-bounce shadow-lg">
                 <Trophy className="w-3 h-3 text-black" />
               </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <AnimatePresence>
+          {pendingArcadeDefenseGameId && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[1350] flex items-center justify-center bg-black/80 p-4 backdrop-blur-xl"
+            >
+              <motion.div
+                initial={{ scale: 0.94, y: 18 }}
+                animate={{ scale: 1, y: 0 }}
+                exit={{ scale: 0.94, y: 18 }}
+                className="relative w-full max-w-lg overflow-hidden rounded-2xl border border-red-400/45 bg-zinc-950 p-7 shadow-[0_0_70px_rgba(239,68,68,0.28)]"
+              >
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(239,68,68,0.24),transparent_42%)] pointer-events-none" />
+                <div className="relative flex flex-col items-center text-center">
+                  <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-full border border-red-300/35 bg-red-500/15 text-red-200">
+                    <AlertTriangle className="h-7 w-7" />
+                  </div>
+                  <h2 className="font-orbitron text-xl font-black uppercase tracking-[0.22em] text-white">
+                    {language === 'pt' ? 'Defesa em risco' : 'Defense at risk'}
+                  </h2>
+                  <p className="mt-5 font-orbitron text-base font-bold leading-relaxed text-red-100">
+                    {language === 'pt'
+                      ? 'Você vai jogar enquanto sua equipe de busca precisa de você?'
+                      : 'Will you play while your search team needs you?'}
+                  </p>
+                  <p className="mt-3 max-w-md text-sm leading-relaxed text-zinc-400">
+                    {language === 'pt'
+                      ? 'Sim encerra a defesa como derrota. Não leva você imediatamente para a batalha.'
+                      : 'Yes ends the defense as a defeat. No sends you immediately to the battle.'}
+                  </p>
+                  <div className="mt-7 grid w-full grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={confirmArcadeOverDefense}
+                      className="rounded-xl border border-red-400/45 bg-red-500/20 px-4 py-3 font-orbitron text-sm font-black uppercase tracking-widest text-red-100 transition-all hover:bg-red-500 hover:text-white"
+                    >
+                      {language === 'pt' ? 'Sim' : 'Yes'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={goToRoute4DefenseFromArcadePrompt}
+                      className="rounded-xl border border-cyan-300/45 bg-cyan-300/15 px-4 py-3 font-orbitron text-sm font-black uppercase tracking-widest text-cyan-100 transition-all hover:bg-cyan-300 hover:text-black"
+                    >
+                      {language === 'pt' ? 'Não' : 'No'}
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <AnimatePresence>
+          {arcadeTabWarning && (
+            <motion.div
+              initial={{ opacity: 0, y: 16, scale: 0.96 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 16, scale: 0.96 }}
+              className="fixed bottom-8 left-1/2 z-[1300] -translate-x-1/2 rounded-2xl border border-red-400/45 bg-red-950/90 px-6 py-4 font-orbitron text-sm font-black uppercase tracking-[0.22em] text-red-100 shadow-[0_0_34px_rgba(239,68,68,0.35)] backdrop-blur-xl"
+            >
+              {arcadeTabWarning}
             </motion.div>
           )}
         </AnimatePresence>
@@ -8844,7 +9038,7 @@ const DashboardContent = memo(({
 
 export const GameDashboard = memo((props: GameDashboardProps) => {
   return (
-    <DashboardProvider language={props.language}>
+    <DashboardProvider language={props.language} jukebox={props.jukebox}>
       <DashboardContent {...props} />
     </DashboardProvider>
   );

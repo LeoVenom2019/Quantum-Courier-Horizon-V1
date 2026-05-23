@@ -45,6 +45,7 @@ export type SFXType =
   | 'mining_stones'
   | 'serve_glass'
   | 'alert_alert'
+  | 'warning_gaming'
   | 'alien_explosion_zero' | 'alien_explosion_1' | 'alien_explosion_2' | 'alien_explosion_3' | 'alien_explosion_4' | 'alien_explosion_5' | 'alien_explosion_6' | 'alien_explosion_7' | 'alien_explosion_8' | 'alien_explosion_9'
   | 'boss_explosion_zero' | 'boss_explosion_1' | 'boss_explosion_2' | 'boss_explosion_3' | 'boss_explosion_4' | 'boss_explosion_5' | 'boss_explosion_6' | 'boss_explosion_7' | 'boss_explosion_8' | 'boss_explosion_9'
   | 'boss_scream_zero' | 'boss_scream_1' | 'boss_scream_2' | 'boss_scream_3' | 'boss_scream_4' | 'boss_scream_5' | 'boss_scream_6' | 'boss_scream_7' | 'boss_scream_8' | 'boss_scream_9'
@@ -100,6 +101,7 @@ const SFX_PATHS: Partial<Record<string, string>> = {
   mining_stones: '/audio/sfx/mining_stones.ogg',
   serve_glass: '/audio/sfx/serve_glass.ogg',
   alert_alert: '/audio/sfx/alert_alert.ogg',
+  warning_gaming: '/assets/rota4/SFX_new_land/warning_gaming.ogg',
   // Void Monster SFX
   alien_explosion_zero: '/audio/sfx/void/alien_explosion_zero.ogg',
   boss_explosion_zero: '/audio/sfx/void/boss_explosion_zero.ogg',

@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { X } from 'lucide-react';
-import { BattleShipComputedStats } from '@/lib/colony-cards';
+import { BattleShipComputedStats, getHorizonXpForNextLevel, MAX_HORIZON_LEVEL } from '@/lib/colony-cards';
 
 type DefenseSpecialId = 'apocalypse-laser' | 'hellfire-barrage' | 'special-slot-3' | 'special-slot-4';
 type EnemyKind = 'common-ship' | 'elite-ship' | 'boss-ship' | 'monster-1' | 'monster-2';
@@ -32,6 +32,7 @@ export interface BattleResultSummary {
   kills: number;
   xp: number;
   qc: number;
+  levelUpSfxHandled?: boolean;
 }
 
 type EnemyStatus = {
@@ -176,6 +177,7 @@ const PLAYER_SOUNDS = {
   apocalypseLaserLastExplosion: `${ASSET_BASE}/player/horizon/apocalipse_laser_last_explosion.ogg`,
   hellfireShoot: `${ASSET_BASE}/player/horizon/hellfire_barrage_shoot.ogg`,
   hellfireImpact: `${ASSET_BASE}/player/horizon/hellfire_barrage_impact.ogg`,
+  horizonLevelUp: `${ASSET_BASE}/player/horizon/horizon_level_up.ogg`,
 };
 
 const COMMON_SHIP_IMAGES = [
@@ -258,6 +260,19 @@ const stopAllBattleSounds = () => {
 const pick = <T,>(items: T[]) => items[Math.floor(Math.random() * items.length)];
 
 const isMonsterKind = (kind: EnemyKind) => kind === 'monster-1' || kind === 'monster-2';
+
+const getDefenseDifficultyLabel = (level: number, language: 'en' | 'pt') => {
+  const safeLevel = Math.max(1, Math.floor(level || 1));
+  if (safeLevel <= 9) return language === 'pt' ? 'Normal' : 'Normal';
+  if (safeLevel <= 19) return language === 'pt' ? 'Difícil' : 'Hard';
+  if (safeLevel <= 29) return language === 'pt' ? 'Extremo' : 'Extreme';
+  if (safeLevel <= 39) return language === 'pt' ? 'Pesadelo' : 'Nightmare';
+  if (safeLevel <= 49) return language === 'pt' ? 'Insano' : 'Insane';
+  if (safeLevel <= 59) return language === 'pt' ? 'Tormento' : 'Torment';
+  if (safeLevel <= 69) return language === 'pt' ? 'Caos' : 'Chaos';
+  const chaosRank = Math.floor((safeLevel - 70) / 10) + 1;
+  return language === 'pt' ? `Caos ${chaosRank}` : `Chaos ${chaosRank}`;
+};
 
 const buildEnemyBlueprint = (kills: number, forceMonsterBoss: boolean): EnemyBlueprint => {
   const roll = Math.random();
@@ -365,6 +380,8 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
   const backgroundRef = useRef(pick(BATTLE_BACKGROUNDS));
   const keysRef = useRef<Record<string, boolean>>({});
   const controlsRef = useRef({ specialOne: 0, specialTwo: 0 });
+  const horizonProgressRef = useRef({ level: horizonLevel, currentXp: horizonXp, nextXp: horizonNextXp });
+  const levelUpSfxHandledRef = useRef(false);
   const stateRef = useRef({
     player: { x: 120, y: HEIGHT / 2, hp: shipStats.health, shield: shipStats.shield },
     enemies: [] as Enemy[],
@@ -415,9 +432,11 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
     ended: false,
     result: '' as 'victory' | 'defeat' | '',
   });
+  const [horizonHud, setHorizonHud] = useState({ level: horizonLevel, currentXp: horizonXp, nextXp: horizonNextXp });
   const [result, setResult] = useState<'victory' | 'defeat' | ''>('');
 
   const t = (en: string, pt: string) => language === 'pt' ? pt : en;
+  const difficultyLabel = getDefenseDifficultyLabel(currentDefenseBattleLevel, language);
 
   useEffect(() => {
     const down = (event: KeyboardEvent) => {
@@ -475,9 +494,37 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
     state.trinityParticles = [];
     state.trinityShockwaves = [];
     state.trinityShake = 0;
+    horizonProgressRef.current = { level: horizonLevel, currentXp: horizonXp, nextXp: horizonNextXp };
+    levelUpSfxHandledRef.current = false;
+    setHorizonHud({ level: horizonLevel, currentXp: horizonXp, nextXp: horizonNextXp });
 
     const spawnFloat = (x: number, y: number, text: string, color: string) => {
       state.floats.push({ id: state.nextId++, x, y, text, color, life: 45 });
+    };
+
+    const awardHorizonXp = (amount: number) => {
+      const safeAmount = Math.max(0, Math.floor(amount));
+      if (safeAmount <= 0) return;
+
+      let { level, currentXp, nextXp } = horizonProgressRef.current;
+      currentXp += safeAmount;
+      let leveledUp = false;
+
+      while (level < MAX_HORIZON_LEVEL && nextXp > 0 && currentXp >= nextXp) {
+        currentXp -= nextXp;
+        level += 1;
+        nextXp = level >= MAX_HORIZON_LEVEL ? 0 : getHorizonXpForNextLevel(level);
+        leveledUp = true;
+      }
+
+      const nextProgress = { level, currentXp, nextXp };
+      horizonProgressRef.current = nextProgress;
+      setHorizonHud(nextProgress);
+
+      if (leveledUp) {
+        levelUpSfxHandledRef.current = true;
+        playSound(PLAYER_SOUNDS.horizonLevelUp, 0.78);
+      }
     };
 
     const spawnParticle = (
@@ -1040,6 +1087,7 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
       const levelScale = 1 + Math.max(0, level - 1) * 0.06;
       const bossScale = isMonsterKind(blueprint.kind) ? 1.25 : 1;
       const battleLevelScale = 1 + Math.max(0, currentDefenseBattleLevel - 1) * 0.1;
+      const rewardScale = battleLevelScale;
       const scaledHp = Math.round(blueprint.hp * levelScale * bossScale * battleLevelScale);
       const scaledDamage = Math.round(blueprint.damage * levelScale * bossScale * battleLevelScale);
       const enemy: Enemy = {
@@ -1063,8 +1111,8 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
         screamSound: blueprint.screamSound,
         explosionSound: blueprint.explosionSound,
         frameOffset: Math.random() * 10,
-        xp: blueprint.xp,
-        qc: blueprint.qc,
+        xp: Math.round(blueprint.xp * rewardScale),
+        qc: Math.round(blueprint.qc * rewardScale),
       };
       if (blueprint.screamSound) enemy.screamAudio = playSound(blueprint.screamSound, 0.72);
       state.enemies.push(enemy);
@@ -1927,11 +1975,6 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
         ctx.fillRect(enemy.x - 34, enemy.y - enemy.height / 2 - 14, 68, 4);
         ctx.fillStyle = enemy.kind === 'boss-ship' ? '#f97316' : enemy.kind === 'elite-ship' ? '#eab308' : '#22c55e';
         ctx.fillRect(enemy.x - 34, enemy.y - enemy.height / 2 - 14, 68 * Math.max(0, enemy.hp / enemy.maxHp), 4);
-        ctx.font = 'bold 11px monospace';
-        ctx.textAlign = 'center';
-        ctx.fillStyle = isMonsterKind(enemy.kind) ? '#f0abfc' : '#f8fafc';
-        ctx.shadowColor = isMonsterKind(enemy.kind) ? '#d946ef' : '#22d3ee';
-        ctx.fillText(isMonsterKind(enemy.kind) ? `BOSS LVL ${enemy.level}` : `LVL ${enemy.level}`, enemy.x, enemy.y - enemy.height / 2 - 22);
         ctx.textAlign = 'start';
       });
 
@@ -2110,6 +2153,7 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
         if (enemy.hp <= 0) {
           state.kills += 1;
           state.earnedXp += enemy.xp;
+          awardHorizonXp(enemy.xp);
           state.earnedQc += enemy.qc;
           if (isMonsterKind(enemy.kind)) {
             state.monsterDefeated = true;
@@ -2140,8 +2184,12 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
       if (state.kills >= 20 && state.monsterDefeated) {
         state.ended = true;
         stopAllBattleSounds();
-        state.earnedXp += 450;
-        state.earnedQc += 35000;
+        const victoryRewardScale = 1 + Math.max(0, currentDefenseBattleLevel - 1) * 0.1;
+        const victoryXp = Math.round(450 * victoryRewardScale);
+        const victoryQc = Math.round(35000 * victoryRewardScale);
+        state.earnedXp += victoryXp;
+        awardHorizonXp(victoryXp);
+        state.earnedQc += victoryQc;
         setHud({ hp: p.hp, shield: p.shield, kills: state.kills, earnedXp: state.earnedXp, earnedQc: state.earnedQc, enemies: state.enemies.length, ended: true, result: 'victory' });
         setResult('victory');
         return;
@@ -2165,7 +2213,7 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
 
   const finishResult = () => {
     if (result === 'victory') {
-      onVictory({ kills: hud.kills, xp: hud.earnedXp, qc: hud.earnedQc });
+      onVictory({ kills: hud.kills, xp: hud.earnedXp, qc: hud.earnedQc, levelUpSfxHandled: levelUpSfxHandledRef.current });
       return;
     }
     if (result === 'defeat') {
@@ -2173,25 +2221,27 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
     }
   };
 
-  const projectedXp = horizonXp + hud.earnedXp;
-  const xpPercent = horizonNextXp > 0 ? Math.min(100, (projectedXp / horizonNextXp) * 100) : 100;
+  const xpPercent = horizonHud.nextXp > 0 ? Math.min(100, (horizonHud.currentXp / horizonHud.nextXp) * 100) : 100;
 
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/95 p-3 backdrop-blur-xl">
       <div className="relative grid h-[94vh] w-[97vw] grid-rows-[auto_1fr] overflow-hidden rounded-2xl border border-cyan-300/25 bg-slate-950 shadow-[0_0_80px_rgba(34,211,238,0.2)]">
-        <div className="flex items-center justify-between border-b border-white/10 bg-black/50 px-4 py-3">
-          <div>
+        <div className="grid grid-cols-[1fr_auto_1fr] items-center border-b border-white/10 bg-black/50 px-4 py-3">
+          <div className="min-w-0">
             <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-cyan-300">{t('New Earth Aerial Defense', 'Defesa Aérea da Nova Terra')}</p>
-            <h3 className="font-orbitron text-lg font-black uppercase text-white">{threatTitle}</h3>
+            <h3 className="truncate font-orbitron text-lg font-black uppercase text-white">{threatTitle}</h3>
           </div>
-          <div className="hidden min-w-[380px] rounded-2xl border border-amber-300/25 bg-amber-300/10 px-4 py-2 lg:block">
+          <div className="hidden w-[480px] rounded-2xl border border-amber-300/25 bg-amber-300/10 px-4 py-2 lg:block">
             <div className="flex items-center justify-between gap-4">
               <div>
                 <p className="font-mono text-[9px] uppercase tracking-[0.24em] text-cyan-200">{t('Battle Level', 'Nível da Batalha')}</p>
-                <p className="font-orbitron text-sm font-black uppercase text-white">{currentDefenseBattleLevel}</p>
+                <p className="font-orbitron text-sm font-black uppercase text-white">
+                  {currentDefenseBattleLevel}
+                  <span className="ml-2 text-[10px] text-cyan-200">{difficultyLabel}</span>
+                </p>
               </div>
               <div className="text-right">
-                <p className="font-mono text-[9px] uppercase tracking-[0.24em] text-amber-200">HORIZON LVL {horizonLevel}</p>
+                <p className="font-mono text-[9px] uppercase tracking-[0.24em] text-amber-200">HORIZON LVL {horizonHud.level}</p>
                 <p className="font-mono text-[9px] uppercase tracking-widest text-amber-100">+{hud.earnedXp} XP</p>
               </div>
             </div>
@@ -2199,9 +2249,11 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
               <div className="h-full rounded-full bg-gradient-to-r from-amber-400 via-cyan-300 to-emerald-300" style={{ width: `${xpPercent}%` }} />
             </div>
           </div>
-          <button type="button" onClick={onClose} disabled={Boolean(result)} className="rounded-xl border border-white/10 bg-white/5 p-2 text-zinc-400 hover:text-white disabled:cursor-not-allowed disabled:opacity-30">
-            <X size={18} />
-          </button>
+          <div className="flex justify-end">
+            <button type="button" onClick={onClose} disabled={Boolean(result)} className="rounded-xl border border-white/10 bg-white/5 p-2 text-zinc-400 hover:text-white disabled:cursor-not-allowed disabled:opacity-30">
+              <X size={18} />
+            </button>
+          </div>
         </div>
 
         <div className="grid min-h-0 grid-cols-[minmax(0,1fr)_260px]">
@@ -2307,7 +2359,7 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
               <div className="rounded-xl border border-amber-300/20 bg-amber-300/10 p-3">
                 <div className="flex items-center justify-between">
                   <p className="font-mono text-[9px] uppercase tracking-widest text-amber-200">Horizon XP</p>
-                  <p className="font-mono text-[9px] uppercase tracking-widest text-amber-100">LVL {horizonLevel}</p>
+                  <p className="font-mono text-[9px] uppercase tracking-widest text-amber-100">LVL {horizonHud.level}</p>
                 </div>
                 <div className="mt-2 h-2 overflow-hidden rounded-full bg-black/55">
                   <div className="h-full rounded-full bg-gradient-to-r from-amber-400 via-cyan-300 to-emerald-300" style={{ width: `${xpPercent}%` }} />

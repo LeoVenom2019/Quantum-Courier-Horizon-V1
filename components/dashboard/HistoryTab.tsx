@@ -1,10 +1,29 @@
 'use client';
 
-import React, { memo } from 'react';
+import React, { memo, useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
 import { motion, AnimatePresence } from 'motion/react';
-import { Download, Upload, Target, Activity, TrendingUp, LogOut, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Download, Upload, Target, Activity, TrendingUp, LogOut, ChevronLeft, ChevronRight, Play, Pause } from 'lucide-react';
 import { useDashboard } from './DashboardProvider';
+
+const ROUTE4_DUST_PARTICLES = [
+  { left: 72, top: 18, size: 1.3, delay: 0.1, duration: 8.5 },
+  { left: 78, top: 25, size: 0.9, delay: 1.2, duration: 10.5 },
+  { left: 84, top: 34, size: 1.1, delay: 2.1, duration: 9.2 },
+  { left: 69, top: 42, size: 0.8, delay: 0.7, duration: 11.2 },
+  { left: 91, top: 48, size: 1.2, delay: 1.8, duration: 8.8 },
+  { left: 63, top: 56, size: 0.7, delay: 2.8, duration: 12.4 },
+  { left: 75, top: 64, size: 1.0, delay: 3.1, duration: 10.1 },
+  { left: 88, top: 70, size: 0.8, delay: 0.4, duration: 9.8 },
+  { left: 57, top: 31, size: 0.7, delay: 1.5, duration: 12.0 },
+  { left: 48, top: 39, size: 0.9, delay: 2.5, duration: 11.5 },
+  { left: 36, top: 45, size: 0.8, delay: 1.1, duration: 13.2 },
+  { left: 28, top: 53, size: 0.7, delay: 3.4, duration: 10.7 },
+  { left: 18, top: 61, size: 1.0, delay: 0.9, duration: 12.6 },
+  { left: 43, top: 22, size: 0.7, delay: 2.2, duration: 9.7 },
+  { left: 54, top: 16, size: 0.8, delay: 4.0, duration: 11.8 },
+  { left: 81, top: 12, size: 0.7, delay: 3.8, duration: 10.9 },
+];
 
 const HistoryTab = memo(function HistoryTab() {
   const { 
@@ -17,6 +36,7 @@ const HistoryTab = memo(function HistoryTab() {
     playSfx, 
     exportGameData, 
     importGameData, 
+    pauseMusicForRoute4Credits,
     historyPage, 
     setHistoryPage,
     isRoute2Unlocked,
@@ -32,6 +52,37 @@ const HistoryTab = memo(function HistoryTab() {
   const isVoid = routeTier === 'Void';
   const isEarth = routeTier === 'Earth';
   const route4Unlocked = progression.unlockedTechLevels['Void'] >= 10; // Simple check
+  const creditsVideoRef = useRef<HTMLVideoElement | null>(null);
+  const [creditsPlaying, setCreditsPlaying] = useState(false);
+
+  useEffect(() => {
+    return () => {
+      creditsVideoRef.current?.pause();
+    };
+  }, []);
+
+  const toggleRoute4Credits = async () => {
+    const video = creditsVideoRef.current;
+    if (!video) return;
+
+    if (creditsPlaying) {
+      video.pause();
+      setCreditsPlaying(false);
+      return;
+    }
+
+    pauseMusicForRoute4Credits();
+    video.currentTime = 0;
+    video.volume = 0.9;
+
+    try {
+      await video.play();
+      setCreditsPlaying(true);
+    } catch (error) {
+      video.pause();
+      setCreditsPlaying(false);
+    }
+  };
 
   return (
     <motion.div 
@@ -43,7 +94,10 @@ const HistoryTab = memo(function HistoryTab() {
     >
       {isEarth ? (
         <>
-          <div className="glass-panel neon-border-emerald p-4 rounded-xl flex justify-between items-center">
+          <div
+            className="glass-panel neon-border-emerald bg-cover bg-center p-4 rounded-xl flex justify-between items-center"
+            style={{ backgroundImage: "linear-gradient(rgba(0, 0, 0, 0.22), rgba(0, 0, 0, 0.38)), url('/assets/texturas/textura_historic_cap4.webp')" }}
+          >
             <div>
               <h2 className="text-lg font-orbitron font-bold text-emerald-400 uppercase tracking-tighter">{t('history')}</h2>
               <p className="text-base text-slate-500 font-mono uppercase tracking-widest">{t('gameStatsByRoute')}</p>
@@ -63,90 +117,98 @@ const HistoryTab = memo(function HistoryTab() {
               </label>
             </div>
           </div>
-          <div className="glass-panel neon-border-emerald bg-emerald-500/5 p-8 rounded-3xl min-h-[600px] flex flex-col items-center justify-center space-y-12 shadow-[0_0_50px_rgba(16,185,129,0.1)] relative overflow-hidden">
+          <div className="glass-panel neon-border-emerald bg-black rounded-3xl min-h-[600px] shadow-[0_0_50px_rgba(16,185,129,0.1)] relative overflow-hidden">
+            <style>{`
+              @keyframes route4DustFloat {
+                0%, 100% { transform: translate3d(0, 0, 0); opacity: 0.28; }
+                45% { transform: translate3d(-8px, -10px, 0); opacity: 0.74; }
+                70% { transform: translate3d(-12px, -4px, 0); opacity: 0.44; }
+              }
+              @keyframes route4LampPulse {
+                0%, 100% { opacity: 0.58; transform: scale(0.94); }
+                50% { opacity: 1; transform: scale(1.08); }
+              }
+              @keyframes route4TvAura {
+                0%, 100% { opacity: 0.52; filter: blur(14px); }
+                50% { opacity: 0.78; filter: blur(22px); }
+              }
+              @keyframes route4WindowGlow {
+                0%, 100% { opacity: 0.72; transform: translate3d(0, 0, 0) scale(1); }
+                50% { opacity: 0.9; transform: translate3d(-0.3%, -0.2%, 0) scale(1.015); }
+              }
+            `}</style>
             <div className="absolute inset-0 pointer-events-none">
-              <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_center,rgba(16,185,129,0.05)_0%,transparent_70%)]" />
-              <div className="absolute top-0 left-0 w-full h-full opacity-10 " />
+              <Image
+                src="/images/bobby_blue/bobby_blue_new_land.webp"
+                alt=""
+                fill
+                sizes="100vw"
+                priority={false}
+                className="object-cover opacity-70 saturate-125"
+              />
+              <div className="absolute inset-0 bg-black/18" />
             </div>
-
-            <motion.div 
-              className="relative w-64 h-64 z-10"
-              animate={{ 
-                y: [0, -15, 0],
-                rotate: [-1, 1, -1]
-              }}
-              transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
-            >
-              <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/20 via-emerald-900/40 to-black/60 rounded-[3rem] border-2 border-emerald-400/50 shadow-[0_0_60px_rgba(16,185,129,0.2)] overflow-hidden backdrop-blur-md">
-                <motion.div 
-                  className="absolute inset-x-0 h-1/2 bg-gradient-to-b from-emerald-400/10 to-transparent z-10"
-                  animate={{ top: ["-50%", "100%", "-50%"] }}
-                  transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
+            <div className="pointer-events-none absolute inset-0 z-[8] overflow-hidden mix-blend-screen">
+              <div
+                className="absolute right-[-4%] top-[3%] h-[72%] w-[38%] bg-[radial-gradient(ellipse_at_92%_22%,rgba(255,232,180,0.34)_0%,rgba(255,201,128,0.17)_28%,rgba(255,184,105,0.07)_48%,transparent_72%)] blur-[10px]"
+                style={{ animation: 'route4WindowGlow 6.4s ease-in-out infinite' }}
+              />
+              <div
+                className="absolute right-[13%] top-[11%] h-[53%] w-[22%] bg-[radial-gradient(ellipse_at_80%_18%,rgba(255,245,212,0.22)_0%,rgba(255,199,122,0.09)_42%,transparent_74%)] blur-[14px]"
+                style={{ animation: 'route4WindowGlow 7.8s ease-in-out 0.9s infinite' }}
+              />
+              <div className="absolute bottom-[16%] right-[16%] h-[19%] w-[34%] bg-[radial-gradient(ellipse_at_center,rgba(255,192,116,0.11)_0%,rgba(255,177,88,0.045)_38%,transparent_72%)] blur-[16px]" />
+              <div
+                className="absolute left-[86.4%] top-[52.1%] h-[12.5%] w-[5.8%] rounded-full bg-[radial-gradient(circle,rgba(255,231,158,0.9)_0%,rgba(255,176,76,0.36)_38%,transparent_74%)] blur-[2px]"
+                style={{ animation: 'route4LampPulse 3.6s ease-in-out infinite' }}
+              />
+              <div
+                className="absolute left-[27.5%] top-[29.5%] h-[8.6%] w-[3.9%] rounded-full bg-[radial-gradient(circle,rgba(255,231,158,0.86)_0%,rgba(255,176,76,0.38)_42%,transparent_76%)] blur-[1.6px]"
+                style={{ animation: 'route4LampPulse 4.1s ease-in-out 0.45s infinite' }}
+              />
+              <div className="absolute left-[-0.9%] top-[22.8%] h-[22.2%] w-[6.4%] bg-[radial-gradient(ellipse_at_center,rgba(34,211,238,0.24)_0%,rgba(34,211,238,0.09)_46%,transparent_74%)] blur-[5px]" />
+              <div className="absolute left-[33.0%] bottom-[20.8%] h-[5.2%] w-[35.2%] bg-[linear-gradient(90deg,transparent_0%,rgba(34,211,238,0.08)_12%,rgba(34,211,238,0.28)_48%,rgba(34,211,238,0.12)_84%,transparent_100%)] blur-[6px]" />
+              <div className="absolute left-[34.6%] bottom-[23.6%] h-[0.9%] w-[32.2%] bg-[linear-gradient(90deg,transparent_0%,rgba(103,232,249,0.16)_12%,rgba(103,232,249,0.55)_48%,rgba(103,232,249,0.18)_86%,transparent_100%)] blur-[0.8px]" />
+              <div
+                className="absolute left-[33.7%] top-[12.4%] h-[45.5%] w-[34.7%] rounded-[1.2rem] bg-[radial-gradient(ellipse_at_center,rgba(34,211,238,0.46)_0%,rgba(34,211,238,0.22)_40%,transparent_74%)]"
+                style={{ animation: 'route4TvAura 4.5s ease-in-out infinite' }}
+              />
+              {ROUTE4_DUST_PARTICLES.map((particle, index) => (
+                <span
+                  key={`route4-dust-${index}`}
+                  className="absolute rounded-full bg-amber-100 shadow-[0_0_7px_rgba(255,229,180,0.62)]"
+                  style={{
+                    left: `${particle.left}%`,
+                    top: `${particle.top}%`,
+                    width: `${particle.size * 1.35}px`,
+                    height: `${particle.size * 1.35}px`,
+                    animation: `route4DustFloat ${particle.duration}s ease-in-out ${particle.delay}s infinite`,
+                  }}
                 />
-                
-                <div className="absolute top-1/3 left-0 right-0 flex justify-around px-12">
-                  <motion.div 
-                    className="w-8 h-8 bg-emerald-400 rounded-full shadow-[0_0_20px_rgba(16,185,129,0.8)] relative"
-                    animate={{ scaleY: [1, 1, 0.1, 1, 1] }}
-                    transition={{ duration: 3, repeat: Infinity, times: [0, 0.9, 0.92, 0.94, 1] }}
-                  >
-                    <div className="absolute top-2 left-2 w-2 h-2 bg-white rounded-full opacity-90" />
-                  </motion.div>
-                  <motion.div 
-                    className="w-8 h-8 bg-emerald-400 rounded-full shadow-[0_0_20px_rgba(16,185,129,0.8)] relative"
-                    animate={{ scaleY: [1, 1, 0.1, 1, 1] }}
-                    transition={{ duration: 3, repeat: Infinity, times: [0, 0.9, 0.92, 0.94, 1] }}
-                  >
-                    <div className="absolute top-2 left-2 w-2 h-2 bg-white rounded-full opacity-90" />
-                  </motion.div>
-                </div>
-                
-                <div className="absolute bottom-[20%] left-1/2 -translate-x-1/2 w-20 h-10">
-                  <svg viewBox="0 0 100 50" className="w-full h-full fill-none stroke-emerald-400 stroke-[6]">
-                    <path d="M10,10 Q50,50 90,10" />
-                  </svg>
-                </div>
-
-                <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/5 to-white/20 pointer-events-none" />
-              </div>
-
-              {[...Array(6)].map((_, i) => (
-                <motion.div
-                  key={i}
-                  className="absolute text-emerald-400"
-                  initial={{ opacity: 0, scale: 0 }}
-                  animate={{ 
-                    y: [-20, -100], 
-                    x: [(i - 2.5) * 40, (i - 2.5) * 60],
-                    opacity: [0, 1, 0],
-                    scale: [0.5, 1.2, 0.5],
-                    rotate: [0, 45, -45]
-                  }}
-                  transition={{ 
-                    duration: 3 + Math.random() * 2, 
-                    repeat: Infinity, 
-                    delay: i * 0.5 
-                  }}
-                  style={{ bottom: '20%', left: '50%' }}
-                >
-                  ✨
-                </motion.div>
               ))}
-            </motion.div>
-            
-            <div className="text-center space-y-6 relative z-10">
-              <motion.h4 
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="text-5xl font-orbitron font-black text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 via-white to-emerald-400 uppercase tracking-[0.2em]"
+            </div>
+            <div className="absolute left-[35.45%] top-[15.15%] z-10 h-[39.75%] w-[30.95%] overflow-hidden rounded-[0.28rem] bg-black">
+              <video
+                ref={creditsVideoRef}
+                src="/assets/rota4/videos/quantum_courier_credits.webm"
+                className="h-full w-full object-cover"
+                preload="metadata"
+                playsInline
+                onEnded={() => {
+                  if (creditsVideoRef.current) creditsVideoRef.current.currentTime = 0;
+                  setCreditsPlaying(false);
+                }}
+              />
+              <button
+                type="button"
+                onClick={toggleRoute4Credits}
+                className={`absolute inset-0 flex items-center justify-center bg-black/20 text-cyan-100 transition-all hover:bg-black/10 ${creditsPlaying ? 'opacity-0 hover:opacity-100' : 'opacity-100'}`}
+                aria-label={creditsPlaying ? 'Pausar créditos da TV' : 'Reproduzir créditos da TV'}
               >
-                {language === 'pt' ? 'Obrigado por jogar' : 'Thanks for playing'}
-              </motion.h4>
-              <div className="flex items-center justify-center gap-6">
-                <div className="h-px w-24 bg-gradient-to-r from-transparent to-emerald-500/50" />
-                <div className="w-3 h-3 rounded-full bg-emerald-500/50 animate-ping" />
-                <div className="h-px w-24 bg-gradient-to-l from-transparent to-emerald-500/50" />
-              </div>
+                <span className="flex h-14 w-14 items-center justify-center rounded-full border border-cyan-200/50 bg-black/55 shadow-[0_0_22px_rgba(34,211,238,0.25)] backdrop-blur-sm">
+                  {creditsPlaying ? <Pause className="h-6 w-6" /> : <Play className="h-6 w-6 translate-x-0.5" />}
+                </span>
+              </button>
             </div>
           </div>
         </>

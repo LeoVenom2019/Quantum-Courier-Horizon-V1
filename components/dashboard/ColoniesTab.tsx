@@ -1,22 +1,31 @@
 'use client';
 
-import React, { memo } from 'react';
+import React, { memo, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { ColonySystem } from '../ColonySystem';
 import { useDashboard } from './DashboardProvider';
+import { preloadAssetGroupPassive } from '@/lib/asset-preloader';
 
 interface ColoniesTabProps {
   addEarthYears: (years: number) => void;
   isColoniesOpenRef: React.MutableRefObject<boolean>;
   handleBuildingComplete: (type: any, level: number) => void;
   setEarthProjectBoostCount: React.Dispatch<React.SetStateAction<number>>;
+  onDefenseThreatAlertChange?: (alert: { title: string; remainingSeconds: number } | null) => void;
+  openDefenseRequest?: number;
+  abandonDefenseRequest?: number;
+  defenseAlertsPaused?: boolean;
 }
 
 const ColoniesTab = memo(({
   addEarthYears,
   isColoniesOpenRef,
   handleBuildingComplete,
-  setEarthProjectBoostCount
+  setEarthProjectBoostCount,
+  onDefenseThreatAlertChange,
+  openDefenseRequest = 0,
+  abandonDefenseRequest = 0,
+  defenseAlertsPaused = false
 }: ColoniesTabProps) => {
   const { 
     language, 
@@ -29,6 +38,12 @@ const ColoniesTab = memo(({
     formatValue,
     dispatch
   } = useDashboard();
+
+  useEffect(() => {
+    preloadAssetGroupPassive('route4-colonies');
+    preloadAssetGroupPassive('route4-battle');
+    preloadAssetGroupPassive('card-frames');
+  }, []);
 
   return (
     <motion.div
@@ -61,6 +76,10 @@ const ColoniesTab = memo(({
         onSpendQC={(amount) => {
           dispatch({ type: 'SPEND_QC', payload: { amount } });
         }}
+        onDefenseThreatAlertChange={onDefenseThreatAlertChange}
+        openDefenseRequest={openDefenseRequest}
+        abandonDefenseRequest={abandonDefenseRequest}
+        defenseAlertsPaused={defenseAlertsPaused}
       />
     </motion.div>
   );

@@ -10,6 +10,8 @@ interface EarthSidebarProps {
   totalHumanPopulation: number;
   earthBiodiversity: number;
   earthEvents: any[];
+  defenseThreatAlert?: { title: string; remainingSeconds: number } | null;
+  onDefenseThreatAlertClick?: () => void;
   formatValue: (val: number) => string;
 }
 
@@ -21,13 +23,31 @@ const EarthSidebar: React.FC<EarthSidebarProps> = ({
   totalHumanPopulation, 
   earthBiodiversity, 
   earthEvents,
+  defenseThreatAlert,
+  onDefenseThreatAlertClick,
   formatValue
 }) => {
   const totalProgress = Object.values(earthReconstructionProgress).reduce((a, b: any) => a + (typeof b === 'number' ? b : 0), 0) / 5;
   const isComplete = totalProgress >= 100;
   
   // Safety check: ensure earthEvents is an array
-  const last5Events = Array.isArray(earthEvents) ? earthEvents.slice(0, 5) : [];
+  const safeEarthEvents = Array.isArray(earthEvents) ? earthEvents : [];
+  const route4DefenseEvent = safeEarthEvents.find(event => event?.id === 'route4-defense-alert');
+  const last5Events = safeEarthEvents.filter(event => event?.id !== 'route4-defense-alert').slice(0, 5);
+  const fixedDefenseEvent = defenseThreatAlert ? {
+    id: 'route4-defense-alert',
+    name: language === 'pt' ? 'FROTA SOB ATAQUE' : 'FLEET UNDER ATTACK',
+    description: language === 'pt'
+      ? 'Suas buscas estão sendo atacadas.'
+      : 'Your searches are under attack.',
+    year: gameTime.years,
+    isFixed: true,
+    specialStyles: {
+      bg: 'bg-red-500/12',
+      border: 'border-red-400/60',
+      color: 'text-red-200',
+    },
+  } : route4DefenseEvent;
 
   return (
     <div className={`glass-panel border-2 ${isComplete ? 'border-emerald-500/50' : 'border-emerald-500/20'} rounded-xl flex-1 flex flex-col overflow-hidden bg-emerald-500/5 transition-all duration-500`}>
@@ -128,6 +148,20 @@ const EarthSidebar: React.FC<EarthSidebarProps> = ({
                 );
               })
             )}
+            {fixedDefenseEvent ? (
+              <motion.button 
+                type="button"
+                key={fixedDefenseEvent.id}
+                onClick={onDefenseThreatAlertClick}
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                className={`w-full rounded-xl p-3 text-left transition-all group ${fixedDefenseEvent.specialStyles?.bg || 'bg-red-500/10'} ${fixedDefenseEvent.specialStyles?.border || 'border-red-400/50'} border-2 shadow-[0_0_24px_rgba(248,113,113,0.22)] hover:bg-red-500/18 hover:shadow-[0_0_30px_rgba(248,113,113,0.32)]`}
+              >
+                <p className="font-orbitron text-[13px] font-black uppercase leading-snug tracking-widest text-red-100 drop-shadow-[0_0_12px_rgba(248,113,113,0.85)]">
+                  {String(fixedDefenseEvent.description || '')}
+                </p>
+              </motion.button>
+            ) : null}
           </div>
         </div>
       </div>

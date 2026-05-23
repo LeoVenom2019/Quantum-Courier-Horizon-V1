@@ -31,6 +31,7 @@ import {
 } from 'lucide-react';
 import { GameStorage } from '@/lib/game-storage';
 import { MINI_GAMES_CONFIG } from '@/lib/mini-games-config';
+import { preloadAssetGroupPassive } from '@/lib/asset-preloader';
 import NewEarthDefenseBattle, { BattleResultSummary } from './NewEarthDefenseBattle';
 import {
   BATTLE_CARD_SLOTS,
@@ -55,6 +56,7 @@ import {
   getHorizonLevelFromXp,
   getCardStyle,
   getPoliticalEffects,
+  getPoliticalPassiveBonuses,
   calculateBattleShipStats,
   calculateBattleStatTotals,
   canEquipBattleCardWithElementRule,
@@ -90,6 +92,11 @@ const SEARCH_SLOT_STYLES = [
   'border-emerald-300/35 bg-emerald-300/10 text-emerald-100 hover:border-emerald-200/70 hover:bg-emerald-300 hover:text-black',
   'border-amber-300/35 bg-amber-300/10 text-amber-100 hover:border-amber-200/70 hover:bg-amber-300 hover:text-black',
 ];
+const ROUTE4_LAYOUT_BACKGROUNDS = {
+  searchLand: '/assets/rota4/layout_cap4/searc_land_background.webp',
+  searchSea: '/assets/rota4/layout_cap4/search_sea_background.webp',
+  hangar: '/assets/rota4/layout_cap4/hangar_horizon.webp',
+};
 const BATTLE_SLOT_LABEL: Record<BattleCardSlot, Record<'en' | 'pt', string>> = {
   weapon: { en: 'Weapon', pt: 'Arma' },
   armor: { en: 'Armor', pt: 'Blindagem' },
@@ -160,14 +167,25 @@ interface PendingDefenseThreat {
   id: string;
   sourceSearchId: ColonyExpeditionId;
   sourceTitle: string;
+  rewards?: Partial<ColonySupplies>;
   threatChance: number;
   detectedAt: number;
+  expiresAt?: number;
+  openedAt?: number;
   status: 'pending';
 }
 
 const MAX_PENDING_DEFENSE_THREATS = 2;
+const DEFENSE_THREAT_RESPONSE_SECONDS = 50;
 const ROUTE4_SEARCH_SFX_BASE = '/assets/rota4/SFX_new_land';
+const ROUTE4_COLONIES_TAB_SFX = `${ROUTE4_SEARCH_SFX_BASE}/aba_colonys_click.ogg`;
+const ROUTE4_ROBOTS_50_SFX = `${ROUTE4_SEARCH_SFX_BASE}/50_robots.ogg`;
+const ROUTE4_ROBOTS_250_SFX = `${ROUTE4_SEARCH_SFX_BASE}/250_robots.ogg`;
+const ROUTE4_HANGAR_OPEN_SFX = `${ROUTE4_SEARCH_SFX_BASE}/hangar_open_door.ogg`;
+const ROUTE4_HANGAR_CLOSE_SFX = `${ROUTE4_SEARCH_SFX_BASE}/hangar_close_door.ogg`;
+const HORIZON_LEVEL_UP_SFX = '/assets/rota4/battles/player/horizon/horizon_level_up.ogg';
 const route4SearchSfxCache = new Map<string, HTMLAudioElement>();
+const route4BattleSfxCache = new Map<string, HTMLAudioElement>();
 
 const playRoute4SearchSfx = (id: ColonyExpeditionId, slotIndex: number) => {
   if (typeof Audio === 'undefined') return;
@@ -184,6 +202,32 @@ const playRoute4SearchSfx = (id: ColonyExpeditionId, slotIndex: number) => {
   instance.play().catch(() => {});
 };
 
+const playRoute4UiSfx = (src: string, volume = 0.68) => {
+  if (typeof Audio === 'undefined') return;
+  let audio = route4SearchSfxCache.get(src);
+  if (!audio) {
+    audio = new Audio(src);
+    audio.preload = 'auto';
+    route4SearchSfxCache.set(src, audio);
+  }
+  const instance = audio.cloneNode(true) as HTMLAudioElement;
+  instance.volume = volume;
+  instance.play().catch(() => {});
+};
+
+const playRoute4BattleSfx = (src: string, volume = 0.74) => {
+  if (typeof Audio === 'undefined') return;
+  let audio = route4BattleSfxCache.get(src);
+  if (!audio) {
+    audio = new Audio(src);
+    audio.preload = 'auto';
+    route4BattleSfxCache.set(src, audio);
+  }
+  const instance = audio.cloneNode(true) as HTMLAudioElement;
+  instance.volume = volume;
+  instance.play().catch(() => {});
+};
+
 export interface Construction {
   id: string;
   type: ConstructionType;
@@ -192,6 +236,7 @@ export interface Construction {
   assignedConstructors: number;
   isComplete: boolean;
   order: number; // Track which one was built first
+  lastProgressAt?: number;
 }
 
 export interface Colony {
@@ -223,6 +268,10 @@ export interface ColonySystemProps {
   qc?: number;
   onEarnQC?: (amount: number) => void;
   onSpendQC?: (amount: number) => void;
+  onDefenseThreatAlertChange?: (alert: { title: string; remainingSeconds: number } | null) => void;
+  openDefenseRequest?: number;
+  abandonDefenseRequest?: number;
+  defenseAlertsPaused?: boolean;
   formatValue?: (value: number) => string;
 }
 
@@ -408,6 +457,7 @@ const createInitialConstructions = () => (
     assignedConstructors: 0,
     isComplete: false,
     order: idx,
+    lastProgressAt: undefined,
   }))
 );
 
@@ -473,6 +523,29 @@ const COLONY_COMPLETION_BACKGROUNDS: Record<string, Partial<Record<ConstructionT
   },
 };
 
+const COLONY_STATUS_BACKGROUNDS: Record<string, { colony: string; constructors: string; population: string }> = {
+  'colony-1': {
+    colony: '/assets/rota4/colonys/genesis/1genesis_colony.webp',
+    constructors: '/assets/rota4/colonys/genesis/2genesis_constructors.webp',
+    population: '/assets/rota4/colonys/genesis/3genesis_population.webp',
+  },
+  'colony-2': {
+    colony: '/assets/rota4/colonys/eden/1eden_colony.webp',
+    constructors: '/assets/rota4/colonys/eden/2eden_constructors.webp',
+    population: '/assets/rota4/colonys/eden/3eden_population.webp',
+  },
+  'colony-3': {
+    colony: '/assets/rota4/colonys/elysium/1elysium_colony.webp',
+    constructors: '/assets/rota4/colonys/elysium/2elysium_constructors.webp',
+    population: '/assets/rota4/colonys/elysium/3elysium_population.webp',
+  },
+  'colony-4': {
+    colony: '/assets/rota4/colonys/gaia/1gaia_colony.webp',
+    constructors: '/assets/rota4/colonys/gaia/2gaia_constructors.webp',
+    population: '/assets/rota4/colonys/gaia/3gaia_population.webp',
+  },
+};
+
 const createColonyFromBlueprint = (blueprint: typeof COLONY_BLUEPRINTS[number], language: 'en' | 'pt'): Colony => ({
   id: blueprint.id,
   name: blueprint.name[language],
@@ -502,7 +575,7 @@ export const cleanColoniesData = (data: any, language: 'en' | 'pt'): Colony[] =>
   const cleaned = data.map((col: Colony) => {
     const blueprint = COLONY_BLUEPRINTS.find(item => item.id === col.id);
     const uniqueTypes = new Set();
-    const cleanConstructions = (col.constructions || []).filter(c => {
+    const cleanConstructions: Construction[] = (col.constructions || []).filter(c => {
       if (CONSTRUCTION_CONFIG[c.type] && !uniqueTypes.has(c.type)) {
         uniqueTypes.add(c.type);
         return true;
@@ -524,16 +597,18 @@ export const cleanColoniesData = (data: any, language: 'en' | 'pt'): Colony[] =>
              progress: 0,
              assignedConstructors: 0,
              isComplete: false,
-             order: idx
+             order: idx,
+             lastProgressAt: undefined
           });
        }
     });
 
     // Final fix: Ensure isComplete reflects level >= 10
-    const finalConstructions = cleanConstructions.map(c => ({
+    const finalConstructions: Construction[] = cleanConstructions.map(c => ({
       ...c,
       isComplete: c.level >= 10,
-      assignedConstructors: c.level >= 10 ? 0 : c.assignedConstructors
+      assignedConstructors: c.level >= 10 ? 0 : c.assignedConstructors,
+      lastProgressAt: c.level >= 10 || c.assignedConstructors <= 0 ? undefined : (Number(c.lastProgressAt) || Date.now())
     }));
 
     const sectors = {
@@ -594,21 +669,24 @@ const PanelHeader = ({
   </div>
 );
 
-const CardEffectPills = ({ card, language, cardLevels = {} }: { card: ColonyCard; language: 'en' | 'pt'; cardLevels?: ColonyCardLevels }) => (
+const CardEffectPills = ({ card, language, cardLevels = {} }: { card: ColonyCard; language: 'en' | 'pt'; cardLevels?: ColonyCardLevels }) => {
+  const passiveBonuses = getPoliticalPassiveBonuses(card, cardLevels);
+
+  return (
   <div className="mt-3 flex flex-wrap gap-1.5">
-    {card.passiveBonuses?.constructorsAllColonies ? (
+    {passiveBonuses.constructorsAllColonies ? (
       <span className="rounded-full border border-cyan-300/60 bg-zinc-950/90 px-2 py-0.5 text-[10px] font-mono text-cyan-100 shadow-[0_0_10px_rgba(0,0,0,0.45)]">
-        +{card.passiveBonuses.constructorsAllColonies} {language === 'pt' ? 'Robôs Construtores' : 'Builder Robots'}
+        +{passiveBonuses.constructorsAllColonies} {language === 'pt' ? 'Robôs Construtores' : 'Builder Robots'}
       </span>
     ) : null}
-    {card.passiveBonuses?.allSectorBonus ? (
+    {passiveBonuses.allSectorBonus ? (
       <span className="rounded-full border border-emerald-300/60 bg-zinc-950/90 px-2 py-0.5 text-[10px] font-mono text-emerald-200 shadow-[0_0_10px_rgba(0,0,0,0.45)]">
-        +{card.passiveBonuses.allSectorBonus} {language === 'pt' ? 'Todas as Colônias' : 'All Colonies'}
+        +{passiveBonuses.allSectorBonus} {language === 'pt' ? 'Todas as Colônias' : 'All Colonies'}
       </span>
     ) : null}
-    {card.passiveBonuses?.constructionSpeedPercent ? (
+    {passiveBonuses.constructionSpeedPercent ? (
       <span className="rounded-full border border-amber-300/60 bg-zinc-950/90 px-2 py-0.5 text-[10px] font-mono text-amber-100 shadow-[0_0_10px_rgba(0,0,0,0.45)]">
-        +{card.passiveBonuses.constructionSpeedPercent}% {language === 'pt' ? 'Velocidade de Construção' : 'Construction Speed'}
+        +{passiveBonuses.constructionSpeedPercent}% {language === 'pt' ? 'Velocidade de Construção' : 'Construction Speed'}
       </span>
     ) : null}
     {getPoliticalEffects(card, cardLevels).map(effect => (
@@ -624,7 +702,8 @@ const CardEffectPills = ({ card, language, cardLevels = {} }: { card: ColonyCard
       </span>
     ))}
   </div>
-);
+  );
+};
 
 const ColonyCardView = ({
   card,
@@ -1024,6 +1103,10 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
   qc = 0,
   onEarnQC,
   onSpendQC,
+  onDefenseThreatAlertChange,
+  openDefenseRequest = 0,
+  abandonDefenseRequest = 0,
+  defenseAlertsPaused = false,
   formatValue = (value: number) => value.toLocaleString()
 }) => {
   const [activeColonyId, setActiveColonyId] = useState<string | null>(null);
@@ -1061,9 +1144,14 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
   const [pendingDefenseThreats, setPendingDefenseThreats] = useState<PendingDefenseThreat[]>([]);
   const [activeDefenseThreat, setActiveDefenseThreat] = useState<PendingDefenseThreat | null>(null);
   const [showDefenseHangar, setShowDefenseHangar] = useState(false);
+  const [defenseAlertTick, setDefenseAlertTick] = useState(0);
   const [battleCardCodexPage, setBattleCardCodexPage] = useState(0);
   const [selectedCard, setSelectedCard] = useState<{ card: ColonyCard; action: 'equip' | 'remove'; slot?: ColonyCardSlot | BattleCardSlot; blockedBy?: string } | null>(null);
   const colonySuppliesRef = useRef<ColonySupplies>(DEFAULT_COLONY_SUPPLIES);
+  const horizonXpRef = useRef(0);
+  const handledOpenDefenseRequestRef = useRef(0);
+  const handledAbandonDefenseRequestRef = useRef(0);
+  const defenseAlertsPausedAtRef = useRef<number | null>(null);
   const lastBuildingLevelsRef = useRef<Record<string, Record<string, number>>>({});
 
   const t = (en: string, pt: string) => language === 'pt' ? pt : en;
@@ -1074,8 +1162,27 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
     const remainder = safeSeconds % 60;
     return `${String(minutes).padStart(2, '0')}:${String(remainder).padStart(2, '0')}`;
   };
+  const openDefenseHangar = useCallback(() => {
+    playRoute4UiSfx(ROUTE4_HANGAR_OPEN_SFX, 0.72);
+    setShowDefenseHangar(true);
+  }, []);
+  const closeDefenseHangar = useCallback(() => {
+    playRoute4UiSfx(ROUTE4_HANGAR_CLOSE_SFX, 0.72);
+    setShowDefenseHangar(false);
+  }, []);
 
   // Load state
+  useEffect(() => {
+    preloadAssetGroupPassive('route4-colonies');
+    preloadAssetGroupPassive('card-frames');
+  }, []);
+
+  useEffect(() => {
+    if (showDefenseHangar || activeDefenseThreat) {
+      preloadAssetGroupPassive('route4-battle');
+    }
+  }, [showDefenseHangar, activeDefenseThreat]);
+
   useEffect(() => {
     const timer = window.setTimeout(() => setIsLoaded(true), 0);
     onTabStatusChange(true);
@@ -1261,6 +1368,8 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
           .map((threat, index) => ({
             ...threat,
             id: `${threat.id || `threat-${threat.sourceSearchId || 'unknown'}-${threat.detectedAt || Date.now()}`}-${index}`,
+            detectedAt: Number(threat.detectedAt) || Date.now(),
+            expiresAt: threat.openedAt ? undefined : (Number(threat.expiresAt) || (Number(threat.detectedAt) || Date.now()) + DEFENSE_THREAT_RESPONSE_SECONDS * 1000),
           }))
           .slice(0, MAX_PENDING_DEFENSE_THREATS)
         );
@@ -1331,8 +1440,31 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
   }, [pendingDefenseThreats, isLoaded, isThreatsLoaded]);
 
   useEffect(() => {
+    if (defenseAlertsPaused) {
+      defenseAlertsPausedAtRef.current = defenseAlertsPausedAtRef.current || Date.now();
+      onDefenseThreatAlertChange?.(null);
+      return;
+    }
+
+    const pausedAt = defenseAlertsPausedAtRef.current;
+    if (!pausedAt) return;
+    defenseAlertsPausedAtRef.current = null;
+    const nextExpiresAt = Date.now() + DEFENSE_THREAT_RESPONSE_SECONDS * 1000;
+
+    setPendingDefenseThreats(prev => prev.map(threat => (
+      threat.expiresAt && !threat.openedAt
+        ? { ...threat, expiresAt: nextExpiresAt }
+        : threat
+    )));
+  }, [defenseAlertsPaused, onDefenseThreatAlertChange]);
+
+  useEffect(() => {
     colonySuppliesRef.current = colonySupplies;
   }, [colonySupplies]);
+
+  useEffect(() => {
+    horizonXpRef.current = horizonXp;
+  }, [horizonXp]);
 
   useEffect(() => {
     if (!isLoaded) return;
@@ -1354,14 +1486,16 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
   }, [isLoaded, setColonies]);
 
   const completeSearch = useCallback((search: ActiveColonySearch) => {
-    const nextSupplies = applySupplyDelta(colonySuppliesRef.current, search.rewards);
     const attacked = Math.random() * 100 < search.threatChance;
     const rewardText = (Object.entries(search.rewards) as Array<[ColonySupplyId, number]>)
       .map(([key, value]) => `+${value} ${SUPPLY_CONFIG[key].label[language]}`)
       .join(' · ');
 
-    colonySuppliesRef.current = nextSupplies;
-    setColonySupplies(nextSupplies);
+    if (!attacked) {
+      const nextSupplies = applySupplyDelta(colonySuppliesRef.current, search.rewards);
+      colonySuppliesRef.current = nextSupplies;
+      setColonySupplies(nextSupplies);
+    }
     setActiveSearches(prev => {
       const next = { ...prev };
       delete next[search.searchKey];
@@ -1378,8 +1512,10 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
         id: `threat-${search.searchKey}-${detectedAt}-${Math.random().toString(36).slice(2, 8)}`,
         sourceSearchId: search.id,
         sourceTitle: search.title,
+        rewards: search.rewards,
         threatChance: search.threatChance,
         detectedAt,
+        expiresAt: detectedAt + DEFENSE_THREAT_RESPONSE_SECONDS * 1000,
         status: 'pending',
       };
       setPendingDefenseThreats(prev => [
@@ -1415,6 +1551,111 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
     const interval = window.setInterval(updateSearchClock, 1000);
     return () => window.clearInterval(interval);
   }, [activeSearches, completeSearch]);
+
+  useEffect(() => {
+    if (defenseAlertsPaused) {
+      onDefenseThreatAlertChange?.(null);
+      return;
+    }
+
+    if (pendingDefenseThreats.length === 0) {
+      onDefenseThreatAlertChange?.(null);
+      return;
+    }
+
+    const updateDefenseThreatClock = () => {
+      const now = Date.now();
+      let expiredCount = 0;
+
+      setPendingDefenseThreats(prev => {
+        const next = prev.filter(threat => {
+          if (threat.id === activeDefenseThreat?.id || threat.openedAt || !threat.expiresAt) return true;
+          const expired = threat.expiresAt <= now;
+          if (expired) expiredCount += 1;
+          return !expired;
+        });
+        return next.length === prev.length ? prev : next;
+      });
+
+      if (expiredCount > 0) {
+        setCardFeedback(language === 'pt'
+          ? 'Janela de defesa encerrada. Os recursos da expedição foram perdidos.'
+          : 'Defense window expired. Expedition resources were lost.'
+        );
+      }
+
+      setDefenseAlertTick(now);
+    };
+
+    updateDefenseThreatClock();
+    const interval = window.setInterval(updateDefenseThreatClock, 1000);
+    return () => window.clearInterval(interval);
+  }, [activeDefenseThreat?.id, defenseAlertsPaused, language, onDefenseThreatAlertChange, pendingDefenseThreats.length]);
+
+  useEffect(() => {
+    if (defenseAlertsPaused) {
+      onDefenseThreatAlertChange?.(null);
+      return;
+    }
+
+    const now = typeof defenseAlertTick === 'number' && defenseAlertTick > 0 ? defenseAlertTick : Date.now();
+    const alertThreat = pendingDefenseThreats.find(threat => (
+      threat.id !== activeDefenseThreat?.id &&
+      !threat.openedAt &&
+      Boolean(threat.expiresAt) &&
+      (threat.expiresAt || 0) > now
+    ));
+
+    if (!alertThreat) {
+      onDefenseThreatAlertChange?.(null);
+      return;
+    }
+
+    onDefenseThreatAlertChange?.({
+      title: alertThreat.sourceTitle,
+      remainingSeconds: Math.max(0, Math.ceil(((alertThreat.expiresAt || now) - now) / 1000)),
+    });
+  }, [activeDefenseThreat?.id, defenseAlertTick, defenseAlertsPaused, onDefenseThreatAlertChange, pendingDefenseThreats]);
+
+  useEffect(() => {
+    if (!openDefenseRequest || handledOpenDefenseRequestRef.current === openDefenseRequest) return;
+    handledOpenDefenseRequestRef.current = openDefenseRequest;
+    if (activeDefenseThreat) return;
+
+    const threat = pendingDefenseThreats.find(item => (
+      !item.openedAt &&
+      Boolean(item.expiresAt)
+    ));
+    if (!threat) return;
+
+    const openedAt = Date.now();
+    setShowDefenseHangar(false);
+    setPendingDefenseThreats(prev => prev.map(item => (
+      item.id === threat.id ? { ...item, openedAt, expiresAt: undefined } : item
+    )));
+    onDefenseThreatAlertChange?.(null);
+    setActiveDefenseThreat({ ...threat, openedAt, expiresAt: undefined });
+  }, [activeDefenseThreat, onDefenseThreatAlertChange, openDefenseRequest, pendingDefenseThreats]);
+
+  useEffect(() => {
+    if (!abandonDefenseRequest || handledAbandonDefenseRequestRef.current === abandonDefenseRequest) return;
+    handledAbandonDefenseRequestRef.current = abandonDefenseRequest;
+
+    const now = Date.now();
+    const threat = pendingDefenseThreats.find(item => (
+      !item.openedAt &&
+      Boolean(item.expiresAt) &&
+      (item.expiresAt || 0) > now
+    ));
+    if (!threat) return;
+
+    setPendingDefenseThreats(prev => prev.filter(item => item.id !== threat.id));
+    onDefenseThreatAlertChange?.(null);
+    setCardFeedback(language === 'pt'
+      ? 'Defesa abandonada. A equipe de busca foi derrotada.'
+      : 'Defense abandoned. The search team was defeated.'
+    );
+  }, [abandonDefenseRequest, language, onDefenseThreatAlertChange, pendingDefenseThreats]);
 
   useEffect(() => {
     if (!cardFeedback) return;
@@ -1523,15 +1764,23 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
   const selectedCardNavigationLabel = selectedCardNavigationList.length > 1 && selectedCardNavigationIndex >= 0
     ? `${selectedCardNavigationIndex + 1}/${selectedCardNavigationList.length}`
     : undefined;
+  const equippedPoliticalPassiveCards = useMemo(() => (
+    colonies.flatMap(colony => (
+      Object.values(colony.equippedCards || {})
+        .map(id => getCardById(id))
+        .filter(Boolean)
+        .filter(card => card && isPoliticalCard(card)) as ColonyCard[]
+    ))
+  ), [colonies]);
   const ownedPassiveBonuses = useMemo(() => (
-    ownedCards.reduce((acc, card) => {
-      if (!isPoliticalCard(card)) return acc;
-      acc.constructorsAllColonies += card.passiveBonuses?.constructorsAllColonies || 0;
-      acc.allSectorBonus += card.passiveBonuses?.allSectorBonus || 0;
-      acc.constructionSpeedPercent += card.passiveBonuses?.constructionSpeedPercent || 0;
+    equippedPoliticalPassiveCards.reduce((acc, card) => {
+      const passiveBonuses = getPoliticalPassiveBonuses(card, cardLevels);
+      acc.constructorsAllColonies += passiveBonuses.constructorsAllColonies || 0;
+      acc.allSectorBonus += passiveBonuses.allSectorBonus || 0;
+      acc.constructionSpeedPercent += passiveBonuses.constructionSpeedPercent || 0;
       return acc;
     }, { constructorsAllColonies: 0, allSectorBonus: 0, constructionSpeedPercent: 0 })
-  ), [ownedCards]);
+  ), [equippedPoliticalPassiveCards, cardLevels]);
   const getEffectiveConstructors = useCallback((colony: Colony) => (
     colony.constructors + ownedPassiveBonuses.constructorsAllColonies
   ), [ownedPassiveBonuses.constructorsAllColonies]);
@@ -1567,81 +1816,86 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
 
   // Construction Progress Logic
   useEffect(() => {
-    if (!isLoaded || !effectiveActiveColonyId) return;
+    if (!isLoaded) return;
 
-    const interval = setInterval(() => {
+    const updateConstructionProgress = () => {
+      const now = Date.now();
       setColonies(prev => {
-        const activeIdx = prev.findIndex(c => c.id === effectiveActiveColonyId);
-        if (activeIdx === -1) return prev;
+        let hasGlobalChanges = false;
 
-        const colony = prev[activeIdx];
-        let hasChanges = false;
+        const updatedColonies = prev.map(colony => {
+          let hasColonyChanges = false;
 
-        const updatedConstructions = colony.constructions.map(con => {
-          // If already level 10, ensure stopped and zeroed
-          if (con.level >= 10) {
-             if (con.assignedConstructors > 0 || !con.isComplete) {
-               hasChanges = true;
-               return { ...con, assignedConstructors: 0, isComplete: true, progress: 100 };
-             }
-             return con;
-          }
+          const updatedConstructions = colony.constructions.map(con => {
+            if (con.level >= 10) {
+              if (con.assignedConstructors > 0 || !con.isComplete || con.lastProgressAt) {
+                hasColonyChanges = true;
+                return { ...con, assignedConstructors: 0, isComplete: true, progress: 100, lastProgressAt: undefined };
+              }
+              return con;
+            }
 
-          // If no robots, no progress
-          if (con.assignedConstructors === 0) return con;
+            if (con.assignedConstructors === 0) {
+              if (con.lastProgressAt) {
+                hasColonyChanges = true;
+                return { ...con, lastProgressAt: undefined };
+              }
+              return con;
+            }
 
-          const config = CONSTRUCTION_CONFIG[con.type];
-          // Progress speed: 100% / baseTime * (constructors / baseFactor)
-          // Base factor is 10 for balancing
-          const tickSeconds = 1;
-          const speedFactor = con.assignedConstructors / 10; 
-          const passiveSpeedMultiplier = 1 + ownedPassiveBonuses.constructionSpeedPercent / 100;
-          const increment = (100 / config.baseTime) * speedFactor * passiveSpeedMultiplier * tickSeconds;
-          
-          const newProgress = Math.min(100, con.progress + increment);
-          const isNowAtLevelComplete = newProgress >= 100;
+            const lastProgressAt = Number(con.lastProgressAt) || now;
+            const elapsedSeconds = Math.max(0, (now - lastProgressAt) / 1000);
+            if (elapsedSeconds <= 0) return con;
 
-          if (isNowAtLevelComplete || newProgress !== con.progress) {
-            hasChanges = true;
-          }
+            const config = CONSTRUCTION_CONFIG[con.type];
+            const speedFactor = con.assignedConstructors / 10;
+            const passiveSpeedMultiplier = 1 + ownedPassiveBonuses.constructionSpeedPercent / 100;
+            const increment = (100 / config.baseTime) * speedFactor * passiveSpeedMultiplier * elapsedSeconds;
+            const newProgress = Math.min(100, con.progress + increment);
+            const isNowAtLevelComplete = newProgress >= 100;
 
-          if (isNowAtLevelComplete) {
-            const nextLevel = con.level + 1;
+            if (isNowAtLevelComplete) {
+              const nextLevel = con.level + 1;
+              hasColonyChanges = true;
+              return {
+                ...con,
+                progress: nextLevel >= 10 ? 100 : 0,
+                level: nextLevel,
+                assignedConstructors: 0,
+                isComplete: nextLevel >= 10,
+                lastProgressAt: undefined
+              };
+            }
+
+            if (newProgress !== con.progress || con.lastProgressAt !== now) {
+              hasColonyChanges = true;
+            }
+
             return {
               ...con,
-              progress: 0,
-              level: nextLevel,
-              assignedConstructors: 0, // Liberação automática ao concluir nível
-              isComplete: nextLevel >= 10 
+              progress: newProgress,
+              lastProgressAt: now
             };
-          }
+          });
+
+          if (!hasColonyChanges) return colony;
+          hasGlobalChanges = true;
 
           return {
-            ...con,
-            progress: newProgress
+            ...colony,
+            constructions: updatedConstructions,
+            isHabitable: updatedConstructions.every(c => c.level >= 10)
           };
         });
 
-        if (!hasChanges) return prev;
-
-
-        // Check habitability: ALL 10 of EACH
-        const allMaxed = updatedConstructions.every(c => c.level === 10);
-        const isHabitable = allMaxed;
-
-        const updatedColonies = [...prev];
-        updatedColonies[activeIdx] = {
-          ...colony,
-          constructions: updatedConstructions,
-          isHabitable
-        };
-
-        return updatedColonies;
+        return hasGlobalChanges ? updatedColonies : prev;
       });
-    }, 1000);
+    };
 
+    updateConstructionProgress();
+    const interval = setInterval(updateConstructionProgress, 1000);
     return () => clearInterval(interval);
-  }, [isLoaded, effectiveActiveColonyId]);
+  }, [isLoaded, ownedPassiveBonuses.constructionSpeedPercent, setColonies]);
 
   // Actions
   const equipCard = (card: ColonyCard): boolean => {
@@ -1783,7 +2037,8 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
       progress: 0,
       assignedConstructors: 0,
       isComplete: false,
-      order: activeColony.constructions.length
+      order: activeColony.constructions.length,
+      lastProgressAt: undefined
     };
 
     setColonies(prev => prev.map(c => 
@@ -1794,14 +2049,14 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
   };
 
   const updateConstructors = (id: string, delta: number) => {
-    if (!effectiveActiveColonyId) return;
+    if (!effectiveActiveColonyId) return false;
     
     // 1. Encontrar a colônia e construção no estado atual (prop) para cálculos prévios
     const colony = colonies.find(c => c.id === effectiveActiveColonyId);
-    if (!colony) return;
+    if (!colony) return false;
     
     const construction = colony.constructions.find(con => con.id === id);
-    if (!construction || construction.level >= 10) return;
+    if (!construction || construction.level >= 10) return false;
 
     const totalAssigned = colony.constructions.reduce((sum, con) => sum + con.assignedConstructors, 0);
     const available = getEffectiveConstructors(colony) - totalAssigned;
@@ -1820,7 +2075,7 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
 
       if (affordableBatches <= 0) {
         setCardFeedback(t('Insufficient supplies', 'Suprimentos insuficientes'));
-        return;
+        return false;
       }
 
       finalDelta = Math.min(finalDelta, affordableBatches * 50);
@@ -1835,7 +2090,7 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
       finalDelta = Math.max(finalDelta, -construction.assignedConstructors);
     }
 
-    if (finalDelta === 0) return;
+    if (finalDelta === 0) return false;
 
     // 2. Agora atualizar as colônias apenas com o delta já validado
     setColonies(prev => {
@@ -1843,14 +2098,23 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
       if (activeIdx === -1) return prev;
 
       const targetColony = prev[activeIdx];
-      const updatedConstructions = targetColony.constructions.map(con => 
-        con.id === id ? { ...con, assignedConstructors: con.assignedConstructors + finalDelta } : con
-      );
+      const now = Date.now();
+      const updatedConstructions = targetColony.constructions.map(con => {
+        if (con.id !== id) return con;
+        const nextAssignedConstructors = con.assignedConstructors + finalDelta;
+        return {
+          ...con,
+          assignedConstructors: nextAssignedConstructors,
+          lastProgressAt: nextAssignedConstructors > 0 ? (con.lastProgressAt || now) : undefined
+        };
+      });
 
       const next = [...prev];
       next[activeIdx] = { ...targetColony, constructions: updatedConstructions };
       return next;
     });
+
+    return true;
   };
 
   const allocatePopulation = (requestedAmount: number) => {
@@ -1890,13 +2154,24 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
     const battleQc = summary?.qc || (kills * 4200 + 35000);
     const supplyReward: Partial<ColonySupplies> = {
       materials: 10 + kills,
-      tech: 4 + Math.floor(kills / 3),
+      tech: 6 + Math.floor(kills / 3),
       defense: 3 + Math.floor(kills / 4),
     };
-    const nextSupplies = applySupplyDelta(colonySuppliesRef.current, supplyReward);
+    const nextSupplies = applySupplyDelta(
+      applySupplyDelta(colonySuppliesRef.current, activeDefenseThreat.rewards || {}),
+      supplyReward
+    );
     colonySuppliesRef.current = nextSupplies;
     setColonySupplies(nextSupplies);
-    setHorizonXp(prev => prev + battleXp);
+    const previousHorizonXp = horizonXpRef.current;
+    const nextHorizonXp = previousHorizonXp + battleXp;
+    const previousHorizonLevel = getHorizonLevelFromXp(previousHorizonXp).level;
+    const nextHorizonLevel = getHorizonLevelFromXp(nextHorizonXp).level;
+    horizonXpRef.current = nextHorizonXp;
+    setHorizonXp(nextHorizonXp);
+    if (nextHorizonLevel > previousHorizonLevel && !summary?.levelUpSfxHandled) {
+      playRoute4BattleSfx(HORIZON_LEVEL_UP_SFX, 0.78);
+    }
     setDefenseBattleLevel(prev => Math.max(1, Math.floor(prev)) + 1);
     onEarnQC?.(battleQc);
     setPendingDefenseThreats(prev => prev.filter(threat => threat.id !== activeDefenseThreat.id));
@@ -1924,9 +2199,15 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
   }, [activeDefenseThreat, ownedCardIds, playSfx, legendaryBattleCardPity, onEarnQC, formatValue]);
 
   const resolveDefenseDefeat = useCallback(() => {
+    const retryUntil = Date.now() + DEFENSE_THREAT_RESPONSE_SECONDS * 1000;
+    if (activeDefenseThreat) {
+      setPendingDefenseThreats(prev => prev.map(threat => (
+        threat.id === activeDefenseThreat.id ? { ...threat, openedAt: undefined, expiresAt: retryUntil } : threat
+      )));
+    }
     setActiveDefenseThreat(null);
-    setCardFeedback(t('Defense failed. Threat remains pending.', 'Defesa falhou. A ameaça permanece pendente.'));
-  }, []);
+    setCardFeedback(language === 'pt' ? 'Defesa falhou. A ameaça permanece pendente.' : 'Defense failed. Threat remains pending.');
+  }, [activeDefenseThreat, language]);
 
   const handleRunSearch = useCallback((option: ColonySearchOption, slotIndex: number) => {
     const searchKey = getSearchSlotKey(option.id, slotIndex);
@@ -1981,19 +2262,20 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
 
   const totalAssignedConstructors = activeColony.constructions.reduce((sum, c) => sum + c.assignedConstructors, 0);
   const effectiveConstructors = getEffectiveConstructors(activeColony);
-  const availableConstructors = effectiveConstructors - totalAssignedConstructors;
+  const availableConstructors = Math.max(0, effectiveConstructors - totalAssignedConstructors);
+  const statusBackgrounds = COLONY_STATUS_BACKGROUNDS[activeColony.id];
   const landSearchLevel = searchUpgradeLevels.land || 0;
   const seaSearchLevel = searchUpgradeLevels.sea || 0;
-  const landSearchRewards = applySearchUpgradeRewards({ materials: 18, food: 12, biomass: 6, meds: 3 }, landSearchLevel);
-  const seaSearchRewards = applySearchUpgradeRewards({ biomass: 14, food: 10, meds: 7, materials: 6, tech: 2 }, seaSearchLevel);
+  const landSearchRewards = applySearchUpgradeRewards({ materials: 27, food: 18, biomass: 9, meds: 5, tech: 3 }, landSearchLevel);
+  const seaSearchRewards = applySearchUpgradeRewards({ biomass: 21, food: 15, meds: 11, materials: 9, tech: 6 }, seaSearchLevel);
   const searchOptions: ColonySearchOption[] = [
     {
       id: 'land',
       title: t('Land Search', 'Busca por Terra'),
       subtitle: t('Ground Vehicles', 'Veículos Terrestres'),
       description: t(
-        'Ground convoys cross ruined roads, supply depots, old farms, and transit corridors.',
-        'Comboios terrestres cruzam estradas destruídas, depósitos, antigas fazendas e corredores de transporte.'
+        'Ground convoys recover supplies across ruined roads and old farms.',
+        'Comboios terrestres recuperam suprimentos em estradas e antigas fazendas.'
       ),
       tone: 'text-emerald-300 border-emerald-400/40 bg-emerald-400/10',
       icon: Bot,
@@ -2007,11 +2289,11 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
     },
     {
       id: 'sea',
-      title: t('Sea Search', 'Busca por Mar'),
-      subtitle: t('Aquatic Vehicles', 'Veículos Aquáticos'),
+      title: t('Sea and Air Search', 'Buscas Marítimas e Aéreas'),
+      subtitle: t('Aquatic and Air Vehicles', 'Veículos Aquáticos e Aéreos'),
       description: t(
-        'Recovered vessels scan coastlines, submerged cargo zones, algae farms, and medical wreckage.',
-        'Embarcações recuperadas vasculham costas, cargas submersas, fazendas de algas e destroços médicos.'
+        'Crews scan coastlines, air routes, wreckage, and submerged cargo.',
+        'Equipes vasculham costas, rotas aéreas, destroços e cargas submersas.'
       ),
       tone: 'text-cyan-300 border-cyan-400/40 bg-cyan-400/10',
       icon: Activity,
@@ -2157,7 +2439,7 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
                 </div>
                 <button
                   type="button"
-                  onClick={() => setShowDefenseHangar(false)}
+                  onClick={closeDefenseHangar}
                   className="rounded-2xl border border-white/10 bg-white/5 p-3 text-zinc-400 transition-all hover:text-white"
                 >
                   <X size={18} />
@@ -2316,7 +2598,12 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
                           <button
                             type="button"
                             onClick={() => {
-                              setShowDefenseHangar(false);
+                              closeDefenseHangar();
+                              const openedAt = Date.now();
+                              setPendingDefenseThreats(prev => prev.map(item => (
+                                item.id === threat.id ? { ...item, openedAt, expiresAt: undefined } : item
+                              )));
+                              onDefenseThreatAlertChange?.(null);
                               setActiveDefenseThreat(threat);
                             }}
                             className="mt-3 w-full rounded-lg border border-red-300/30 bg-red-300/20 px-3 py-2 font-orbitron text-[10px] font-black uppercase tracking-widest text-white transition-all hover:bg-red-300 hover:text-black"
@@ -2342,7 +2629,10 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
                         <div className="flex items-center gap-1">
                           <button
                             type="button"
-                            onClick={() => setBattleCardCodexPage(prev => (prev - 1 + battleCardCodexPageCount) % battleCardCodexPageCount)}
+                            onClick={() => {
+                              playSfx?.('view_card');
+                              setBattleCardCodexPage(prev => (prev - 1 + battleCardCodexPageCount) % battleCardCodexPageCount);
+                            }}
                             className="rounded-lg border border-white/10 bg-white/5 p-1.5 text-zinc-400 transition-all hover:border-red-300/40 hover:text-white"
                             aria-label={t('Previous battle card page', 'Página anterior de cartas de batalha')}
                           >
@@ -2353,7 +2643,10 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
                           </span>
                           <button
                             type="button"
-                            onClick={() => setBattleCardCodexPage(prev => (prev + 1) % battleCardCodexPageCount)}
+                            onClick={() => {
+                              playSfx?.('view_card');
+                              setBattleCardCodexPage(prev => (prev + 1) % battleCardCodexPageCount);
+                            }}
                             className="rounded-lg border border-white/10 bg-white/5 p-1.5 text-zinc-400 transition-all hover:border-red-300/40 hover:text-white"
                             aria-label={t('Next battle card page', 'Próxima página de cartas de batalha')}
                           >
@@ -2419,8 +2712,13 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
         )}
       </AnimatePresence>
 
-      <div className="shrink-0 rounded-2xl border border-emerald-400/20 bg-black/40 p-3">
-        <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+      <div
+        className="relative shrink-0 overflow-hidden rounded-2xl border border-emerald-400/20 bg-black/40 bg-cover bg-center p-3"
+        style={{ backgroundImage: "url('/assets/texturas/textura_ficsi_2400x240.webp')" }}
+      >
+        <div className="pointer-events-none absolute inset-0 bg-black/24" />
+        <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(90deg,rgba(0,0,0,0.32),rgba(0,0,0,0.14)_48%,rgba(0,0,0,0.36))]" />
+        <div className="relative z-10 flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
           <div>
             <p className="font-mono text-[10px] uppercase tracking-[0.35em] text-emerald-300">{t('Chapter 4 Habitat Network', 'Rede Habitacional do Capítulo 4')}</p>
             <h2 className="font-orbitron text-xl font-black uppercase tracking-tight text-white">{t('Colonies', 'Colônias')}</h2>
@@ -2432,6 +2730,7 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
                 key={colony.id}
                 type="button"
                 onClick={() => {
+                  playRoute4UiSfx(ROUTE4_COLONIES_TAB_SFX);
                   setActiveView('colony');
                   setActiveColonyId(colony.id);
                 }}
@@ -2446,7 +2745,10 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
             ))}
             <button
               type="button"
-              onClick={() => setActiveView('searches')}
+              onClick={() => {
+                playRoute4UiSfx(ROUTE4_COLONIES_TAB_SFX);
+                setActiveView('searches');
+              }}
               className={`rounded-xl px-3 py-2 text-[10px] font-orbitron font-black uppercase tracking-widest transition-all ${
                 activeView === 'searches'
                   ? 'bg-cyan-300 text-black shadow-[0_0_18px_rgba(34,211,238,0.22)]'
@@ -2462,46 +2764,61 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
       {activeView === 'colony' ? (
         <div className="flex flex-1 flex-col gap-3 overflow-hidden rounded-2xl border border-zinc-800/50 bg-zinc-900/20 p-4">
           <div className="grid shrink-0 grid-cols-1 gap-2 md:grid-cols-3">
-            <div className="rounded-xl border border-blue-400/20 bg-black/45 p-3">
-              <p className="font-mono text-[10px] uppercase tracking-[0.24em] text-blue-300/70">{t('Active Colony', 'Colônia Ativa')}</p>
-              <div className="mt-2 flex items-center justify-between gap-3">
-                <h3 className="truncate font-orbitron text-base font-black uppercase text-white">{activeColony.name}</h3>
-                <Home className="h-5 w-5 shrink-0 text-blue-300/50" />
+            <div className="relative overflow-hidden rounded-xl border border-blue-400/25 bg-black/45 p-3">
+              {statusBackgrounds?.colony ? <div aria-hidden="true" className="absolute inset-0 bg-cover bg-center opacity-95 saturate-125" style={{ backgroundImage: `url(${statusBackgrounds.colony})` }} /> : null}
+              <div aria-hidden="true" className="absolute inset-0 bg-gradient-to-r from-black/64 via-black/26 to-black/45" />
+              <div aria-hidden="true" className="absolute inset-0 bg-[radial-gradient(circle_at_72%_35%,rgba(96,165,250,0.20),transparent_55%)]" />
+              <div className="relative z-10">
+                <p className="font-mono text-[10px] uppercase tracking-[0.24em] text-blue-300/80">{t('Active Colony', 'Colônia Ativa')}</p>
+                <div className="mt-2 flex items-center justify-between gap-3">
+                  <h3 className="truncate font-orbitron text-base font-black uppercase text-white drop-shadow-[0_0_10px_rgba(0,0,0,0.8)]">{activeColony.name}</h3>
+                  <Home className="h-5 w-5 shrink-0 text-blue-300/70" />
+                </div>
               </div>
             </div>
-            <div className="rounded-xl border border-cyan-400/20 bg-black/45 p-3">
-              <p className="font-mono text-[10px] uppercase tracking-[0.24em] text-cyan-300/70">{t('Available Constructors', 'Construtores Disponíveis')}</p>
-              <div className="mt-2 flex items-center justify-between gap-3">
-                <h3 className="font-orbitron text-base font-black text-cyan-300">{availableConstructors} / {effectiveConstructors}</h3>
-                <Bot className="h-5 w-5 text-cyan-300/50" />
+            <div className="relative overflow-hidden rounded-xl border border-cyan-400/25 bg-black/45 p-3">
+              {statusBackgrounds?.constructors ? <div aria-hidden="true" className="absolute inset-0 bg-cover bg-center opacity-95 saturate-125" style={{ backgroundImage: `url(${statusBackgrounds.constructors})` }} /> : null}
+              <div aria-hidden="true" className="absolute inset-0 bg-gradient-to-r from-black/64 via-black/24 to-black/45" />
+              <div aria-hidden="true" className="absolute inset-0 bg-[radial-gradient(circle_at_74%_35%,rgba(34,211,238,0.22),transparent_55%)]" />
+              <div className="relative z-10">
+                <p className="font-mono text-[10px] uppercase tracking-[0.24em] text-cyan-300/80">{t('Available Constructors', 'Construtores Disponíveis')}</p>
+                <div className="mt-2 flex items-center justify-between gap-3">
+                  <h3 className="font-orbitron text-base font-black text-cyan-300 drop-shadow-[0_0_10px_rgba(0,0,0,0.8)]">{availableConstructors} / {effectiveConstructors}</h3>
+                  <Bot className="h-5 w-5 text-cyan-300/70" />
+                </div>
               </div>
             </div>
-            <div className="rounded-xl border border-emerald-400/20 bg-black/45 p-3">
-              <p className="font-mono text-[10px] uppercase tracking-[0.24em] text-emerald-300/70">{t('Population', 'População')}</p>
-              <div className="mt-2 flex items-center justify-between gap-3">
-                <h3 className={`font-orbitron text-base font-black ${activeColony.population > 0 ? 'text-emerald-300' : 'text-zinc-500'}`}>
-                  {activeColony.population.toLocaleString()}
-                </h3>
-                {activeColony.isHabitable ? (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (showConfirmAllocate) {
-                        allocatePopulation(10000);
-                        onAllocate10k?.();
-                        setShowConfirmAllocate(false);
-                      } else {
-                        setShowConfirmAllocate(true);
-                      }
-                    }}
-                    disabled={earthPopulation <= 0}
-                    className="rounded-lg border border-emerald-400/30 bg-emerald-400/10 px-2 py-1 font-orbitron text-[10px] font-black uppercase tracking-widest text-emerald-200 transition-all hover:bg-emerald-400 hover:text-black disabled:cursor-not-allowed disabled:border-zinc-700 disabled:bg-zinc-900 disabled:text-zinc-600"
-                  >
-                    {showConfirmAllocate ? t('Confirm', 'Confirmar') : t('Allocate', 'Alocar')}
-                  </button>
-                ) : (
-                  <Users className="h-5 w-5 text-emerald-300/50" />
-                )}
+            <div className="relative overflow-hidden rounded-xl border border-emerald-400/25 bg-black/45 p-3">
+              {statusBackgrounds?.population ? <div aria-hidden="true" className="absolute inset-0 bg-cover bg-center opacity-95 saturate-125" style={{ backgroundImage: `url(${statusBackgrounds.population})` }} /> : null}
+              <div aria-hidden="true" className="absolute inset-0 bg-gradient-to-r from-black/64 via-black/26 to-black/45" />
+              <div aria-hidden="true" className="absolute inset-0 bg-[radial-gradient(circle_at_74%_35%,rgba(52,211,153,0.20),transparent_55%)]" />
+              <div className="relative z-10">
+                <p className="font-mono text-[10px] uppercase tracking-[0.24em] text-emerald-300/80">{t('Population', 'População')}</p>
+                <div className="mt-2 flex items-center justify-between gap-3">
+                  <h3 className={`font-orbitron text-base font-black drop-shadow-[0_0_10px_rgba(0,0,0,0.8)] ${activeColony.population > 0 ? 'text-emerald-300' : 'text-zinc-400'}`}>
+                    {activeColony.population.toLocaleString()}
+                  </h3>
+                  {activeColony.isHabitable ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (showConfirmAllocate) {
+                          allocatePopulation(10000);
+                          onAllocate10k?.();
+                          setShowConfirmAllocate(false);
+                        } else {
+                          setShowConfirmAllocate(true);
+                        }
+                      }}
+                      disabled={earthPopulation <= 0}
+                      className="rounded-lg border border-emerald-400/35 bg-black/45 px-2 py-1 font-orbitron text-[10px] font-black uppercase tracking-widest text-emerald-200 backdrop-blur-sm transition-all hover:bg-emerald-400 hover:text-black disabled:cursor-not-allowed disabled:border-zinc-700 disabled:bg-zinc-900/80 disabled:text-zinc-600"
+                    >
+                      {showConfirmAllocate ? t('Confirm', 'Confirmar') : t('Allocate', 'Alocar')}
+                    </button>
+                  ) : (
+                    <Users className="h-5 w-5 text-emerald-300/70" />
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -2620,14 +2937,18 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
                         </div>
                         <div className="flex gap-2">
                            <button 
-                             onClick={() => updateConstructors(con.id, 50)}
+                             onClick={() => {
+                               if (updateConstructors(con.id, 50)) playRoute4UiSfx(ROUTE4_ROBOTS_50_SFX);
+                             }}
                              disabled={!hasSuppliesFor50 || availableConstructors < 50}
                              className="flex-1 py-2 rounded-xl bg-blue-600/20 border border-blue-500/40 text-blue-400 hover:bg-blue-600 hover:text-white font-black text-[12px] uppercase tracking-widest transition-all disabled:cursor-not-allowed disabled:border-zinc-700 disabled:bg-zinc-900/70 disabled:text-zinc-600"
                            >
                               +50
                            </button>
                            <button 
-                             onClick={() => updateConstructors(con.id, 250)}
+                             onClick={() => {
+                               if (updateConstructors(con.id, 250)) playRoute4UiSfx(ROUTE4_ROBOTS_250_SFX);
+                             }}
                              disabled={!hasSuppliesFor250 || availableConstructors < 50}
                              className="flex-1 py-2 rounded-xl bg-zinc-800/80 hover:bg-zinc-700 text-zinc-300 font-bold text-[12px] transition-colors border border-white/5 disabled:cursor-not-allowed disabled:opacity-30"
                            >
@@ -2712,7 +3033,16 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
                 };
               });
               return (
-              <div key={option.id} className={`flex min-h-0 flex-col overflow-hidden rounded-2xl border p-4 ${option.tone}`}>
+              <div
+                key={option.id}
+                className={`relative flex min-h-0 flex-col overflow-hidden rounded-2xl border bg-cover bg-center p-4 ${option.tone}`}
+                style={{
+                  backgroundImage: `url(${option.id === 'land' ? ROUTE4_LAYOUT_BACKGROUNDS.searchLand : ROUTE4_LAYOUT_BACKGROUNDS.searchSea})`,
+                }}
+              >
+                <div className="pointer-events-none absolute inset-0 bg-black/46" />
+                <div className={`pointer-events-none absolute inset-0 ${option.id === 'land' ? 'bg-[radial-gradient(circle_at_24%_16%,rgba(16,185,129,0.22),transparent_42%),linear-gradient(to_bottom,rgba(0,0,0,0.08),rgba(0,0,0,0.36)_48%,rgba(0,0,0,0.68))]' : 'bg-[radial-gradient(circle_at_26%_14%,rgba(34,211,238,0.24),transparent_44%),linear-gradient(to_bottom,rgba(0,0,0,0.08),rgba(0,0,0,0.34)_48%,rgba(0,0,0,0.66))]'}`} />
+                <div className="relative z-10 flex min-h-0 flex-1 flex-col">
                 <div className="mb-2 flex items-start justify-between gap-3">
                   <div>
                     <p className="font-mono text-[10px] uppercase tracking-[0.28em] opacity-80">{option.subtitle}</p>
@@ -2804,10 +3134,17 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
                     </button>
                   ))}
                 </div>
+                </div>
               </div>
             );})}
 
-            <div className="flex min-h-0 flex-col rounded-2xl border border-red-400/40 bg-red-400/10 p-5 text-red-300">
+            <div
+              className="relative flex min-h-0 flex-col overflow-hidden rounded-2xl border border-red-400/40 bg-cover bg-center p-5 text-red-300"
+              style={{ backgroundImage: `url(${ROUTE4_LAYOUT_BACKGROUNDS.hangar})` }}
+            >
+              <div className="pointer-events-none absolute inset-0 bg-black/48" />
+              <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_78%_18%,rgba(248,113,113,0.24),transparent_42%),linear-gradient(to_bottom,rgba(127,29,29,0.2),rgba(0,0,0,0.36)_48%,rgba(0,0,0,0.7))]" />
+              <div className="relative z-10 flex min-h-0 flex-1 flex-col">
               <div className="mb-4 flex items-start justify-between gap-3">
                 <div>
                   <p className="font-mono text-[10px] uppercase tracking-[0.28em] opacity-80">{t('Aerial Defense', 'Defesa Aérea')}</p>
@@ -2846,11 +3183,12 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
 
               <button
                 type="button"
-                onClick={() => setShowDefenseHangar(true)}
+                onClick={openDefenseHangar}
                 className="mt-auto rounded-2xl border border-red-300/40 bg-red-300/20 px-4 py-3 font-orbitron text-[12px] font-black uppercase tracking-[0.22em] text-white transition-all hover:bg-red-300 hover:text-black"
               >
                 {t('Open Hangar', 'Abrir Hangar')}
               </button>
+              </div>
             </div>
           </div>
         </div>

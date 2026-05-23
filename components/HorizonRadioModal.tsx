@@ -44,9 +44,10 @@ export const HorizonRadioModal: React.FC<HorizonRadioModalProps> = ({
               <div className="absolute inset-0 bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06))] bg-[length:100%_2px,2px_100%] opacity-20" />
             </div>
 
-            <div className="bg-slate-900/90 rounded-[2.3rem] p-8 relative z-10">
+            <div className="bg-slate-900/90 rounded-[2.3rem] p-8 relative z-10 overflow-hidden bg-[url('/images/ui/sounds_ef_background.webp')] bg-cover bg-center">
+              <div className="absolute inset-0 bg-slate-950/56 pointer-events-none" />
               {/* Header */}
-              <div className="flex justify-between items-center mb-8 border-b border-white/5 pb-6">
+              <div className="relative z-10 flex justify-between items-center mb-8 border-b border-white/5 pb-6">
                 <div className="flex items-center gap-4">
                   <div className="p-3 bg-cyan-500/10 rounded-2xl border border-cyan-500/20">
                     <Radio className="w-6 h-6 text-cyan-400" />
@@ -69,7 +70,7 @@ export const HorizonRadioModal: React.FC<HorizonRadioModalProps> = ({
               </div>
 
               {/* Controls */}
-              <div className="space-y-8">
+              <div className="relative z-10 space-y-8">
                 {/* Music Control */}
                 <div className="space-y-4">
                   <div className="flex justify-between items-center">
@@ -223,7 +224,7 @@ export const HorizonRadioModal: React.FC<HorizonRadioModalProps> = ({
                 </button>
               </div>
               
-              <div className="mt-8 pt-6 border-t border-white/5 flex justify-center">
+              <div className="relative z-10 mt-8 pt-6 border-t border-white/5 flex justify-center">
                 <span className="text-[8px] font-mono text-slate-600 uppercase tracking-[0.5em]">
                   QUANTUM COURIER AUDIO ENGINE // HORIZON MODULE
                 </span>

@@ -244,6 +244,8 @@ function getSnakeColorStage() {
 }
 
 function handleInput(e) {
+    if (recoveryCountdownUntil > performance.now()) return;
+
     const key = e.key;
     if ((key === 'ArrowUp' || key === 'w' || key === 'W') && direction !== 'DOWN') nextDirection = 'UP';
     if ((key === 'ArrowDown' || key === 's' || key === 'S') && direction !== 'UP') nextDirection = 'DOWN';
@@ -251,25 +253,50 @@ function handleInput(e) {
     if ((key === 'ArrowRight' || key === 'd' || key === 'D') && direction !== 'LEFT') nextDirection = 'RIGHT';
 }
 
+function buildCornerRespawnRoute(targetLength) {
+    const head = {
+        x: Math.min(8, Math.max(4, COLS - 8)),
+        y: Math.max(2, ROWS - 2)
+    };
+    const minX = 1;
+    const maxX = COLS - 2;
+    const minY = 1;
+    const route = [{ x: head.x, y: head.y }];
+
+    for (let x = head.x - 1; x >= minX && route.length < targetLength; x--) {
+        route.push({ x, y: head.y });
+    }
+
+    let y = head.y - 1;
+    let movingRight = true;
+
+    while (y >= minY && route.length < targetLength) {
+        if (movingRight) {
+            for (let x = minX; x <= maxX && route.length < targetLength; x++) {
+                route.push({ x, y });
+            }
+        } else {
+            for (let x = maxX; x >= minX && route.length < targetLength; x--) {
+                route.push({ x, y });
+            }
+        }
+
+        movingRight = !movingRight;
+        y--;
+    }
+
+    return route;
+}
+
 function rebuildSnakeInSafeZone() {
     const length = Math.max(3, snake.length);
-    const safeHead = { x: Math.floor(COLS * 0.35), y: Math.floor(ROWS * 0.5) };
-    const rebuilt = [];
-
-    rebuilt.push({ x: safeHead.x, y: safeHead.y, px: safeHead.x, py: safeHead.y });
-
-    for (let i = 1; i < length; i++) {
-        const rowOffset = Math.floor((i - 1) / 8);
-        const colOffset = (i - 1) % 8;
-        const y = Math.min(ROWS - 4, safeHead.y + 1 + rowOffset);
-        const directionMod = rowOffset % 2 === 0 ? -1 : 1;
-        const x = Math.max(3, Math.min(COLS - 4, safeHead.x + directionMod * colOffset));
-        rebuilt.push({ x, y, px: x, py: y });
-    }
+    const rebuilt = buildCornerRespawnRoute(length)
+        .map(segment => ({ x: segment.x, y: segment.y, px: segment.x, py: segment.y }));
 
     snake = rebuilt;
     direction = 'RIGHT';
     nextDirection = 'RIGHT';
+    spawnFood();
 }
 
 function consumeEmergencyLife() {

@@ -45,6 +45,7 @@ interface DashboardContextType {
   addLog: (message: string, type?: 'info' | 'success' | 'warning' | 'error') => void;
   playSfx: (id: string) => void;
   stopSfx: (id: string) => void;
+  pauseMusicForRoute4Credits: () => void;
   language: string;
   activeTab: string;
   setActiveTab: (tab: any) => void;
@@ -255,11 +256,13 @@ export const useDashboard = () => {
 interface DashboardProviderProps {
   children: ReactNode;
   language: string;
+  jukebox?: any;
 }
 
 export const DashboardProvider = ({ 
   children, 
-  language
+  language,
+  jukebox
 }: DashboardProviderProps) => {
   const [autoTravelActive, setAutoTravelActive] = React.useState<{ [key: string]: boolean }>({});
   const [autoTravelProgress, setAutoTravelProgress] = React.useState<{ [key: string]: number }>({});
@@ -430,12 +433,24 @@ export const DashboardProvider = ({
 
   // Sincroniza a aba ativa quando o tier muda (importante para o carregamento inicial)
   useEffect(() => {
-    if (progression.routeTier === 'Void' && (activeTab === 'routes' || activeTab === 'routes2' || activeTab === 'missions')) {
-      setActiveTab('void_aircraft');
-    } else if (progression.routeTier === 'Earth' && (activeTab === 'routes' || activeTab === 'routes2' || activeTab === 'missions')) {
-      setActiveTab('colonies');
+    const validTabsByTier: Record<string, string[]> = {
+      Solar: ['routes', 'missions', 'aircraft', 'technology', 'upgrades', 'auto', 'mining', 'history', 'exit'],
+      Interstellar: ['routes2', 'missions', 'aircraft', 'technology', 'upgrades', 'auto', 'mining', 'history', 'exit'],
+      Void: ['void_aircraft', 'void_battle', 'void_map', 'void_war', 'void_earth', 'history', 'exit'],
+      Earth: ['colonies', 'cards', 'void_earth', 'mini_games', 'history', 'exit'],
+    };
+    const fallbackTabByTier: Record<string, string> = {
+      Solar: 'routes',
+      Interstellar: 'routes2',
+      Void: 'void_aircraft',
+      Earth: 'colonies',
+    };
+    const routeTabs = validTabsByTier[progression.routeTier] || validTabsByTier.Solar;
+
+    if (!routeTabs.includes(activeTab)) {
+      setActiveTab(fallbackTabByTier[progression.routeTier] || 'routes');
     }
-  }, [progression.routeTier]);
+  }, [activeTab, progression.routeTier]);
 
   const t = useMemo(() => (key: string): string => {
     return (translations as any)[language]?.[key] || key;
@@ -1980,6 +1995,10 @@ export const DashboardProvider = ({
     addLog(`${t('aetherionSynthesized')} (Fadiga)`, 'success');
   }, [economy.aetherionTubes, economy.aetherion, dispatch, playSfx, t, addLog, language]);
 
+  const pauseMusicForRoute4Credits = useCallback(() => {
+    jukebox?.setIsPlaying?.(false);
+  }, [jukebox]);
+
   const setExtractionTechLevel = useCallback((val: number | ((prev: number) => number)) => {
     dispatch({ type: 'UPGRADE_EXTRACTION_TECH' });
   }, [dispatch]);
@@ -2167,6 +2186,7 @@ export const DashboardProvider = ({
     addLog,
     playSfx,
     stopSfx,
+    pauseMusicForRoute4Credits,
     language,
     activeTab,
     setActiveTab,
@@ -2345,7 +2365,7 @@ export const DashboardProvider = ({
 
   }), [
     progression, economy, missions, mining, combat, earth, system, game, dispatch, boostResearch, t, formatValue, 
-    addLog, playSfx, language, activeTab, autoTravelActive, autoTravelProgress, autoTravelDesired, toggleAutoSell,
+    addLog, playSfx, pauseMusicForRoute4Credits, language, activeTab, autoTravelActive, autoTravelProgress, autoTravelDesired, toggleAutoSell,
     activeDeliveries, showSkillMap, miningPageIndex, techSubTab, extractionPageIndex, 
     aircraftSubTab, shipPageIndex, historyPage, colonies, isScanning, scanProgress, scanResult, 
     lastScanTime, findBattle, upgradeRadar, upgradeBattleLevel, voidBattleStatus, 
