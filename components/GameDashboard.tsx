@@ -423,6 +423,10 @@ const DashboardContent = memo(({
 
   const [formatNumbers, setFormatNumbers] = useState(false);
   const [arcadeScores, setArcadeScores] = useState<Record<string, number>>({});
+  const arcadeScoresRef = React.useRef(arcadeScores);
+  useEffect(() => {
+    arcadeScoresRef.current = arcadeScores;
+  }, [arcadeScores]);
   const [currentVoidLocationId, setCurrentVoidLocationId] = useState<number>(0);
   const {
     activeTab, setActiveTab,
@@ -674,6 +678,7 @@ const DashboardContent = memo(({
   const autoSkipRandomBattlesRef = React.useRef(autoSkipRandomBattles);
   const lastProcessedYearRef = React.useRef(-1);
   const autoClaimMissionsRef = React.useRef(autoClaimMissions);
+  const route4PopulationMilestoneRef = React.useRef<Set<number>>(new Set<number>());
   // Last-flushed baselines for the 500ms flush loop.
   // The flush loop must compare against these, NOT against the stale Redux state snapshot.
   const lastFlushedQcRef = React.useRef(qc);
@@ -1415,16 +1420,39 @@ const DashboardContent = memo(({
     }
 
     // Filter unique IDs and ensure item is a valid object with an ID
-    const nextVal = Array.from(
+    const uniqueItems = Array.from(
       new Map(
         rawVal
           .filter((item: any) => item && typeof item === 'object' && item.id && typeof item.id === 'string')
           .map((item: any) => [item.id, item])
       ).values()
-    ).slice(0, 50);
+    );
 
+    // Keep all permanent milestones or records
+    const permanentEvents = uniqueItems.filter((item: any) => 
+      item.permanent === true || 
+      item.importance === 'mythic' || 
+      item.importance === 'population' || 
+      item.importance === 'epic' || 
+      (item.importance === 'major' && item.unique === true)
+    );
+
+    // Keep non-permanent events and slice them to the 50 most recent
+    const nonPermanentEvents = uniqueItems.filter((item: any) => 
+      !(item.permanent === true || 
+        item.importance === 'mythic' || 
+        item.importance === 'population' || 
+        item.importance === 'epic' || 
+        (item.importance === 'major' && item.unique === true))
+    );
+    const slicedNonPermanent = nonPermanentEvents.slice(0, 50);
+
+    // Combine them, keeping all permanent ones and the most recent non-permanent ones
+    const nextVal = [...permanentEvents, ...slicedNonPermanent];
+
+    earthEventsRef.current = nextVal;
     dispatch({ type: 'UPDATE_EARTH_STATE', payload: { events: nextVal } });
-  }, []);
+  }, [dispatch]);
 
   const setActiveBattle = useCallback((val: Battle | null | ((prev: Battle | null) => Battle | null)) => {
     const nextVal = typeof val === 'function' ? val(activeBattle) : val;
@@ -1570,19 +1598,136 @@ const DashboardContent = memo(({
     return earthPopulation + colonyPop;
   }, [earthPopulation, colonies]);
 
-  // Persistent refs for Earth simulation to avoid resets on re-renders
+  // Population Milestones Effect (Route 4)
+  useEffect(() => {
+    if (!isLoaded || routeTier !== 'Earth') return;
 
+    const populationMilestones = [
+      1000000,
+      10000000,
+      50000000,
+      100000000,
+      500000000,
+      1000000000,
+      5000000000,
+      10000000000
+    ];
+
+    const getMilestoneLabel = (milestone: number) => {
+      if (milestone === 1000000) {
+        return language === 'pt' ? 'Primeiro Milhão' : 'First Million';
+      }
+      if (milestone === 10000000) {
+        return language === 'pt' ? 'Primeiros 10 Milhões' : 'First 10 Million';
+      }
+      if (milestone === 50000000) {
+        return language === 'pt' ? 'Primeiros 50 Milhões' : 'First 50 Million';
+      }
+      if (milestone === 100000000) {
+        return language === 'pt' ? 'Primeiros 100 Milhões' : 'First 100 Million';
+      }
+      if (milestone === 500000000) {
+        return language === 'pt' ? '500 Milhões de Pessoas' : '500 Million People';
+      }
+      if (milestone === 1000000000) {
+        return language === 'pt' ? '1 Bilhão de Vidas' : '1 Billion Lives';
+      }
+      if (milestone === 5000000000) {
+        return language === 'pt' ? '5 Bilhões de Almas' : '5 Billion Souls';
+      }
+      if (milestone === 10000000000) {
+        return language === 'pt' ? '10 Bilhões de Habitantes' : '10 Billion Inhabitants';
+      }
+      return language === 'pt'
+        ? `Humanidade alcançou ${milestone.toLocaleString()} habitantes`
+        : `Humanity reached ${milestone.toLocaleString()} inhabitants`;
+    };
+
+    const getMilestoneDesc = (milestone: number) => {
+      if (milestone === 1000000) {
+        return language === 'pt'
+          ? 'A Nova Terra celebra seu primeiro milhão de habitantes. O início de uma nova civilização planetária.'
+          : 'New Earth celebrates its first million inhabitants. The dawn of a new planetary civilization.';
+      }
+      if (milestone === 10000000) {
+        return language === 'pt'
+          ? '10 Milhões de pessoas agora chamam a Nova Terra de lar. As colônias estão se consolidando.'
+          : '10 Million people now call New Earth home. The colonies are consolidating.';
+      }
+      if (milestone === 50000000) {
+        return language === 'pt'
+          ? '50 Milhões de habitantes! O crescimento populacional atinge velocidade cruzeiro.'
+          : '50 Million inhabitants! Population growth reaches cruising speed.';
+      }
+      if (milestone === 100000000) {
+        return language === 'pt'
+          ? '100 Milhões de vidas espalhadas pelo planeta. A Nova Terra pulsa com energia e esperança.'
+          : '100 Million lives scattered across the planet. New Earth pulses with energy and hope.';
+      }
+      if (milestone === 500000000) {
+        return language === 'pt'
+          ? 'Meio bilhão de colonos! As megalópoles florescem em perfeito equilíbrio solar-punk.'
+          : 'Half a billion colonists! Megalopolises flourish in perfect solar-punk balance.';
+      }
+      if (milestone === 1000000000) {
+        return language === 'pt'
+          ? '1 Bilhão de pessoas na Nova Terra! Um marco histórico absoluto na reconstrução pós-vazio.'
+          : '1 Billion people on New Earth! An absolute historic milestone in post-void reconstruction.';
+      }
+      if (milestone === 5000000000) {
+        return language === 'pt'
+          ? 'Nova Terra abriga 5 Bilhões de almas. Um marco monumental para a sobrevivência da espécie.'
+          : 'New Earth houses 5 Billion souls. A monumental milestone for the survival of the species.';
+      }
+      if (milestone === 10000000000) {
+        return language === 'pt'
+          ? 'A plenitude da vida! 10 Bilhões de habitantes na Nova Terra, um novo amanhecer para o amanhã.'
+          : 'The fullness of life! 10 Billion inhabitants on New Earth, a new dawn for tomorrow.';
+      }
+      return language === 'pt'
+        ? `A humanidade alcançou ${milestone.toLocaleString()} habitantes na Nova Terra.`
+        : `Humanity reached ${milestone.toLocaleString()} inhabitants on New Earth.`;
+    };
+
+    populationMilestones.forEach(milestone => {
+      if (totalHumanPopulation >= milestone && !route4PopulationMilestoneRef.current.has(milestone)) {
+        route4PopulationMilestoneRef.current.add(milestone);
+        const name = getMilestoneLabel(milestone);
+        const description = getMilestoneDesc(milestone);
+        setEarthEvents(prev => [{
+          id: `route4-population-${milestone}`,
+          month: gameTime.months,
+          year: gameTime.years,
+          name,
+          description,
+          type: 'population',
+          importance: 'population',
+          permanent: true,
+          timestamp: Date.now(),
+        }, ...prev]);
+        addLog(
+          language === 'pt'
+            ? `Marco populacional: ${name}. ${description}`
+            : `Population milestone: ${name}. ${description}`,
+          'population'
+        );
+      }
+    });
+  }, [addLog, colonies, gameTime.months, gameTime.years, isLoaded, language, routeTier, setEarthEvents, totalHumanPopulation]);
+
+  // Persistent refs for Earth simulation
   const generateEarthEvent = useCallback(() => {
     const totalDays = Math.floor(gameTimeSecondsRef.current * 0.75);
     const year = Math.floor(totalDays / 360);
+    const month = Math.floor((totalDays % 360) / 30) + 1;
 
     // Fixed Comic Events
     const fixedEvents = [
       {
         year: 520,
-        name: { pt: 'ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â Ãƒâ€šÃ‚Â® Profecia do PÃƒÂ£o', en: 'ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â Ãƒâ€šÃ‚Â® Bread Prophecy' },
+        name: { pt: 'Profecia do Pão', en: 'Bread Prophecy' },
         desc: {
-          pt: '"Houve uma profecia dizendo que o mundo acabaria em 1524... SerÃƒÂ¡ que agora vai? Tem gente jÃƒÂ¡ vendendo tudo e comprando pÃƒÂ£o. Humanidade em leve desespero!"',
+          pt: '"Houve uma profecia dizendo que o mundo acabaria em 1524... Será que agora vai? Tem gente já vendendo tudo e comprando pão. Humanidade em leve desespero!"',
           en: '"There was a prophecy saying the world would end in 1524... Could it be now? People are already selling everything and buying bread. Humanity in mild despair!"'
         },
         isFixed: true,
@@ -1592,9 +1737,9 @@ const DashboardContent = memo(({
       },
       {
         year: 662,
-        name: { pt: 'ÃƒÂ¢Ãƒâ€¦Ã‚Â¡Ãƒâ€šÃ‚Â ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¸Ãƒâ€šÃ‚Â  O NÃƒÂºmero da Besta?', en: 'ÃƒÂ¢Ãƒâ€¦Ã‚Â¡Ãƒâ€šÃ‚Â ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¸Ãƒâ€šÃ‚Â  The Beast Number?' },
+        name: { pt: 'O Número da Besta?', en: 'The Beast Number?' },
         desc: {
-          pt: '"Corre o boato de que o ano 1666 será o fim de tudo! Mas por quê 666? Alguém claramente levou esse nÃºmero a sério demais... clima de pÃ¢nico e teorias estranhas no ar."',
+          pt: '"Corre o boato de que o ano 1666 será o fim de tudo! Mas por quê 666? Alguém claramente levou esse número a sério demais... clima de pânico e teorias estranhas no ar."',
           en: '"Rumor has it that the year 1666 will be the end of it all! But why 666? Someone clearly took that number too seriously... panic and strange theories in the air."'
         },
         isFixed: true,
@@ -1604,7 +1749,7 @@ const DashboardContent = memo(({
       },
       {
         year: 840,
-        name: { pt: 'ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â Ãƒâ€šÃ‚Â® O Sinal nas Nuvens', en: 'ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â Ãƒâ€šÃ‚Â® Cloud Signal' },
+        name: { pt: 'O Sinal nas Nuvens', en: 'Cloud Signal' },
         desc: {
           pt: '"Um grupo garante que em 1844 tudo acaba! Já tem gente olhando pro céu esperando algum sinal... até agora só nuvem mesmo."',
           en: '"A group guarantees that in 1844 everything ends! People are already looking at the sky waiting for some sign... so far just clouds."'
@@ -1616,9 +1761,9 @@ const DashboardContent = memo(({
       },
       {
         year: 906,
-        name: { pt: 'ÃƒÂ¢Ãƒâ€¦Ã‚Â¡Ãƒâ€šÃ‚Â ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¸Ãƒâ€šÃ‚Â  MÃƒÂ¡scaras Anti-Cometa', en: 'ÃƒÂ¢Ãƒâ€¦Ã‚Â¡Ãƒâ€šÃ‚Â ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¸Ãƒâ€šÃ‚Â  Anti-Comet Masks' },
+        name: { pt: 'Máscaras Anti-Cometa', en: 'Anti-Comet Masks' },
         desc: {
-          pt: "Descobriram que um cometa vai passar em 1910! Tem gente achando que é o fim... outros estão vendendo 'máscaras anti-cometa'. Negócio lucrativo!",
+          pt: "Descobriram que um cometa vai passar in 1910! Tem gente achando que é o fim... outros estão vendendo 'máscaras anti-cometa'. Negócio lucrativo!",
           en: "They discovered that a comet will pass in 1910! Some people think it's the end... others are selling 'anti-comet masks'. Lucrative business!"
         },
         isFixed: true,
@@ -1628,10 +1773,10 @@ const DashboardContent = memo(({
       },
       {
         year: 995,
-        name: { pt: 'ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â Ãƒâ€šÃ‚Â® Bug do MilÃƒÂªnio Antecipado', en: 'ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â Ãƒâ€šÃ‚Â® Early Millennium Bug' },
+        name: { pt: 'Bug do Milênio Antecipado', en: 'Early Millennium Bug' },
         desc: {
-          pt: '"Segundo um tal de profeta antigo, 1999 será o fim do mundo! Enquanto isso, a humanidade segue normalmente... alguns já desistiram de fazer planos de longo prazo Ã°Å¸Ëœâ€¦"',
-          en: '"According to an old prophet, 1999 will be the end of the world! Meanwhile, humanity goes on normally... some have already given up on making long-term plans Ã°Å¸Ëœâ€¦"'
+          pt: '"Segundo um tal de profeta antigo, 1999 será o fim do mundo! Enquanto isso, a humanidade segue normalmente... alguns já desistiram de fazer planos de longo prazo"',
+          en: '"According to an old prophet, 1999 will be the end of the world! Meanwhile, humanity goes on normally... some have already given up on making long-term plans"'
         },
         isFixed: true,
         specialColor: 'text-purple-400',
@@ -1640,7 +1785,7 @@ const DashboardContent = memo(({
       },
       {
         year: 1008,
-        name: { pt: 'ÃƒÂ¢Ãƒâ€¦Ã‚Â¡Ãƒâ€šÃ‚Â ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¸Ãƒâ€šÃ‚Â  CalendÃƒÂ¡rio Maia?', en: 'ÃƒÂ¢Ãƒâ€¦Ã‚Â¡Ãƒâ€šÃ‚Â ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¸Ãƒâ€šÃ‚Â  Mayan Calendar?' },
+        name: { pt: 'Calendário Maia?', en: 'Mayan Calendar?' },
         desc: {
           pt: '"Boatos dizem que 2012 será o fim de tudo! Uns estão preocupados... outros só querem saber se ainda dá tempo de terminar aquela série."',
           en: '"Rumors say that 2012 will be the end of it all! Some are worried... others just want to know if there\'s still time to finish that series."'
@@ -1668,20 +1813,146 @@ const DashboardContent = memo(({
         border: currentFixed.specialBorder
       };
     } else {
-      // Define some types of events
       const eventPoolSource = [
-        { name: { pt: 'Grande Floresta Descoberta', en: 'Great Forest Discovered' }, desc: { pt: 'Uma vasta ÃƒÂ¡rea verde se expandiu, trazendo novos habitats e biodiversidade.', en: 'A vast green area has expanded, bringing new habitats and biodiversity.' }, impactType: 'biodiversity', impact: 5 },
-        { name: { pt: 'Grande Floresta Descoberta', en: 'Great Forest Discovered' }, desc: { pt: 'Uma vasta área verde se expandiu, trazendo novos habitats e biodiversidade.', en: 'A vast green area has expanded, bringing new habitats and biodiversity.' }, impactType: 'biodiversity', impact: 5 },
-        { name: { pt: 'Avanço Agrícola Primordial', en: 'Primordial Agricultural Breakthrough' }, desc: { pt: 'Novas técnicas de colheita natural aumentam a oferta de subsistência.', en: 'New natural harvesting techniques increase subsistence supply.' }, impactType: 'health', impact: 4 },
-        { name: { pt: 'Clima Estável Estelar', en: 'Stellar Stable Climate' }, desc: { pt: 'Um período de harmonia climática favorece a saÃºde e o bem-estar.', en: 'A period of climatic harmony favors health and well-being.' }, impactType: 'happiness', impact: 5 },
-        { name: { pt: 'A Primeira Grande Migração', en: 'The First Great Migration' }, desc: { pt: 'A população se espalha por novos continentes férteis e seguros.', en: 'The population spreads across new fertile and safe continents.' }, impactType: 'security', impact: 3 },
-        { name: { pt: 'Descoberta de Fontes Termais', en: 'Discovery of Hot Springs' }, desc: { pt: 'Fontes de energia natural melhoram a saÃºde e longevidade básica.', en: 'Natural energy sources improve basic health and longevity.' }, impactType: 'health', impact: 6 },
-        { name: { pt: 'O Despertar da Fauna', en: 'The Awakening of Fauna' }, desc: { pt: 'Novas espécies animais surgem dos santuários ecológicos.', en: 'New animal species emerge from ecological sanctuaries.' }, impactType: 'biodiversity', impact: 8 },
-        { name: { pt: 'Simbiose BotÃ¢nica', en: 'Botanical Symbiosis' }, desc: { pt: 'Plantas alienígenas adaptadas aceleram o oxigênio e a vida vegetal.', en: 'Adapted alien plants accelerate oxygen and plant life.' }, impactType: 'qualityOfLife', impact: 5 },
-        { name: { pt: 'Era da AbundÃ¢ncia', en: 'Age of Abundance' }, desc: { pt: 'Recursos naturais brotam em todas as zonas de colonização.', en: 'Natural resources sprout in all colonization zones.' }, impactType: 'happiness', impact: 7 },
-        { name: { pt: 'Sistema de Patrulha Iniciado', en: 'Patrol System Initiated' }, desc: { pt: 'Drones de vigilÃ¢ncia garantem a paz nas novas colÃ´nias.', en: 'Surveillance drones ensure peace in the new colonies.' }, impactType: 'security', impact: 10 },
-        { name: { pt: 'Festival da Terra', en: 'Earth Festival' }, desc: { pt: 'Uma celebração global aumenta o moral e a união da população.', en: 'A global celebration boosts morale and population unity.' }, impactType: 'happiness', impact: 12 },
-        { name: { pt: 'Otimização de Sanitarismo', en: 'Sanitation Optimization' }, desc: { pt: 'Novos sistemas de purificação de água reduzem doenças.', en: 'New water purification systems reduce diseases.' }, impactType: 'health', impact: 8 },
+        {
+          name: { pt: 'Grande Floresta Descoberta', en: 'Great Forest Discovered' },
+          desc: { pt: 'Uma vasta área verde se expandiu, trazendo novos habitats e biodiversidade.', en: 'A vast green area has expanded, bringing new habitats and biodiversity.' },
+          impactType: 'biodiversity',
+          impact: 5
+        },
+        {
+          name: { pt: 'Avanço Agrícola Primordial', en: 'Primordial Agricultural Breakthrough' },
+          desc: { pt: 'Novas técnicas de colheita natural aumentam a oferta de subsistência.', en: 'New natural harvesting techniques increase subsistence supply.' },
+          impactType: 'health',
+          impact: 4
+        },
+        {
+          name: { pt: 'Clima Estável Estelar', en: 'Stellar Stable Climate' },
+          desc: { pt: 'Um período de harmonia climática favorece a saúde e o bem-estar.', en: 'A period of climatic harmony favors health and well-being.' },
+          impactType: 'happiness',
+          impact: 5
+        },
+        {
+          name: { pt: 'A Primeira Grande Migração', en: 'The First Great Migration' },
+          desc: { pt: 'A população se espalha por novos continentes férteis e seguros.', en: 'The population spreads across new fertile and safe continents.' },
+          impactType: 'security',
+          impact: 3
+        },
+        {
+          name: { pt: 'Descoberta de Fontes Termais', en: 'Discovery of Hot Springs' },
+          desc: { pt: 'Fontes de energia natural melhoram a saúde e longevidade básica.', en: 'Natural energy sources improve basic health and longevity.' },
+          impactType: 'health',
+          impact: 6
+        },
+        {
+          name: { pt: 'O Despertar da Fauna', en: 'The Awakening of Fauna' },
+          desc: { pt: 'Novas espécies animais surgem dos santuários ecológicos.', en: 'New animal species emerge from ecological sanctuaries.' },
+          impactType: 'biodiversity',
+          impact: 8
+        },
+        {
+          name: { pt: 'Simbiose Botânica', en: 'Botanical Symbiosis' },
+          desc: { pt: 'Plantas alienígenas adaptadas aceleram o oxigênio e a vida vegetal.', en: 'Adapted alien plants accelerate oxygen and plant life.' },
+          impactType: 'qualityOfLife',
+          impact: 5
+        },
+        {
+          name: { pt: 'Era da Abundância', en: 'Age of Abundance' },
+          desc: { pt: 'Recursos naturais brotam em todas as zonas de colonização.', en: 'Natural resources sprout in all colonization zones.' },
+          impactType: 'happiness',
+          impact: 7
+        },
+        {
+          name: { pt: 'Sistema de Patrulha Iniciado', en: 'Patrol System Initiated' },
+          desc: { pt: 'Drones de vigilância garantem a paz nas novas colônias.', en: 'Surveillance drones ensure peace in the new colonies.' },
+          impactType: 'security',
+          impact: 10
+        },
+        {
+          name: { pt: 'Festival da Terra', en: 'Earth Festival' },
+          desc: { pt: 'Uma celebração global aumenta o moral e a união da população.', en: 'A global celebration boosts morale and population unity.' },
+          impactType: 'happiness',
+          impact: 12
+        },
+        {
+          name: { pt: 'Otimização de Sanitarismo', en: 'Sanitation Optimization' },
+          desc: { pt: 'Novos sistemas de purificação de água reduzem doenças.', en: 'New water purification systems reduce diseases.' },
+          impactType: 'health',
+          impact: 8
+        },
+        // --- 12 SOLAR-PUNK / RANDOM / COMIC EVENTS ---
+        {
+          name: { pt: 'Refúgio dos Corais Luminosos', en: 'Luminous Coral Sanctuary' },
+          desc: { pt: 'Corais bio-luminescentes modificados se adaptam aos oceanos purificados da Nova Terra, iluminando as noites costeiras e atraindo novas espécies marinhas.', en: 'Modified bioluminescent corals adapt to the purified oceans of New Earth, illuminating coastal nights and attracting new marine species.' },
+          impactType: 'biodiversity',
+          impact: 7
+        },
+        {
+          name: { pt: 'O Grande Polvilhar de Esporos', en: 'The Great Spore Shower' },
+          desc: { pt: 'Uma frota de drones dispersa esporos de fungos decompositores de alta performance, acelerando a fertilização do solo infértil.', en: 'A fleet of drones disperses high-performance decomposing fungi spores, accelerating the fertilization of barren soil.' },
+          impactType: 'biodiversity',
+          impact: 5
+        },
+        {
+          name: { pt: 'Rede Global de Trilhos Maglev', en: 'Global Maglev Grid' },
+          desc: { pt: 'A conclusão da linha de trens de levitação magnética conecta as colônias pioneiras de Nova Terra, facilitando o transporte e encurtando distâncias.', en: 'The completion of the magnetic levitation train line connects the pioneer colonies of New Earth, facilitating transport and shortening distances.' },
+          impactType: 'qualityOfLife',
+          impact: 10
+        },
+        {
+          name: { pt: 'Redoma Climática Ativada', en: 'Climatic Dome Activated' },
+          desc: { pt: 'Geradores de microclima começam a operar em áreas áridas, suavizando tempestades de areia e tornando o ambiente aconchegante.', en: 'Microclimate generators begin operating in arid areas, softening dust storms and making the environment cozy.' },
+          impactType: 'qualityOfLife',
+          impact: 8
+        },
+        {
+          name: { pt: 'Aliança dos Guardiões Voluntários', en: 'Pioneers Shield' },
+          desc: { pt: 'Associações comunitárias locais organizam redes de apoio e resgate rápido para lidar com pequenos tremores ecológicos.', en: 'Local community associations organize support networks and quick rescue teams to handle minor ecological tremors.' },
+          impactType: 'security',
+          impact: 6
+        },
+        {
+          name: { pt: 'Escudo Orbital Ionizado', en: 'Ionized Orbital Shield' },
+          desc: { pt: 'A ativação de uma rede de satélites no cinturão da Nova Terra desvia pequenos detritos cósmicos e radiação nociva, assegurando a órbita planetária.', en: 'The activation of a satellite network in New Earth\'s belt deflects small cosmic debris and harmful radiation, securing the planetary orbit.' },
+          impactType: 'security',
+          impact: 8
+        },
+        {
+          name: { pt: 'Sintetizador Genético Molecular', en: 'Molecular Gene Synthesizer' },
+          desc: { pt: 'Uma cura para febres geradas por poeira eletrostática é sintetizada nos laboratórios médicos usando extratos de plantas adaptadas.', en: 'A cure for electrostatic dust-induced fevers is synthesized in medical labs using adapted plant extracts.' },
+          impactType: 'health',
+          impact: 9
+        },
+        {
+          name: { pt: 'Filtros de Nanopartículas na Água', en: 'Nanotech Water Purification' },
+          desc: { pt: 'A central de tratamento de Nova Terra adota purificação molecular, erradicando qualquer contaminação microbiológica do suprimento.', en: 'The New Earth treatment plant adopts molecular purification, eradicating any microbiological contamination from the supply.' },
+          impactType: 'health',
+          impact: 8
+        },
+        {
+          name: { pt: 'Primeiro Derby de Hoverboards', en: 'First Hoverboard Derby' },
+          desc: { pt: 'Jovens colonos inventam uma competição de corrida de pranchas flutuantes sobre os canyons de terra vermelha. A febre esportiva vira fenômeno de audiência.', en: 'Young colonists invent a floating board racing competition over red earth canyons. The sports craze becomes a massive viewer phenomenon.' },
+          impactType: 'happiness',
+          impact: 12
+        },
+        {
+          name: { pt: 'Abertura da Cápsula de Discos da Velha Terra', en: 'Retro Disc Capsule Opened' },
+          desc: { pt: 'Uma cápsula do tempo contendo gravações originais de jazz, rock e MPB da Velha Terra é recuperada, gerando uma onda nostálgica nas rádios locais.', en: 'A time capsule containing original jazz, rock, and MPB recordings from Old Earth is recovered, sparking a nostalgic wave on local radio stations.' },
+          impactType: 'happiness',
+          impact: 8
+        },
+        {
+          name: { pt: 'A Grande Greve dos Robôs Aspiradores', en: 'The Roomba Rebellion' },
+          desc: { pt: 'Um pequeno erro em uma atualização de firmware faz todos os pequenos robôs de limpeza das colônias andarem em círculos buzinando e exigindo \'folga semanal\'. O moral da população dispara pelo ridículo da situação.', en: 'A minor firmware update bug causes all colony cleaning robots to spin in circles honking and demanding \'weekly time off\'. Morale skyrockets due to the hilarity.' },
+          impactType: 'happiness',
+          impact: 6
+        },
+        {
+          name: { pt: 'Invasão dos Esquilos Espaciais', en: 'Space Squirrels Invasion' },
+          desc: { pt: 'Uma espécie de roedor local altamente curiosa e brincalhona invade a praça de alimentação de uma das colônias em busca de petiscos, virando a atração turística do mês.', en: 'A highly curious and playful local rodent species invades a colony\'s food court in search of snacks, becoming the month\'s top tourist attraction.' },
+          impactType: 'happiness',
+          impact: 8
+        }
       ];
       eventSource = eventPoolSource[Math.floor(Math.random() * eventPoolSource.length)];
     }
@@ -1690,16 +1961,18 @@ const DashboardContent = memo(({
     const newEvent = {
       id: `ev-v2-${Date.now()}-${Math.floor(Math.random() * 1000000)}`,
       year: isFixed ? source.year : year,
+      month: isFixed ? 1 : month,
       name: language === 'pt' ? source.name.pt : source.name.en,
       description: language === 'pt' ? source.desc.pt : source.desc.en,
       type: isFixed ? 'fixed' : source.impactType,
       isFixed,
+      importance: isFixed ? 'major' : (source.impact >= 10 ? 'major' : (source.impact >= 7 ? 'relevant' : 'important')),
+      permanent: false,
       specialStyles,
       timestamp: Date.now()
     };
 
-    setEarthEvents(prev => [newEvent, ...prev].slice(0, 50));
-
+    setEarthEvents(prev => [newEvent, ...prev]);
 
     // Apply impacts if not fixed (or add minor boost if fixed)
     if (!isFixed) {
@@ -2019,9 +2292,81 @@ const DashboardContent = memo(({
         const score = Number(event.data.score) || 0;
         const isFinalScore = event.data.type === 'GAME_COMPLETE' || event.data.final === true;
         evaluateArcadeCardReward(gameId, score, isFinalScore, event.data.victory);
+
+        if (routeTierRef.current === 'Earth' && isFinalScore) {
+          const gameNames: Record<string, string> = {
+            'grid-collapse': 'Grid Collapse',
+            'star-runner': 'Star Runner',
+            'quantum-connection': 'Quantum Connection',
+            'memory-matrix': 'Memory Matrix',
+            'asteroid-miner': 'Asteroid Miner',
+            'cyber-defense': 'Cyber Defense'
+          };
+          const gameName = gameNames[gameId] || gameId;
+          const previousRecord = arcadeScoresRef.current[gameId] || 0;
+          const totalDays = Math.floor(gameTimeSecondsRef.current * 0.75);
+          const evYear = Math.floor(totalDays / 360);
+          const evMonth = Math.floor((totalDays % 360) / 30) + 1;
+
+          if (score > previousRecord) {
+            // New Record Beaten!
+            const recordName = language === 'pt' ? `Recorde Quebrado em ${gameName}!` : `New Record in ${gameName}!`;
+            const recordDesc = language === 'pt'
+              ? `Uma nova marca histórica de ${score.toLocaleString()} pontos foi estabelecida no fliperama.`
+              : `A new historic mark of ${score.toLocaleString()} points was established in the arcade.`;
+
+            setEarthEvents(prev => {
+              const filtered = prev.filter((ev: any) => !(ev?.permanent === true && ev?.type === 'arcade' && ev?.gameId === gameId));
+              return [{
+                id: `route4-arcade-record-${gameId}-${Date.now()}`,
+                gameId,
+                month: evMonth,
+                year: evYear,
+                name: recordName,
+                description: recordDesc,
+                type: 'arcade',
+                importance: 'arcade',
+                permanent: true,
+                timestamp: Date.now(),
+              }, ...filtered];
+            });
+
+            addLog(
+              language === 'pt'
+                ? `Novo Recorde em ${gameName}: ${score.toLocaleString()} pontos!`
+                : `New Record in ${gameName}: ${score.toLocaleString()} points!`,
+              'arcade'
+            );
+          } else if (previousRecord > 0 && score >= previousRecord * 0.9) {
+            // Near Record! (>= 90% but didn't beat it)
+            const nearName = language === 'pt' ? `Quase Recorde em ${gameName}` : `${gameName} Near Record`;
+            const nearDesc = language === 'pt'
+              ? `${score.toLocaleString()} pontos registrados! Incrivelmente próximo do recorde de ${previousRecord.toLocaleString()} pontos.`
+              : `${score.toLocaleString()} points registered! Incredibly close to the record of ${previousRecord.toLocaleString()} points.`;
+
+            setEarthEvents(prev => [{
+              id: `route4-arcade-near-record-${gameId}-${Date.now()}`,
+              gameId,
+              month: evMonth,
+              year: evYear,
+              name: nearName,
+              description: nearDesc,
+              type: 'arcade',
+              importance: 'arcade',
+              permanent: false,
+              timestamp: Date.now(),
+            }, ...prev]);
+
+            addLog(
+              language === 'pt'
+                ? `Grande desempenho em ${gameName}: ${score.toLocaleString()} pontos, quase recorde!`
+                : `Great performance in ${gameName}: ${score.toLocaleString()} points, near record!`,
+              'arcade'
+            );
+          }
+        }
+
         setArcadeScores(prev => {
-          // Check if this game is time-based (where lower is better)
-          // For now, all current games are "higher is better" either by points or remaining time
           if (!prev[gameId] || score > prev[gameId]) {
             const key = `${gameId.replace(/-/g, '_')}_high_score`;
             localStorage.setItem(key, String(score));
@@ -2033,7 +2378,7 @@ const DashboardContent = memo(({
     };
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, [evaluateArcadeCardReward, jukebox.stop]);
+  }, [evaluateArcadeCardReward, jukebox.stop, language]);
 
 
   const updateHistoryStats = useCallback((
@@ -3857,9 +4202,20 @@ const DashboardContent = memo(({
         try {
           const data = SaveManager.loadSave(saved);
 
-          // CRÃ TICO: hidratar o Redux com o save completo
-          // O GameProvider agora começa com INITIAL_STATE â€” precisamos fazer isso aqui
+          // CRÍTICO: hidratar o Redux com o save completo
+          // O GameProvider agora começa com INITIAL_STATE — precisamos fazer isso aqui
           dispatch({ type: 'LOAD_SAVE', payload: data });
+
+          // Hydrate population milestones triggered set
+          const savedEvents = data.earth?.events || [];
+          const savedMilestonesSet = new Set<number>();
+          savedEvents.forEach((ev: any) => {
+            if (ev?.id && String(ev.id).startsWith('route4-population-')) {
+              const val = parseInt(String(ev.id).replace('route4-population-', ''), 10);
+              if (!isNaN(val)) savedMilestonesSet.add(val);
+            }
+          });
+          route4PopulationMilestoneRef.current = savedMilestonesSet;
 
           // Estado de UI não gerenciado pelo Redux (como arcade scores locais)
           if (data.arcadeScores) {
@@ -6843,11 +7199,6 @@ const DashboardContent = memo(({
                   <div className="flex items-center gap-4 px-4 py-1.5 bg-white/5 rounded-full border border-emerald-500/30 ml-auto mr-4 shadow-inner relative overflow-hidden group">
                     <div className="absolute inset-0 bg-emerald-500/5 group-hover:bg-emerald-500/10 transition-colors pointer-events-none" />
                     <div className="flex flex-col items-center relative z-10">
-                      <span className="text-[14px] uppercase tracking-tighter opacity-50 font-bold leading-none mb-1 text-emerald-400">{t('day')}</span>
-                      <span className="text-base font-orbitron font-bold text-white leading-none tabular-nums">{gameTime.days}</span>
-                    </div>
-                    <div className="w-[1px] h-4 bg-emerald-500/20 relative z-10" />
-                    <div className="flex flex-col items-center relative z-10">
                       <span className="text-[14px] uppercase tracking-tighter opacity-50 font-bold leading-none mb-1 text-emerald-400">{t('month')}</span>
                       <span className="text-base font-orbitron font-bold text-white leading-none tabular-nums">{gameTime.months}</span>
                     </div>
@@ -7315,7 +7666,6 @@ const DashboardContent = memo(({
                       addEarthYears={addEarthYears}
                       isColoniesOpenRef={isColoniesOpenRef}
                       handleBuildingComplete={handleBuildingComplete}
-                      setEarthProjectBoostCount={setEarthProjectBoostCount}
                       onDefenseThreatAlertChange={setRoute4DefenseThreatAlert}
                       openDefenseRequest={openRoute4DefenseRequest}
                       abandonDefenseRequest={abandonRoute4DefenseRequest}

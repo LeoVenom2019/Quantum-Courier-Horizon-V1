@@ -23,6 +23,9 @@ import { ROUTES, SHIPS, UPGRADES, VOID_AIRCRAFT, TECHNOLOGIES, VOID_POIS } from 
 
 import { ROUTES_MAP, EXTRACTION_PRODUCTION_COSTS, ORES_MAP, EXTRACTION_POINTS_MAP, UPGRADES_MAP, ROBOT_UPGRADES_MAP } from '@/lib/game-constants';
 
+export type GameLogType = 'info' | 'success' | 'warning' | 'error' | 'important' | 'relevant' | 'major' | 'population' | 'mythic' | 'arcade';
+export type GameLogEntry = { id: string; message: string; type: GameLogType };
+
 // Define the shape of our dashboard context
 interface DashboardContextType {
   // Redux States
@@ -41,8 +44,8 @@ interface DashboardContextType {
   formatValue: (val: number) => string;
   formatTime: (ms: number) => string;
   translateData: (data: any) => string;
-  gameLogs: { id: string; message: string; type: 'info' | 'success' | 'warning' | 'error' }[];
-  addLog: (message: string, type?: 'info' | 'success' | 'warning' | 'error') => void;
+  gameLogs: GameLogEntry[];
+  addLog: (message: string, type?: GameLogType) => void;
   playSfx: (id: string) => void;
   stopSfx: (id: string) => void;
   pauseMusicForRoute4Credits: () => void;
@@ -281,7 +284,7 @@ export const DashboardProvider = ({
   const [scanProgress, setScanProgress] = React.useState(0);
   const [scanResult, setScanResult] = React.useState<'success' | 'failure' | null>(null);
   const [lastScanTime, setLastScanTime] = React.useState(0);
-  const [gameLogs, setGameLogs] = React.useState<{ id: string; message: string; type: 'info' | 'success' | 'warning' | 'error' }[]>([]);
+  const [gameLogs, setGameLogs] = React.useState<GameLogEntry[]>([]);
   
   const progression = useProgression();
   const totalDeliveries = progression.totalDeliveries;
@@ -456,8 +459,8 @@ export const DashboardProvider = ({
     return (translations as any)[language]?.[key] || key;
   }, [language]);
 
-  const addLog = useCallback((message: string, type: 'info' | 'success' | 'warning' | 'error' = 'info') => {
-    setGameLogs(prev => [{ id: Math.random().toString(36).substr(2, 9), message, type }, ...prev].slice(0, 5));
+  const addLog = useCallback((message: string, type: GameLogType = 'info') => {
+    setGameLogs(prev => [{ id: Math.random().toString(36).substr(2, 9), message, type }, ...prev].slice(0, 12));
   }, []);
 
   const formatValue = useMemo(() => (val: number): string => {

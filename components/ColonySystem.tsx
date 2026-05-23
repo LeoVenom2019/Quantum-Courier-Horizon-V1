@@ -264,7 +264,6 @@ export interface ColonySystemProps {
   unlockedAchievements?: string[];
   playSfx?: (type: string, config?: any) => void;
   onBuildingComplete?: (type: ConstructionType, level: number) => void;
-  onAllocate10k?: () => void;
   qc?: number;
   onEarnQC?: (amount: number) => void;
   onSpendQC?: (amount: number) => void;
@@ -339,12 +338,12 @@ const INITIAL_CONSTRUCTORS = 500;
 const INITIAL_POP_CAPACITY = 10000;
 
 const DEFAULT_COLONY_SUPPLIES: ColonySupplies = {
-  materials: 0,
-  biomass: 0,
-  tech: 0,
-  defense: 0,
-  food: 0,
-  meds: 0,
+  materials: 500,
+  biomass: 500,
+  tech: 500,
+  defense: 500,
+  food: 500,
+  meds: 500,
 };
 
 const DEFAULT_SEARCH_THREAT_BONUS: SearchThreatBonus = {
@@ -1099,7 +1098,6 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
   unlockedAchievements = [],
   playSfx,
   onBuildingComplete,
-  onAllocate10k,
   qc = 0,
   onEarnQC,
   onSpendQC,
@@ -1115,7 +1113,6 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
   const [isSuppliesLoaded, setIsSuppliesLoaded] = useState(false);
   const [isSearchLoaded, setIsSearchLoaded] = useState(false);
   const [isThreatsLoaded, setIsThreatsLoaded] = useState(false);
-  const [showConfirmAllocate, setShowConfirmAllocate] = useState(false);
   const [colonySupplies, setColonySupplies] = useState<ColonySupplies>(DEFAULT_COLONY_SUPPLIES);
   const [ownedCardIds, setOwnedCardIds] = useState<string[]>(DEFAULT_OWNED_COLONY_CARD_IDS);
   const [isOwnedCardsLoaded, setIsOwnedCardsLoaded] = useState(false);
@@ -1148,6 +1145,10 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
   const [battleCardCodexPage, setBattleCardCodexPage] = useState(0);
   const [selectedCard, setSelectedCard] = useState<{ card: ColonyCard; action: 'equip' | 'remove'; slot?: ColonyCardSlot | BattleCardSlot; blockedBy?: string } | null>(null);
   const colonySuppliesRef = useRef<ColonySupplies>(DEFAULT_COLONY_SUPPLIES);
+  const earthPopulationRef = useRef(earthPopulation);
+  const setEarthPopulationRef = useRef(setEarthPopulation);
+  const cardLevelsRef = useRef<ColonyCardLevels>({});
+  const allSectorBonusRef = useRef(0);
   const horizonXpRef = useRef(0);
   const handledOpenDefenseRequestRef = useRef(0);
   const handledAbandonDefenseRequestRef = useRef(0);
@@ -1461,6 +1462,18 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
   useEffect(() => {
     colonySuppliesRef.current = colonySupplies;
   }, [colonySupplies]);
+
+  useEffect(() => {
+    earthPopulationRef.current = earthPopulation;
+  }, [earthPopulation]);
+
+  useEffect(() => {
+    setEarthPopulationRef.current = setEarthPopulation;
+  }, [setEarthPopulation]);
+
+  useEffect(() => {
+    cardLevelsRef.current = cardLevels;
+  }, [cardLevels]);
 
   useEffect(() => {
     horizonXpRef.current = horizonXp;
@@ -1781,6 +1794,11 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
       return acc;
     }, { constructorsAllColonies: 0, allSectorBonus: 0, constructionSpeedPercent: 0 })
   ), [equippedPoliticalPassiveCards, cardLevels]);
+
+  useEffect(() => {
+    allSectorBonusRef.current = ownedPassiveBonuses.allSectorBonus;
+  }, [ownedPassiveBonuses.allSectorBonus]);
+
   const getEffectiveConstructors = useCallback((colony: Colony) => (
     colony.constructors + ownedPassiveBonuses.constructorsAllColonies
   ), [ownedPassiveBonuses.constructorsAllColonies]);
@@ -1813,6 +1831,30 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
     });
     return next;
   }, [activeColony, equippedCards, cardLevels, ownedPassiveBonuses.allSectorBonus]);
+
+  const getColonyEffectiveSectorScore = useCallback((colony: Colony) => {
+    const next = { ...DEFAULT_COLONY_SECTORS, ...(colony.sectors || {}) };
+    const allSectorBonus = allSectorBonusRef.current;
+    const currentCardLevels = cardLevelsRef.current;
+    if (allSectorBonus > 0) {
+      (Object.keys(next) as ColonySectorId[]).forEach(sector => {
+        next[sector] = Math.min(100, Math.max(0, next[sector] + allSectorBonus));
+      });
+    }
+
+    const colonyCards = (Object.values(colony.equippedCards || {})
+      .map(id => getCardById(id))
+      .filter(Boolean)
+      .filter(card => card && isPoliticalCard(card)) as ColonyCard[]);
+
+    colonyCards.forEach(card => {
+      getPoliticalEffects(card, currentCardLevels).forEach(effect => {
+        next[effect.sector] = Math.min(100, Math.max(0, next[effect.sector] + effect.value));
+      });
+    });
+
+    return (Object.values(next) as number[]).reduce((sum, value) => sum + value, 0);
+  }, []);
 
   // Construction Progress Logic
   useEffect(() => {
@@ -1896,6 +1938,69 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
     const interval = setInterval(updateConstructionProgress, 1000);
     return () => clearInterval(interval);
   }, [isLoaded, ownedPassiveBonuses.constructionSpeedPercent, setColonies]);
+
+  useEffect(() => {
+    if (!isLoaded) return;
+
+    const syncAutomaticPopulation = () => {
+      let nextEarthPopulation: number | null = null;
+      setColonies(prevColonies => {
+        const habitableColonies = prevColonies.filter(colony => (
+          colony.isHabitable && colony.constructions.every(construction => construction.isComplete)
+        ));
+        if (habitableColonies.length === 0) return prevColonies;
+
+        const currentColonyPopulation = prevColonies.reduce((sum, colony) => sum + Math.max(0, Math.floor(colony.population || 0)), 0);
+        const totalPopulation = Math.max(0, Math.floor(earthPopulationRef.current + currentColonyPopulation));
+        if (totalPopulation <= 0) return prevColonies;
+
+        const ratioNoise = (Math.sin(totalPopulation * 0.00013 + habitableColonies.length * 7.17) + 1) / 2;
+        const colonialRatio = 0.7 + ratioNoise * 0.1;
+        const targetColonialPopulation = Math.floor(totalPopulation * colonialRatio);
+        const baseShareTotal = Math.floor(targetColonialPopulation * 0.8);
+        const bonusShareTotal = targetColonialPopulation - baseShareTotal;
+        const basePerColony = Math.floor(baseShareTotal / habitableColonies.length);
+        const scoreByColony = new Map(habitableColonies.map(colony => [
+          colony.id,
+          Math.max(1, getColonyEffectiveSectorScore(colony)),
+        ]));
+        const totalScore = Array.from(scoreByColony.values()).reduce((sum, score) => sum + score, 0) || 1;
+        let assignedColonialPopulation = 0;
+        let hasPopulationChanges = false;
+
+        const nextColonies = prevColonies.map(colony => {
+          const currentPopulation = Math.max(0, Math.floor(colony.population || 0));
+          if (!scoreByColony.has(colony.id)) {
+            assignedColonialPopulation += currentPopulation;
+            if (currentPopulation === colony.population) return colony;
+            hasPopulationChanges = true;
+            return { ...colony, population: currentPopulation };
+          }
+
+          const targetPopulation = basePerColony + Math.floor(bonusShareTotal * (scoreByColony.get(colony.id)! / totalScore));
+          const delta = targetPopulation - currentPopulation;
+          const migrationStep = Math.sign(delta) * Math.min(Math.abs(delta), Math.max(1, Math.ceil(Math.abs(delta) * 0.08)));
+          const nextPopulation = Math.max(0, currentPopulation + migrationStep);
+          assignedColonialPopulation += nextPopulation;
+          if (nextPopulation === colony.population) return colony;
+          hasPopulationChanges = true;
+          return { ...colony, population: nextPopulation };
+        });
+
+        nextEarthPopulation = Math.max(0, totalPopulation - assignedColonialPopulation);
+        return hasPopulationChanges ? nextColonies : prevColonies;
+      });
+
+      if (nextEarthPopulation !== null && nextEarthPopulation !== earthPopulationRef.current) {
+        earthPopulationRef.current = nextEarthPopulation;
+        setEarthPopulationRef.current(nextEarthPopulation);
+      }
+    };
+
+    syncAutomaticPopulation();
+    const interval = window.setInterval(syncAutomaticPopulation, 15000);
+    return () => window.clearInterval(interval);
+  }, [getColonyEffectiveSectorScore, isLoaded, setColonies]);
 
   // Actions
   const equipCard = (card: ColonyCard): boolean => {
@@ -2115,35 +2220,6 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
     });
 
     return true;
-  };
-
-  const allocatePopulation = (requestedAmount: number) => {
-    if (!effectiveActiveColonyId || !activeColony) return;
-    if (!activeColony.isHabitable) return;
-
-    if (earthPopulation <= 0) return;
-
-    const actualAmount = Math.min(requestedAmount, earthPopulation);
-
-    if (actualAmount <= 0) return;
-
-    // Update Earth population (Sequentially, React handles batching)
-    setEarthPopulation(prev => Math.max(0, prev - actualAmount));
-
-    // Update Colony population
-    setColonies(prevColonies => {
-      const activeIdx = prevColonies.findIndex(c => c.id === effectiveActiveColonyId);
-      if (activeIdx === -1) return prevColonies;
-      
-      const colony = prevColonies[activeIdx];
-      const nextColonies = [...prevColonies];
-      nextColonies[activeIdx] = {
-        ...colony,
-        population: colony.population + actualAmount
-      };
-      
-      return nextColonies;
-    });
   };
 
   const resolveDefenseVictory = useCallback((summary?: BattleResultSummary) => {
@@ -2798,26 +2874,7 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
                   <h3 className={`font-orbitron text-base font-black drop-shadow-[0_0_10px_rgba(0,0,0,0.8)] ${activeColony.population > 0 ? 'text-emerald-300' : 'text-zinc-400'}`}>
                     {activeColony.population.toLocaleString()}
                   </h3>
-                  {activeColony.isHabitable ? (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (showConfirmAllocate) {
-                          allocatePopulation(10000);
-                          onAllocate10k?.();
-                          setShowConfirmAllocate(false);
-                        } else {
-                          setShowConfirmAllocate(true);
-                        }
-                      }}
-                      disabled={earthPopulation <= 0}
-                      className="rounded-lg border border-emerald-400/35 bg-black/45 px-2 py-1 font-orbitron text-[10px] font-black uppercase tracking-widest text-emerald-200 backdrop-blur-sm transition-all hover:bg-emerald-400 hover:text-black disabled:cursor-not-allowed disabled:border-zinc-700 disabled:bg-zinc-900/80 disabled:text-zinc-600"
-                    >
-                      {showConfirmAllocate ? t('Confirm', 'Confirmar') : t('Allocate', 'Alocar')}
-                    </button>
-                  ) : (
-                    <Users className="h-5 w-5 text-emerald-300/70" />
-                  )}
+                  <Users className={`h-5 w-5 ${activeColony.isHabitable ? 'text-emerald-300/70' : 'text-zinc-500/70'}`} />
                 </div>
               </div>
             </div>

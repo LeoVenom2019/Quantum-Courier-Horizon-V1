@@ -5,6 +5,9 @@ import Image from 'next/image';
 import { motion, AnimatePresence } from 'motion/react';
 import { Download, Upload, Target, Activity, TrendingUp, LogOut, ChevronLeft, ChevronRight, Play, Pause } from 'lucide-react';
 import { useDashboard } from './DashboardProvider';
+import { GameStorage } from '@/lib/game-storage';
+import { MINI_GAMES_CONFIG } from '@/lib/mini-games-config';
+import { getOwnedArcadeIdsFromCards, normalizeOwnedColonyCardIds } from '@/lib/colony-cards';
 
 const ROUTE4_DUST_PARTICLES = [
   { left: 72, top: 18, size: 1.3, delay: 0.1, duration: 8.5 },
@@ -37,6 +40,7 @@ const HistoryTab = memo(function HistoryTab() {
     exportGameData, 
     importGameData, 
     pauseMusicForRoute4Credits,
+    colonies,
     historyPage, 
     setHistoryPage,
     isRoute2Unlocked,
@@ -54,6 +58,17 @@ const HistoryTab = memo(function HistoryTab() {
   const route4Unlocked = progression.unlockedTechLevels['Void'] >= 10; // Simple check
   const creditsVideoRef = useRef<HTMLVideoElement | null>(null);
   const [creditsPlaying, setCreditsPlaying] = useState(false);
+  const [ownedCardIds, setOwnedCardIds] = useState<string[]>([]);
+
+  const allNewEarthConstructionsComplete = progression.routeTier === 'Earth'
+    && colonies.length > 0
+    && colonies.every(colony => (
+      colony.constructions?.length > 0
+      && colony.constructions.every((construction: any) => construction.isComplete)
+    ));
+  const unlockedArcadeIds = getOwnedArcadeIdsFromCards(ownedCardIds);
+  const route4CreditsUnlocked = allNewEarthConstructionsComplete
+    && MINI_GAMES_CONFIG.every(game => unlockedArcadeIds.has(game.id));
 
   useEffect(() => {
     return () => {
@@ -61,9 +76,36 @@ const HistoryTab = memo(function HistoryTab() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!isEarth) return;
+    let mounted = true;
+
+    const loadOwnedCards = () => GameStorage.load('colony_cards_data').then(saved => {
+      if (!mounted) return;
+      setOwnedCardIds(normalizeOwnedColonyCardIds(Array.isArray(saved) ? saved : []));
+    });
+
+    const handleCardsUpdated = (event: Event) => {
+      const detail = (event as CustomEvent<string[]>).detail;
+      setOwnedCardIds(normalizeOwnedColonyCardIds(Array.isArray(detail) ? detail : []));
+    };
+
+    loadOwnedCards();
+    window.addEventListener('qch:colony-cards-updated', handleCardsUpdated);
+    window.addEventListener('focus', loadOwnedCards);
+    return () => {
+      mounted = false;
+      window.removeEventListener('qch:colony-cards-updated', handleCardsUpdated);
+      window.removeEventListener('focus', loadOwnedCards);
+    };
+  }, [isEarth]);
+
   const toggleRoute4Credits = async () => {
     const video = creditsVideoRef.current;
-    if (!video) return;
+    if (!video || !route4CreditsUnlocked) {
+      playSfx('warning_gaming');
+      return;
+    }
 
     if (creditsPlaying) {
       video.pause();
@@ -191,7 +233,7 @@ const HistoryTab = memo(function HistoryTab() {
               <video
                 ref={creditsVideoRef}
                 src="/assets/rota4/videos/quantum_courier_credits.webm"
-                className="h-full w-full object-cover"
+                className={`h-full w-full object-cover transition ${route4CreditsUnlocked ? '' : 'opacity-20 grayscale'}`}
                 preload="metadata"
                 playsInline
                 onEnded={() => {
@@ -202,12 +244,18 @@ const HistoryTab = memo(function HistoryTab() {
               <button
                 type="button"
                 onClick={toggleRoute4Credits}
-                className={`absolute inset-0 flex items-center justify-center bg-black/20 text-cyan-100 transition-all hover:bg-black/10 ${creditsPlaying ? 'opacity-0 hover:opacity-100' : 'opacity-100'}`}
-                aria-label={creditsPlaying ? 'Pausar créditos da TV' : 'Reproduzir créditos da TV'}
+                className={`absolute inset-0 flex items-center justify-center text-cyan-100 transition-all ${route4CreditsUnlocked ? `bg-black/20 hover:bg-black/10 ${creditsPlaying ? 'opacity-0 hover:opacity-100' : 'opacity-100'}` : 'bg-black/72 opacity-100'}`}
+                aria-label={route4CreditsUnlocked ? (creditsPlaying ? 'Pausar créditos da TV' : 'Reproduzir créditos da TV') : 'Transmissão final indisponível'}
               >
-                <span className="flex h-14 w-14 items-center justify-center rounded-full border border-cyan-200/50 bg-black/55 shadow-[0_0_22px_rgba(34,211,238,0.25)] backdrop-blur-sm">
-                  {creditsPlaying ? <Pause className="h-6 w-6" /> : <Play className="h-6 w-6 translate-x-0.5" />}
-                </span>
+                {route4CreditsUnlocked ? (
+                  <span className="flex h-14 w-14 items-center justify-center rounded-full border border-cyan-200/50 bg-black/55 shadow-[0_0_22px_rgba(34,211,238,0.25)] backdrop-blur-sm">
+                    {creditsPlaying ? <Pause className="h-6 w-6" /> : <Play className="h-6 w-6 translate-x-0.5" />}
+                  </span>
+                ) : (
+                  <span className="rounded-lg border border-cyan-200/20 bg-black/70 px-4 py-3 text-center font-mono text-[10px] font-black uppercase tracking-[0.24em] text-cyan-100/80 shadow-[0_0_18px_rgba(34,211,238,0.18)]">
+                    {language === 'pt' ? 'Transmissão final indisponível' : 'Final transmission unavailable'}
+                  </span>
+                )}
               </button>
             </div>
           </div>

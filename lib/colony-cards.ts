@@ -361,14 +361,7 @@ export const DEFAULT_COLONY_SECTORS: Record<ColonySectorId, number> = {
   culture: 38,
 };
 
-export const DEFAULT_OWNED_COLONY_CARD_IDS = [
-  'mayor-agronomist',
-  'orbital-engineer',
-  'civic-mediator',
-  'arcade-salto-espacial',
-  'battle-white-spark',
-  'battle-iron-pulse',
-];
+export const DEFAULT_OWNED_COLONY_CARD_IDS: string[] = [];
 
 export const STARTER_BATTLE_CARD_IDS = [
   'battle-white-spark',
@@ -377,10 +370,7 @@ export const STARTER_BATTLE_CARD_IDS = [
 
 export const normalizeOwnedColonyCardIds = (ids?: string[]) => {
   const validIds = new Set(COLONY_CARD_CATALOG.map(card => card.id));
-  return Array.from(new Set([
-    ...DEFAULT_OWNED_COLONY_CARD_IDS,
-    ...((ids || []).filter(id => validIds.has(id))),
-  ]));
+  return Array.from(new Set((ids || []).filter(id => validIds.has(id))));
 };
 
 export const BATTLE_CARD_ATTRIBUTE_COUNT: Record<ColonyCardRarity, number> = {

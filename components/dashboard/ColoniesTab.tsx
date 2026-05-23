@@ -10,7 +10,6 @@ interface ColoniesTabProps {
   addEarthYears: (years: number) => void;
   isColoniesOpenRef: React.MutableRefObject<boolean>;
   handleBuildingComplete: (type: any, level: number) => void;
-  setEarthProjectBoostCount: React.Dispatch<React.SetStateAction<number>>;
   onDefenseThreatAlertChange?: (alert: { title: string; remainingSeconds: number } | null) => void;
   openDefenseRequest?: number;
   abandonDefenseRequest?: number;
@@ -21,7 +20,6 @@ const ColoniesTab = memo(({
   addEarthYears,
   isColoniesOpenRef,
   handleBuildingComplete,
-  setEarthProjectBoostCount,
   onDefenseThreatAlertChange,
   openDefenseRequest = 0,
   abandonDefenseRequest = 0,
@@ -58,7 +56,6 @@ const ColoniesTab = memo(({
         onAddYear={addEarthYears}
         onTabStatusChange={(isOpen) => { isColoniesOpenRef.current = isOpen; }}
         onBuildingComplete={handleBuildingComplete}
-        onAllocate10k={() => setEarthProjectBoostCount(prev => prev + 1)}
         earthPopulation={earth.population}
         setEarthPopulation={(val) => dispatch({ type: 'UPDATE_EARTH_STATE', payload: { population: typeof val === 'function' ? val(earth.population) : val } })}
         colonies={colonies}
