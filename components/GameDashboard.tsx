@@ -521,6 +521,7 @@ const DashboardContent = memo(({
   const [openRoute4DefenseRequest, setOpenRoute4DefenseRequest] = useState(0);
   const [abandonRoute4DefenseRequest, setAbandonRoute4DefenseRequest] = useState(0);
   const [pendingArcadeDefenseGameId, setPendingArcadeDefenseGameId] = useState<string | null>(null);
+  const [selectedColonyId, setSelectedColonyId] = useState<string>('colony-1');
 
   const isInterstellar = useMemo(() => routeTier === 'Interstellar', [routeTier]);
   const isVoid = useMemo(() => routeTier === 'Void', [routeTier]);
@@ -7670,6 +7671,8 @@ const DashboardContent = memo(({
                       openDefenseRequest={openRoute4DefenseRequest}
                       abandonDefenseRequest={abandonRoute4DefenseRequest}
                       defenseAlertsPaused={Boolean(activeMiniGameId)}
+                      selectedColonyId={selectedColonyId}
+                      setSelectedColonyId={setSelectedColonyId}
                     />
                   </div>
                 )}
@@ -7709,34 +7712,49 @@ const DashboardContent = memo(({
                       <div className="pointer-events-none absolute inset-6 z-10 rounded-2xl border border-cyan-300/20 bg-black/10 backdrop-blur-[0.5px]" />
                       <div className="absolute inset-0 z-20">
                         {[
-                          { id: 'gaia', label: 'GAIA', left: '28.8%', top: '37.1%', tone: 'green' },
-                          { id: 'genesis', label: 'GENESIS', left: '56.3%', top: '58.0%', tone: 'green' },
-                          { id: 'elysium', label: 'ELYSIUM', left: '65.3%', top: '37.1%', tone: 'green' },
-                          { id: 'eden', label: 'EDEN', left: '39.3%', top: '65.6%', tone: 'green' },
+                          { id: 'gaia', colonyId: 'colony-4', label: 'GAIA', left: '28.8%', top: '37.1%', tone: 'green' },
+                          { id: 'genesis', colonyId: 'colony-1', label: 'GENESIS', left: '56.3%', top: '58.0%', tone: 'green' },
+                          { id: 'elysium', colonyId: 'colony-3', label: 'ELYSIUM', left: '65.3%', top: '37.1%', tone: 'green' },
+                          { id: 'eden', colonyId: 'colony-2', label: 'EDEN', left: '39.3%', top: '65.6%', tone: 'green' },
                           { id: 'zona-glacial', label: 'ZONA GLACIAL', left: '45.3%', top: '10.5%', tone: 'red' },
                           { id: 'oceano-abissal', label: 'OCEANO ABISSAL', left: '13.8%', top: '42.1%', tone: 'red' },
                           { id: 'ruinas-europeias', label: 'RUÍNAS EUROPÉIAS', left: '51.3%', top: '38.0%', tone: 'red' },
                           { id: 'cemiterio-navios', label: 'CEMITÉRIO DE NAVIOS', left: '45.3%', top: '69.3%', tone: 'red' },
                           { id: 'continente-esquecido', label: 'CONTINENTE ESQUECIDO', left: '80.5%', top: '77.0%', tone: 'red' },
-                        ].map((marker) => (
-                          <div
-                            key={marker.id}
-                            className="absolute"
-                            style={{ left: marker.left, top: marker.top }}
-                          >
-                            <span
-                              className={`absolute left-0 top-0 h-8 w-8 rounded-full border ${marker.tone === 'red' ? 'border-red-300/70' : 'border-emerald-300/70'}`}
-                              style={{ animation: 'newEarthRadarPulse 2.2s ease-out infinite' }}
-                            />
-                            <span
-                              className={`absolute left-0 top-0 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full border ${marker.tone === 'red' ? 'border-red-100/80 bg-red-400/85' : 'border-emerald-100/80 bg-emerald-300/85'}`}
-                              style={{ animation: `${marker.tone === 'red' ? 'newEarthDangerDot' : 'newEarthRadarDot'} 2.2s ease-in-out infinite` }}
-                            />
-                            <span className={`absolute left-4 top-[-1.15rem] whitespace-nowrap rounded-full border bg-black/45 px-2 py-0.5 font-mono text-[8px] font-bold uppercase tracking-[0.22em] ${marker.tone === 'red' ? 'border-red-300/20 text-red-100 shadow-[0_0_14px_rgba(239,68,68,0.18)]' : 'border-emerald-300/20 text-emerald-100 shadow-[0_0_14px_rgba(16,185,129,0.18)]'}`}>
-                              {marker.label}
-                            </span>
-                          </div>
-                        ))}
+                        ].map((marker) => {
+                          const colony = marker.colonyId ? colonies.find((c: any) => c.id === marker.colonyId) : null;
+                          const isComplete = colony ? colony.constructions.every((c: any) => c.isComplete) : false;
+                          const isClickable = marker.tone === 'green' && (marker.id === 'genesis' || isComplete);
+
+                          return (
+                            <button
+                              key={marker.id}
+                              type="button"
+                              onClick={() => {
+                                if (isClickable && marker.colonyId) {
+                                  playSfx('aba_click');
+                                  setSelectedColonyId(marker.colonyId);
+                                  setActiveTab('colonies');
+                                }
+                              }}
+                              disabled={!isClickable}
+                              className={`absolute bg-transparent border-0 p-0 outline-none text-left transition-all group ${isClickable ? 'cursor-pointer hover:scale-110 active:scale-95' : 'cursor-default opacity-85'}`}
+                              style={{ left: marker.left, top: marker.top }}
+                            >
+                              <span
+                                className={`absolute left-0 top-0 h-8 w-8 rounded-full border ${marker.tone === 'red' ? 'border-red-300/70' : 'border-emerald-300/70'} ${isClickable ? 'group-hover:border-emerald-300/90 shadow-[0_0_12px_rgba(52,211,153,0.3)]' : ''}`}
+                                style={{ animation: 'newEarthRadarPulse 2.2s ease-out infinite' }}
+                              />
+                              <span
+                                className={`absolute left-0 top-0 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full border ${marker.tone === 'red' ? 'border-red-100/80 bg-red-400/85' : 'border-emerald-100/80 bg-emerald-300/85'} ${isClickable ? 'group-hover:bg-white group-hover:border-white shadow-[0_0_14px_rgba(52,211,153,0.9)]' : ''}`}
+                                style={{ animation: `${marker.tone === 'red' ? 'newEarthDangerDot' : 'newEarthRadarDot'} 2.2s ease-in-out infinite` }}
+                              />
+                              <span className={`absolute left-4 top-[-1.15rem] whitespace-nowrap rounded-full border bg-black/45 px-2 py-0.5 font-mono text-[8px] font-bold uppercase tracking-[0.22em] ${marker.tone === 'red' ? 'border-red-300/20 text-red-100 shadow-[0_0_14px_rgba(239,68,68,0.18)]' : 'border-emerald-300/20 text-emerald-100 shadow-[0_0_14px_rgba(16,185,129,0.18)]'} ${isClickable ? 'group-hover:border-emerald-400/60 group-hover:text-white' : ''}`}>
+                                {marker.label}
+                              </span>
+                            </button>
+                          );
+                        })}
                       </div>
                     </motion.div>
                   ) : (

@@ -272,6 +272,8 @@ export interface ColonySystemProps {
   abandonDefenseRequest?: number;
   defenseAlertsPaused?: boolean;
   formatValue?: (value: number) => string;
+  selectedColonyId?: string;
+  setSelectedColonyId?: (id: string) => void;
 }
 
 // --- Configuration ---
@@ -1105,9 +1107,17 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
   openDefenseRequest = 0,
   abandonDefenseRequest = 0,
   defenseAlertsPaused = false,
-  formatValue = (value: number) => value.toLocaleString()
+  formatValue = (value: number) => value.toLocaleString(),
+  selectedColonyId,
+  setSelectedColonyId,
 }) => {
-  const [activeColonyId, setActiveColonyId] = useState<string | null>(null);
+  const [activeColonyId, setActiveColonyId] = useState<string>('colony-1');
+
+  useEffect(() => {
+    if (selectedColonyId) {
+      setActiveColonyId(selectedColonyId);
+    }
+  }, [selectedColonyId]);
   const [activeView, setActiveView] = useState<'colony' | 'searches'>('colony');
   const [isLoaded, setIsLoaded] = useState(false);
   const [isSuppliesLoaded, setIsSuppliesLoaded] = useState(false);
@@ -2809,6 +2819,9 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
                   playRoute4UiSfx(ROUTE4_COLONIES_TAB_SFX);
                   setActiveView('colony');
                   setActiveColonyId(colony.id);
+                  if (setSelectedColonyId) {
+                    setSelectedColonyId(colony.id);
+                  }
                 }}
                 className={`rounded-xl px-3 py-2 text-[10px] font-orbitron font-black uppercase tracking-widest transition-all ${
                   activeView === 'colony' && effectiveActiveColonyId === colony.id

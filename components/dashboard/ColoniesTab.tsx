@@ -14,6 +14,8 @@ interface ColoniesTabProps {
   openDefenseRequest?: number;
   abandonDefenseRequest?: number;
   defenseAlertsPaused?: boolean;
+  selectedColonyId?: string;
+  setSelectedColonyId?: (id: string) => void;
 }
 
 const ColoniesTab = memo(({
@@ -23,7 +25,9 @@ const ColoniesTab = memo(({
   onDefenseThreatAlertChange,
   openDefenseRequest = 0,
   abandonDefenseRequest = 0,
-  defenseAlertsPaused = false
+  defenseAlertsPaused = false,
+  selectedColonyId = 'colony-1',
+  setSelectedColonyId
 }: ColoniesTabProps) => {
   const { 
     language, 
@@ -77,6 +81,8 @@ const ColoniesTab = memo(({
         openDefenseRequest={openDefenseRequest}
         abandonDefenseRequest={abandonDefenseRequest}
         defenseAlertsPaused={defenseAlertsPaused}
+        selectedColonyId={selectedColonyId}
+        setSelectedColonyId={setSelectedColonyId}
       />
     </motion.div>
   );
