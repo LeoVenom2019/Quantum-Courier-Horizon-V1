@@ -116,11 +116,19 @@ import {
   ARCADE_CARD_REWARD_CHANCE,
   ARCADE_CARD_REWARD_RULES,
   ColonyCard,
+  ColonyCardLevels,
+  ColonySectorId,
+  POLITICAL_CARD_SLOTS,
+  SECTOR_CONFIG,
   getBattleEffects,
   getArcadeWildcardPerks,
   getCardBackgroundImage,
+  getCardById,
   getCardClass,
+  getCardLevel,
   getPoliticalEffects,
+  getPoliticalPassiveBonuses,
+  isPoliticalCard,
   normalizeOwnedColonyCardIds,
   rollAnyMissingColonyCardReward,
 } from '@/lib/colony-cards';
@@ -189,6 +197,230 @@ import {
   Battle,
   Language
 } from '@/lib/game-state/types';
+
+const NEW_EARTH_YEAR_SECONDS = 1200;
+const NEW_EARTH_MONTHS_PER_YEAR = 12;
+const NEW_EARTH_MONTH_SECONDS = NEW_EARTH_YEAR_SECONDS / NEW_EARTH_MONTHS_PER_YEAR;
+
+const getNewEarthCalendar = (seconds: number) => {
+  const totalMonths = Math.floor(Math.max(0, seconds) / NEW_EARTH_MONTH_SECONDS);
+  return {
+    years: Math.floor(totalMonths / NEW_EARTH_MONTHS_PER_YEAR),
+    months: (totalMonths % NEW_EARTH_MONTHS_PER_YEAR) + 1,
+  };
+};
+
+const NEW_EARTH_COLONY_MARKERS = [
+  { id: 'gaia', colonyId: 'colony-4', label: 'GAIA', left: '28.8%', top: '37.1%' },
+  { id: 'genesis', colonyId: 'colony-1', label: 'GENESIS', left: '56.3%', top: '58.0%' },
+  { id: 'elysium', colonyId: 'colony-3', label: 'ELYSIUM', left: '65.3%', top: '37.1%' },
+  { id: 'eden', colonyId: 'colony-2', label: 'EDEN', left: '39.3%', top: '65.6%' },
+] as const;
+
+const NEW_EARTH_DANGER_MARKERS = [
+  { id: 'zona-glacial', label: 'ZONA GLACIAL', left: '45.3%', top: '10.5%' },
+  { id: 'oceano-abissal', label: 'OCEANO ABISSAL', left: '13.8%', top: '42.1%' },
+  { id: 'ruinas-europeias', label: 'RUÍNAS EUROPÉIAS', left: '51.3%', top: '38.0%' },
+  { id: 'cemiterio-navios', label: 'CEMITÉRIO DE NAVIOS', left: '45.3%', top: '69.3%' },
+  { id: 'continente-esquecido', label: 'CONTINENTE ESQUECIDO', left: '80.5%', top: '77.0%' },
+] as const;
+
+const NEW_EARTH_SECTOR_ORDER: ColonySectorId[] = ['culture', 'economy', 'health', 'happiness', 'security', 'technology'];
+
+const NEW_EARTH_WAR_MISSION_POOL = [
+  { id: 'land-search-5', title: { pt: 'Faça 5 buscas por suprimentos', en: 'Complete 5 supply searches' }, meta: { pt: 'Buscas por terra', en: 'Land searches' }, progress: '0 / 5', reward: 'QC + recursos diversos + Peças Tec' },
+  { id: 'sea-air-search-3', title: { pt: 'Faça 3 buscas marítimas e aéreas', en: 'Complete 3 sea and air searches' }, meta: { pt: 'Buscas marítimas e aéreas', en: 'Sea and air searches' }, progress: '0 / 3', reward: 'QC + recursos raros + Peças Tec' },
+  { id: 'defense-2', title: { pt: 'Defenda 2 ataques', en: 'Defend 2 attacks' }, meta: { pt: 'Defesas da equipe de busca', en: 'Search team defenses' }, progress: '0 / 2', reward: 'QC + bônus de defesa + recursos' },
+  { id: 'attack-abyssal', title: { pt: 'Ataque o Oceano Abissal', en: 'Attack the Abyssal Ocean' }, meta: { pt: 'Missão de ataque', en: 'Attack mission' }, progress: '0 / 1', reward: 'QC + recursos 2x-4x' },
+  { id: 'attack-glacial', title: { pt: 'Ataque a Zona Glacial', en: 'Attack the Glacial Zone' }, meta: { pt: 'Missão de ataque', en: 'Attack mission' }, progress: '0 / 1', reward: 'QC + suprimentos 2x-4x' },
+  { id: 'space-jump', title: { pt: 'Jogue Salto Espacial', en: 'Play Space Jump' }, meta: { pt: 'Fliperama', en: 'Arcade' }, progress: '0 / 1', reward: 'QC + recursos diversos' },
+  { id: 'grid-5000', title: { pt: 'Faça 5000 pontos em Grid Collapse', en: 'Score 5000 in Grid Collapse' }, meta: { pt: 'Fliperama', en: 'Arcade' }, progress: '0 / 5000', reward: 'QC + Peças Tec + recursos' },
+  { id: 'robot-runner', title: { pt: 'Complete uma fase em Robot Runner', en: 'Complete one Robot Runner phase' }, meta: { pt: 'Fliperama', en: 'Arcade' }, progress: '0 / 1', reward: 'QC + recursos diversos' },
+] as const;
+
+const isNewEarthColonyUnlocked = (colony?: Colony | null) => (
+  Boolean(colony?.constructions?.length) && colony!.constructions.every(construction => construction.isComplete)
+);
+
+const getNewEarthEquippedPoliticalCards = (colony?: Colony | null) => (
+  colony
+    ? POLITICAL_CARD_SLOTS
+        .map(slot => getCardById(colony.equippedCards?.[slot]))
+        .filter((card): card is ColonyCard => Boolean(card && isPoliticalCard(card)))
+    : []
+);
+
+const calculateNewEarthSectors = (colony: Colony, cardLevels: ColonyCardLevels) => {
+  const next = { ...colony.sectors };
+  const equippedCards = getNewEarthEquippedPoliticalCards(colony);
+
+  equippedCards.forEach(card => {
+    const passive = getPoliticalPassiveBonuses(card, cardLevels);
+    if (passive.allSectorBonus) {
+      NEW_EARTH_SECTOR_ORDER.forEach(sector => {
+        next[sector] = Math.min(100, Math.max(0, next[sector] + passive.allSectorBonus!));
+      });
+    }
+
+    getPoliticalEffects(card, cardLevels).forEach(effect => {
+      next[effect.sector] = Math.min(100, Math.max(0, next[effect.sector] + effect.value));
+    });
+  });
+
+  return next;
+};
+
+const getNewEarthWarMissions = (colonyId?: string | null) => {
+  const seed = (colonyId || 'colony-1').split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+  return [...NEW_EARTH_WAR_MISSION_POOL]
+    .map((mission, index) => ({ mission, sort: (index * 17 + seed) % NEW_EARTH_WAR_MISSION_POOL.length }))
+    .sort((a, b) => a.sort - b.sort)
+    .slice(0, 5)
+    .map(({ mission }) => mission);
+};
+
+const NewEarthCardThumb = ({
+  card,
+  language,
+  cardLevels,
+  onClick,
+}: {
+  card?: ColonyCard;
+  language: 'en' | 'pt';
+  cardLevels: ColonyCardLevels;
+  onClick?: () => void;
+}) => {
+  const effects = card ? getPoliticalEffects(card, cardLevels).slice(0, 2) : [];
+
+  if (!card) {
+    return (
+      <div className="mx-auto aspect-[2/3] h-full min-h-0 rounded-xl border border-white/10 bg-black/45 p-2">
+        <div className="flex h-full items-center justify-center rounded-lg border border-dashed border-cyan-300/15 text-center font-mono text-[9px] uppercase tracking-[0.28em] text-cyan-100/35">
+          {language === 'pt' ? 'Slot vazio' : 'Empty slot'}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="group relative mx-auto aspect-[2/3] h-full min-h-0 overflow-hidden rounded-xl border border-cyan-300/25 bg-black text-left shadow-[0_0_18px_rgba(34,211,238,0.12)] transition hover:border-cyan-200/70"
+    >
+      <img src={getCardBackgroundImage(card.rarity)} alt="" className="absolute inset-0 h-full w-full object-cover" />
+      <div className="absolute inset-0 bg-gradient-to-t from-black/86 via-black/18 to-transparent" />
+      <div className="absolute left-2 top-2 z-10 flex max-w-[78%] flex-wrap gap-1">
+        <span className="rounded-full bg-black/58 px-1.5 py-0.5 font-mono text-[5px] font-black uppercase tracking-[0.12em] text-white/85">
+          {card.cardClass === 'battle' ? (language === 'pt' ? 'Batalha' : 'Battle') : language === 'pt' ? 'Política' : 'Political'}
+        </span>
+        <span className="rounded-full bg-black/58 px-1.5 py-0.5 font-mono text-[5px] font-black uppercase tracking-[0.12em] text-white/85">
+          {card.role[language].split(' ')[0]}
+        </span>
+      </div>
+      <div className="absolute inset-x-2 bottom-2 z-10">
+        <p className="line-clamp-2 font-orbitron text-[9px] font-black uppercase leading-tight text-white">{card.name[language]}</p>
+        <p className="mt-1 font-mono text-[8px] uppercase tracking-[0.22em] text-cyan-100/80">LVL {getCardLevel(card.id, cardLevels)} / 10</p>
+        <div className="mt-1 flex flex-wrap gap-1">
+          {effects.map(effect => (
+            <span key={`${card.id}-${effect.sector}`} className="rounded-full border border-emerald-200/25 bg-black/45 px-1.5 py-0.5 font-mono text-[5px] font-black uppercase text-emerald-100">
+              +{effect.value} {SECTOR_CONFIG[effect.sector].label[language]}
+            </span>
+          ))}
+        </div>
+      </div>
+    </button>
+  );
+};
+
+const NewEarthCardDetail = ({
+  card,
+  language,
+  cardLevels,
+  onClose,
+  onNavigate,
+}: {
+  card: ColonyCard;
+  language: 'en' | 'pt';
+  cardLevels: ColonyCardLevels;
+  onClose: () => void;
+  onNavigate: (direction: -1 | 1) => void;
+}) => {
+  const passive = getPoliticalPassiveBonuses(card, cardLevels);
+  const effectPills = [
+    ...getPoliticalEffects(card, cardLevels).map(effect => ({
+      id: `${card.id}-${effect.sector}`,
+      label: `${effect.value >= 0 ? '+' : ''}${effect.value} ${SECTOR_CONFIG[effect.sector].label[language]}`,
+    })),
+    ...(passive.allSectorBonus ? [{
+      id: `${card.id}-all-sector`,
+      label: `${passive.allSectorBonus >= 0 ? '+' : ''}${passive.allSectorBonus} ${language === 'pt' ? 'Todos os setores' : 'All sectors'}`
+    }] : []),
+    ...(passive.constructorsAllColonies ? [{
+      id: `${card.id}-constructors`,
+      label: `${passive.constructorsAllColonies >= 0 ? '+' : ''}${passive.constructorsAllColonies} ${language === 'pt' ? 'Robôs construtores' : 'Builder robots'}`
+    }] : []),
+  ];
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="absolute inset-0 z-40 flex items-center justify-center bg-black/86 backdrop-blur-sm"
+    >
+      <motion.div
+        initial={{ y: 16, scale: 0.96 }}
+        animate={{ y: 0, scale: 1 }}
+        exit={{ y: 12, scale: 0.98 }}
+        className="relative flex h-[92%] w-full max-w-[520px] items-center justify-center"
+      >
+        <button type="button" onClick={() => onNavigate(-1)} className="absolute left-0 top-1/2 z-20 -translate-y-1/2 rounded-full border border-white/10 bg-white/8 p-3 text-cyan-100 hover:bg-white/14">
+          <ChevronLeft size={22} />
+        </button>
+        <button type="button" onClick={() => onNavigate(1)} className="absolute right-0 top-1/2 z-20 -translate-y-1/2 rounded-full border border-white/10 bg-white/8 p-3 text-cyan-100 hover:bg-white/14">
+          <ChevronRight size={22} />
+        </button>
+        <button type="button" onClick={onClose} className="absolute right-4 top-4 z-20 rounded-full border border-white/10 bg-white/8 p-2 text-cyan-100 hover:bg-white/14">
+          <X size={18} />
+        </button>
+
+        <div className="relative aspect-[2/3] h-full max-h-[760px] overflow-hidden rounded-[3.8%] border border-cyan-100/45 bg-black shadow-[0_0_45px_rgba(34,211,238,0.18)]">
+          <img src={getCardBackgroundImage(card.rarity)} alt={card.name[language]} className="absolute inset-0 h-full w-full object-cover" />
+          <div className="absolute inset-0 bg-gradient-to-b from-black/8 via-transparent to-black/18" />
+          <div className="absolute left-[11%] right-[11%] top-[18%]">
+            <div className="flex flex-wrap gap-2">
+              <span className="rounded-full bg-black/70 px-2.5 py-1 font-mono text-[10px] font-black uppercase tracking-[0.14em] text-white">
+                {card.cardClass === 'battle' ? (language === 'pt' ? 'Batalha' : 'Battle') : language === 'pt' ? 'Política' : 'Political'}
+              </span>
+              <span className="rounded-full bg-black/70 px-2.5 py-1 font-mono text-[10px] font-black uppercase tracking-[0.14em] text-white">
+                {card.role[language]}
+              </span>
+            </div>
+            <h3 className="mt-4 rounded-md bg-black/72 px-2.5 py-2 font-orbitron text-lg font-black uppercase leading-tight text-white">
+              {card.name[language]}
+            </h3>
+            <p className="mt-3 rounded-md bg-black/62 px-2.5 py-2 text-sm font-bold leading-relaxed text-white">
+              {card.lore[language]}
+            </p>
+          </div>
+          <div className="absolute bottom-[8%] left-[11%] right-[11%]">
+            <span className="rounded-full bg-black/78 px-3 py-1.5 font-mono text-[10px] font-black uppercase tracking-[0.14em] text-white">
+              LVL {getCardLevel(card.id, cardLevels)} / 10
+            </span>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {effectPills.map(effect => (
+                <span key={effect.id} className="rounded-full border border-emerald-200/45 bg-black/68 px-3 py-1.5 font-mono text-[10px] font-black uppercase tracking-[0.12em] text-emerald-100">
+                  {effect.label}
+                </span>
+              ))}
+            </div>
+          </div>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+};
 
 
 
@@ -522,6 +754,10 @@ const DashboardContent = memo(({
   const [abandonRoute4DefenseRequest, setAbandonRoute4DefenseRequest] = useState(0);
   const [pendingArcadeDefenseGameId, setPendingArcadeDefenseGameId] = useState<string | null>(null);
   const [selectedColonyId, setSelectedColonyId] = useState<string>('colony-1');
+  const [newEarthCardLevels, setNewEarthCardLevels] = useState<ColonyCardLevels>({});
+  const [selectedNewEarthColonyId, setSelectedNewEarthColonyId] = useState<string | null>(null);
+  const [selectedNewEarthCardIndex, setSelectedNewEarthCardIndex] = useState<number | null>(null);
+  const [newEarthMapFeedback, setNewEarthMapFeedback] = useState<string | null>(null);
 
   const isInterstellar = useMemo(() => routeTier === 'Interstellar', [routeTier]);
   const isVoid = useMemo(() => routeTier === 'Void', [routeTier]);
@@ -549,6 +785,19 @@ const DashboardContent = memo(({
       preloadAssetGroupPassive('card-frames');
     }
   }, [activeTab]);
+
+  useEffect(() => {
+    let mounted = true;
+    GameStorage.load('colony_card_levels').then(saved => {
+      if (!mounted) return;
+      if (saved && typeof saved === 'object') {
+        setNewEarthCardLevels(saved as ColonyCardLevels);
+      }
+    });
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const [selectedReward, setSelectedReward] = useState<{
     level: number;
@@ -908,11 +1157,7 @@ const DashboardContent = memo(({
 
 
   const gameTime = useMemo(() => {
-    const totalDays = Math.floor(gameTimeSeconds * 0.75);
-    const years = Math.floor(totalDays / 360);
-    const months = Math.floor((totalDays % 360) / 30);
-    const days = totalDays % 30;
-    return { years, months, days };
+    return getNewEarthCalendar(gameTimeSeconds);
   }, [gameTimeSeconds]);
 
   const setRouteTier = useCallback((tier: 'Solar' | 'Interstellar' | 'Void' | 'Earth') => {
@@ -924,9 +1169,10 @@ const DashboardContent = memo(({
   }, [dispatch]);
 
   const setGameTimeSeconds = useCallback((val: number | ((prev: number) => number)) => {
-    const nextVal = typeof val === 'function' ? val(gameTimeSeconds) : val;
+    const nextVal = typeof val === 'function' ? val(gameTimeSecondsRef.current) : val;
+    gameTimeSecondsRef.current = nextVal;
     dispatch({ type: 'SET_GAME_TIME', payload: { seconds: nextVal } });
-  }, [gameTimeSeconds, dispatch]);
+  }, [dispatch]);
 
   const isArcadeUnlocked = routeTier === 'Earth';
   const isNeon = false;
@@ -1067,6 +1313,57 @@ const DashboardContent = memo(({
     }
     setActiveTab(tab as any);
   }, [playSfx, setActiveTab]);
+
+  const selectedNewEarthColony = useMemo(
+    () => colonies.find((colony: Colony) => colony.id === selectedNewEarthColonyId) || null,
+    [colonies, selectedNewEarthColonyId]
+  );
+
+  const selectedNewEarthColonyCards = useMemo(
+    () => getNewEarthEquippedPoliticalCards(selectedNewEarthColony),
+    [selectedNewEarthColony]
+  );
+
+  const selectedNewEarthColonySectors = useMemo(
+    () => selectedNewEarthColony ? calculateNewEarthSectors(selectedNewEarthColony, newEarthCardLevels) : null,
+    [newEarthCardLevels, selectedNewEarthColony]
+  );
+
+  const selectedNewEarthWarMissions = useMemo(
+    () => getNewEarthWarMissions(selectedNewEarthColony?.id),
+    [selectedNewEarthColony?.id]
+  );
+
+  const selectedNewEarthCard = selectedNewEarthCardIndex !== null
+    ? selectedNewEarthColonyCards[selectedNewEarthCardIndex]
+    : undefined;
+
+  const handleNewEarthColonyMarkerClick = useCallback((colonyId: string) => {
+    const colony = colonies.find((item: Colony) => item.id === colonyId);
+    if (!colony || !isNewEarthColonyUnlocked(colony)) {
+      setNewEarthMapFeedback(
+        language === 'pt'
+          ? 'Visita bloqueada: conclua todas as construções desta colônia.'
+          : 'Visit blocked: complete every construction in this colony.'
+      );
+      playSfx('warning_gaming');
+      return;
+    }
+
+    setSelectedNewEarthColonyId(colony.id);
+    setSelectedNewEarthCardIndex(null);
+    setNewEarthMapFeedback(null);
+    playSfx('aba_click');
+  }, [colonies, language, playSfx]);
+
+  const navigateNewEarthCard = useCallback((direction: -1 | 1) => {
+    setSelectedNewEarthCardIndex(current => {
+      if (!selectedNewEarthColonyCards.length) return null;
+      const safeCurrent = current ?? 0;
+      return (safeCurrent + direction + selectedNewEarthColonyCards.length) % selectedNewEarthColonyCards.length;
+    });
+    playSfx('view_card');
+  }, [playSfx, selectedNewEarthColonyCards.length]);
 
 
   const setQc = useCallback((val: number | ((prev: number) => number)) => {
@@ -1432,6 +1729,7 @@ const DashboardContent = memo(({
     // Keep all permanent milestones or records
     const permanentEvents = uniqueItems.filter((item: any) => 
       item.permanent === true || 
+      item.isFixed === true ||
       item.importance === 'mythic' || 
       item.importance === 'population' || 
       item.importance === 'epic' || 
@@ -1441,6 +1739,7 @@ const DashboardContent = memo(({
     // Keep non-permanent events and slice them to the 50 most recent
     const nonPermanentEvents = uniqueItems.filter((item: any) => 
       !(item.permanent === true || 
+        item.isFixed === true ||
         item.importance === 'mythic' || 
         item.importance === 'population' || 
         item.importance === 'epic' || 
@@ -1718,9 +2017,7 @@ const DashboardContent = memo(({
 
   // Persistent refs for Earth simulation
   const generateEarthEvent = useCallback(() => {
-    const totalDays = Math.floor(gameTimeSecondsRef.current * 0.75);
-    const year = Math.floor(totalDays / 360);
-    const month = Math.floor((totalDays % 360) / 30) + 1;
+    const { years: year, months: month } = getNewEarthCalendar(gameTimeSecondsRef.current);
 
     // Fixed Comic Events
     const fixedEvents = [
@@ -1953,22 +2250,210 @@ const DashboardContent = memo(({
           desc: { pt: 'Uma espécie de roedor local altamente curiosa e brincalhona invade a praça de alimentação de uma das colônias em busca de petiscos, virando a atração turística do mês.', en: 'A highly curious and playful local rodent species invades a colony\'s food court in search of snacks, becoming the month\'s top tourist attraction.' },
           impactType: 'happiness',
           impact: 8
+        },
+        {
+          name: { pt: 'Comboio Fantasma', en: 'Ghost Convoy' },
+          desc: { pt: 'Um antigo comboio automatizado foi encontrado atravessando lentamente uma estrada destruída. Os veículos estavam vazios, mas carregados com caixas intactas de metais raros, polímeros industriais e peças de construção esquecidas há décadas. +450 Materiais', en: 'An old automated convoy was found slowly crossing a destroyed road. The vehicles were empty, but loaded with intact crates of rare metals, industrial polymers, and construction parts forgotten for decades. +450 Materials' },
+          impactType: 'colonySupply',
+          impact: 4,
+          supplies: { materials: 450 },
+          rarity: 'common',
+          weight: 0.25,
+          cooldownYears: 2 + Math.floor(Math.random() * 2)
+        },
+        {
+          name: { pt: 'Ruínas da Megaestrutura', en: 'Megastructure Ruins' },
+          desc: { pt: 'Exploradores localizaram os restos de uma antiga megaestrutura soterrada sob areia tóxica. Após horas de escavação, toneladas de ligas reaproveitáveis foram extraídas antes do colapso parcial do local. +500 Materiais', en: 'Explorers located the remains of an ancient megastructure buried under toxic sand. After hours of excavation, tons of reusable alloys were extracted before the site partially collapsed. +500 Materials' },
+          impactType: 'colonySupply',
+          impact: 4,
+          supplies: { materials: 500 },
+          rarity: 'common',
+          weight: 0.25,
+          cooldownYears: 2 + Math.floor(Math.random() * 2)
+        },
+        {
+          name: { pt: 'Jardim Radioativo', en: 'Radioactive Garden' },
+          desc: { pt: 'Uma região contaminada revelou espécies vegetais mutantes extremamente nutritivas. Apesar da aparência grotesca, a biomassa extraída pode ser convertida em combustível orgânico e alimento sintético. +380 Biomassa', en: 'A contaminated region revealed extremely nutritious mutant plant species. Despite their grotesque appearance, the extracted biomass can be converted into organic fuel and synthetic food. +380 Biomass' },
+          impactType: 'colonySupply',
+          impact: 4,
+          supplies: { biomass: 380 },
+          rarity: 'common',
+          weight: 0.25,
+          cooldownYears: 2 + Math.floor(Math.random() * 2)
+        },
+        {
+          name: { pt: 'Chuva Verde', en: 'Green Rain' },
+          desc: { pt: 'Uma tempestade química cobriu parte da rota com uma névoa esverdeada. Após a chuva, fungos gigantes cresceram rapidamente nos destroços metálicos da cidade. +450 Biomassa', en: 'A chemical storm covered part of the route with a greenish mist. After the rain, giant fungi quickly grew across the city\'s metal wreckage. +450 Biomass' },
+          impactType: 'colonySupply',
+          impact: 4,
+          supplies: { biomass: 450 },
+          rarity: 'common',
+          weight: 0.25,
+          cooldownYears: 2 + Math.floor(Math.random() * 2)
+        },
+        {
+          name: { pt: 'Núcleo de Nave Antiga', en: 'Ancient Ship Core' },
+          desc: { pt: 'Os scanners detectaram uma nave parcialmente enterrada sob o concreto destruído. O interior continha módulos eletrônicos extremamente avançados, impossíveis de fabricar atualmente. +200 Peças Tecnológicas', en: 'Scanners detected a ship partially buried under ruined concrete. Inside were extremely advanced electronic modules that cannot currently be manufactured. +200 Tech Parts' },
+          impactType: 'colonySupply',
+          impact: 4,
+          supplies: { tech: 200 },
+          rarity: 'common',
+          weight: 0.25,
+          cooldownYears: 2 + Math.floor(Math.random() * 2)
+        },
+        {
+          name: { pt: 'Laboratório Selado', en: 'Sealed Laboratory' },
+          desc: { pt: 'Uma instalação subterrânea permaneceu intacta após décadas. Entre os destroços, foram encontrados processadores quânticos e interfaces militares raríssimas. +300 Peças Tecnológicas', en: 'An underground facility remained intact for decades. Among the wreckage, rare quantum processors and military interfaces were found. +300 Tech Parts' },
+          impactType: 'colonySupply',
+          impact: 4,
+          supplies: { tech: 300 },
+          rarity: 'common',
+          weight: 0.25,
+          cooldownYears: 2 + Math.floor(Math.random() * 2)
+        },
+        {
+          name: { pt: 'Arsenal Abandonado', en: 'Abandoned Arsenal' },
+          desc: { pt: 'Uma antiga fortaleza automática foi encontrada desativada na periferia de um quartel em ruínas. Após neutralizar drones defensivos restantes, a equipe recuperou núcleos energéticos militares ainda operacionais. +200 Núcleos de Defesa', en: 'An old automated fortress was found inactive near a ruined military base. After neutralizing remaining defensive drones, the team recovered military energy cores that still worked. +200 Defense Cores' },
+          impactType: 'colonySupply',
+          impact: 4,
+          supplies: { defense: 200 },
+          rarity: 'common',
+          weight: 0.25,
+          cooldownYears: 2 + Math.floor(Math.random() * 2)
+        },
+        {
+          name: { pt: 'Torre Sentinela', en: 'Sentinel Tower' },
+          desc: { pt: 'Uma torre de vigilância ancestral continuava funcionando parcialmente, alimentada por energia desconhecida. O núcleo principal foi removido antes da estrutura entrar em colapso. +250 Núcleos de Defesa', en: 'An ancient surveillance tower was still partially operating, powered by unknown energy. The main core was removed before the structure collapsed. +250 Defense Cores' },
+          impactType: 'colonySupply',
+          impact: 4,
+          supplies: { defense: 250 },
+          rarity: 'common',
+          weight: 0.25,
+          cooldownYears: 2 + Math.floor(Math.random() * 2)
+        },
+        {
+          name: { pt: 'Colônia Sobrevivente', en: 'Survivor Colony' },
+          desc: { pt: 'Uma pequena comunidade isolada foi descoberta e, depois de discussões políticas, resolveu se juntar a {colonyName}. +750 Comida e +10k Habitantes para a colônia.', en: 'A small isolated community was discovered and, after political discussions, decided to join {colonyName}. +750 Food and +10k population for the colony.' },
+          impactType: 'colonySupply',
+          impact: 4,
+          supplies: { food: 750 },
+          colonyPopulation: 10000,
+          rarity: 'common',
+          weight: 0.25,
+          cooldownYears: 2 + Math.floor(Math.random() * 2)
+        },
+        {
+          name: { pt: 'Oceano Morto', en: 'Dead Ocean' },
+          desc: { pt: 'Pescadores automatizados ainda operavam em uma costa devastada da antiga Namuraza. As redes continham criaturas marinhas mutantes, mas ainda próprias para processamento alimentar. +950 Comida', en: 'Automated fishing systems were still operating on a devastated coast of ancient Namuraza. Their nets contained mutant sea creatures, but they were still suitable for food processing. +950 Food' },
+          impactType: 'colonySupply',
+          impact: 4,
+          supplies: { food: 950 },
+          rarity: 'common',
+          weight: 0.25,
+          cooldownYears: 2 + Math.floor(Math.random() * 2)
+        },
+        {
+          name: { pt: 'Hospital Congelado', en: 'Frozen Hospital' },
+          desc: { pt: 'Uma ala subterrânea de emergência permaneceu preservada pelo frio extremo. Medicamentos raros e kits cirúrgicos intactos foram recuperados. +400 Insumos Médicos', en: 'An underground emergency wing was preserved by extreme cold. Rare medicines and intact surgical kits were recovered. +400 Medical Inputs' },
+          impactType: 'colonySupply',
+          impact: 4,
+          supplies: { meds: 400 },
+          rarity: 'common',
+          weight: 0.25,
+          cooldownYears: 2 + Math.floor(Math.random() * 2)
+        },
+        {
+          name: { pt: 'Drone de Resgate', en: 'Rescue Drone' },
+          desc: { pt: 'Um drone médico automático ainda seguia sua programação original, distribuindo caixas de primeiros socorros em áreas devastadas. Após rastrear seu trajeto, o esquadrão encontrou o depósito principal. +650 Insumos Médicos', en: 'An automatic medical drone was still following its original programming, distributing first-aid boxes in devastated areas. After tracking its route, the squad found the main depot. +650 Medical Inputs' },
+          impactType: 'colonySupply',
+          impact: 4,
+          supplies: { meds: 650 },
+          rarity: 'common',
+          weight: 0.25,
+          cooldownYears: 2 + Math.floor(Math.random() * 2)
         }
       ];
-      eventSource = eventPoolSource[Math.floor(Math.random() * eventPoolSource.length)];
+      const normalizeEventKey = (value: string) => value
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-|-$/g, '');
+
+      const getEventKey = (event: any) => {
+        if (event?.eventKey) return String(event.eventKey);
+        if (typeof event?.name === 'string') return normalizeEventKey(event.name);
+        if (event?.name?.pt) return normalizeEventKey(event.name.pt);
+        return String(event?.id || '');
+      };
+
+      const recentEvents = [...earthEventsRef.current]
+        .filter((event: any) => event && !event.isFixed && event.type !== 'population')
+        .sort((a: any, b: any) => (b.timestamp || 0) - (a.timestamp || 0));
+      const recentlyUsedKeys = new Set(recentEvents.slice(0, 12).map(getEventKey));
+      const repeatCooldownYears = 6;
+      const isCandidateUnderCooldown = (candidate: any, candidateKey: string) => {
+        const previousMatch = recentEvents.find((event: any) => getEventKey(event) === candidateKey);
+        if (!previousMatch || typeof previousMatch.year !== 'number') return false;
+        const cooldownYears = previousMatch.cooldownYears || candidate.cooldownYears || repeatCooldownYears;
+        return year - previousMatch.year < cooldownYears;
+      };
+      const eligibleEventPool = eventPoolSource.filter(candidate => {
+        const candidateKey = normalizeEventKey(candidate.name.pt);
+        if (recentlyUsedKeys.has(candidateKey)) return false;
+        return !isCandidateUnderCooldown(candidate, candidateKey);
+      });
+      const fallbackEventPool = eventPoolSource.filter(candidate => {
+        const candidateKey = normalizeEventKey(candidate.name.pt);
+        return !recentlyUsedKeys.has(candidateKey) && !isCandidateUnderCooldown(candidate, candidateKey);
+      });
+      const emergencyFallbackPool = eventPoolSource.filter(candidate => {
+        const candidateKey = normalizeEventKey(candidate.name.pt);
+        return candidate.impactType !== 'colonySupply' || !isCandidateUnderCooldown(candidate, candidateKey);
+      });
+      const sourcePool = eligibleEventPool.length > 0
+        ? eligibleEventPool
+        : (fallbackEventPool.length > 0 ? fallbackEventPool : emergencyFallbackPool);
+
+      const totalWeight = sourcePool.reduce((sum: number, candidate: any) => sum + (candidate.weight || 1), 0);
+      let roll = Math.random() * totalWeight;
+      eventSource = sourcePool.find((candidate: any) => {
+        roll -= candidate.weight || 1;
+        return roll <= 0;
+      }) || sourcePool[sourcePool.length - 1];
     }
 
     const source = eventSource as any;
+    const colonyPopulationCandidates = (coloniesRef.current || []).filter((colony: Colony) => colony.isHabitable || colony.population > 0);
+    const selectedResourceColony = source.colonyPopulation
+      ? (colonyPopulationCandidates.length > 0 ? colonyPopulationCandidates : (coloniesRef.current || []))[Math.floor(Math.random() * Math.max(1, (colonyPopulationCandidates.length > 0 ? colonyPopulationCandidates : (coloniesRef.current || [])).length))]
+      : null;
+    const selectedResourceColonyName = selectedResourceColony?.name || (language === 'pt' ? 'uma colônia pioneira' : 'a pioneer colony');
+    const sourceDescription = language === 'pt' ? source.desc.pt : source.desc.en;
     const newEvent = {
       id: `ev-v2-${Date.now()}-${Math.floor(Math.random() * 1000000)}`,
       year: isFixed ? source.year : year,
       month: isFixed ? 1 : month,
       name: language === 'pt' ? source.name.pt : source.name.en,
-      description: language === 'pt' ? source.desc.pt : source.desc.en,
+      description: String(sourceDescription).replace('{colonyName}', selectedResourceColonyName),
+      eventKey: source.name?.pt
+        ? source.name.pt
+          .toLowerCase()
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/^-|-$/g, '')
+        : undefined,
       type: isFixed ? 'fixed' : source.impactType,
       isFixed,
       importance: isFixed ? 'major' : (source.impact >= 10 ? 'major' : (source.impact >= 7 ? 'relevant' : 'important')),
-      permanent: false,
+      permanent: isFixed,
+      unique: isFixed,
+      rarity: source.rarity,
+      cooldownYears: source.cooldownYears,
+      supplies: source.supplies,
+      colonyPopulation: source.colonyPopulation,
+      targetColonyId: selectedResourceColony?.id,
       specialStyles,
       timestamp: Date.now()
     };
@@ -1977,6 +2462,38 @@ const DashboardContent = memo(({
 
     // Apply impacts if not fixed (or add minor boost if fixed)
     if (!isFixed) {
+      if (source.impactType === 'colonySupply' && source.supplies) {
+        const supplyAwardEvent = new CustomEvent('qch:colony-supplies-awarded', {
+          detail: source.supplies,
+          cancelable: true,
+        });
+        const handledByColonySystem = !window.dispatchEvent(supplyAwardEvent);
+        if (!handledByColonySystem) {
+          GameStorage.load('colony_supplies_data')
+            .then(saved => {
+              const current = saved && typeof saved === 'object' ? saved : {};
+              const nextSupplies = Object.entries(source.supplies).reduce((acc: Record<string, number>, [key, value]) => {
+                acc[key] = Math.max(0, Math.floor(Number(acc[key] || 0) + Number(value || 0)));
+                return acc;
+              }, { ...current });
+              return GameStorage.save(nextSupplies, 'colony_supplies_data');
+            })
+            .catch(error => console.warn('Failed to persist colony supply event reward', error));
+        }
+      }
+
+      if (source.colonyPopulation && selectedResourceColony) {
+        setColonies(prev => prev.map((colony: Colony) => (
+          colony.id === selectedResourceColony.id
+            ? {
+              ...colony,
+              population: colony.population + source.colonyPopulation,
+              maxPopulation: Math.max(colony.maxPopulation, colony.population + source.colonyPopulation),
+            }
+            : colony
+        )));
+      }
+
       const impact = source.impact;
       const updates: Partial<EarthState> = {};
       switch (source.impactType) {
@@ -1986,18 +2503,23 @@ const DashboardContent = memo(({
         case 'security': updates.security = Math.min(100, Math.max(0, earthSecurityRef.current + impact)); break;
         case 'qualityOfLife': updates.qualityOfLife = Math.min(100, Math.max(0, earthQualityOfLifeRef.current + impact)); break;
       }
+      if (typeof updates.biodiversity === 'number') earthBiodiversityRef.current = updates.biodiversity;
+      if (typeof updates.health === 'number') earthHealthRef.current = updates.health;
+      if (typeof updates.happiness === 'number') earthHappinessRef.current = updates.happiness;
+      if (typeof updates.security === 'number') earthSecurityRef.current = updates.security;
+      if (typeof updates.qualityOfLife === 'number') earthQualityOfLifeRef.current = updates.qualityOfLife;
       dispatch({ type: 'UPDATE_EARTH_STATE', payload: updates });
     } else {
       // Fixed events give a small global boost
-      dispatch({ type: 'UPDATE_EARTH_STATE', payload: { happiness: Math.min(100, earthHappinessRef.current + 2) } });
+      const nextHappiness = Math.min(100, earthHappinessRef.current + 2);
+      earthHappinessRef.current = nextHappiness;
+      dispatch({ type: 'UPDATE_EARTH_STATE', payload: { happiness: nextHappiness } });
     }
   }, [language]);
 
   // Global Game Time & Earth Simulation Loop (Route 4)
   useEffect(() => {
     if (!isLoaded) return;
-
-    const BASE_YEAR_SECONDS = 1200; // 20 minutes = 1200 seconds (Reduced speed by 60%)
 
     const interval = setInterval(() => {
       // 0. Time Acceleration Factor
@@ -2008,12 +2530,14 @@ const DashboardContent = memo(({
 
       // 1. Time Progression (Global - Only in Route 4)
       if (routeTierRef.current === 'Earth') {
-        setGameTimeSeconds(prev => prev + (timeFactor * 1));
+        const nextGameTimeSeconds = gameTimeSecondsRef.current + timeFactor;
+        gameTimeSecondsRef.current = nextGameTimeSeconds;
+        dispatch({ type: 'SET_GAME_TIME', payload: { seconds: nextGameTimeSeconds } });
       }
 
       // 2. Earth Specific Logic (Route 4)
       if (routeTierRef.current === 'Earth') {
-        const nextYear = gameTimeSecondsRef.current / BASE_YEAR_SECONDS;
+        const nextYear = gameTimeSecondsRef.current / NEW_EARTH_YEAR_SECONDS;
         // Calculate season (0-3)
         const seasonProgress = (nextYear % 1) * 4;
 
@@ -2030,7 +2554,7 @@ const DashboardContent = memo(({
         updates.maleRatio = Math.max(0.45, Math.min(0.55, earthMaleRatioRef.current + ratioVariation));
 
         // 3. Indicators Evolution (Natural growth)
-        const yearFraction = timeFactor / BASE_YEAR_SECONDS;
+        const yearFraction = timeFactor / NEW_EARTH_YEAR_SECONDS;
         const boostPerYear = earthProjectBoostCountRef.current * 0.05; // 0.05% boost per year per 10k allocation
         const boostFraction = (boostPerYear * yearFraction) / 100;
 
@@ -2048,6 +2572,11 @@ const DashboardContent = memo(({
         const qolBonus = isPlaying ? (0.015 * yearFraction) : 0;
         updates.qualityOfLife = Math.min(100, earthQualityOfLifeRef.current + (0.008 * (1 - (earthQualityOfLifeRef.current / 100)) * yearFraction + qolBonus + boostFraction));
 
+        earthBiodiversityRef.current = updates.biodiversity;
+        earthHealthRef.current = updates.health;
+        earthHappinessRef.current = updates.happiness;
+        earthSecurityRef.current = updates.security;
+        earthQualityOfLifeRef.current = updates.qualityOfLife;
         dispatch({ type: 'UPDATE_EARTH_STATE', payload: updates });
 
         // 4. Random Events (Route 4 Event frequency increased)
@@ -2305,9 +2834,7 @@ const DashboardContent = memo(({
           };
           const gameName = gameNames[gameId] || gameId;
           const previousRecord = arcadeScoresRef.current[gameId] || 0;
-          const totalDays = Math.floor(gameTimeSecondsRef.current * 0.75);
-          const evYear = Math.floor(totalDays / 360);
-          const evMonth = Math.floor((totalDays % 360) / 30) + 1;
+          const { years: evYear, months: evMonth } = getNewEarthCalendar(gameTimeSecondsRef.current);
 
           if (score > previousRecord) {
             // New Record Beaten!
@@ -7711,51 +8238,203 @@ const DashboardContent = memo(({
                       <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_38%,transparent_0%,rgba(0,0,0,0.28)_72%)]" />
                       <div className="pointer-events-none absolute inset-6 z-10 rounded-2xl border border-cyan-300/20 bg-black/10 backdrop-blur-[0.5px]" />
                       <div className="absolute inset-0 z-20">
-                        {[
-                          { id: 'gaia', colonyId: 'colony-4', label: 'GAIA', left: '28.8%', top: '37.1%', tone: 'green' },
-                          { id: 'genesis', colonyId: 'colony-1', label: 'GENESIS', left: '56.3%', top: '58.0%', tone: 'green' },
-                          { id: 'elysium', colonyId: 'colony-3', label: 'ELYSIUM', left: '65.3%', top: '37.1%', tone: 'green' },
-                          { id: 'eden', colonyId: 'colony-2', label: 'EDEN', left: '39.3%', top: '65.6%', tone: 'green' },
-                          { id: 'zona-glacial', label: 'ZONA GLACIAL', left: '45.3%', top: '10.5%', tone: 'red' },
-                          { id: 'oceano-abissal', label: 'OCEANO ABISSAL', left: '13.8%', top: '42.1%', tone: 'red' },
-                          { id: 'ruinas-europeias', label: 'RUÍNAS EUROPÉIAS', left: '51.3%', top: '38.0%', tone: 'red' },
-                          { id: 'cemiterio-navios', label: 'CEMITÉRIO DE NAVIOS', left: '45.3%', top: '69.3%', tone: 'red' },
-                          { id: 'continente-esquecido', label: 'CONTINENTE ESQUECIDO', left: '80.5%', top: '77.0%', tone: 'red' },
-                        ].map((marker) => {
-                          const colony = marker.colonyId ? colonies.find((c: any) => c.id === marker.colonyId) : null;
-                          const isComplete = colony ? colony.constructions.every((c: any) => c.isComplete) : false;
-                          const isClickable = marker.tone === 'green' && (marker.id === 'genesis' || isComplete);
+                        {NEW_EARTH_COLONY_MARKERS.map((marker) => {
+                          const colony = colonies.find((item: Colony) => item.id === marker.colonyId);
+                          const unlocked = isNewEarthColonyUnlocked(colony);
 
                           return (
                             <button
-                              key={marker.id}
                               type="button"
-                              onClick={() => {
-                                if (isClickable && marker.colonyId) {
-                                  playSfx('aba_click');
-                                  setSelectedColonyId(marker.colonyId);
-                                  setActiveTab('colonies');
-                                }
-                              }}
-                              disabled={!isClickable}
-                              className={`absolute bg-transparent border-0 p-0 outline-none text-left transition-all group ${isClickable ? 'cursor-pointer hover:scale-110 active:scale-95' : 'cursor-default opacity-85'}`}
+                              key={marker.id}
+                              onClick={() => handleNewEarthColonyMarkerClick(marker.colonyId)}
+                              className={`absolute h-8 w-8 text-left transition ${unlocked ? 'cursor-pointer hover:scale-110' : 'cursor-not-allowed opacity-70 grayscale-[0.35]'}`}
                               style={{ left: marker.left, top: marker.top }}
                             >
                               <span
-                                className={`absolute left-0 top-0 h-8 w-8 rounded-full border ${marker.tone === 'red' ? 'border-red-300/70' : 'border-emerald-300/70'} ${isClickable ? 'group-hover:border-emerald-300/90 shadow-[0_0_12px_rgba(52,211,153,0.3)]' : ''}`}
+                                className={`absolute left-0 top-0 h-8 w-8 rounded-full border ${unlocked ? 'border-emerald-300/70' : 'border-slate-300/45'}`}
                                 style={{ animation: 'newEarthRadarPulse 2.2s ease-out infinite' }}
                               />
                               <span
-                                className={`absolute left-0 top-0 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full border ${marker.tone === 'red' ? 'border-red-100/80 bg-red-400/85' : 'border-emerald-100/80 bg-emerald-300/85'} ${isClickable ? 'group-hover:bg-white group-hover:border-white shadow-[0_0_14px_rgba(52,211,153,0.9)]' : ''}`}
-                                style={{ animation: `${marker.tone === 'red' ? 'newEarthDangerDot' : 'newEarthRadarDot'} 2.2s ease-in-out infinite` }}
+                                className={`absolute left-0 top-0 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full border ${unlocked ? 'border-emerald-100/80 bg-emerald-300/85' : 'border-slate-100/70 bg-slate-400/80'}`}
+                                style={{ animation: 'newEarthRadarDot 2.2s ease-in-out infinite' }}
                               />
-                              <span className={`absolute left-4 top-[-1.15rem] whitespace-nowrap rounded-full border bg-black/45 px-2 py-0.5 font-mono text-[8px] font-bold uppercase tracking-[0.22em] ${marker.tone === 'red' ? 'border-red-300/20 text-red-100 shadow-[0_0_14px_rgba(239,68,68,0.18)]' : 'border-emerald-300/20 text-emerald-100 shadow-[0_0_14px_rgba(16,185,129,0.18)]'} ${isClickable ? 'group-hover:border-emerald-400/60 group-hover:text-white' : ''}`}>
+                              {!unlocked && (
+                                <Lock size={12} className="absolute -left-1 -top-6 text-slate-100 drop-shadow-[0_0_8px_rgba(0,0,0,0.9)]" />
+                              )}
+                              <span className={`absolute left-4 top-[-1.15rem] whitespace-nowrap rounded-full border bg-black/45 px-2 py-0.5 font-mono text-[8px] font-bold uppercase tracking-[0.22em] ${unlocked ? 'border-emerald-300/20 text-emerald-100 shadow-[0_0_14px_rgba(16,185,129,0.18)]' : 'border-slate-300/20 text-slate-100 shadow-[0_0_14px_rgba(148,163,184,0.16)]'}`}>
                                 {marker.label}
                               </span>
                             </button>
                           );
                         })}
+
+                        {NEW_EARTH_DANGER_MARKERS.map((marker) => (
+                          <button
+                            type="button"
+                            key={marker.id}
+                            onClick={() => {
+                              setNewEarthMapFeedback(language === 'pt' ? 'Zona hostil. Operação ainda indisponível.' : 'Hostile zone. Operation unavailable.');
+                              playSfx('warning_gaming');
+                            }}
+                            className="absolute cursor-not-allowed text-left transition hover:scale-105"
+                            style={{ left: marker.left, top: marker.top }}
+                          >
+                            <span
+                              className="absolute left-0 top-0 h-8 w-8 rounded-full border border-red-300/70"
+                              style={{ animation: 'newEarthRadarPulse 2.2s ease-out infinite' }}
+                            />
+                            <span
+                              className="absolute left-0 top-0 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full border border-red-100/80 bg-red-400/85"
+                              style={{ animation: 'newEarthDangerDot 2.2s ease-in-out infinite' }}
+                            />
+                            <span className="absolute left-4 top-[-1.15rem] whitespace-nowrap rounded-full border border-red-300/20 bg-black/45 px-2 py-0.5 font-mono text-[8px] font-bold uppercase tracking-[0.22em] text-red-100 shadow-[0_0_14px_rgba(239,68,68,0.18)]">
+                              {marker.label}
+                            </span>
+                          </button>
+                        ))}
                       </div>
+                      <AnimatePresence>
+                        {newEarthMapFeedback && (
+                          <motion.div
+                            initial={{ opacity: 0, y: 14 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: 14 }}
+                            className="absolute bottom-8 left-1/2 z-40 -translate-x-1/2 rounded-2xl border border-red-300/35 bg-red-950/80 px-5 py-3 font-orbitron text-xs font-black uppercase tracking-[0.18em] text-red-100 shadow-[0_0_24px_rgba(239,68,68,0.25)]"
+                          >
+                            {newEarthMapFeedback}
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                      <AnimatePresence>
+                        {selectedNewEarthColony && selectedNewEarthColonySectors && (
+                          <motion.div
+                            initial={{ opacity: 0, scale: 0.97, y: 18 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.97, y: 18 }}
+                            className="absolute inset-4 z-30 overflow-hidden rounded-3xl border border-emerald-300/25 bg-slate-950/94 p-4 shadow-[0_0_50px_rgba(16,185,129,0.2)] backdrop-blur-md"
+                          >
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelectedNewEarthColonyId(null);
+                                setSelectedNewEarthCardIndex(null);
+                                playSfx('close_window');
+                              }}
+                              className="absolute right-5 top-5 z-20 rounded-full border border-white/10 bg-white/5 p-2 text-cyan-100 hover:bg-white/10"
+                            >
+                              <X size={18} />
+                            </button>
+
+                            <div className="flex h-full flex-col gap-3">
+                              <div className="pr-14">
+                                <div className="grid grid-cols-2 gap-2 md:grid-cols-3 xl:grid-cols-6">
+                                  {NEW_EARTH_SECTOR_ORDER.map(sector => {
+                                    const sectorConfig = SECTOR_CONFIG[sector];
+                                    return (
+                                      <div key={sector} className="flex h-[60px] flex-col justify-between rounded-xl border border-white/10 bg-black/40 px-3 py-2 shadow-[inset_0_0_16px_rgba(15,23,42,0.8)]">
+                                        <p className={`whitespace-nowrap font-mono text-[9px] uppercase tracking-[0.2em] ${sectorConfig.color}`}>
+                                          {sectorConfig.label[language]}
+                                        </p>
+                                        <p className="self-end font-orbitron text-[24px] font-black leading-none text-white">{selectedNewEarthColonySectors[sector]}</p>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+
+                              <div className="grid min-h-0 flex-1 grid-cols-[minmax(400px,0.9fr)_minmax(520px,1.1fr)] gap-3.5">
+                                <div className="flex min-h-0 flex-col gap-3">
+                                  <div className="grid min-h-0 flex-[1.08] grid-rows-[auto_1fr] rounded-2xl border border-cyan-300/18 bg-black/32 px-3.5 pb-3.5 pt-4">
+                                    <p className="text-center font-mono text-[11px] uppercase tracking-[0.34em] text-cyan-100/78">
+                                      {language === 'pt' ? 'Cartas equipadas' : 'Equipped cards'}
+                                    </p>
+                                    <div className="mx-auto grid h-full max-h-[230px] w-full max-w-[470px] grid-cols-3 items-center justify-center gap-4 pt-3">
+                                      {POLITICAL_CARD_SLOTS.map(slot => {
+                                        const card = getCardById(selectedNewEarthColony.equippedCards?.[slot]);
+                                        const cardIndex = card ? selectedNewEarthColonyCards.findIndex(item => item.id === card.id) : -1;
+                                        return (
+                                          <NewEarthCardThumb
+                                            key={slot}
+                                            card={card}
+                                            language={language}
+                                            cardLevels={newEarthCardLevels}
+                                            onClick={cardIndex >= 0 ? () => {
+                                              setSelectedNewEarthCardIndex(cardIndex);
+                                              playSfx('view_card');
+                                            } : undefined}
+                                          />
+                                        );
+                                      })}
+                                    </div>
+                                  </div>
+
+                                  <div className="flex min-h-0 flex-[0.92] flex-col items-center justify-center rounded-2xl border border-emerald-300/18 bg-black/32 p-4 text-center">
+                                    <h3 className="font-orbitron text-5xl font-black uppercase leading-none text-white">{selectedNewEarthColony.name}</h3>
+                                    <p className="mt-7 font-mono text-sm font-black uppercase tracking-[0.34em] text-emerald-100/76">{language === 'pt' ? 'População' : 'Population'}</p>
+                                    <p className="mt-3 font-orbitron text-5xl font-black leading-none text-white">{selectedNewEarthColony.population.toLocaleString()}</p>
+                                  </div>
+                                </div>
+
+                                <div className="min-h-0 overflow-hidden rounded-2xl border border-red-300/18 bg-black/36 p-4">
+                                  <div className="flex items-center justify-between gap-4">
+                                    <div>
+                                      <p className="font-mono text-[10px] uppercase tracking-[0.34em] text-red-100/70">
+                                        {language === 'pt' ? 'Comando estratégico' : 'Strategic command'}
+                                      </p>
+                                      <h3 className="mt-1 font-orbitron text-2xl font-black uppercase text-white">
+                                        {language === 'pt' ? 'Planos de Guerra' : 'War Plans'}
+                                      </h3>
+                                    </div>
+                                    <span className="rounded-full border border-amber-300/25 bg-amber-300/10 px-3 py-1 font-mono text-[9px] uppercase tracking-[0.22em] text-amber-100">
+                                      {language === 'pt' ? 'Batalha em breve' : 'Battle soon'}
+                                    </span>
+                                  </div>
+
+                                  <div className="mt-3 grid h-[calc(100%-5rem)] grid-rows-5 gap-2">
+                                    {selectedNewEarthWarMissions.map(plan => (
+                                      <div key={plan.id} className="flex min-h-0 flex-col justify-center rounded-xl border border-white/10 bg-slate-950/72 px-3.5 py-2">
+                                        <div className="flex items-start justify-between gap-3">
+                                          <div>
+                                            <h4 className="font-orbitron text-xs font-black uppercase leading-tight text-white">{plan.title[language]}</h4>
+                                            <p className="mt-1 font-mono text-[8px] uppercase tracking-[0.22em] text-slate-400">{plan.meta[language]}</p>
+                                          </div>
+                                          <div className="flex shrink-0 items-center gap-2">
+                                            <span className="rounded-full border border-cyan-300/20 bg-cyan-300/10 px-2.5 py-1 font-mono text-[9px] font-black uppercase tracking-[0.18em] text-cyan-100">
+                                              {plan.progress}
+                                            </span>
+                                            <button
+                                              type="button"
+                                              disabled
+                                              className="rounded-full border border-white/10 bg-white/5 px-3 py-1 font-mono text-[9px] font-black uppercase tracking-[0.18em] text-white/35"
+                                            >
+                                              {language === 'pt' ? 'Resgatar' : 'Claim'}
+                                            </button>
+                                          </div>
+                                        </div>
+                                        <p className="mt-2 rounded-lg border border-emerald-300/15 bg-emerald-300/10 px-3 py-1 font-mono text-[9px] uppercase tracking-[0.18em] text-emerald-100">
+                                          {plan.reward}
+                                        </p>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+
+                            <AnimatePresence>
+                              {selectedNewEarthCard && (
+                                <NewEarthCardDetail
+                                  card={selectedNewEarthCard}
+                                  language={language}
+                                  cardLevels={newEarthCardLevels}
+                                  onClose={() => setSelectedNewEarthCardIndex(null)}
+                                  onNavigate={navigateNewEarthCard}
+                                />
+                              )}
+                            </AnimatePresence>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
                     </motion.div>
                   ) : (
                     <VoidEarth

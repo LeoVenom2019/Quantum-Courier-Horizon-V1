@@ -70,7 +70,9 @@ const cleanEventText = (value: unknown) => String(value || '')
   .replace(/Ã°Å¸Ëœâ€¦/g, '')
   .trim();
 
-const PERMANENT_EVENTS_PER_PAGE = 5;
+const RECENT_EVENTS_LIMIT = 4;
+const COMMON_EVENT_VISIBLE_MS = 30 * 1000;
+const PERMANENT_EVENTS_PER_PAGE = 4;
 
 interface EarthSidebarProps {
   earthReconstructionProgress: { [key: string]: number };
@@ -99,24 +101,56 @@ const EarthSidebar: React.FC<EarthSidebarProps> = ({
 }) => {
   const [showPermanentHistory, setShowPermanentHistory] = React.useState(false);
   const [permanentHistoryPage, setPermanentHistoryPage] = React.useState(0);
+  const [recentEventClock, setRecentEventClock] = React.useState(Date.now());
   const totalProgress = Object.values(earthReconstructionProgress).reduce((a, b: any) => a + (typeof b === 'number' ? b : 0), 0) / 5;
   const isComplete = totalProgress >= 100;
   
   // Safety check: ensure earthEvents is an array
   const safeEarthEvents = Array.isArray(earthEvents) ? earthEvents : [];
-  const seenRecentArcadeKeys = new Set<string>();
+  React.useEffect(() => {
+    const hasVisibleCommonEvent = safeEarthEvents.some((event: any) => (
+      !event?.permanent
+      && !event?.isFixed
+      && (event?.importance || 'important') === 'important'
+      && typeof event?.timestamp === 'number'
+      && recentEventClock - event.timestamp < COMMON_EVENT_VISIBLE_MS
+    ));
+    if (!hasVisibleCommonEvent) return;
 
-  const last5Events = safeEarthEvents.filter(event => {
+    const interval = window.setInterval(() => setRecentEventClock(Date.now()), 1000);
+    return () => window.clearInterval(interval);
+  }, [recentEventClock, safeEarthEvents]);
+
+  const seenRecentArcadeKeys = new Set<string>();
+  const isPermanentMilestone = (event: any) => (
+    event?.permanent === true
+    || event?.isFixed === true
+    || event?.importance === 'mythic'
+    || event?.importance === 'population'
+    || event?.importance === 'epic'
+    || (event?.importance === 'major' && event?.unique === true)
+  );
+
+  const recentEvents = safeEarthEvents.filter(event => {
     if (event?.id === 'route4-defense-alert') return false;
+    if (isPermanentMilestone(event)) return false;
+    const importance = event?.importance || 'important';
+    if (
+      importance === 'important'
+      && typeof event?.timestamp === 'number'
+      && recentEventClock - event.timestamp > COMMON_EVENT_VISIBLE_MS
+    ) {
+      return false;
+    }
     if (event?.importance !== 'arcade') return true;
     const eventKind = event?.permanent ? 'record' : String(event.id).includes('near-record') ? 'near-record' : String(event.id).includes('score') ? 'score' : 'arcade';
     const arcadeKey = `${eventKind}-${event.gameId || event.name || event.id}`;
     if (seenRecentArcadeKeys.has(arcadeKey)) return false;
     seenRecentArcadeKeys.add(arcadeKey);
     return true;
-  }).slice(0, 5);
+  }).slice(0, RECENT_EVENTS_LIMIT);
   const permanentHistoryEvents = safeEarthEvents
-    .filter(event => event?.permanent === true || event?.importance === 'mythic' || event?.importance === 'population' || event?.importance === 'epic' || (event?.importance === 'major' && event?.unique === true))
+    .filter(isPermanentMilestone)
     .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
   const permanentHistoryTotalPages = Math.max(1, Math.ceil(permanentHistoryEvents.length / PERMANENT_EVENTS_PER_PAGE));
   const safePermanentHistoryPage = Math.min(permanentHistoryPage, permanentHistoryTotalPages - 1);
@@ -224,12 +258,12 @@ const EarthSidebar: React.FC<EarthSidebarProps> = ({
           </button>
           
           <div className="space-y-2">
-            {last5Events.length === 0 ? (
+            {recentEvents.length === 0 ? (
               <div className="text-[15px] font-mono text-white/10 italic text-center py-4 border border-dashed border-white/5 rounded-xl">
                 {language === 'pt' ? 'Aguardando simulação...' : 'Waiting for simulation...'}
               </div>
             ) : (
-              last5Events.map((event, idx) => {
+              recentEvents.map((event, idx) => {
                 // Defensive check: ensure event is a valid object
                 if (!event || typeof event !== 'object' || !event.id) {
                   return null;
@@ -289,13 +323,13 @@ const EarthSidebar: React.FC<EarthSidebarProps> = ({
       <AnimatePresence>
         {showPermanentHistory ? (
           <motion.div
-            className="fixed inset-0 z-[120] flex items-center justify-center bg-black/95 p-6 backdrop-blur-md"
+            className="fixed inset-0 z-[120] flex items-center justify-center bg-black/95 p-3 backdrop-blur-md sm:p-6"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
           >
             <motion.div
-              className="relative flex h-[72vh] min-h-[520px] w-full max-w-[900px] flex-col overflow-hidden rounded-2xl border border-emerald-300/40 shadow-[0_0_48px_rgba(16,185,129,0.24)]"
+              className="relative flex h-[calc(100vh-1.5rem)] max-h-[840px] min-h-[560px] w-full max-w-[1040px] flex-col overflow-hidden rounded-2xl border border-emerald-300/40 shadow-[0_0_48px_rgba(16,185,129,0.24)] sm:h-[86vh] sm:min-h-[620px]"
               style={{ backgroundColor: '#050914' }}
               initial={{ opacity: 0, y: 18, scale: 0.98 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -307,11 +341,8 @@ const EarthSidebar: React.FC<EarthSidebarProps> = ({
                 style={{ backgroundColor: '#08111d' }}
               >
                 <div>
-                  <p className="font-mono text-[10px] font-black uppercase tracking-[0.35em] text-emerald-300/70">
-                    {language === 'pt' ? 'Grandes Acontecimentos!' : 'Great Events!'}
-                  </p>
-                  <h3 className="mt-2 font-orbitron text-2xl font-black uppercase tracking-widest text-white">
-                    {language === 'pt' ? 'Grandes Acontecimentos!' : 'Great Events!'}
+                  <h3 className="font-orbitron text-2xl font-black uppercase tracking-widest text-white">
+                    {language === 'pt' ? 'Mural dos Grandes Acontecimentos' : 'Great Events Wall'}
                   </h3>
                 </div>
                 <button

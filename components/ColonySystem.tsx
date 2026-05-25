@@ -83,6 +83,8 @@ type DefenseSpecialId = 'apocalypse-laser' | 'hellfire-barrage' | 'special-slot-
 const BATTLE_CARD_CODEX_PAGE_SIZE = 6;
 const MAX_SEARCH_UPGRADE_LEVEL = 5;
 const MAX_PARALLEL_SEARCHES_PER_TYPE = 3;
+const SEARCH_THREAT_TRIGGER_MIN_PROGRESS = 0.2;
+const SEARCH_THREAT_TRIGGER_MAX_PROGRESS = 0.9;
 const SEARCH_UPGRADE_RESOURCE_BONUS = 15;
 const SEARCH_UPGRADE_THREAT_BONUS = 5;
 const DEFAULT_SEARCH_UPGRADE_LEVELS: SearchUpgradeLevels = { land: 0, sea: 0 };
@@ -116,6 +118,10 @@ interface ActiveColonySearch {
   threatChance: number;
   startedAt: number;
   endsAt: number;
+  threatCheckAt: number;
+  threatCheckedAt?: number;
+  threatTriggeredAt?: number;
+  rewardResolved?: boolean;
 }
 
 interface ColonySearchOption {
@@ -166,6 +172,7 @@ interface DefenseSpecial {
 interface PendingDefenseThreat {
   id: string;
   sourceSearchId: ColonyExpeditionId;
+  sourceSearchKey?: string;
   sourceTitle: string;
   rewards?: Partial<ColonySupplies>;
   threatChance: number;
@@ -175,8 +182,9 @@ interface PendingDefenseThreat {
   status: 'pending';
 }
 
-const MAX_PENDING_DEFENSE_THREATS = 2;
+const MAX_PENDING_DEFENSE_THREATS = 6;
 const DEFENSE_THREAT_RESPONSE_SECONDS = 50;
+const DEFENSE_VICTORY_REWARD_BONUS_PERCENT = 30;
 const ROUTE4_SEARCH_SFX_BASE = '/assets/rota4/SFX_new_land';
 const ROUTE4_COLONIES_TAB_SFX = `${ROUTE4_SEARCH_SFX_BASE}/aba_colonys_click.ogg`;
 const ROUTE4_ROBOTS_50_SFX = `${ROUTE4_SEARCH_SFX_BASE}/50_robots.ogg`;
@@ -356,8 +364,20 @@ const DEFAULT_SEARCH_THREAT_BONUS: SearchThreatBonus = {
 const SEARCH_THREAT_BONUS_STEP = 15;
 const LEGENDARY_BATTLE_CARD_PITY_STEP = 3;
 const getSearchUpgradeCost = (level: number) => (level >= MAX_SEARCH_UPGRADE_LEVEL ? 0 : 30000 * (level + 1));
+const getSearchThreatCheckAt = (startedAt: number, endsAt: number, random = Math.random) => {
+  const duration = Math.max(0, endsAt - startedAt);
+  if (duration <= 0) return endsAt;
+  const progress = SEARCH_THREAT_TRIGGER_MIN_PROGRESS + random() * (SEARCH_THREAT_TRIGGER_MAX_PROGRESS - SEARCH_THREAT_TRIGGER_MIN_PROGRESS);
+  return Math.round(startedAt + duration * progress);
+};
 const applySearchUpgradeRewards = (rewards: Partial<ColonySupplies>, level: number): Partial<ColonySupplies> => {
   const multiplier = 1 + (Math.max(0, Math.min(MAX_SEARCH_UPGRADE_LEVEL, level)) * SEARCH_UPGRADE_RESOURCE_BONUS) / 100;
+  return (Object.entries(rewards) as Array<[ColonySupplyId, number]>).reduce((acc, [key, value]) => {
+    acc[key] = Math.max(1, Math.round(value * multiplier));
+    return acc;
+  }, {} as Partial<ColonySupplies>);
+};
+const scaleSupplyRewards = (rewards: Partial<ColonySupplies>, multiplier: number): Partial<ColonySupplies> => {
   return (Object.entries(rewards) as Array<[ColonySupplyId, number]>).reduce((acc, [key, value]) => {
     acc[key] = Math.max(1, Math.round(value * multiplier));
     return acc;
@@ -1239,11 +1259,23 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
           if (!search?.endsAt || !search?.rewards) return null;
           const id = search.id === 'sea' ? 'sea' : fallbackId;
           const safeSlot = Math.max(0, Math.min(MAX_PARALLEL_SEARCHES_PER_TYPE - 1, Number(search.slotIndex ?? slotIndex) || 0));
+          const startedAt = Number(search.startedAt) || Date.now();
+          const endsAt = Number(search.endsAt) || startedAt;
+          const latestThreatCheckAt = startedAt + Math.max(0, endsAt - startedAt) * SEARCH_THREAT_TRIGGER_MAX_PROGRESS;
+          const threatCheckAt = Number(search.threatCheckAt) || (
+            Date.now() >= latestThreatCheckAt
+              ? latestThreatCheckAt
+              : getSearchThreatCheckAt(startedAt, endsAt)
+          );
           return {
             ...search,
             id,
             searchKey: search.searchKey || getSearchSlotKey(id, safeSlot),
             slotIndex: safeSlot,
+            startedAt,
+            endsAt,
+            threatCheckAt,
+            threatCheckedAt: search.threatCheckedAt || (Date.now() >= latestThreatCheckAt ? Date.now() : undefined),
           } as ActiveColonySearch;
         };
 
@@ -1474,6 +1506,20 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
   }, [colonySupplies]);
 
   useEffect(() => {
+    const handleExternalSupplyAward = (event: Event) => {
+      const supplies = (event as CustomEvent<Partial<ColonySupplies>>).detail;
+      if (!supplies || typeof supplies !== 'object') return;
+      const nextSupplies = applySupplyDelta(colonySuppliesRef.current, supplies);
+      colonySuppliesRef.current = nextSupplies;
+      setColonySupplies(nextSupplies);
+      event.preventDefault();
+    };
+
+    window.addEventListener('qch:colony-supplies-awarded', handleExternalSupplyAward);
+    return () => window.removeEventListener('qch:colony-supplies-awarded', handleExternalSupplyAward);
+  }, []);
+
+  useEffect(() => {
     earthPopulationRef.current = earthPopulation;
   }, [earthPopulation]);
 
@@ -1508,13 +1554,56 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
     });
   }, [isLoaded, setColonies]);
 
-  const completeSearch = useCallback((search: ActiveColonySearch) => {
+  const triggerSearchThreatCheck = useCallback((search: ActiveColonySearch) => {
+    if (search.threatCheckedAt || Date.now() < search.threatCheckAt || Date.now() >= search.endsAt) return;
+    const checkedAt = Date.now();
     const attacked = Math.random() * 100 < search.threatChance;
+
+    setActiveSearches(prev => {
+      const current = prev[search.searchKey];
+      if (!current || current.threatCheckedAt) return prev;
+      return {
+        ...prev,
+        [search.searchKey]: {
+          ...current,
+          threatCheckedAt: checkedAt,
+          threatTriggeredAt: attacked ? checkedAt : current.threatTriggeredAt,
+        },
+      };
+    });
+
+    setSearchThreatBonus(prev => ({
+      ...prev,
+      [search.id]: attacked ? 0 : Math.min(100, (prev[search.id] || 0) + SEARCH_THREAT_BONUS_STEP),
+    }));
+
+    if (!attacked) return;
+
+    const threat: PendingDefenseThreat = {
+      id: `threat-${search.searchKey}-${checkedAt}-${Math.random().toString(36).slice(2, 8)}`,
+      sourceSearchId: search.id,
+      sourceSearchKey: search.searchKey,
+      sourceTitle: search.title,
+      rewards: search.rewards,
+      threatChance: search.threatChance,
+      detectedAt: checkedAt,
+      expiresAt: checkedAt + DEFENSE_THREAT_RESPONSE_SECONDS * 1000,
+      status: 'pending',
+    };
+    setPendingDefenseThreats(prev => [
+      threat,
+      ...prev,
+    ].slice(0, MAX_PENDING_DEFENSE_THREATS));
+    setCardFeedback(t('Hostile contact detected during search', 'Contato hostil detectado durante a busca'));
+  }, [t]);
+
+  const completeSearch = useCallback((search: ActiveColonySearch) => {
+    const resourcesSettledByDefense = Boolean(search.threatTriggeredAt || search.rewardResolved);
     const rewardText = (Object.entries(search.rewards) as Array<[ColonySupplyId, number]>)
       .map(([key, value]) => `+${value} ${SUPPLY_CONFIG[key].label[language]}`)
       .join(' · ');
 
-    if (!attacked) {
+    if (!resourcesSettledByDefense) {
       const nextSupplies = applySupplyDelta(colonySuppliesRef.current, search.rewards);
       colonySuppliesRef.current = nextSupplies;
       setColonySupplies(nextSupplies);
@@ -1525,36 +1614,15 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
       return next;
     });
     setSearchRemainingSeconds(prev => ({ ...prev, [search.searchKey]: 0 }));
-    setSearchThreatBonus(prev => ({
-      ...prev,
-      [search.id]: attacked ? 0 : Math.min(100, (prev[search.id] || 0) + SEARCH_THREAT_BONUS_STEP),
-    }));
-    if (attacked) {
-      const detectedAt = Date.now();
-      const threat: PendingDefenseThreat = {
-        id: `threat-${search.searchKey}-${detectedAt}-${Math.random().toString(36).slice(2, 8)}`,
-        sourceSearchId: search.id,
-        sourceTitle: search.title,
-        rewards: search.rewards,
-        threatChance: search.threatChance,
-        detectedAt,
-        expiresAt: detectedAt + DEFENSE_THREAT_RESPONSE_SECONDS * 1000,
-        status: 'pending',
-      };
-      setPendingDefenseThreats(prev => [
-        threat,
-        ...prev,
-      ].slice(0, MAX_PENDING_DEFENSE_THREATS));
-    }
-    setLastSearchReport(attacked
-      ? t(`${search.title} returned with hostile contact registered. ${rewardText}`, `${search.title} retornou com contato hostil registrado. ${rewardText}`)
+    setLastSearchReport(resourcesSettledByDefense
+      ? t(`${search.title} returned after hostile contact. Resolve the defense to secure its resources.`, `${search.title} retornou após contato hostil. Resolva a defesa para garantir os recursos.`)
       : t(`${search.title} completed. ${rewardText}`, `${search.title} concluída. ${rewardText}`)
     );
-    setCardFeedback(attacked
-      ? t('Search returned under attack warning', 'Busca retornou com alerta de ataque')
+    setCardFeedback(resourcesSettledByDefense
+      ? t('Search completed with pending defense', 'Busca concluída com defesa pendente')
       : t('Search completed', 'Busca concluída')
     );
-  }, [language]);
+  }, [language, t]);
 
   useEffect(() => {
     const activeList = Object.values(activeSearches).filter(Boolean) as ActiveColonySearch[];
@@ -1563,6 +1631,7 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
     const updateSearchClock = () => {
       const nextRemaining: Record<string, number> = {};
       activeList.forEach(search => {
+        triggerSearchThreatCheck(search);
         const remaining = Math.max(0, Math.ceil((search.endsAt - Date.now()) / 1000));
         nextRemaining[search.searchKey] = remaining;
         if (remaining <= 0) completeSearch(search);
@@ -1573,7 +1642,7 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
     updateSearchClock();
     const interval = window.setInterval(updateSearchClock, 1000);
     return () => window.clearInterval(interval);
-  }, [activeSearches, completeSearch]);
+  }, [activeSearches, completeSearch, triggerSearchThreatCheck]);
 
   useEffect(() => {
     if (defenseAlertsPaused) {
@@ -2243,8 +2312,13 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
       tech: 6 + Math.floor(kills / 3),
       defense: 3 + Math.floor(kills / 4),
     };
+    const defendedSearchRewards = activeDefenseThreat.rewards || {};
+    const defendedSearchBonus = scaleSupplyRewards(defendedSearchRewards, DEFENSE_VICTORY_REWARD_BONUS_PERCENT / 100);
     const nextSupplies = applySupplyDelta(
-      applySupplyDelta(colonySuppliesRef.current, activeDefenseThreat.rewards || {}),
+      applySupplyDelta(
+        applySupplyDelta(colonySuppliesRef.current, defendedSearchRewards),
+        defendedSearchBonus
+      ),
       supplyReward
     );
     colonySuppliesRef.current = nextSupplies;
@@ -2260,6 +2334,19 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
     }
     setDefenseBattleLevel(prev => Math.max(1, Math.floor(prev)) + 1);
     onEarnQC?.(battleQc);
+    if (activeDefenseThreat.sourceSearchKey) {
+      setActiveSearches(prev => {
+        const search = prev[activeDefenseThreat.sourceSearchKey || ''];
+        if (!search) return prev;
+        return {
+          ...prev,
+          [search.searchKey]: {
+            ...search,
+            rewardResolved: true,
+          },
+        };
+      });
+    }
     setPendingDefenseThreats(prev => prev.filter(threat => threat.id !== activeDefenseThreat.id));
     setActiveDefenseThreat(null);
 
@@ -2303,6 +2390,7 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
     }
 
     const now = Date.now();
+    const endsAt = now + option.durationSeconds * 1000;
     setLastSearchReport(null);
     playRoute4SearchSfx(option.id, slotIndex);
     setActiveSearches(prev => ({
@@ -2316,7 +2404,8 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
         rewards: option.rewards,
         threatChance: option.threatChance,
         startedAt: now,
-        endsAt: now + option.durationSeconds * 1000,
+        endsAt,
+        threatCheckAt: getSearchThreatCheckAt(now, endsAt),
       }
     }));
     setSearchRemainingSeconds(prev => ({ ...prev, [searchKey]: option.durationSeconds }));

@@ -19,7 +19,7 @@ export const COLONY_SAVE_STORAGE_KEYS = [
 
 export type ColonySaveStorageKey = typeof COLONY_SAVE_STORAGE_KEYS[number];
 
-const MAX_PENDING_DEFENSE_THREATS = 2;
+const MAX_PENDING_DEFENSE_THREATS = 6;
 
 export interface ColonySystemSaveData {
   colonies: any[];
