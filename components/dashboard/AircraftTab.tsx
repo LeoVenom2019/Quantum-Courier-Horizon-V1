@@ -6,6 +6,7 @@ import { Rocket, Lock, Cpu, Coins, Info } from 'lucide-react';
 import ShipVisual from '@/components/ShipVisual';
 import { SHIPS } from '@/lib/game-data';
 import { useDashboard } from './DashboardProvider';
+import { PremiumCanvasButton } from '../ui/PremiumCanvasButton';
 
 const AircraftTab = memo(({ renderBattleLevelTab }: { renderBattleLevelTab: () => React.ReactNode }) => {
   const { 
@@ -57,28 +58,30 @@ const AircraftTab = memo(({ renderBattleLevelTab }: { renderBattleLevelTab: () =
         </div>
         
         <div className="flex bg-black/40 p-1 rounded-xl border border-white/10">
-          <button
+          <PremiumCanvasButton
             onClick={() => {
               setAircraftSubTab('fleet');
               playSfx('laser_up');
             }}
-            className={`px-3 py-1.5 lg:px-4 lg:py-2 rounded-lg text-[14px] font-bold transition-all ${
-              aircraftSubTab === 'fleet' ? 'bg-white/10 text-white' : 'text-white/40 hover:text-white/60'
+            tone={aircraftSubTab === 'fleet' ? (isInterstellar ? 'orange' : 'cyan') : 'steel'}
+            className={`h-10 min-w-[132px] px-3 text-[14px] font-bold lg:px-4 ${
+              aircraftSubTab === 'fleet' ? 'text-white shadow-[0_4px_0_rgba(0,0,0,0.45),0_8px_12px_rgba(0,0,0,0.24)]' : 'text-white/55 hover:brightness-110'
             }`}
           >
             {t('fleet')}
-          </button>
-          <button
+          </PremiumCanvasButton>
+          <PremiumCanvasButton
             onClick={() => {
               setAircraftSubTab('battle');
               playSfx('laser_up');
             }}
-            className={`px-3 py-1.5 lg:px-4 lg:py-2 rounded-lg text-[14px] font-bold transition-all ${
-              aircraftSubTab === 'battle' ? 'bg-purple-500/20 text-purple-400' : 'text-white/40 hover:text-white/60'
+            tone={aircraftSubTab === 'battle' ? 'purple' : 'steel'}
+            className={`h-10 min-w-[142px] px-3 text-[14px] font-bold lg:px-4 ${
+              aircraftSubTab === 'battle' ? 'text-purple-100 shadow-[0_4px_0_rgba(0,0,0,0.45),0_8px_12px_rgba(0,0,0,0.24)]' : 'text-white/55 hover:brightness-110'
             }`}
           >
             {t('battleLevel')}
-          </button>
+          </PremiumCanvasButton>
         </div>
       </div>
 
@@ -88,25 +91,26 @@ const AircraftTab = memo(({ renderBattleLevelTab }: { renderBattleLevelTab: () =
             {currentShips.map((ship) => {
               const isUnlocked = (unlockedTechLevels[routeTier] || 0) >= ship.level;
               return (
-                <button
+                <PremiumCanvasButton
                   key={ship.level}
                   onClick={() => isUnlocked && setShipPageIndex(ship.level - 1)}
-                  className={`flex-1 min-w-[120px] py-4 px-2 rounded-xl border transition-all duration-300 font-bold ${
+                  disabled={!isUnlocked}
+                  tone={shipPageIndex === ship.level - 1 ? (isInterstellar ? 'orange' : 'cyan') : 'steel'}
+                  className={`min-h-[72px] min-w-[120px] flex-1 px-2 py-3 font-bold ${
                     shipPageIndex === ship.level - 1
-                      ? `${themeBorder} bg-white/10 shadow-[0_0_20px_rgba(255,255,255,0.05)]`
-                      : `border-white/10 bg-white/5 hover:bg-white/10 hover:border-white/20`
-                  } ${!isUnlocked ? 'opacity-30 grayscale cursor-not-allowed' : ''}`}
+                      ? 'shadow-[0_5px_0_rgba(0,0,0,0.45),0_10px_14px_rgba(0,0,0,0.24)]'
+                      : 'hover:brightness-110'
+                  } ${!isUnlocked ? 'grayscale' : ''}`}
+                  contentClassName="flex-col gap-1.5"
                 >
-                  <div className="flex flex-col items-center gap-1.5">
-                    <span className={`text-[11px] uppercase tracking-[0.2em] ${shipPageIndex === ship.level - 1 ? 'text-white' : 'text-slate-500'}`}>
-                      Lvl {ship.level}
-                    </span>
-                    <span className={`truncate w-full text-center text-[15px] font-orbitron uppercase tracking-wider ${isUnlocked ? ship.color : 'text-slate-400'}`}>
-                      {translateData(ship.name)}
-                    </span>
-                    {!isUnlocked && <Lock className="w-3.5 h-3.5 text-slate-600 mt-0.5" />}
-                  </div>
-                </button>
+                  <span className={`text-[11px] uppercase tracking-[0.2em] ${shipPageIndex === ship.level - 1 ? 'text-white' : 'text-slate-500'}`}>
+                    Lvl {ship.level}
+                  </span>
+                  <span className={`w-full truncate text-center font-orbitron text-[15px] uppercase tracking-wider ${isUnlocked ? ship.color : 'text-slate-400'}`}>
+                    {translateData(ship.name)}
+                  </span>
+                  {!isUnlocked && <Lock className="mt-0.5 h-3.5 w-3.5 text-slate-600" />}
+                </PremiumCanvasButton>
               );
             })}
           </div>
@@ -178,20 +182,26 @@ const AircraftTab = memo(({ renderBattleLevelTab }: { renderBattleLevelTab: () =
                       </div>
 
                       <div className="flex items-center gap-4">
-                        <button
+                        <PremiumCanvasButton
                           onClick={() => buyShip(currentShips[shipPageIndex].level)}
                           disabled={
                             (ownedShips[`${routeTier}-${currentShips[shipPageIndex].level}`] || 0) >= 5 || 
                             (unlockedTechLevels[routeTier] || 0) < currentShips[shipPageIndex].level ||
                             (qc < (currentShips[shipPageIndex].level === 1 && (ownedShips[`${routeTier}-${currentShips[shipPageIndex].level}`] || 0) >= 1 ? 500 * getEconomicMultipliers().cost : currentShips[shipPageIndex].cost * getEconomicMultipliers().cost) && (ownedShips[`${routeTier}-${currentShips[shipPageIndex].level}`] || 0) > 0)
                           }
-                          className={`flex-1 py-4 rounded-xl font-bold text-xl font-orbitron transition-all flex items-center justify-center gap-2 border-b-4 ${
+                          tone={
                             (ownedShips[`${routeTier}-${currentShips[shipPageIndex].level}`] || 0) >= 5
-                              ? 'bg-slate-800 text-slate-500 cursor-not-allowed border-slate-900'
+                              ? 'steel'
                               : (unlockedTechLevels[routeTier] || 0) < currentShips[shipPageIndex].level
-                                ? 'bg-slate-800 text-slate-500 cursor-not-allowed border-slate-900'
-                                : `${isInterstellar ? 'bg-orange-500 hover:bg-orange-400' : 'bg-cyan-500 hover:bg-cyan-400'} bg-gradient-to-r text-white shadow-lg hover:scale-[1.01] active:scale-[0.99] border-black/20`
+                                ? 'steel'
+                                : (isInterstellar ? 'orange' : 'cyan')
+                          }
+                          className={`h-14 flex-1 text-xl font-bold ${
+                            (ownedShips[`${routeTier}-${currentShips[shipPageIndex].level}`] || 0) >= 5 || (unlockedTechLevels[routeTier] || 0) < currentShips[shipPageIndex].level
+                              ? 'text-slate-500'
+                              : `${isInterstellar ? 'text-orange-50 shadow-[0_7px_0_rgba(154,52,18,0.65),0_14px_18px_rgba(0,0,0,0.32)] active:shadow-[0_3px_0_rgba(154,52,18,0.72),0_7px_10px_rgba(0,0,0,0.3)]' : 'text-cyan-50 shadow-[0_7px_0_rgba(14,116,144,0.65),0_14px_18px_rgba(0,0,0,0.32)] active:shadow-[0_3px_0_rgba(14,116,144,0.72),0_7px_10px_rgba(0,0,0,0.3)]'} hover:brightness-110`
                           }`}
+                          contentClassName="gap-2"
                         >
                           {(ownedShips[`${routeTier}-${currentShips[shipPageIndex].level}`] || 0) >= 5 ? (
                             t('max')
@@ -205,7 +215,7 @@ const AircraftTab = memo(({ renderBattleLevelTab }: { renderBattleLevelTab: () =
                               )}
                             </>
                           )}
-                        </button>
+                        </PremiumCanvasButton>
                       </div>
                     </div>
                   </div>

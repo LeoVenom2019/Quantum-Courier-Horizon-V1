@@ -18,6 +18,7 @@ import {
   Clock 
 } from 'lucide-react';
 import VoidBattleArena, { VoidBattleEnemy } from '../VoidBattleArena';
+import { PremiumCanvasButton } from '../ui/PremiumCanvasButton';
 
 interface BattleOverlayProps {
   activeBattle: any;
@@ -40,6 +41,7 @@ interface BattleOverlayProps {
   ROUTES_MAP: Map<string, any>;
   aetherion: number;
   autoSkipBattle: (battle: any, cost: number) => boolean;
+  meteoriteRewardValue?: number;
 }
 
 const BattleOverlay = memo(({
@@ -62,7 +64,8 @@ const BattleOverlay = memo(({
   getPoliceBonus,
   ROUTES_MAP,
   aetherion,
-  autoSkipBattle
+  autoSkipBattle,
+  meteoriteRewardValue = 0
 }: BattleOverlayProps) => {
   if (!activeBattle) return null;
   
@@ -174,12 +177,22 @@ const BattleOverlay = memo(({
                       <div className="text-xl font-orbitron text-orange-400">
                         {activeBattle.destroyedMeteorites || 0}
                       </div>
+                      {activeBattle.meteoriteRewardTotal !== undefined && (
+                        <div className="text-[12px] font-orbitron text-emerald-300">
+                          {language === 'pt' ? 'Meteoritos' : 'Meteorites'} x {activeBattle.destroyedMeteorites || 0} = {formatValue(activeBattle.meteoriteRewardTotal || 0)} QC
+                        </div>
+                      )}
                     </div>
                     <div className="text-right space-y-1">
                       <span className="text-[10px] text-white/40 uppercase tracking-widest">{language === 'pt' ? 'Meteoros Destruídos' : 'Meteors Destroyed'}</span>
                       <div className="text-xl font-orbitron text-red-500">
                         {activeBattle.destroyedMeteors || 0}
                       </div>
+                      {activeBattle.meteorRewardTotal !== undefined && (
+                        <div className="text-[12px] font-orbitron text-emerald-300">
+                          {language === 'pt' ? 'Meteoros' : 'Meteors'} x {activeBattle.destroyedMeteors || 0} = {formatValue(activeBattle.meteorRewardTotal || 0)} QC
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
@@ -190,17 +203,14 @@ const BattleOverlay = memo(({
               </p>
             )}
 
-            <button
+            <PremiumCanvasButton
               onClick={finishBattle}
-              className={`w-full py-5 rounded-2xl font-orbitron font-black text-lg tracking-[0.5em] uppercase transition-all relative overflow-hidden group ${
-                activeBattle.isVictory 
-                  ? 'bg-emerald-600 text-white hover:bg-emerald-500 shadow-[0_0_40px_rgba(16,185,129,0.3)]' 
-                  : 'bg-rose-700 text-white hover:bg-rose-600 shadow-[0_0_40px_rgba(225,29,72,0.3)]'
-              }`}
+              tone={activeBattle.isVictory ? 'green' : 'red'}
+              className="w-full h-[68px] text-lg font-black tracking-[0.5em] uppercase"
+              contentClassName="text-white"
             >
-              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
-              <span className="relative z-10">{language === 'pt' ? 'CONTINUAR' : 'CONTINUE'}</span>
-            </button>
+              {language === 'pt' ? 'CONTINUAR' : 'CONTINUE'}
+            </PremiumCanvasButton>
           </motion.div>
         </motion.div>
       </AnimatePresence>
@@ -252,8 +262,14 @@ const BattleOverlay = memo(({
               ...activeBattle, 
               isVictory: true, 
               enemyHp: 0,
+              reward: result?.reward ?? activeBattle.reward,
+              isMeteorEventReward: Boolean(result?.isMeteorEventReward),
               destroyedMeteors: result?.destroyedMeteors || 0,
-              destroyedMeteorites: result?.destroyedMeteorites || 0
+              destroyedMeteorites: result?.destroyedMeteorites || 0,
+              meteoriteRewardValue: result?.meteoriteRewardValue,
+              meteorRewardValue: result?.meteorRewardValue,
+              meteoriteRewardTotal: result?.meteoriteRewardTotal,
+              meteorRewardTotal: result?.meteorRewardTotal
             };
             setActiveBattle(updated);
             resolveBattleVictory(updated);
@@ -272,6 +288,8 @@ const BattleOverlay = memo(({
         formatValue={formatValue}
         isGroupBattle={false}
         onExitBattle={forceBattleDefeat}
+        meteoriteRewardValue={meteoriteRewardValue}
+        disableMeteorEvent={String(activeBattle.deliveryId || '').startsWith('auto-')}
       />
 
         {/* Skip Button during active combat */}

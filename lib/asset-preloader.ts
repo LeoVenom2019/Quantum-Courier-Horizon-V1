@@ -44,6 +44,16 @@ const routeHeaderImages = {
   route4: '/assets/rota4/layout_header_cap_4/background_header_rota_4.webp',
 } as const;
 
+const activeDeliveryBackgrounds = {
+  route1: '/assets/texturas/deliver_bg_cap1.webp',
+  route2: '/assets/texturas/deliver_bg_cap2.webp',
+} as const;
+
+const missionHeaderBackgrounds = {
+  route1: '/assets/texturas/cap1_mission_bg.webp',
+  route2: '/assets/texturas/cap2_mission_bg.webp',
+} as const;
+
 const route4ColonyImages = [
   'genesis/1genesis_colony.webp',
   'genesis/2genesis_constructors.webp',
@@ -81,6 +91,8 @@ const route4ColonyImages = [
   'gaia/gaia_theater.webp',
   'gaia/gaia_police.webp',
   'gaia/gaia_restaurant.webp',
+  'gaia/neptune_explor_prev.webp',
+  'eden/poseidon_explor_prev.webp',
 ].map(path => `/assets/rota4/colonys/${path}`);
 
 const route4LayoutImages = [
@@ -106,6 +118,56 @@ const route4ColonyAudio = [
 ];
 
 const route4BattleBase = '/assets/rota4/battles';
+const submarineSpriteKeys = [
+  'front',
+  'back',
+  'up',
+  'down',
+  'down_front',
+  'down_back',
+  'up_back',
+  'up_front',
+  'turn_1',
+  'turn_2',
+  'turn_3',
+  'turn_back_1',
+  'turn_back_2',
+  'turn_back_3',
+];
+const route4SubmarineSpriteImages = [
+  ...submarineSpriteKeys.map(key => `/assets/rota4/colonys/gaia/gaia_submarine_neptune/gaia_${key}.webp`),
+  ...submarineSpriteKeys.map(key => `/assets/rota4/colonys/eden/eden_submarine_poseidon/eden_${key}.webp`),
+  ...submarineSpriteKeys.map(key => `/assets/rota4/colonys/enemy_submarine1/enemy_submarine1_${key}.webp`),
+  ...submarineSpriteKeys.map(key => `/assets/rota4/colonys/enemy_submarine2/enemy_submarine2_${key}.webp`),
+  ...submarineSpriteKeys.map(key => `/assets/rota4/colonys/enemy_submarine3/enemy_submarine3_${key}.webp`),
+];
+const route4TreasureRelicBase = '/assets/rota4/treasures/relics';
+const route4TreasureRelicImages = [
+  ...Array.from({ length: 17 }, (_, index) => `${route4TreasureRelicBase}/fishs/${index + 1}_fish.webp`),
+  ...Array.from({ length: 10 }, (_, index) => `${route4TreasureRelicBase}/rings/${index + 1}_ring.webp`),
+  ...[
+    'collar_necklace.webp',
+    'dead_pirate.webp',
+    'futuristic_artifact.webp',
+    'golden_anchor.webp',
+    'golden_coins.webp',
+    'golden_cup.webp',
+    'golden_north.webp',
+    'golden_watch.webp',
+    'hourglass.webp',
+    'j_j_1866_revolver.webp',
+    'lz_vinyl.webp',
+    'message_in_a_bottle.webp',
+    'old_artifact.webp',
+    'old_book.webp',
+    'old_golden_key.webp',
+    'old_joystick.webp',
+    'old_map.webp',
+    'old_shield.webp',
+    'shell_pearl.webp',
+    'strange_mask.webp',
+  ].map(file => `${route4TreasureRelicBase}/others/${file}`),
+];
 
 const route4BattleImages = [
   `${route4BattleBase}/backgrounds/day/rt4_background_day.webp`,
@@ -128,6 +190,28 @@ const route4BattleImages = [
   `${route4BattleBase}/enemys/monsters/monster 2/m4_up.webp`,
   `${route4BattleBase}/enemys/monsters/monster 2/m2_down.webp`,
   `${route4BattleBase}/enemys/monsters/monster 2/m2_backward.webp`,
+  '/assets/rota4/new_land_assets/abyssal_ocean_new_land_system/abissal_01.webp',
+  '/assets/rota4/new_land_assets/abyssal_ocean_new_land_system/abissal_02.webp',
+  '/assets/rota4/new_land_assets/abyssal_ocean_new_land_system/abissal_03.webp',
+  '/assets/rota4/new_land_assets/abyssal_ocean_new_land_system/abissal_04.webp',
+  '/assets/rota4/new_land_assets/abyssal_ocean_new_land_system/abissal_05.webp',
+  '/assets/rota4/new_land_assets/ship_graveyard_new_land_system/graveyard_01.webp',
+  '/assets/rota4/new_land_assets/ship_graveyard_new_land_system/graveyard_02.webp',
+  '/assets/rota4/new_land_assets/ship_graveyard_new_land_system/graveyard_03.webp',
+  '/assets/rota4/new_land_assets/ship_graveyard_new_land_system/graveyard_04.webp',
+  '/assets/rota4/new_land_assets/ship_graveyard_new_land_system/graveyard_05.webp',
+  '/assets/rota4/treasures/treasure_closed.webp',
+  '/assets/rota4/treasures/treasure_closed2.webp',
+  '/assets/rota4/treasures/treasure_closed3.webp',
+  '/assets/rota4/treasures/treasure_closed4.webp',
+  '/assets/rota4/treasures/treasure_closed5.webp',
+  '/assets/rota4/treasures/treasure_open.webp',
+  '/assets/rota4/treasures/treasure_open2.webp',
+  '/assets/rota4/treasures/treasure_open3.webp',
+  '/assets/rota4/treasures/treasure_open4.webp',
+  '/assets/rota4/treasures/treasure_open5.webp',
+  ...route4TreasureRelicImages,
+  ...route4SubmarineSpriteImages,
 ];
 
 const route4BattleAudio = [
@@ -151,13 +235,43 @@ const route4BattleAudio = [
   `${route4BattleBase}/enemys/monsters/monster 2/shoot_m2.ogg`,
   `${route4BattleBase}/enemys/monsters/monster 2/scream_m2.ogg`,
   `${route4BattleBase}/enemys/monsters/monster 2/explosion_m2.ogg`,
+  '/assets/rota4/SFX_new_land/abissal_sounds_1_mistery.ogg',
+  '/assets/rota4/SFX_new_land/abissal_sounds_2_mistery.ogg',
+  '/assets/rota4/SFX_new_land/abissal_sounds_3_mistery.ogg',
+  '/assets/rota4/SFX_new_land/enemy_submarine_enter.ogg',
+  '/assets/rota4/SFX_new_land/player_torped_launcher.ogg',
+  '/assets/rota4/SFX_new_land/player_torped_impact.ogg',
+  '/assets/rota4/SFX_new_land/submarine_enter.ogg',
+  '/assets/rota4/SFX_new_land/radar_submarine_1.ogg',
+  '/assets/rota4/SFX_new_land/submarine_aim_green.ogg',
+  '/assets/rota4/SFX_new_land/submarine_ocean_sounds_1.ogg',
+  '/assets/rota4/SFX_new_land/submarine_ocean_sounds_2.ogg',
+  '/assets/rota4/SFX_new_land/submarine_explosion1.ogg',
+  '/assets/rota4/SFX_new_land/submarine_explosion_2.ogg',
+  '/assets/rota4/SFX_new_land/submarine_explosion_3.ogg',
+  '/assets/rota4/SFX_new_land/submarine_motion_1.ogg',
+  '/assets/rota4/SFX_new_land/submarine_motion_2.ogg',
+  '/assets/rota4/SFX_new_land/submarine_player_constant.ogg',
+  '/assets/rota4/SFX_new_land/submarine_player_stoping.ogg',
 ];
 
-const arcadeResultImages = MINI_GAMES_CONFIG.flatMap(game => {
+const route4OceanThemeAudio = [
+  '/assets/rota4/themes_ocean/abyssal_whispers.ogg',
+  '/assets/rota4/themes_ocean/bioluminescent_dreams.ogg',
+  '/assets/rota4/themes_ocean/deep_sea_serenity.ogg',
+  '/assets/rota4/themes_ocean/underwater_colors.ogg',
+  '/assets/rota4/themes_ocean/sunken_silence.ogg',
+  '/assets/rota4/themes_ocean/ocean_floor_slumber.ogg',
+  '/assets/rota4/themes_ocean/gentle_tides.ogg',
+  '/assets/rota4/themes_ocean/floating_coral.ogg',
+];
+
+const arcadeResultVideos = MINI_GAMES_CONFIG.flatMap(game => {
   const folder = game.id.replaceAll('-', '_');
+  const file = game.id === 'salto-espacial' ? 'space_jump' : folder;
   return [
-    `/assets/games/${folder}/${folder}_victory.webp`,
-    `/assets/games/${folder}/${folder}_lose.webp`,
+    `/assets/games/${folder}/${file}_victory.webm`,
+    `/assets/games/${folder}/${file}_lose.webm`,
   ];
 });
 
@@ -189,11 +303,17 @@ const fliperSfx = [
   'ruptura_estelar_boss_shot',
   'ruptura_estelar_enemy_explosion',
   'ruptura_estelar_player_explosion',
+  'barrier_explosion',
+  'rupture_last_explosion',
   'neo_catcher_black',
   'neo_catcher_3_colors',
   'neo_catcher_heall',
   'neo_catcher_miss',
   'neo_catcher_bomb',
+  'intro_fliper',
+  'insert_coins',
+  'victory_theme_games',
+  'lose_theme_games',
 ].map(name => `/assets/games/flipers_sfx/${name}.ogg`);
 
 const neoCatcherBackgrounds = [
@@ -201,6 +321,91 @@ const neoCatcherBackgrounds = [
   '/assets/games/neo_catcher/neo_catcher_beach_background.webp',
   '/assets/games/neo_catcher/neo_catcher_bridge_background.webp',
   '/assets/games/neo_catcher/neo_catcher_volcano_background.webp',
+];
+
+const dangerZoomZonesImages = [
+  '/assets/games/danger_zoom_zones/danger_zoom_zones_bg.webp',
+  '/assets/games/danger_zoom_zones/danger_zoom_zones_bg2.webp',
+];
+
+const route3VoidLocationKeys = ['zero', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
+const route3VoidBossSpriteImages = route3VoidLocationKeys.flatMap(locationKey => (
+  ['neutral', 'up', 'down', 'forward', 'backward'].map(direction => (
+    `/assets/rota3/void/${locationKey}/boss_${direction}.webp`
+  ))
+));
+const route3VoidBossShootImages = [
+  '/assets/rota3/void/5/boss_shoot.webp',
+];
+const route3VoidBattleImages = [
+  '/images/ships/battle/player_battle_neutral.webp',
+  '/images/ships/battle/player_battle_up.webp',
+  '/images/ships/battle/player_battle_down.webp',
+  '/images/ships/battle/player-battle.webp',
+  '/images/battle/void/meteorite1.webp',
+  '/images/battle/void/meteorite2.webp',
+  '/images/battle/void/meteor1.webp',
+  '/images/battle/void/meteor2.webp',
+  '/assets/rota3/void/mitic_eclipse/mitic_eclipse_neutral.webp',
+  '/assets/rota3/void/mitic_eclipse/mitic_eclipse_up.webp',
+  '/assets/rota3/void/mitic_eclipse/mitic_eclipse_down.webp',
+  '/assets/rota3/void/mitic_eclipse/mitic_eclipse_forward.webp',
+  '/assets/rota3/void/zero/monster-elite_neutral.webp',
+  '/assets/rota3/void/zero/monster-common-1_neutral.webp',
+  '/assets/rota3/void/zero/monster-common-2_neutral.webp',
+  '/assets/rota3/void/zero/monster-common-3_neutral.webp',
+  '/assets/rota3/void/zero/monster-common-4_neutral.webp',
+  ...route3VoidLocationKeys.map(locationKey => `/assets/rota3/void/${locationKey}/bg_layer_${locationKey}.webp`),
+  ...route3VoidBossSpriteImages,
+  ...route3VoidBossShootImages,
+];
+const route3VoidBattleVideos = [
+  ...route3VoidLocationKeys.map(locationKey => `/assets/rota3/void/${locationKey}/background_battle_${locationKey}.mp4`),
+  '/assets/rota3/void/1/devorador_alpha.mp4',
+  '/assets/rota3/void/2/sanguessuga_estelar.mp4',
+  '/assets/rota3/void/3/colosso_amalgamado.mp4',
+  '/assets/rota3/void/4/kraken_do_vazio.mp4',
+  '/assets/rota3/void/5/besta_titã_de_ferro.mp4',
+  '/assets/rota3/void/6/horror_mutante.mp4',
+  '/assets/rota3/void/7/verme_rei_do_vazio.mp4',
+  '/assets/rota3/void/8/predador_abissal.mp4',
+  '/assets/rota3/void/9/deus_monstro_do_vazio.mp4',
+];
+
+const route3VoidDonationAudio = [
+  '/audio/sfx/open_window_void.ogg',
+  '/audio/sfx/close_window_void.ogg',
+  '/audio/sfx/donation_1_void.ogg',
+  '/audio/sfx/donation_2_void.ogg',
+  '/audio/sfx/donation_3_void.ogg',
+  '/audio/sfx/full_void.ogg',
+  '/audio/sfx/songs_of_war.ogg',
+];
+
+const rupturaEstelarEnemies = [
+  '/assets/games/ruptura_estelar/ruptura_canvas_bg.webp',
+  '/assets/games/ruptura_estelar/battle_shopter_ruptura.webp',
+  '/assets/games/ruptura_estelar/battle_airship_ruptura.webp',
+  '/assets/games/ruptura_estelar/1bg_beach_ruptura.webp',
+  '/assets/games/ruptura_estelar/2bg_city_ruptura.webp',
+  '/assets/games/ruptura_estelar/3bg_montain_ruptura.webp',
+  '/assets/games/ruptura_estelar/4bg_desert_ruptura.webp',
+  '/assets/games/ruptura_estelar/5bg_nebula_ruptura.webp',
+  '/assets/games/ruptura_estelar/6bg_saturn_ruptura.webp',
+  '/assets/games/ruptura_estelar/7bg_space_ruptura.webp',
+  '/assets/games/ruptura_estelar/8bg_earth_ruptura.webp',
+  '/assets/games/ruptura_estelar/boos_1_ruptura.webp',
+  '/assets/games/ruptura_estelar/boos_2_ruptura.webp',
+  '/assets/games/ruptura_estelar/boos_3_ruptura.webp',
+  '/assets/games/ruptura_estelar/boos_4_ruptura.webp',
+  '/assets/games/ruptura_estelar/ruptura_meteor1.webp',
+  '/assets/games/ruptura_estelar/ruptura_meteor2.webp',
+  '/assets/games/ruptura_estelar/ruptura_meteor3.webp',
+  '/assets/games/ruptura_estelar/ruptura_meteor4.webp',
+  '/assets/games/ruptura_estelar/ruptura_meteorite1.webp',
+  '/assets/games/ruptura_estelar/ruptura_meteorite2.webp',
+  '/assets/games/ruptura_estelar/ruptura_meteorite3.webp',
+  '/assets/games/ruptura_estelar/ruptura_meteorite4.webp',
 ];
 
 const asEntries = (srcs: string[], kind: AssetKind): AssetPreloadEntry[] => (
@@ -235,6 +440,10 @@ export const ASSET_GROUPS: Record<AssetGroupId, AssetPreloadEntry[]> = {
       '/images/ui/sounds_ef_background.webp',
       '/images/ui/jukebox_background.webp',
     ], 'image'),
+    ...asEntries([
+      '/videos/bobby_blue/bobby_blue_game_intro_glitch.webm',
+      '/videos/bobby_blue/bobby_blue_game_intro.webm',
+    ], 'video'),
   ],
   'card-frames': asEntries([
     ...Object.values(CARD_BACKGROUND_BY_RARITY),
@@ -243,29 +452,29 @@ export const ASSET_GROUPS: Record<AssetGroupId, AssetPreloadEntry[]> = {
   arcades: [
     ...asEntries(['/assets/games/arcade_background.webp'], 'image'),
     ...asEntries(MINI_GAMES_CONFIG.map(game => game.cabinetImage), 'image'),
-    ...asEntries(MINI_GAMES_CONFIG.map(game => game.image), 'video'),
-    ...asEntries(arcadeResultImages, 'image'),
+    ...asEntries([...MINI_GAMES_CONFIG.map(game => game.image), '/assets/games/fliper_intro.webm'], 'video'),
+    ...asEntries(arcadeResultVideos, 'video'),
+    ...asEntries(dangerZoomZonesImages, 'image'),
     ...asEntries(neoCatcherBackgrounds, 'image'),
+    ...asEntries(rupturaEstelarEnemies, 'image'),
     ...asEntries(arcadeThemeAudio, 'audio'),
     ...asEntries(fliperSfx, 'audio'),
   ],
   route1: [
-    ...asEntries([routeHeaderImages.route1], 'image'),
+    ...asEntries([routeHeaderImages.route1, activeDeliveryBackgrounds.route1, missionHeaderBackgrounds.route1], 'image'),
     ...asEntries(routeThemeAudio('Solar'), 'audio'),
   ],
   route2: [
-    ...asEntries([routeHeaderImages.route2], 'image'),
+    ...asEntries([routeHeaderImages.route2, activeDeliveryBackgrounds.route2, missionHeaderBackgrounds.route2], 'image'),
     ...asEntries(routeThemeAudio('Interstellar'), 'audio'),
   ],
   route3: [
     ...asEntries([
       routeHeaderImages.route3,
-      '/assets/rota3/void/zero/bg_layer_zero.webp',
-      '/assets/rota3/void/zero/boss_neutral.webp',
-      '/assets/rota3/void/zero/monster-elite_neutral.webp',
-      '/assets/rota3/void/mitic_eclipse/mitic_eclipse_neutral.webp',
+      ...route3VoidBattleImages,
     ], 'image'),
-    ...asEntries(routeThemeAudio('Void'), 'audio'),
+    ...asEntries(route3VoidBattleVideos, 'video'),
+    ...asEntries([...routeThemeAudio('Void'), ...route3VoidDonationAudio], 'audio'),
   ],
   route4: [
     ...asEntries([routeHeaderImages.route4, '/images/bobby_blue/bobby_blue_new_land.webp', '/assets/rota4/new_land_map.webp', ...route4TextureImages], 'image'),
@@ -278,7 +487,7 @@ export const ASSET_GROUPS: Record<AssetGroupId, AssetPreloadEntry[]> = {
   ],
   'route4-battle': [
     ...asEntries(route4BattleImages, 'image'),
-    ...asEntries(route4BattleAudio, 'audio'),
+    ...asEntries([...route4BattleAudio, ...route4OceanThemeAudio], 'audio'),
   ],
 };
 

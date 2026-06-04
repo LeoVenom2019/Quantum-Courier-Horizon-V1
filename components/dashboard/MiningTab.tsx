@@ -6,6 +6,7 @@ import { ArrowRight, Lock, Cpu, TrendingUp, Coins, Zap } from 'lucide-react';
 import { ORES, ROBOT_UPGRADES } from '@/lib/game-data';
 import { ROBOT_UPGRADES_MAP } from '@/lib/game-constants';
 import { useDashboard } from './DashboardProvider';
+import { PremiumCanvasButton } from '../ui/PremiumCanvasButton';
 
 const MiningTab = memo(() => {
   const { 
@@ -45,7 +46,6 @@ const MiningTab = memo(() => {
   const themeBorder = isInterstellar ? 'border-orange-500/20' : 'border-cyan-500/20';
   const themeBg = isInterstellar ? 'bg-orange-500/5' : 'bg-cyan-500/5';
   const themeGlow = isInterstellar ? 'neon-border-orange' : 'neon-border-cyan';
-  const themeBtn = isInterstellar ? 'hover:bg-orange-500/20 text-orange-400 border-orange-500/30' : 'hover:bg-cyan-500/20 text-cyan-400 border-cyan-500/30';
 
   const renderOreCard = (ore: any, isMainCard: boolean = false) => {
     const robots = miningRobots[ore.id] || 0;
@@ -120,19 +120,23 @@ const MiningTab = memo(() => {
             <div className={`text-xl lg:text-2xl font-orbitron font-bold tracking-tighter ${themeAccent}`}>{formatValue(packs)} <span className="text-[12px] opacity-60 font-mono">PKS</span></div>
             <div className="flex items-center justify-end gap-2 mt-1">
               {autoSellUnlockedByOre[ore.id] ? (
-                <button 
+                <PremiumCanvasButton
                   onClick={() => toggleAutoSell(ore.id)}
-                  className={`text-[10px] font-bold px-2 py-0.5 rounded-full transition-all border ${isAutoSell ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-400' : 'bg-slate-900 border-white/10 text-slate-500 hover:text-white'}`}
+                  tone={isAutoSell ? 'green' : 'steel'}
+                  className="h-6 min-w-[94px] px-2 text-[10px] font-bold uppercase"
+                  contentClassName={isAutoSell ? 'text-emerald-200' : 'text-slate-400'}
                 >
                   {isAutoSell ? 'AUTO-SELL ON' : 'AUTO-SELL OFF'}
-                </button>
+                </PremiumCanvasButton>
               ) : (
-                <button 
+                <PremiumCanvasButton
                   onClick={() => buyAutoSell(ore.id)}
-                  className="text-[10px] font-bold bg-slate-900 border border-white/5 text-slate-500 hover:text-slate-300 px-2 py-0.5 rounded-full flex items-center gap-1.5"
+                  tone="steel"
+                  className="h-6 min-w-[82px] px-2 text-[10px] font-bold"
+                  contentClassName="gap-1.5 text-slate-300"
                 >
                   <Coins className="w-2.5 h-2.5" /> {formatValue(Math.floor(ore.autoSellCost * getEconomicMultipliers().cost))}
-                </button>
+                </PremiumCanvasButton>
               )}
             </div>
           </div>
@@ -171,65 +175,51 @@ const MiningTab = memo(() => {
         {/* Interaction Grid */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 lg:gap-3 shrink-0 mb-4">
           {/* Buy Robot */}
-          <button 
+          <PremiumCanvasButton
             onClick={() => buyMiningRobot(ore.id)} 
             disabled={robots >= 5 || qc < robotCost} 
-            className={`group relative p-2 lg:p-3 rounded-xl border transition-all flex flex-col items-center justify-center gap-1 ${
-              robots >= 5 
-                ? 'border-white/5 bg-slate-900/40 text-slate-600 opacity-60 cursor-not-allowed' 
-                : qc >= robotCost 
-                  ? `border-white/10 bg-slate-900/60 ${themeAccent} hover:scale-[1.02] active:scale-[0.98] hover:border-white/20`
-                  : 'border-white/5 bg-slate-900/40 text-slate-700 cursor-not-allowed'
-            }`}
+            tone={robots >= 5 || qc < robotCost ? 'steel' : (isInterstellar ? 'orange' : 'cyan')}
+            className="min-h-[74px] p-2 lg:p-3 text-center"
+            contentClassName={`flex-col gap-1 ${robots >= 5 || qc < robotCost ? 'text-slate-500' : themeAccent}`}
           >
             <Cpu className="w-4 h-4 mb-1" />
             <div className="text-[10px] font-bold uppercase tracking-widest leading-none">{t('robot')}</div>
             <div className="text-[12px] font-mono font-bold leading-none">{robots >= 5 ? 'MAX' : formatValue(robotCost)}</div>
-          </button>
+          </PremiumCanvasButton>
 
           {/* Upgrade Robot */}
-          <button 
+          <PremiumCanvasButton
             onClick={() => upgradeMiningRobot(ore.id, 'power')} 
             disabled={level >= 5 || qc < upgradeCost} 
-            className={`group relative p-2 lg:p-3 rounded-xl border transition-all flex flex-col items-center justify-center gap-1 ${
-              level >= 5 
-                ? 'border-white/5 bg-slate-900/40 text-slate-600 opacity-60 cursor-not-allowed' 
-                : qc >= upgradeCost 
-                  ? 'border-white/10 bg-slate-900/60 text-emerald-400 hover:scale-[1.02] active:scale-[0.98] hover:border-white/20'
-                  : 'border-white/5 bg-slate-900/40 text-slate-700 cursor-not-allowed'
-            }`}
+            tone={level >= 5 || qc < upgradeCost ? 'steel' : 'green'}
+            className="min-h-[74px] p-2 lg:p-3 text-center"
+            contentClassName={`flex-col gap-1 ${level >= 5 || qc < upgradeCost ? 'text-slate-500' : 'text-emerald-300'}`}
           >
             <TrendingUp className="w-4 h-4 mb-1" />
             <div className="text-[10px] font-bold uppercase tracking-widest leading-none">{t('upgrade')}</div>
             <div className="text-[12px] font-mono font-bold leading-none">{level >= 5 ? 'MAX' : formatValue(upgradeCost)}</div>
-          </button>
+          </PremiumCanvasButton>
 
           {/* Compression */}
-          <button 
+          <PremiumCanvasButton
             onClick={() => buyMiningCompression(ore.id)} 
             disabled={compressionLevel >= 10 || qc < compressionCost} 
-            className={`group relative p-2 lg:p-3 rounded-xl border transition-all flex flex-col items-center justify-center gap-1 ${
-              compressionLevel >= 10 
-                ? 'border-white/5 bg-slate-900/40 text-slate-600 opacity-60 cursor-not-allowed' 
-                : qc >= compressionCost 
-                  ? 'border-white/10 bg-slate-900/60 text-indigo-400 hover:scale-[1.02] active:scale-[0.98] hover:border-white/20'
-                  : 'border-white/5 bg-slate-900/40 text-slate-700 cursor-not-allowed'
-            }`}
+            tone={compressionLevel >= 10 || qc < compressionCost ? 'steel' : 'indigo'}
+            className="min-h-[74px] p-2 lg:p-3 text-center"
+            contentClassName={`flex-col gap-1 ${compressionLevel >= 10 || qc < compressionCost ? 'text-slate-500' : 'text-indigo-300'}`}
           >
             <Zap className="w-4 h-4 mb-1" />
             <div className="text-[10px] font-bold uppercase tracking-widest leading-none">{t('compression')}</div>
             <div className="text-[12px] font-mono font-bold leading-none">{compressionLevel >= 10 ? 'MAX' : formatValue(compressionCost)}</div>
-          </button>
+          </PremiumCanvasButton>
 
           {/* Manual Sell */}
-          <button 
+          <PremiumCanvasButton
             onClick={(e) => isInterstellar ? sellExtractionPointPacks(ore.id, e) : sellOrePack(ore.id, e)} 
             disabled={isInterstellar ? packs < 100 : packs <= 0} 
-            className={`group relative p-2 lg:p-3 rounded-xl border transition-all flex flex-col items-center justify-center gap-1 ${
-              (isInterstellar ? packs >= 100 : packs > 0)
-                ? 'border-white/10 bg-slate-900/60 text-yellow-400 hover:scale-[1.02] active:scale-[0.98] hover:border-white/20'
-                : 'border-white/5 bg-slate-900/40 text-slate-700 cursor-not-allowed'
-            }`}
+            tone={(isInterstellar ? packs >= 100 : packs > 0) ? 'amber' : 'steel'}
+            className="min-h-[74px] p-2 lg:p-3 text-center"
+            contentClassName={`flex-col gap-1 ${(isInterstellar ? packs >= 100 : packs > 0) ? 'text-yellow-300' : 'text-slate-500'}`}
           >
             <Coins className="w-4 h-4 mb-1" />
             <div className="text-[10px] font-bold uppercase tracking-widest leading-none">{t('sell')}</div>
@@ -239,7 +229,7 @@ const MiningTab = memo(() => {
                 : (packs > 0 ? `${packs} PKS` : '---')
               }
             </div>
-          </button>
+          </PremiumCanvasButton>
         </div>
       </div>
     );
@@ -261,26 +251,30 @@ const MiningTab = memo(() => {
         
         {/* Universal Pager Logic */}
         <div className="flex items-center gap-4">
-          <button 
+          <PremiumCanvasButton
             onClick={() => setMiningPageIndex(Math.max(0, miningPageIndex - 1))}
             disabled={miningPageIndex === 0}
-            className={`p-2 rounded-lg border transition-all ${miningPageIndex === 0 ? 'opacity-20 cursor-not-allowed border-white/10' : themeBtn}`}
+            tone={miningPageIndex === 0 ? 'steel' : (isInterstellar ? 'orange' : 'cyan')}
+            className="h-10 w-10"
+            contentClassName={miningPageIndex === 0 ? 'text-slate-500' : themeAccent}
           >
             <ArrowRight className="w-5 h-5 rotate-180" />
-          </button>
+          </PremiumCanvasButton>
           <div className="flex flex-col items-center">
             <span className={`text-xl font-orbitron font-bold ${themeAccent} leading-none`}>
               {miningPageIndex + 1}
             </span>
             <span className="text-[10px] text-slate-600 font-bold uppercase tracking-widest mt-1">{t('of')} {currentOres.length}</span>
           </div>
-          <button 
+          <PremiumCanvasButton
             onClick={() => setMiningPageIndex(Math.min(currentOres.length - 1, miningPageIndex + 1))}
             disabled={miningPageIndex === currentOres.length - 1}
-            className={`p-2 rounded-lg border transition-all ${miningPageIndex === currentOres.length - 1 ? 'opacity-20 cursor-not-allowed border-white/10' : themeBtn}`}
+            tone={miningPageIndex === currentOres.length - 1 ? 'steel' : (isInterstellar ? 'orange' : 'cyan')}
+            className="h-10 w-10"
+            contentClassName={miningPageIndex === currentOres.length - 1 ? 'text-slate-500' : themeAccent}
           >
             <ArrowRight className="w-5 h-5" />
-          </button>
+          </PremiumCanvasButton>
         </div>
       </div>
 

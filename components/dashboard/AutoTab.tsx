@@ -5,6 +5,7 @@ import { motion } from 'motion/react';
 import { Flame, Coins, Zap } from 'lucide-react';
 import { ROUTES, SHIPS } from '@/lib/game-data';
 import { useDashboard } from './DashboardProvider';
+import { PremiumCanvasButton } from '../ui/PremiumCanvasButton';
 
 const AutoTab = memo(() => {
   const { 
@@ -130,12 +131,14 @@ const AutoTab = memo(() => {
                 
                 {slots < 5 ? (
                   <div className="flex flex-col items-end gap-1">
-                    <button
+                    <PremiumCanvasButton
                       onClick={() => buyAutoTravelSlot(route.id)}
-                      className={`${isInterstellar ? 'bg-orange-600/20 hover:bg-orange-600/40 text-orange-400 border-orange-600/30' : 'bg-pink-600/20 hover:bg-pink-600/40 text-pink-400 border-pink-600/30'} border px-2 py-1 rounded text-[7px] font-orbitron font-bold tracking-widest transition-all flex items-center gap-1 uppercase`}
+                      tone={isInterstellar ? 'orange' : 'purple'}
+                      className="h-8 min-w-[118px] px-2 text-[7px] font-bold uppercase tracking-widest"
+                      contentClassName={`gap-1 ${isInterstellar ? 'text-orange-200' : 'text-pink-200'}`}
                     >
                       {t('buy').toUpperCase()} <Coins className="w-2 h-2" /> {formatValue([1000, 5000, 10000, 15000, 20000][slots] * getLocationMultiplier(route.id) * getEconomicMultipliers().cost * (route.tier === 'Interstellar' ? 2 : 1))}
-                    </button>
+                    </PremiumCanvasButton>
                     {route.id !== 'speed_run' && (
                       <div className={`text-[7px] font-mono ${aetherion < (slots + 1) * 200 ? 'text-red-500 font-bold' : 'text-pink-400/80'} uppercase tracking-tighter flex items-center gap-1 mt-0.5`}>
                         <Zap className="w-1.5 h-1.5" /> {t('activationCost')}: {(slots + 1) * 200}
@@ -152,16 +155,14 @@ const AutoTab = memo(() => {
               <div className="pt-2 border-t border-white/5 flex flex-col gap-2 mt-auto">
                 <div className="flex justify-between items-center">
                   <div className="flex flex-col gap-1">
-                    <button
+                    <PremiumCanvasButton
                       onClick={() => toggleAutoTravel(route.id)}
-                      className={`px-3 py-1 rounded text-[14px] font-orbitron font-bold tracking-widest transition-all border uppercase ${
-                        isDesired 
-                        ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-400' 
-                        : 'bg-white/5 border-white/10 text-slate-500'
-                      }`}
+                      tone={isDesired ? 'green' : 'steel'}
+                      className="h-8 min-w-[74px] px-3 text-[14px] font-bold uppercase tracking-widest"
+                      contentClassName={isDesired ? 'text-emerald-200' : 'text-slate-400'}
                     >
                       {isDesired ? t('on').toUpperCase() : t('off').toUpperCase()}
-                    </button>
+                    </PremiumCanvasButton>
                     {isDesired && !isActive && (
                       <span className="text-[6px] text-red-400 font-mono uppercase tracking-tighter">
                         {t('insufficientAetherion')}

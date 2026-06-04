@@ -1,0 +1,383 @@
+
+<canvas id="pc" style="display:block;background:#000;border-radius:14px;width:100%;"></canvas>
+<script>
+const pc = document.getElementById('pc');
+const cx = pc.getContext('2d');
+const DPR = Math.min(window.devicePixelRatio||1, 2);
+pc.width = 680*DPR; pc.height = 500*DPR;
+pc.style.height = '500px';
+cx.scale(DPR, DPR);
+const W=680, H=500;
+const PX = W-110, PY = H/2;
+
+let ticks=0;
+
+function hash(n){let x=Math.sin(n)*43758.5453;return x-Math.floor(x);}
+
+function easeInOut(t){return t<0.5?2*t*t:1-Math.pow(-2*t+2,2)/2;}
+
+function drawBg(t){
+  cx.fillStyle='#000408';
+  cx.fillRect(0,0,W,H);
+  for(let i=0;i<55;i++){
+    const sx=hash(i*7.3)*W, sy=hash(i*3.1)*H;
+    const br=0.18+hash(i*13.7)*0.55+Math.sin(t*0.0004+i*2.8)*0.25;
+    const r=0.6+hash(i*2.4)*1.0;
+    cx.beginPath();cx.arc(sx,sy,r,0,Math.PI*2);
+    cx.fillStyle=`rgba(200,210,255,${br*0.9})`;cx.fill();
+  }
+  cx.save();
+  cx.globalCompositeOperation='screen';
+  const mist=cx.createRadialGradient(PX,PY,30,PX,PY,260);
+  mist.addColorStop(0,'rgba(14,40,80,0.55)');
+  mist.addColorStop(0.4,'rgba(8,20,50,0.28)');
+  mist.addColorStop(1,'rgba(0,0,0,0)');
+  cx.fillStyle=mist;cx.fillRect(0,0,W,H);
+  cx.restore();
+}
+
+function drawGroundMist(t){
+  cx.save();
+  cx.globalCompositeOperation='screen';
+  for(let i=0;i<5;i++){
+    const y=PY+80+i*18;
+    const drift=Math.sin(t*0.0003+i*1.9)*30;
+    const g=cx.createRadialGradient(PX+drift,y,10,PX+drift,y,160);
+    g.addColorStop(0,`rgba(20,80,160,${0.07-i*0.01})`);
+    g.addColorStop(1,'rgba(0,0,0,0)');
+    cx.fillStyle=g;
+    cx.fillRect(0,0,W,H);
+  }
+  cx.restore();
+}
+
+function drawTerrain(){
+  cx.save();
+  const leftStone=[
+    [PX-200,PY+140],[PX-180,PY+90],[PX-155,PY+60],[PX-138,PY+30],
+    [PX-128,PY-20],[PX-118,PY-70],[PX-110,PY-140],
+  ];
+  const rightStone=[
+    [PX+80,PY-140],[PX+90,PY-70],[PX+98,PY-20],
+    [PX+105,PY+30],[PX+115,PY+60],[PX+138,PY+90],[PX+155,PY+140],
+  ];
+  cx.beginPath();
+  cx.moveTo(0,H);
+  cx.lineTo(0,PY+140);
+  leftStone.forEach(([x,y])=>cx.lineTo(x,y));
+  cx.lineTo(PX-110,PY-155);
+  cx.lineTo(PX-105,PY-165);
+  cx.lineTo(PX-95,PY-158);
+  rightStone.forEach(([x,y])=>cx.lineTo(x,y));
+  cx.lineTo(W,PY+140);cx.lineTo(W,H);cx.closePath();
+  const stoneG=cx.createLinearGradient(PX-200,PY-160,PX+155,PY+140);
+  stoneG.addColorStop(0,'#0d1520');
+  stoneG.addColorStop(0.3,'#152030');
+  stoneG.addColorStop(0.7,'#0a1018');
+  stoneG.addColorStop(1,'#050a10');
+  cx.fillStyle=stoneG;cx.fill();
+  cx.strokeStyle='rgba(60,100,160,0.3)';cx.lineWidth=1;cx.stroke();
+  cx.restore();
+}
+
+function drawRuneGlyphs(t){
+  cx.save();
+  cx.globalCompositeOperation='screen';
+  const runes=[
+    {x:PX-105,y:PY-175,sym:'⬡',size:11},
+    {x:PX-130,y:PY-100,sym:'◈',size:9},
+    {x:PX-122,y:PY+40,sym:'⟁',size:9},
+    {x:PX+88,y:PY-175,sym:'⬡',size:11},
+    {x:PX+108,y:PY-100,sym:'◈',size:9},
+    {x:PX+100,y:PY+40,sym:'⟁',size:9},
+  ];
+  runes.forEach((r,i)=>{
+    const pulse=0.55+Math.sin(t*0.0018+i*1.4)*0.35;
+    cx.font=`${r.size}px monospace`;
+    cx.textAlign='center';cx.textBaseline='middle';
+    cx.shadowColor='rgba(80,160,255,0.9)';cx.shadowBlur=8;
+    cx.fillStyle=`rgba(140,200,255,${pulse})`;
+    cx.fillText(r.sym,r.x,r.y);
+  });
+  cx.restore();
+}
+
+function drawArchStone(t){
+  cx.save();
+  const archW=220, archH=300;
+  const ax=PX, ay=PY;
+  cx.shadowColor='rgba(40,120,255,0.25)';cx.shadowBlur=18;
+  cx.strokeStyle='rgba(50,80,130,0.7)';cx.lineWidth=3;
+  cx.beginPath();
+  cx.moveTo(ax-archW/2,ay+archH/2);
+  cx.lineTo(ax-archW/2,ay-archH*0.1);
+  cx.bezierCurveTo(ax-archW/2,ay-archH*0.55,ax-archW*0.22,ay-archH/2,ax,ay-archH/2);
+  cx.bezierCurveTo(ax+archW*0.22,ay-archH/2,ax+archW/2,ay-archH*0.55,ax+archW/2,ay-archH*0.1);
+  cx.lineTo(ax+archW/2,ay+archH/2);
+  cx.stroke();
+  cx.strokeStyle='rgba(30,60,110,0.5)';cx.lineWidth=6;
+  cx.beginPath();
+  cx.moveTo(ax-archW/2-4,ay+archH/2);
+  cx.lineTo(ax-archW/2-4,ay-archH*0.1);
+  cx.bezierCurveTo(ax-archW/2-4,ay-archH*0.56,ax-archW*0.22-4,ay-archH/2-6,ax,ay-archH/2-6);
+  cx.bezierCurveTo(ax+archW*0.22+4,ay-archH/2-6,ax+archW/2+4,ay-archH*0.56,ax+archW/2+4,ay-archH*0.1);
+  cx.lineTo(ax+archW/2+4,ay+archH/2);
+  cx.stroke();
+  cx.restore();
+}
+
+function drawPortalVoid(t){
+  cx.save();
+  const rx=72, ry=130;
+  cx.globalCompositeOperation='source-over';
+  const void1=cx.createRadialGradient(PX,PY,0,PX,PY,ry*0.9);
+  void1.addColorStop(0,'rgba(0,2,12,1)');
+  void1.addColorStop(0.4,'rgba(1,4,20,1)');
+  void1.addColorStop(0.7,'rgba(2,6,30,0.96)');
+  void1.addColorStop(1,'rgba(4,10,50,0.8)');
+  cx.fillStyle=void1;
+  cx.beginPath();cx.ellipse(PX,PY,rx,ry,0,0,Math.PI*2);cx.fill();
+  cx.restore();
+}
+
+function drawVoidStars(t){
+  cx.save();
+  cx.globalCompositeOperation='source-over';
+  cx.beginPath();cx.ellipse(PX,PY,72,130,0,0,Math.PI*2);cx.clip();
+  for(let i=0;i<80;i++){
+    const tx=(hash(i*5.1)*2-1)*68;
+    const ty=(hash(i*3.7)*2-1)*125;
+    const drift=0.000025*(i%7+1);
+    const sx=PX+tx*Math.cos(t*drift+i)-ty*Math.sin(t*drift*0.3+i)*0.08;
+    const sy=PY+ty*Math.cos(t*drift*0.4+i)+tx*Math.sin(t*drift*0.2+i)*0.05;
+    const br=0.3+hash(i*9.2)*0.55+Math.sin(t*0.002+i*2.1)*0.12;
+    const sr=0.4+hash(i*1.8)*0.9;
+    cx.beginPath();cx.arc(sx,sy,sr,0,Math.PI*2);
+    cx.fillStyle=`rgba(200,220,255,${br})`;cx.fill();
+  }
+  cx.restore();
+}
+
+function drawVoidNebula(t){
+  cx.save();
+  cx.globalCompositeOperation='screen';
+  cx.beginPath();cx.ellipse(PX,PY,72,130,0,0,Math.PI*2);cx.clip();
+  for(let i=0;i<4;i++){
+    const angle=t*0.0004*(i%2===0?1:-0.7)+i*1.57;
+    const ox=Math.cos(angle)*18, oy=Math.sin(angle)*30;
+    const colors=[
+      ['rgba(20,40,120,0.18)','rgba(0,0,0,0)'],
+      ['rgba(50,10,90,0.14)','rgba(0,0,0,0)'],
+      ['rgba(0,30,80,0.16)','rgba(0,0,0,0)'],
+      ['rgba(10,60,120,0.12)','rgba(0,0,0,0)'],
+    ];
+    const ng=cx.createRadialGradient(PX+ox,PY+oy,5,PX+ox,PY+oy,70);
+    ng.addColorStop(0,colors[i][0]);ng.addColorStop(1,colors[i][1]);
+    cx.fillStyle=ng;cx.fillRect(0,0,W,H);
+  }
+  cx.restore();
+}
+
+function drawEnergyRings(t){
+  cx.save();
+  cx.globalCompositeOperation='screen';
+  const rings=[
+    {rx:76,ry:136,spd:0.0006,color:'rgba(30,120,255,',lw:2.2,phase:0},
+    {rx:84,ry:148,spd:-0.0004,color:'rgba(100,50,220,',lw:1.5,phase:2.1},
+    {rx:92,ry:162,spd:0.00025,color:'rgba(0,180,255,',lw:1.0,phase:4.3},
+    {rx:68,ry:122,spd:-0.0008,color:'rgba(180,80,255,',lw:1.0,phase:1.1},
+  ];
+  rings.forEach((r,i)=>{
+    const wobX=Math.sin(t*r.spd*2.3+r.phase)*4;
+    const wobY=Math.sin(t*r.spd*1.7+r.phase+1)*7;
+    const rot=t*r.spd+r.phase*0.1;
+    const pulse=0.55+Math.sin(t*0.002+i*1.8)*0.35;
+    cx.save();
+    cx.translate(PX+wobX,PY+wobY);cx.rotate(rot);
+    cx.shadowColor=r.color+'0.9)';cx.shadowBlur=14+pulse*10;
+    cx.strokeStyle=r.color+(0.35+pulse*0.45)+')';
+    cx.lineWidth=r.lw;
+    cx.beginPath();cx.ellipse(0,0,r.rx,r.ry,0,0,Math.PI*2);cx.stroke();
+    cx.restore();
+  });
+  cx.restore();
+}
+
+function drawCoreGlow(t){
+  cx.save();
+  cx.globalCompositeOperation='screen';
+  const pulse=0.5+Math.sin(t*0.0025)*0.4;
+  const surge=0.5+Math.sin(t*0.007)*0.5;
+  const g1=cx.createRadialGradient(PX,PY,2,PX,PY,55);
+  g1.addColorStop(0,`rgba(160,210,255,${0.15+surge*0.1})`);
+  g1.addColorStop(0.3,`rgba(60,140,255,${0.12+pulse*0.08})`);
+  g1.addColorStop(0.65,`rgba(80,60,200,${0.08+pulse*0.04})`);
+  g1.addColorStop(1,'rgba(0,0,0,0)');
+  cx.fillStyle=g1;
+  cx.beginPath();cx.ellipse(PX,PY,58,105,0,0,Math.PI*2);cx.fill();
+  const g2=cx.createRadialGradient(PX,PY,0,PX,PY,18);
+  g2.addColorStop(0,`rgba(220,240,255,${0.25+surge*0.2})`);
+  g2.addColorStop(0.5,`rgba(100,180,255,${0.12+pulse*0.08})`);
+  g2.addColorStop(1,'rgba(0,0,0,0)');
+  cx.fillStyle=g2;
+  cx.beginPath();cx.ellipse(PX,PY,20,36,0,0,Math.PI*2);cx.fill();
+  cx.restore();
+}
+
+function drawLightningBolts(t){
+  cx.save();
+  cx.globalCompositeOperation='screen';
+  const numBolts=3;
+  for(let b=0;b<numBolts;b++){
+    const phase=t*0.004+b*2.09;
+    if(Math.sin(phase)>0.55){
+      const alpha=(Math.sin(phase)-0.55)*2.2;
+      const startAngle=hash(Math.floor(t/200)*7+b*13)*Math.PI*2;
+      const ex=PX+Math.cos(startAngle)*72;
+      const ey=PY+Math.sin(startAngle)*130;
+      cx.strokeStyle=`rgba(160,210,255,${alpha*0.9})`;
+      cx.lineWidth=0.8;
+      cx.shadowColor='rgba(120,200,255,0.95)';cx.shadowBlur=12;
+      cx.beginPath();cx.moveTo(PX,PY);
+      let lx=PX,ly=PY;
+      const steps=5;
+      for(let s=1;s<=steps;s++){
+        const prog=s/steps;
+        const tx=PX+(ex-PX)*prog;
+        const ty=PY+(ey-PY)*prog;
+        const jx=(Math.random()-0.5)*22*(1-prog);
+        const jy=(Math.random()-0.5)*22*(1-prog);
+        cx.lineTo(tx+jx,ty+jy);
+      }
+      cx.stroke();
+    }
+  }
+  cx.restore();
+}
+
+function drawFloatingParticles(t){
+  cx.save();
+  cx.globalCompositeOperation='screen';
+  for(let i=0;i<36;i++){
+    const orbit_r=88+hash(i*4.1)*24;
+    const orbit_ry=155+hash(i*2.7)*28;
+    const speed=0.0004*(0.7+hash(i*6.3)*0.8)*(i%2===0?1:-1);
+    const angle=t*speed+i*0.4;
+    const depth=Math.sin(angle);
+    const px2=PX+Math.cos(angle)*orbit_r;
+    const py2=PY+Math.sin(angle)*orbit_ry;
+    const inPortal=Math.abs(px2-PX)<70&&Math.abs(py2-PY)<128;
+    if(!inPortal){
+      const size=0.7+(1+depth)*0.7;
+      const alpha=(0.18+hash(i*5.8)*0.4)*(0.5+depth*0.45);
+      const colors=[
+        `rgba(100,180,255,${alpha})`,
+        `rgba(150,100,255,${alpha})`,
+        `rgba(200,230,255,${alpha})`,
+        `rgba(60,220,255,${alpha*0.7})`,
+      ];
+      cx.beginPath();cx.arc(px2,py2,size,0,Math.PI*2);
+      cx.fillStyle=colors[i%4];
+      cx.shadowColor='rgba(80,160,255,0.7)';cx.shadowBlur=6;
+      cx.fill();
+    }
+  }
+  cx.restore();
+}
+
+function drawOuterAura(t){
+  cx.save();
+  cx.globalCompositeOperation='screen';
+  const pulse=0.5+Math.sin(t*0.0018)*0.4;
+  const halo=cx.createRadialGradient(PX,PY,80,PX,PY,260);
+  halo.addColorStop(0,`rgba(20,80,200,${0.12+pulse*0.06})`);
+  halo.addColorStop(0.3,`rgba(40,60,180,${0.06+pulse*0.04})`);
+  halo.addColorStop(0.65,`rgba(60,40,140,${0.035})`);
+  halo.addColorStop(1,'rgba(0,0,0,0)');
+  cx.fillStyle=halo;cx.fillRect(0,0,W,H);
+  cx.restore();
+}
+
+function drawFloorReflection(t){
+  cx.save();
+  cx.globalCompositeOperation='screen';
+  const pulse=0.5+Math.sin(t*0.002)*0.4;
+  const gy=PY+140;
+  const flR=cx.createRadialGradient(PX,gy,5,PX,gy,120);
+  flR.addColorStop(0,`rgba(30,100,220,${0.14+pulse*0.08})`);
+  flR.addColorStop(0.4,`rgba(20,60,160,${0.06})`);
+  flR.addColorStop(1,'rgba(0,0,0,0)');
+  cx.fillStyle=flR;
+  cx.beginPath();cx.ellipse(PX,gy,110,22,0,0,Math.PI*2);cx.fill();
+  for(let i=0;i<5;i++){
+    const alpha=(0.06-i*0.01)*(0.6+pulse*0.35);
+    cx.strokeStyle=`rgba(60,140,255,${alpha})`;
+    cx.lineWidth=1;
+    cx.beginPath();
+    cx.moveTo(PX-80+i*8,gy+4+i*3);
+    cx.lineTo(PX+80-i*8,gy+4+i*3);
+    cx.stroke();
+  }
+  cx.restore();
+}
+
+function drawEdgeStreams(t){
+  cx.save();
+  cx.globalCompositeOperation='screen';
+  for(let i=0;i<14;i++){
+    const side=i%2===0?-1:1;
+    const baseY=PY-120+Math.floor(i/2)*40;
+    const rx=72+Math.sin(i*1.3)*8;
+    const startX=PX+side*rx;
+    const wave=Math.sin(t*0.003+i*0.9)*12;
+    const alpha=0.08+Math.sin(t*0.0025+i*1.7)*0.07;
+    const endX=PX+side*(rx+28+wave);
+    const colors=[
+      `rgba(80,160,255,${alpha})`,
+      `rgba(120,80,220,${alpha})`,
+      `rgba(40,200,255,${alpha*0.8})`,
+    ];
+    cx.strokeStyle=colors[i%3];
+    cx.lineWidth=0.8;
+    cx.shadowColor='rgba(80,160,255,0.6)';cx.shadowBlur=8;
+    cx.beginPath();cx.moveTo(startX,baseY);cx.lineTo(endX,baseY+wave*0.5);cx.stroke();
+  }
+  cx.restore();
+}
+
+function drawLabel(t){
+  cx.save();
+  cx.globalCompositeOperation='source-over';
+  const pulse=0.7+Math.sin(t*0.002)*0.25;
+  cx.font='600 11px monospace';
+  cx.textAlign='center';cx.textBaseline='middle';
+  cx.letterSpacing='3px';
+  cx.shadowColor='rgba(80,160,255,0.9)';cx.shadowBlur=16;
+  cx.fillStyle=`rgba(160,210,255,${pulse})`;
+  cx.fillText('· BEYOND ·', PX, PY-165);
+  cx.shadowBlur=0;
+  cx.fillStyle=`rgba(80,110,160,${pulse*0.6})`;
+  cx.font='400 9px monospace';
+  cx.fillText('ENTER TO TRAVERSE', PX, PY+165);
+  cx.restore();
+}
+
+function frame(ts){
+  ticks=ts;
+  drawBg(ts);
+  drawGroundMist(ts);
+  drawOuterAura(ts);
+  drawPortalVoid(ts);
+  drawVoidNebula(ts);
+  drawVoidStars(ts);
+  drawCoreGlow(ts);
+  drawLightningBolts(ts);
+  drawEnergyRings(ts);
+  drawEdgeStreams(ts);
+  drawFloatingParticles(ts);
+  drawFloorReflection(ts);
+  drawLabel(ts);
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>

@@ -57,6 +57,7 @@ export function useJukebox(onPlayStateChange?: (isPlaying: boolean) => void) {
   const [playlist, setPlaylist] = useState<Track[]>(fullPlaylist);
   const [currentTrackIndex, setCurrentTrackIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [desiredIsPlaying, setDesiredIsPlaying] = useState(true);
   const [isLoop, setIsLoop] = useState(false);
   const [isShuffle, setIsShuffle] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
@@ -95,6 +96,7 @@ export function useJukebox(onPlayStateChange?: (isPlaying: boolean) => void) {
       if (saved) {
         if (saved.isLoop !== undefined) setIsLoop(saved.isLoop);
         if (saved.isShuffle !== undefined) setIsShuffle(saved.isShuffle);
+        if (saved.desiredIsPlaying !== undefined) setDesiredIsPlaying(Boolean(saved.desiredIsPlaying));
         if (saved.currentTrackIndex !== undefined && saved.currentTrackIndex < fullPlaylist.length) {
           console.log(`[Jukebox] Restoring track index: ${saved.currentTrackIndex}`);
           setCurrentTrackIndex(saved.currentTrackIndex);
@@ -112,9 +114,10 @@ export function useJukebox(onPlayStateChange?: (isPlaying: boolean) => void) {
     GameStorage.save({
       isLoop,
       isShuffle,
+      desiredIsPlaying,
       currentTrackIndex
     }, 'jukebox_settings');
-  }, [isLoop, isShuffle, currentTrackIndex, isLoaded]);
+  }, [isLoop, isShuffle, desiredIsPlaying, currentTrackIndex, isLoaded]);
 
   // Sync volume with master
   useEffect(() => {
@@ -137,9 +140,11 @@ export function useJukebox(onPlayStateChange?: (isPlaying: boolean) => void) {
     if (isPlaying) {
       audioRef.current.pause();
       setIsPlaying(false);
+      setDesiredIsPlaying(false);
     } else {
       requestPlayback('Manual playback failed');
       setIsPlaying(true);
+      setDesiredIsPlaying(true);
     }
   }, [isPlaying, playlist.length, requestPlayback]);
 
@@ -155,6 +160,7 @@ export function useJukebox(onPlayStateChange?: (isPlaying: boolean) => void) {
     
     setCurrentTrackIndex(nextIndex);
     setIsPlaying(true);
+    setDesiredIsPlaying(true);
   }, [currentTrackIndex, isShuffle, playlist.length]);
 
   const playPrev = useCallback(() => {
@@ -167,12 +173,14 @@ export function useJukebox(onPlayStateChange?: (isPlaying: boolean) => void) {
     
     setCurrentTrackIndex(prevIndex);
     setIsPlaying(true);
+    setDesiredIsPlaying(true);
   }, [currentTrackIndex, playlist.length]);
 
   const setTrack = useCallback((index: number) => {
     if (index >= 0 && index < playlist.length) {
       setCurrentTrackIndex(index);
       setIsPlaying(true);
+      setDesiredIsPlaying(true);
     }
   }, [playlist.length]);
 
@@ -194,7 +202,7 @@ export function useJukebox(onPlayStateChange?: (isPlaying: boolean) => void) {
     return () => audio.removeEventListener('ended', handleEnded);
   }, [isLoop, playNext]);
 
-  const playPlaylist = useCallback((newPlaylist: Track[], options: { restart?: boolean; loop?: boolean } = {}) => {
+  const playPlaylist = useCallback((newPlaylist: Track[], options: { restart?: boolean; loop?: boolean; rememberPreference?: boolean } = {}) => {
     setPlaylist(newPlaylist);
     setCurrentTrackIndex(0);
     if (typeof options.loop === 'boolean') setIsLoop(options.loop);
@@ -203,10 +211,16 @@ export function useJukebox(onPlayStateChange?: (isPlaying: boolean) => void) {
       audioRef.current.currentTime = 0;
     }
     setIsPlaying(true);
+    if (options.rememberPreference !== false) {
+      setDesiredIsPlaying(true);
+    }
   }, []);
 
-  const stop = useCallback(() => {
+  const stop = useCallback((options: { rememberPreference?: boolean } = {}) => {
     setIsPlaying(false);
+    if (options.rememberPreference !== false) {
+      setDesiredIsPlaying(false);
+    }
     pendingGesturePlaybackRef.current = false;
     if (audioRef.current) {
       audioRef.current.pause();
@@ -259,6 +273,7 @@ export function useJukebox(onPlayStateChange?: (isPlaying: boolean) => void) {
     playlist,
     currentTrackIndex,
     isPlaying,
+    desiredIsPlaying,
     volume: masterMusicVolume,
     isLoop,
     isShuffle,
@@ -268,7 +283,10 @@ export function useJukebox(onPlayStateChange?: (isPlaying: boolean) => void) {
     setPlaylist,
     setCurrentTrackIndex,
     setTrack,
-    setIsPlaying,
+    setIsPlaying: (next: boolean) => {
+      setIsPlaying(next);
+      setDesiredIsPlaying(next);
+    },
     playPlaylist,
     stop,
     togglePlay,
@@ -280,6 +298,7 @@ export function useJukebox(onPlayStateChange?: (isPlaying: boolean) => void) {
     playlist, 
     currentTrackIndex, 
     isPlaying, 
+    desiredIsPlaying,
     masterMusicVolume, 
     isLoop, 
     isShuffle, 

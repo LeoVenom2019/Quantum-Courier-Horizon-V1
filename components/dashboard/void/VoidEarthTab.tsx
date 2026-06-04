@@ -28,11 +28,11 @@ const VoidEarthTab = memo(() => {
 
   if (isEarth || isVoid) {
     const stats = [
-      { id: 'energy', name: 'Células Quânticas', icon: Zap, color: 'text-yellow-400', progress: earth.reconstructionProgress?.energy || 0 },
-      { id: 'tech', name: 'Dados Multifatoriais', icon: Cpu, color: 'text-cyan-400', progress: earth.reconstructionProgress?.tech || 0 },
-      { id: 'meds', name: 'Kits Médicos Avançados', icon: Heart, color: 'text-red-400', progress: earth.reconstructionProgress?.meds || 0 },
-      { id: 'minerals', name: 'Núcleos Minerais', icon: Gem, color: 'text-orange-400', progress: earth.reconstructionProgress?.minerals || 0 },
-      { id: 'food', name: 'Rações Coloniais', icon: Leaf, color: 'text-green-400', progress: earth.reconstructionProgress?.food || 0 },
+      { id: 'energy', name: 'Células Quânticas', icon: Zap, color: 'text-yellow-400', progress: earth.reconstructionProgress?.energy || 0, bgImage: '/assets/rota3/void/quantic_cels.webp' },
+      { id: 'tech', name: 'Dados Multifatoriais', icon: Cpu, color: 'text-cyan-400', progress: earth.reconstructionProgress?.tech || 0, bgImage: '/assets/rota3/void/multifactorial_data.webp' },
+      { id: 'meds', name: 'Kits Médicos Avançados', icon: Heart, color: 'text-red-400', progress: earth.reconstructionProgress?.meds || 0, bgImage: '/assets/rota3/void/medical_suplies.webp' },
+      { id: 'minerals', name: 'Núcleos Minerais', icon: Gem, color: 'text-orange-400', progress: earth.reconstructionProgress?.minerals || 0, bgImage: '/assets/rota3/void/minerals_void.webp' },
+      { id: 'food', name: 'Rações Coloniais', icon: Leaf, color: 'text-green-400', progress: earth.reconstructionProgress?.food || 0, bgImage: '/assets/rota3/void/colonies_food.webp' },
     ];
 
     const totalProgress = totalProjectTerra;
@@ -80,8 +80,12 @@ const VoidEarthTab = memo(() => {
           <div className="w-full lg:w-1/2 flex flex-col gap-6 overflow-y-auto pr-2 custom-scrollbar min-h-0">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 shrink-0">
               {stats.map(stat => (
-                <div key={stat.id} className="glass-panel border border-white/5 rounded-3xl p-5 space-y-4 bg-white/5 group hover:bg-white/10 transition-all">
-                  <div className="flex justify-between items-center">
+                <div key={stat.id} className="glass-panel border border-white/5 rounded-3xl p-5 space-y-4 bg-black/40 group hover:border-white/20 transition-all overflow-hidden relative">
+                  <div 
+                    className="absolute inset-0 bg-cover bg-center opacity-30 pointer-events-none mix-blend-overlay transition-transform duration-700 group-hover:scale-105"
+                    style={{ backgroundImage: `url(${stat.bgImage})` }}
+                  />
+                  <div className="flex justify-between items-center relative z-10">
                     <div className="flex items-center gap-3">
                       <div className={`p-2 rounded-xl bg-black/40 border border-white/10 ${stat.color} group-hover:scale-110 transition-transform`}>
                         <stat.icon className="w-4 h-4" />
@@ -90,7 +94,7 @@ const VoidEarthTab = memo(() => {
                     </div>
                     <span className={`text-sm font-orbitron font-black ${stat.color}`}>{stat.progress.toFixed(1)}%</span>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 relative z-10">
                     <span className="text-[9px] text-white/30 uppercase tracking-widest font-mono">Enviados do Núcleo de Colonização</span>
                     {stat.progress >= 100 && <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse ml-auto" />}
                   </div>

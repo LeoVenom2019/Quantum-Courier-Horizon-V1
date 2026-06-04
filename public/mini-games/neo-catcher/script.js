@@ -207,6 +207,9 @@ function startPhase(phaseIdx) {
     gameState.immobilized = false;
     gameState.immobilizedTimer = 0;
     gameState.catchRangeBoost = BASE_CATCH_RANGE_BOOST;
+    if (PHASES[phaseIdx]?.name === 'VOLCANO') {
+        notifyArcadeAction('reach-volcano');
+    }
     
     initBackgroundParticles();
     
@@ -221,6 +224,15 @@ function startPhase(phaseIdx) {
     setTimeout(() => announcementEl.classList.add('hidden'), 3000);
     
     requestAnimationFrame(gameLoop);
+}
+
+function notifyArcadeAction(actionId, amount = 1) {
+    window.parent.postMessage({
+        type: 'ARCADE_ACTION',
+        gameId: 'neo-catcher',
+        actionId,
+        amount
+    }, '*');
 }
 
 function restartGame() {

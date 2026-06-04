@@ -1,6 +1,7 @@
 import React from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { ChevronLeft, ChevronRight, Globe, Clock, Users, Activity, History as HistoryIcon, X } from 'lucide-react';
+import { PremiumCanvasButton } from '../ui/PremiumCanvasButton';
 
 const EVENT_IMPORTANCE_STYLES: Record<string, { title: string; card: string; description: string; badgePt?: string; badgeEn?: string }> = {
   important: {
@@ -240,13 +241,15 @@ const EarthSidebar: React.FC<EarthSidebarProps> = ({
 
         {/* Event History */}
         <div className="space-y-3">
-          <button
+          <PremiumCanvasButton
             type="button"
             onClick={() => {
               setPermanentHistoryPage(0);
               setShowPermanentHistory(true);
             }}
-            className="group flex w-full items-center justify-between rounded-xl border border-emerald-500/40 bg-emerald-500/20 px-3 py-2.5 text-left transition-all hover:border-emerald-400/60 hover:bg-emerald-500/30 hover:shadow-[0_0_20px_rgba(16,185,129,0.25)] shadow-[0_0_10px_rgba(16,185,129,0.1)]"
+            tone="green"
+            className="w-full rounded-xl"
+            contentClassName="justify-between px-3 py-2.5 text-left"
           >
             <span className="flex items-center gap-2 text-[15px] font-orbitron font-bold text-emerald-100 uppercase tracking-[0.2em] transition-colors group-hover:text-white drop-shadow-[0_0_5px_rgba(16,185,129,0.5)]">
             <HistoryIcon className="w-3 h-3" />
@@ -255,7 +258,7 @@ const EarthSidebar: React.FC<EarthSidebarProps> = ({
             <span className="rounded-full border border-emerald-200/30 bg-emerald-500/40 px-2 py-0.5 font-mono text-[10px] font-black uppercase tracking-[0.16em] text-white shadow-[0_0_5px_rgba(16,185,129,0.3)]">
               {permanentHistoryEvents.length}
             </span>
-          </button>
+          </PremiumCanvasButton>
           
           <div className="space-y-2">
             {recentEvents.length === 0 ? (
@@ -303,18 +306,23 @@ const EarthSidebar: React.FC<EarthSidebarProps> = ({
               })
             )}
             {fixedDefenseEvent ? (
-              <motion.button 
-                type="button"
+              <motion.div
                 key={fixedDefenseEvent.id}
-                onClick={onDefenseThreatAlertClick}
                 initial={{ opacity: 0, x: -10 }}
                 animate={{ opacity: 1, x: 0 }}
-                className={`w-full rounded-xl p-3 text-left transition-all group ${fixedDefenseEvent.specialStyles?.bg || 'bg-red-500/10'} ${fixedDefenseEvent.specialStyles?.border || 'border-red-400/50'} border-2 shadow-[0_0_24px_rgba(248,113,113,0.22)] hover:bg-red-500/18 hover:shadow-[0_0_30px_rgba(248,113,113,0.32)]`}
               >
-                <p className="font-orbitron text-[13px] font-black uppercase leading-snug tracking-widest text-red-100 drop-shadow-[0_0_12px_rgba(248,113,113,0.85)]">
-                  {String(fixedDefenseEvent.description || '')}
-                </p>
-              </motion.button>
+                <PremiumCanvasButton
+                  type="button"
+                  onClick={onDefenseThreatAlertClick}
+                  tone="red"
+                  className="w-full rounded-xl"
+                  contentClassName="justify-start p-3 text-left"
+                >
+                  <p className="font-orbitron text-[13px] font-black uppercase leading-snug tracking-widest text-red-100 drop-shadow-[0_0_12px_rgba(248,113,113,0.85)]">
+                    {String(fixedDefenseEvent.description || '')}
+                  </p>
+                </PremiumCanvasButton>
+              </motion.div>
             ) : null}
           </div>
         </div>
@@ -345,19 +353,21 @@ const EarthSidebar: React.FC<EarthSidebarProps> = ({
                     {language === 'pt' ? 'Mural dos Grandes Acontecimentos' : 'Great Events Wall'}
                   </h3>
                 </div>
-                <button
+                <PremiumCanvasButton
                   type="button"
                   onClick={() => setShowPermanentHistory(false)}
-                  className="rounded-full border border-white/10 bg-white/5 p-2 text-white/60 transition-all hover:border-cyan-300/40 hover:text-cyan-100"
+                  tone="steel"
+                  className="h-10 w-10 rounded-full"
+                  contentClassName="text-cyan-100"
                   aria-label={language === 'pt' ? 'Fechar histórico fixo' : 'Close fixed history'}
                 >
                   <X className="h-5 w-5" />
-                </button>
+                </PremiumCanvasButton>
               </div>
 
               <div
-                className="flex flex-1 flex-col gap-4 overflow-hidden p-5"
-                style={{ backgroundColor: '#030712' }}
+                className="flex flex-1 flex-col gap-4 overflow-hidden p-5 bg-cover bg-center"
+                style={{ backgroundImage: "linear-gradient(to bottom, rgba(3, 7, 18, 0.75), rgba(3, 7, 18, 0.9)), url('/assets/rota4/layout_cap4/mural_background.webp')" }}
               >
                 {permanentHistoryEvents.length === 0 ? (
                   <div
@@ -368,7 +378,7 @@ const EarthSidebar: React.FC<EarthSidebarProps> = ({
                   </div>
                 ) : (
                   <>
-                    <div className="grid flex-1 auto-rows-fr grid-cols-1 gap-3 overflow-hidden">
+                    <div className="grid flex-1 auto-rows-max grid-cols-1 gap-3 overflow-y-auto custom-scrollbar pr-1">
                       {permanentHistoryPageEvents.map((event, idx) => {
                         const importance = event.importance || (event.isFixed ? 'major' : 'important');
                         const style = EVENT_IMPORTANCE_STYLES[importance] || EVENT_IMPORTANCE_STYLES.important;
@@ -378,7 +388,7 @@ const EarthSidebar: React.FC<EarthSidebarProps> = ({
                             initial={{ opacity: 0, y: 8 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ delay: Math.min(idx * 0.04, 0.3) }}
-                            className="min-h-0 rounded-xl border border-white/14 bg-[#101626] p-4 shadow-[0_0_18px_rgba(0,0,0,0.28)]"
+                            className="min-h-0 rounded-xl border border-white/14 bg-black/50 backdrop-blur-md p-4 shadow-[0_0_18px_rgba(0,0,0,0.28)]"
                           >
                             <div className="mb-2 flex items-start justify-between gap-4">
                               <div>
@@ -403,27 +413,31 @@ const EarthSidebar: React.FC<EarthSidebarProps> = ({
                       })}
                     </div>
                     <div className="flex items-center justify-center gap-4">
-                      <button
+                      <PremiumCanvasButton
                         type="button"
                         onClick={() => setPermanentHistoryPage(prev => Math.max(0, prev - 1))}
                         disabled={safePermanentHistoryPage === 0}
-                        className="flex h-10 w-10 items-center justify-center rounded-full border border-cyan-300/25 bg-white/5 text-cyan-100 transition-all hover:border-cyan-300/70 hover:bg-cyan-300/10 disabled:cursor-not-allowed disabled:opacity-25"
+                        tone="cyan"
+                        className="h-10 w-10 rounded-full"
+                        contentClassName="text-cyan-100"
                         aria-label={language === 'pt' ? 'Página anterior' : 'Previous page'}
                       >
                         <ChevronLeft className="h-5 w-5" />
-                      </button>
+                      </PremiumCanvasButton>
                       <span className="font-mono text-[11px] font-black uppercase tracking-[0.24em] text-white/45">
                         {language === 'pt' ? 'Página' : 'Page'} {String(safePermanentHistoryPage + 1).padStart(2, '0')} / {String(permanentHistoryTotalPages).padStart(2, '0')}
                       </span>
-                      <button
+                      <PremiumCanvasButton
                         type="button"
                         onClick={() => setPermanentHistoryPage(prev => Math.min(permanentHistoryTotalPages - 1, prev + 1))}
                         disabled={safePermanentHistoryPage >= permanentHistoryTotalPages - 1}
-                        className="flex h-10 w-10 items-center justify-center rounded-full border border-cyan-300/25 bg-white/5 text-cyan-100 transition-all hover:border-cyan-300/70 hover:bg-cyan-300/10 disabled:cursor-not-allowed disabled:opacity-25"
+                        tone="cyan"
+                        className="h-10 w-10 rounded-full"
+                        contentClassName="text-cyan-100"
                         aria-label={language === 'pt' ? 'Próxima página' : 'Next page'}
                       >
                         <ChevronRight className="h-5 w-5" />
-                      </button>
+                      </PremiumCanvasButton>
                     </div>
                   </>
                 )}

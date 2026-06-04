@@ -1173,6 +1173,7 @@ export const dashboardTranslations = {
     quantumShield: 'Escudo Quântico',
     hullIntegrity: 'Integridade do Casco',
     baseDamage: 'Dano Base',
+    criticalDamage: 'Dano Crítico',
     searchCombat: 'Buscar Combate',
     repair: 'Reparar',
     weaponSystem: 'Sistema de Armas',

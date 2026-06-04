@@ -179,27 +179,48 @@ const MissionsTab = memo(() => {
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 lg:gap-2 flex-1 overflow-y-auto custom-scrollbar">
-          {missions.map((mission) => {
+          {missions.map((mission, index) => {
             const rarityInfo = getRarityLabel(mission.rarity);
+            
+            const bgMap: Record<string, string> = {
+              'common': '/assets/texturas/bg_card_comum.webp',
+              'rare': '/assets/texturas/bg_card_rara.webp',
+              'legendary': '/assets/texturas/bg_card_lendaria.webp',
+              'mythic': '/assets/texturas/bg_card_mitica.webp',
+              'alien': '/assets/texturas/bg_card_alien.webp'
+            };
+            const bgImage = bgMap[mission.rarity];
+
             return (
               <motion.div
-                key={mission.id}
+                key={mission.id || `mission-${index}`}
                 id={`mission-${mission.id}`}
                 layout
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.8, y: -20 }}
-                className={`glass-panel rounded-xl p-3 lg:p-4 flex flex-col justify-between transition-all relative border-2 h-full ${
+                className={`glass-panel rounded-xl p-3 lg:p-4 flex flex-col justify-between transition-all relative border-2 h-full overflow-hidden ${
                   mission.claimed 
                     ? 'opacity-40 grayscale border-white/5' 
                     : getRarityStyles(mission.rarity, mission.completed)
                 }`}
               >
-                {mission.completed && !mission.claimed && (
-                  <div className={`absolute top-0 right-0 w-16 h-16 bg-gradient-to-br ${isInterstellar ? 'from-orange-500/20' : 'from-cyan-500/20'} to-transparent pointer-events-none`} />
+                {bgImage && (
+                  <div 
+                    className="absolute inset-0 z-0 opacity-40 mix-blend-overlay pointer-events-none transition-opacity hover:opacity-60"
+                    style={{ 
+                      backgroundImage: `url(${bgImage})`,
+                      backgroundSize: 'cover',
+                      backgroundPosition: 'center'
+                    }}
+                  />
                 )}
                 
-                <div className="flex justify-between items-start mb-1">
+                {mission.completed && !mission.claimed && (
+                  <div className={`absolute top-0 right-0 w-16 h-16 bg-gradient-to-br ${isInterstellar ? 'from-orange-500/20' : 'from-cyan-500/20'} to-transparent pointer-events-none z-10`} />
+                )}
+                
+                <div className="relative z-10 flex justify-between items-start mb-1">
                   <div className="flex flex-col gap-1.5">
                     <div className={`p-2 w-fit rounded-lg ${mission.completed ? (isInterstellar ? 'bg-orange-500/20 text-orange-400' : 'bg-cyan-500/20 text-cyan-400') : 'bg-white/5 text-slate-500'}`}>
                       <Trophy className="w-5 h-5" />
@@ -219,12 +240,12 @@ const MissionsTab = memo(() => {
                   )}
                 </div>
 
-                <div className="flex-1 mb-4">
+                <div className="relative z-10 flex-1 mb-4">
                   <h3 className="text-white font-orbitron font-bold text-sm lg:text-base leading-tight mb-1">{mission.title}</h3>
                   <p className="text-slate-400 text-[14px] lg:text-[14px] leading-snug line-clamp-2">{mission.description}</p>
                 </div>
 
-                <div className="space-y-3">
+                <div className="relative z-10 space-y-3">
                   <div className="flex justify-between text-[14px] font-mono mb-1">
                     <span className="text-slate-500 uppercase tracking-wider">{t('status')}</span>
                     <span className="text-white">{mission.current} / {mission.target}</span>

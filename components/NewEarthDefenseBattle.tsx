@@ -3,6 +3,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { X } from 'lucide-react';
 import { BattleShipComputedStats, getHorizonXpForNextLevel, MAX_HORIZON_LEVEL } from '@/lib/colony-cards';
+import { PremiumCanvasButton } from './ui/PremiumCanvasButton';
 
 type DefenseSpecialId = 'apocalypse-laser' | 'hellfire-barrage' | 'special-slot-3' | 'special-slot-4';
 type EnemyKind = 'common-ship' | 'elite-ship' | 'boss-ship' | 'monster-1' | 'monster-2';
@@ -30,6 +31,7 @@ interface NewEarthDefenseBattleProps {
 
 export interface BattleResultSummary {
   kills: number;
+  bossesDefeated?: number;
   xp: number;
   qc: number;
   levelUpSfxHandled?: boolean;
@@ -204,11 +206,15 @@ const MONSTER_2_FRAMES = [
 ];
 
 const SPECIAL_LABEL: Record<DefenseSpecialId, Record<'en' | 'pt', string>> = {
-  'apocalypse-laser': { en: 'Apocalypse Laser', pt: 'Apocalipse Laser' },
-  'hellfire-barrage': { en: 'Hellfire Barrage', pt: 'Hellfire Barrage' },
+  'apocalypse-laser': { en: 'Horizon Laser', pt: 'Horizon Laser' },
+  'hellfire-barrage': { en: 'Horizon Barrage', pt: 'Horizon Barrage' },
   'special-slot-3': { en: 'Special 3', pt: 'Especial 3' },
   'special-slot-4': { en: 'Special 4', pt: 'Especial 4' },
 };
+
+const HORIZON_LASER_DAMAGE_INTERVAL = 1000 / 3;
+const HORIZON_LASER_DAMAGE_RADIUS = 72;
+const HORIZON_LASER_DAMAGE_MULTIPLIER = 1.85;
 
 const imageCache = new Map<string, HTMLImageElement>();
 const audioCache = new Map<string, HTMLAudioElement>();
@@ -397,6 +403,7 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
     specialCooldowns: {} as Record<string, number>,
     monsterSpawned: false,
     monsterDefeated: false,
+    bossesDefeated: 0,
     laserState: 'idle' as LaserState,
     laserStateStart: 0,
     laserImpactPos: { x: 0, y: 0 },
@@ -471,6 +478,7 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
     state.ended = false;
     state.monsterSpawned = false;
     state.monsterDefeated = false;
+    state.bossesDefeated = 0;
     state.laserState = 'idle';
     state.laserStateStart = 0;
     state.laserImpactPos = { x: 0, y: 0 };
@@ -1330,8 +1338,9 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
       let totalDamage = 0;
       state.enemies.forEach(enemy => {
         const distance = distanceToSegment(enemy.x, enemy.y, start.x, start.y, end.x, end.y);
-        if (enemy.hp > 0 && distance < (isMonsterKind(enemy.kind) ? 145 : 105)) {
-          const payload = createSpecialDamagePayload(1.6);
+        const laserContactRadius = HORIZON_LASER_DAMAGE_RADIUS + enemy.radius;
+        if (enemy.hp > 0 && distance <= laserContactRadius) {
+          const payload = createSpecialDamagePayload(HORIZON_LASER_DAMAGE_MULTIPLIER);
           const baseDamage = payload.crit ? payload.damage * shipStats.critMultiplier : payload.damage;
           enemy.hp -= baseDamage;
           const elementalDamage = applyElementalDamage(enemy, payload.elemental, now, hitCount < 2 || isMonsterKind(enemy.kind));
@@ -1413,7 +1422,7 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
         state.backgroundParticles = [];
         state.shockwaves = [];
         state.laserShake = 8;
-        spawnFloat(start.x + 78, start.y - 62, 'APOCALIPSE LASER', '#f0abfc');
+        spawnFloat(start.x + 78, start.y - 62, 'HORIZON LASER', '#f0abfc');
         for (let i = 0; i < 56; i++) {
           state.laserParticles.push({
             x: start.x + (Math.random() - 0.5) * 520,
@@ -1446,7 +1455,7 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
         state.hellfireBannerLife = 95;
         state.hellfireShake = Math.max(state.hellfireShake, 7);
         state.hellfireLaunchIndex = 0;
-        spawnFloat(state.player.x + 76, state.player.y - 58, 'HELLFIRE BARRAGE', '#ffcc66');
+        spawnFloat(state.player.x + 76, state.player.y - 58, 'HORIZON BARRAGE', '#ffcc66');
         launchHellfireOrb();
       }
     };
@@ -1472,12 +1481,12 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
         state.laserStateStart = now;
         state.laserFlashAlpha = 0.28;
         state.laserImpactPos = { x: 0, y: 0 };
-        state.laserLastDamageTick = now - 1000;
+        state.laserLastDamageTick = now - HORIZON_LASER_DAMAGE_INTERVAL;
         state.laserShake = 18;
         return;
       }
 
-      if (state.laserState === 'firing' && now - state.laserLastDamageTick >= 1000) {
+      if (state.laserState === 'firing' && now - state.laserLastDamageTick >= HORIZON_LASER_DAMAGE_INTERVAL) {
         state.laserLastDamageTick = now;
         applyLaserDamageTick();
       }
@@ -1578,7 +1587,7 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
         ctx.font = '900 34px Orbitron, sans-serif';
         ctx.textAlign = 'center';
         ctx.shadowColor = '#d946ef';
-        ctx.fillText('APOCALIPSE LASER', WIDTH / 2, 92);
+        ctx.fillText('HORIZON LASER', WIDTH / 2, 92);
         ctx.fillStyle = 'rgba(255,255,255,0.16)';
         ctx.fillRect(WIDTH / 2 - 190, 112, 380, 7);
         ctx.fillStyle = '#f0abfc';
@@ -1789,7 +1798,7 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
         ctx.font = '900 34px Orbitron, sans-serif';
         ctx.fillStyle = 'rgba(255,210,130,0.94)';
         ctx.shadowColor = '#fb923c';
-        ctx.fillText('HELLFIRE BARRAGE', WIDTH / 2, 92);
+        ctx.fillText('HORIZON BARRAGE', WIDTH / 2, 92);
         ctx.font = '700 11px Orbitron, sans-serif';
         ctx.fillStyle = 'rgba(255,255,255,0.72)';
         ctx.fillText('INCENDIARY HOMING STRIKE', WIDTH / 2, 112);
@@ -2152,6 +2161,7 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
       state.enemies = state.enemies.filter(enemy => {
         if (enemy.hp <= 0) {
           state.kills += 1;
+          if (enemy.kind === 'boss-ship' || isMonsterKind(enemy.kind)) state.bossesDefeated += 1;
           state.earnedXp += enemy.xp;
           awardHorizonXp(enemy.xp);
           state.earnedQc += enemy.qc;
@@ -2213,7 +2223,13 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
 
   const finishResult = () => {
     if (result === 'victory') {
-      onVictory({ kills: hud.kills, xp: hud.earnedXp, qc: hud.earnedQc, levelUpSfxHandled: levelUpSfxHandledRef.current });
+      onVictory({
+        kills: hud.kills,
+        bossesDefeated: stateRef.current.bossesDefeated,
+        xp: hud.earnedXp,
+        qc: hud.earnedQc,
+        levelUpSfxHandled: levelUpSfxHandledRef.current,
+      });
       return;
     }
     if (result === 'defeat') {
@@ -2250,9 +2266,16 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
             </div>
           </div>
           <div className="flex justify-end">
-            <button type="button" onClick={onClose} disabled={Boolean(result)} className="rounded-xl border border-white/10 bg-white/5 p-2 text-zinc-400 hover:text-white disabled:cursor-not-allowed disabled:opacity-30">
+            <PremiumCanvasButton
+              type="button"
+              onClick={onClose}
+              disabled={Boolean(result)}
+              tone="steel"
+              className="h-10 w-10 rounded-xl"
+              contentClassName="text-zinc-200"
+            >
               <X size={18} />
-            </button>
+            </PremiumCanvasButton>
           </div>
         </div>
 
@@ -2272,22 +2295,26 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
                 </div>
 
                 <div className="flex items-center gap-3">
-                  <button
+                  <PremiumCanvasButton
                     type="button"
                     onClick={() => { controlsRef.current.specialOne += 1; }}
-                    className="h-16 w-36 rounded-2xl border border-fuchsia-300/40 bg-fuchsia-300/15 px-3 font-orbitron text-[11px] font-black uppercase tracking-[0.16em] text-fuchsia-100 transition-all hover:bg-fuchsia-300 hover:text-black active:scale-95"
+                    tone="purple"
+                    className="h-16 w-36 rounded-2xl"
+                    contentClassName="flex-col px-3 text-[11px] font-black uppercase tracking-[0.16em] text-fuchsia-100"
                   >
                     <span className="block text-[9px] opacity-65">C</span>
                     {SPECIAL_LABEL[specials[0]]?.[language] || t('Special 1', 'Especial 1')}
-                  </button>
-                  <button
+                  </PremiumCanvasButton>
+                  <PremiumCanvasButton
                     type="button"
                     onClick={() => { controlsRef.current.specialTwo += 1; }}
-                    className="h-16 w-36 rounded-2xl border border-orange-300/40 bg-orange-300/15 px-3 font-orbitron text-[11px] font-black uppercase tracking-[0.16em] text-orange-100 transition-all hover:bg-orange-300 hover:text-black active:scale-95"
+                    tone="orange"
+                    className="h-16 w-36 rounded-2xl"
+                    contentClassName="flex-col px-3 text-[11px] font-black uppercase tracking-[0.16em] text-orange-100"
                   >
                     <span className="block text-[9px] opacity-65">F</span>
                     {SPECIAL_LABEL[specials[1]]?.[language] || t('Special 2', 'Especial 2')}
-                  </button>
+                  </PremiumCanvasButton>
                 </div>
               </div>
             )}
@@ -2328,15 +2355,15 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
                       <p className="mt-1 font-orbitron text-2xl font-black text-white">{Math.ceil(hud.hp)}</p>
                     </div>
                   </div>
-                  <button
+                  <PremiumCanvasButton
                     type="button"
                     onClick={finishResult}
-                    className={`mt-7 w-full rounded-2xl px-5 py-4 font-orbitron text-sm font-black uppercase tracking-[0.25em] text-black transition-all ${
-                      result === 'victory' ? 'bg-emerald-300 hover:bg-emerald-200' : 'bg-rose-300 hover:bg-rose-200'
-                    }`}
+                    tone={result === 'victory' ? 'green' : 'red'}
+                    className="mt-7 h-14 w-full rounded-2xl"
+                    contentClassName="px-5 text-sm font-black uppercase tracking-[0.25em] text-white"
                   >
                     {t('Continue', 'Continuar')}
-                  </button>
+                  </PremiumCanvasButton>
                 </div>
               </div>
             )}

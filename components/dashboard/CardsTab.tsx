@@ -49,6 +49,7 @@ import { MINI_GAMES_CONFIG } from '@/lib/mini-games-config';
 import { preloadAssetGroupPassive } from '@/lib/asset-preloader';
 import { Colony } from '../ColonySystem';
 import { useDashboard } from './DashboardProvider';
+import { PremiumCanvasButton, type PremiumCanvasButtonTone } from '../ui/PremiumCanvasButton';
 
 const CARD_SLOTS = POLITICAL_CARD_SLOTS;
 
@@ -299,8 +300,23 @@ const notifyColonyCardLevelsChanged = (levels: ColonyCardLevels) => {
   window.dispatchEvent(new CustomEvent('qch:colony-card-levels-updated', { detail: levels }));
 };
 
+const notifyNewEarthCardUpgradeMission = (cardId: string, level: number) => {
+  if (typeof window === 'undefined') return;
+  window.dispatchEvent(new CustomEvent('qch:new-earth-mission-event', {
+    detail: { type: 'card-upgrade', cardId, level },
+  }));
+};
+
 type CardClassFilter = 'all' | ColonyCardClass;
 type BattleLoadout = Partial<Record<BattleCardSlot, string>>;
+
+const getCardFilterTone = (filterId: CardClassFilter, active: boolean): PremiumCanvasButtonTone => {
+  if (!active) return 'steel';
+  if (filterId === 'wildcard') return 'purple';
+  if (filterId === 'battle') return 'red';
+  if (filterId === 'political') return 'cyan';
+  return 'cyan';
+};
 
 const CardsTab = memo(function CardsTab() {
   const {
@@ -575,6 +591,7 @@ const CardsTab = memo(function CardsTab() {
     }
     dispatch({ type: 'SPEND_QC', payload: { amount: cost } });
     setCardLevels(prev => ({ ...prev, [card.id]: level + 1 }));
+    notifyNewEarthCardUpgradeMission(card.id, level + 1);
     playSfx('level_up');
     setFeedback(tl(lang, 'Card upgraded', 'Carta aprimorada'));
   };
@@ -712,22 +729,20 @@ const CardsTab = memo(function CardsTab() {
 
           <div className="grid grid-cols-3 gap-1 rounded-2xl border border-white/10 bg-black/40 p-1 lg:w-[520px]">
             {sectionTabs.map(tab => (
-              <button
+              <PremiumCanvasButton
                 key={tab.id}
                 type="button"
                 onClick={() => {
                   playSfx('view_card');
                   setActiveSection(tab.id);
                 }}
-                className={`flex items-center justify-center gap-2 rounded-xl px-3 py-2 text-[10px] font-orbitron font-black uppercase tracking-widest transition-all ${
-                  activeSection === tab.id
-                    ? 'bg-emerald-300 text-black shadow-[0_0_18px_rgba(52,211,153,0.22)]'
-                    : 'text-zinc-500 hover:bg-white/5 hover:text-zinc-200'
-                }`}
+                tone={activeSection === tab.id ? 'green' : 'steel'}
+                className="h-11 rounded-xl"
+                contentClassName={`gap-2 px-3 text-[10px] font-black uppercase tracking-widest ${activeSection === tab.id ? 'text-emerald-50' : 'text-zinc-400'}`}
               >
                 <tab.icon size={13} />
                 {tab.label}
-              </button>
+              </PremiumCanvasButton>
             ))}
           </div>
 
@@ -745,32 +760,29 @@ const CardsTab = memo(function CardsTab() {
           </div>
           <div className="flex items-center gap-2">
             <div className={`grid gap-1 rounded-xl border border-white/10 bg-black/35 p-1 ${activeSection === 'equipped' ? 'grid-cols-3' : 'grid-cols-4'}`}>
-              {availableClassFilters.map(filter => (
-                <button
-                  key={filter.id}
-                  type="button"
-                  onClick={() => {
-                    playSfx('view_card');
-                    setClassFilter(filter.id);
-                  }}
-                  className={`rounded-lg px-2 py-1 font-orbitron text-[9px] font-black uppercase tracking-widest transition-all ${
-                    effectiveClassFilter === filter.id
-                      ? filter.id === 'wildcard'
-                        ? 'bg-fuchsia-300 text-black'
-                        : filter.id === 'battle'
-                        ? 'bg-red-400 text-black'
-                        : 'bg-cyan-300 text-black'
-                      : 'text-zinc-500 hover:bg-white/5 hover:text-white'
-                  }`}
-                >
-                  {filter.label}
-                </button>
-              ))}
+              {availableClassFilters.map(filter => {
+                const isActiveFilter = effectiveClassFilter === filter.id;
+                return (
+                  <PremiumCanvasButton
+                    key={filter.id}
+                    type="button"
+                    onClick={() => {
+                      playSfx('view_card');
+                      setClassFilter(filter.id);
+                    }}
+                    tone={getCardFilterTone(filter.id, isActiveFilter)}
+                    className="h-8 rounded-lg"
+                    contentClassName={`px-2 text-[9px] font-black uppercase tracking-widest ${isActiveFilter ? 'text-white' : 'text-zinc-400'}`}
+                  >
+                    {filter.label}
+                  </PremiumCanvasButton>
+                );
+              })}
             </div>
             <span className="rounded-full border border-white/10 bg-black/35 px-3 py-1 text-[10px] font-mono uppercase tracking-widest text-zinc-400">
               {safePage + 1} / {totalPages}
             </span>
-            <button
+            <PremiumCanvasButton
               type="button"
               disabled={!canGoPrev}
               onClick={() => {
@@ -778,12 +790,14 @@ const CardsTab = memo(function CardsTab() {
                 playSfx('view_card');
                 setPage(prev => Math.max(0, prev - 1));
               }}
-              className="rounded-xl border border-white/10 bg-white/5 p-2 text-cyan-200 transition-all hover:bg-white/10 disabled:cursor-not-allowed disabled:text-zinc-700"
+              tone="cyan"
+              className="h-10 w-10 rounded-xl"
+              contentClassName={canGoPrev ? 'text-cyan-100' : 'text-zinc-600'}
               aria-label={tl(lang, 'Previous page', 'Página anterior')}
             >
               <ChevronLeft size={17} />
-            </button>
-            <button
+            </PremiumCanvasButton>
+            <PremiumCanvasButton
               type="button"
               disabled={!canGoNext}
               onClick={() => {
@@ -791,11 +805,13 @@ const CardsTab = memo(function CardsTab() {
                 playSfx('view_card');
                 setPage(prev => Math.min(totalPages - 1, prev + 1));
               }}
-              className="rounded-xl border border-white/10 bg-white/5 p-2 text-cyan-200 transition-all hover:bg-white/10 disabled:cursor-not-allowed disabled:text-zinc-700"
+              tone="cyan"
+              className="h-10 w-10 rounded-xl"
+              contentClassName={canGoNext ? 'text-cyan-100' : 'text-zinc-600'}
               aria-label={tl(lang, 'Next page', 'Próxima página')}
             >
               <ChevronRight size={17} />
-            </button>
+            </PremiumCanvasButton>
           </div>
         </div>
 
@@ -892,12 +908,14 @@ const CardsTab = memo(function CardsTab() {
               <div className="relative z-10 my-6">
                 <CardTile card={cardEvent} language={lang} owned cardLevels={cardLevels} />
               </div>
-              <button
+              <PremiumCanvasButton
                 onClick={() => setCardEvent(null)}
-                className="relative z-10 w-full rounded-2xl bg-emerald-400 px-5 py-4 font-orbitron text-sm font-black uppercase tracking-[0.24em] text-black transition-all hover:bg-emerald-300"
+                tone="green"
+                className="relative z-10 h-14 w-full rounded-2xl"
+                contentClassName="px-5 text-sm font-black uppercase tracking-[0.24em] text-emerald-50"
               >
                 {tl(lang, 'Register in Album', 'Registrar no Álbum')}
-              </button>
+              </PremiumCanvasButton>
             </motion.div>
           </div>
         )}
@@ -912,34 +930,40 @@ const CardsTab = memo(function CardsTab() {
               exit={{ opacity: 0, scale: 0.94, y: 10 }}
               className={`relative grid h-[min(736px,calc(100vh-1rem))] w-full max-w-5xl gap-5 overflow-hidden rounded-[2rem] border border-white/15 bg-zinc-950 p-5 md:grid-cols-[0.9fr_1.1fr] md:p-6 ${getCardStyle(selectedCard.card.rarity, getCardClass(selectedCard.card))}`}
             >
-              <button
+              <PremiumCanvasButton
                 onClick={() => setSelectedCard(null)}
-                className="absolute right-4 top-4 z-20 rounded-full border border-white/10 bg-black/45 p-2 text-zinc-300 transition-all hover:text-white"
+                tone="steel"
+                className="absolute right-4 top-4 z-20 h-10 w-10 rounded-full"
+                contentClassName="text-zinc-200"
                 aria-label={tl(lang, 'Close card', 'Fechar carta')}
               >
                 <X size={18} />
-              </button>
+              </PremiumCanvasButton>
               {canNavigateSelectedCard && (
                 <div className="absolute left-7 top-4 z-20 flex items-center gap-2 rounded-full border border-white/10 bg-black/65 p-1 shadow-[0_0_22px_rgba(0,0,0,0.35)]">
-                  <button
+                  <PremiumCanvasButton
                     type="button"
                     onClick={() => navigateSelectedCard(-1)}
-                    className="rounded-full p-2 text-zinc-300 transition-all hover:bg-white/10 hover:text-white"
+                    tone="steel"
+                    className="h-9 w-9 rounded-full"
+                    contentClassName="text-zinc-200"
                     aria-label={tl(lang, 'Previous card', 'Carta anterior')}
                   >
                     <ChevronLeft size={18} />
-                  </button>
+                  </PremiumCanvasButton>
                   <span className="min-w-12 text-center font-mono text-[10px] font-bold uppercase tracking-widest text-zinc-400">
                     {selectedCardIndex + 1}/{modalCards.length}
                   </span>
-                  <button
+                  <PremiumCanvasButton
                     type="button"
                     onClick={() => navigateSelectedCard(1)}
-                    className="rounded-full p-2 text-zinc-300 transition-all hover:bg-white/10 hover:text-white"
+                    tone="steel"
+                    className="h-9 w-9 rounded-full"
+                    contentClassName="text-zinc-200"
                     aria-label={tl(lang, 'Next card', 'Próxima carta')}
                   >
                     <ChevronRight size={18} />
-                  </button>
+                  </PremiumCanvasButton>
                 </div>
               )}
 
@@ -989,14 +1013,16 @@ const CardsTab = memo(function CardsTab() {
                           <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-amber-200">{tl(lang, 'Card Level', 'Nível da Carta')}</p>
                           <p className="mt-1 font-orbitron text-lg font-black text-white">LVL {cardLevel} / {MAX_COLONY_CARD_LEVEL}</p>
                         </div>
-                        <button
+                        <PremiumCanvasButton
                           type="button"
                           onClick={() => upgradeCard(selectedCard.card)}
                           disabled={cardLevel >= MAX_COLONY_CARD_LEVEL || (economy.qc || 0) < upgradeCost}
-                          className="rounded-xl border border-amber-300/30 bg-amber-300 px-4 py-2 font-orbitron text-[11px] font-black uppercase tracking-widest text-black transition-all hover:bg-amber-200 disabled:cursor-not-allowed disabled:border-zinc-700 disabled:bg-zinc-800 disabled:text-zinc-500"
+                          tone={cardLevel >= MAX_COLONY_CARD_LEVEL ? 'steel' : 'amber'}
+                          className="h-10 rounded-xl"
+                          contentClassName={`px-4 text-[11px] font-black uppercase tracking-widest ${cardLevel >= MAX_COLONY_CARD_LEVEL || (economy.qc || 0) < upgradeCost ? 'text-zinc-500' : 'text-amber-50'}`}
                         >
                           {cardLevel >= MAX_COLONY_CARD_LEVEL ? 'MAX' : `${formatValue(upgradeCost)} QC`}
-                        </button>
+                        </PremiumCanvasButton>
                       </div>
                     </div>
                   )}
@@ -1073,18 +1099,12 @@ const CardsTab = memo(function CardsTab() {
                     const slotsFull = battleSlotsFull || politicalSlotsFull;
                     const canConfirm = !isWildcard && (selectedCard.action !== 'claim' || selectedRequirement.met || alreadyOwned);
                     return (
-                  <button
+                  <PremiumCanvasButton
                     onClick={confirmSelected}
                     disabled={!canConfirm}
-                    className={`flex-1 rounded-2xl px-5 py-4 font-orbitron text-sm font-black uppercase tracking-[0.22em] transition-all disabled:cursor-not-allowed disabled:bg-zinc-800 disabled:text-zinc-600 ${
-                      isEquipped
-                        ? isBattleCard(selectedCard.card)
-                          ? 'border border-red-300/35 bg-red-400/15 text-red-100 hover:bg-red-400/25'
-                          : 'border border-cyan-300/35 bg-cyan-300/15 text-cyan-100 hover:bg-cyan-300/25'
-                        : slotsFull
-                          ? 'border border-white/10 bg-black/25 text-zinc-500 hover:border-amber-300/40 hover:text-amber-100'
-                          : 'bg-emerald-400 text-black hover:bg-emerald-300'
-                    }`}
+                    tone={!canConfirm || slotsFull ? 'steel' : isEquipped ? (isBattleCard(selectedCard.card) ? 'red' : 'cyan') : 'green'}
+                    className="h-14 flex-1 rounded-2xl"
+                    contentClassName={`px-5 text-sm font-black uppercase tracking-[0.22em] ${!canConfirm ? 'text-zinc-600' : slotsFull ? 'text-amber-100' : 'text-white'}`}
                   >
                     {slotsFull && <LockKeyhole size={15} className="mr-2 inline -translate-y-px" />}
                     {selectedCard.action === 'claim'
@@ -1098,15 +1118,17 @@ const CardsTab = memo(function CardsTab() {
                         : isWildcard
                           ? tl(lang, 'Wildcard Card', 'Carta Curinga')
                           : tl(lang, 'Equip Card', 'Equipar Carta')}
-                  </button>
+                  </PremiumCanvasButton>
                     );
                   })()}
-                  <button
+                  <PremiumCanvasButton
                     onClick={() => setSelectedCard(null)}
-                    className="rounded-2xl border border-white/10 bg-black/35 px-5 py-4 font-orbitron text-sm font-black uppercase tracking-[0.22em] text-zinc-300 transition-all hover:text-white"
+                    tone="steel"
+                    className="h-14 rounded-2xl"
+                    contentClassName="px-5 text-sm font-black uppercase tracking-[0.22em] text-zinc-200"
                   >
                     {tl(lang, 'Back', 'Voltar')}
-                  </button>
+                  </PremiumCanvasButton>
                 </div>
               </div>
             </motion.div>
@@ -1123,13 +1145,15 @@ const CardsTab = memo(function CardsTab() {
               exit={{ opacity: 0, scale: 0.94, y: 10 }}
               className={`relative w-full max-w-4xl overflow-hidden rounded-[2rem] border border-white/15 bg-zinc-950 p-5 md:p-7 ${getCardStyle(equipChoiceCard.rarity, getCardClass(equipChoiceCard))}`}
             >
-              <button
+              <PremiumCanvasButton
                 onClick={() => setEquipChoiceCard(null)}
-                className="absolute right-4 top-4 z-20 rounded-full border border-white/10 bg-black/45 p-2 text-zinc-300 transition-all hover:text-white"
+                tone="steel"
+                className="absolute right-4 top-4 z-20 h-10 w-10 rounded-full"
+                contentClassName="text-zinc-200"
                 aria-label={tl(lang, 'Close colony selection', 'Fechar seleção de colônia')}
               >
                 <X size={18} />
-              </button>
+              </PremiumCanvasButton>
 
               <div className="relative z-10">
                 <p className="font-mono text-[10px] uppercase tracking-[0.42em] text-cyan-200">{tl(lang, 'Choose destination', 'Escolha o destino')}</p>
@@ -1148,7 +1172,7 @@ const CardsTab = memo(function CardsTab() {
                   const effective = getColonyEffectiveSectors(colony, cardLevels);
 
                   return (
-                    <button
+                    <PremiumCanvasButton
                       key={colony.id}
                       type="button"
                       disabled={!canEquip}
@@ -1156,13 +1180,9 @@ const CardsTab = memo(function CardsTab() {
                         equipCard(equipChoiceCard, colony.id);
                         setEquipChoiceCard(null);
                       }}
-                      className={`rounded-2xl border p-4 text-left transition-all ${
-                        canEquip
-                          ? 'border-emerald-300/40 bg-emerald-300/10 hover:bg-emerald-300 hover:text-black'
-                          : alreadyHere
-                            ? 'cursor-not-allowed border-emerald-300/30 bg-emerald-300/10 text-emerald-200'
-                            : 'cursor-not-allowed border-white/10 bg-black/35 text-zinc-500'
-                      }`}
+                      tone={canEquip || alreadyHere ? 'green' : 'steel'}
+                      className={`rounded-2xl ${!canEquip ? 'opacity-75' : ''}`}
+                      contentClassName={`block p-4 text-left ${canEquip || alreadyHere ? 'text-emerald-50' : 'text-zinc-500'}`}
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div>
@@ -1196,7 +1216,7 @@ const CardsTab = memo(function CardsTab() {
                           {tl(lang, 'Remove one political card from this colony to open space.', 'Retire uma carta política desta colônia para abrir espaço.')}
                         </p>
                       )}
-                    </button>
+                    </PremiumCanvasButton>
                   );
                 })}
               </div>

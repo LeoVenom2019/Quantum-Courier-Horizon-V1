@@ -23,6 +23,33 @@ import { ROUTES, SHIPS, UPGRADES, VOID_AIRCRAFT, TECHNOLOGIES, VOID_POIS } from 
 
 import { ROUTES_MAP, EXTRACTION_PRODUCTION_COSTS, ORES_MAP, EXTRACTION_POINTS_MAP, UPGRADES_MAP, ROBOT_UPGRADES_MAP } from '@/lib/game-constants';
 
+const VOID_POI_RESOURCE_KEY_BY_NEED: Record<string, string> = {
+  'Energia': 'energy',
+  'Alimentos': 'food',
+  'Tecnologia': 'tech',
+  'Medicamentos': 'meds',
+  'Minerais': 'minerals',
+};
+const VOID_POI_RESOURCE_KEYS = ['minerals', 'energy', 'food', 'tech', 'meds'] as const;
+const VOID_POI_MAX_RESOURCE_PROGRESS_RATIO = 0.2;
+const VOID_POI_QC_INSPIRATION_CAP = 500000;
+const getVoidPOIResourceRawCap = (poi: any, resourceKey: string) => {
+  const required = poi.resourceRequired || 100000;
+  const targetKey = VOID_POI_RESOURCE_KEY_BY_NEED[poi.need] || 'energy';
+  const weight = resourceKey === targetKey ? 2 : 1;
+  return (required * VOID_POI_MAX_RESOURCE_PROGRESS_RATIO) / weight;
+};
+const getVoidPOIContributionValue = (poi: any, poiProgress: Record<string, number>) => {
+  const required = poi.resourceRequired || 100000;
+  const targetKey = VOID_POI_RESOURCE_KEY_BY_NEED[poi.need] || 'energy';
+  const effectiveCap = required * VOID_POI_MAX_RESOURCE_PROGRESS_RATIO;
+  const resourceValue = VOID_POI_RESOURCE_KEYS.reduce((total, key) => {
+    const weight = key === targetKey ? 2 : 1;
+    return total + Math.min((poiProgress[key] || 0) * weight, effectiveCap);
+  }, 0);
+  return resourceValue;
+};
+
 export type GameLogType = 'info' | 'success' | 'warning' | 'error' | 'important' | 'relevant' | 'major' | 'population' | 'mythic' | 'arcade';
 export type GameLogEntry = { id: string; message: string; type: GameLogType };
 
@@ -1787,8 +1814,22 @@ export const DashboardProvider = ({
   }, [economy.qc, combat.voidResources, dispatch, t, playSfx, addLog]);
 
   const donateToPOI = useCallback((poiId: string, resourceKey: string, amount: number) => {
+    const poi = VOID_POIS.find(p => p.id === poiId);
+    if (!poi) return;
+
+    const poiProgress = combat.voidPOIsInspiration[poiId] || {};
+    const rawCap = getVoidPOIResourceRawCap(poi, resourceKey);
+    const currentDonated = poiProgress[resourceKey] || 0;
+    const acceptedAmount = Math.max(0, Math.min(amount, rawCap - currentDonated));
+
+    if (acceptedAmount <= 0) {
+      addLog(language === 'pt' ? 'Este recurso já atingiu o limite de 20% para esta colônia.' : 'This resource has already reached the 20% limit for this colony.', 'warning');
+      playSfx('full_void');
+      return;
+    }
+
     const currentRes = (combat.voidResources as any)[resourceKey] || 0;
-    if (currentRes < amount) {
+    if (currentRes < acceptedAmount) {
       addLog(t('insufficientResources'), 'error');
       playSfx('error');
       return;
@@ -1796,52 +1837,49 @@ export const DashboardProvider = ({
 
     dispatch({ 
       type: 'DONATE_VOID_RESOURCES', 
-      payload: { poiId, resourceKey, amount } 
+      payload: { poiId, resourceKey, amount: acceptedAmount }
     });
     
-    playSfx('target_up');
     addLog(`${t('donationSuccess')}!`, 'success');
-  }, [combat.voidResources, dispatch, t, playSfx, addLog]);
+  }, [combat.voidPOIsInspiration, combat.voidResources, dispatch, t, language, playSfx, addLog]);
 
   const donateQCToPOI = useCallback((poiId: string, amount: number) => {
-    if (economy.qc < amount) {
+    const poi = VOID_POIS.find(p => p.id === poiId);
+    if (!poi) return;
+
+    const currentQCDonation = combat.voidPOIQCDonations?.[poiId] || 0;
+    const acceptedAmount = Math.max(0, Math.min(amount, VOID_POI_QC_INSPIRATION_CAP - currentQCDonation));
+
+    if (acceptedAmount <= 0) {
+      addLog(language === 'pt' ? 'QC já atingiu o limite de inspiração para esta colônia.' : 'QC has already reached the inspiration limit for this colony.', 'warning');
+      playSfx('full_void');
+      return;
+    }
+
+    if (economy.qc < acceptedAmount) {
       addLog(t('insufficientQC'), 'error');
       playSfx('error');
       return;
     }
 
-    dispatch({ type: 'SPEND_QC', payload: { amount } });
+    dispatch({ type: 'SPEND_QC', payload: { amount: acceptedAmount } });
     dispatch({ 
       type: 'DONATE_VOID_QC', 
-      payload: { poiId, amount } 
+      payload: { poiId, amount: acceptedAmount }
     });
 
-    playSfx('cash_register');
     addLog(`${t('donationSuccess')}!`, 'success');
-  }, [economy.qc, dispatch, t, playSfx, addLog]);
+  }, [combat.voidPOIQCDonations, economy.qc, dispatch, t, language, playSfx, addLog]);
 
   const getPOIProgress = useCallback((poiId: string) => {
     const poi = VOID_POIS.find(p => p.id === poiId);
     if (!poi) return 0;
     
-    const resourceKeyMap: Record<string, string> = {
-      'Energia': 'energy',
-      'Alimentos': 'food',
-      'Tecnologia': 'tech',
-      'Medicamentos': 'meds',
-      'Minerais': 'minerals'
-    };
-    const targetKey = resourceKeyMap[poi.need] || 'energy';
     const poiProgress = combat.voidPOIsInspiration[poiId] || {};
-    const qcDonation = combat.voidPOIQCDonations?.[poiId] || 0;
-    
-    const progressValue = Object.entries(poiProgress).reduce((acc, [key, val]) => {
-      const weight = key === targetKey ? 2 : 1;
-      return acc + (val as number * weight);
-    }, qcDonation / 1000);
+    const progressValue = getVoidPOIContributionValue(poi, poiProgress);
 
     return Math.min(100, (progressValue / (poi.resourceRequired || 100000)) * 100);
-  }, [combat.voidPOIsInspiration, combat.voidPOIQCDonations]);
+  }, [combat.voidPOIsInspiration]);
 
   const totalProjectTerra = useMemo(() => {
     const poiSum = VOID_POIS.reduce((acc, poi) => acc + getPOIProgress(poi.id), 0);
@@ -1999,7 +2037,7 @@ export const DashboardProvider = ({
   }, [economy.aetherionTubes, economy.aetherion, dispatch, playSfx, t, addLog, language]);
 
   const pauseMusicForRoute4Credits = useCallback(() => {
-    jukebox?.setIsPlaying?.(false);
+    jukebox?.stop?.({ rememberPreference: false });
   }, [jukebox]);
 
   const setExtractionTechLevel = useCallback((val: number | ((prev: number) => number)) => {

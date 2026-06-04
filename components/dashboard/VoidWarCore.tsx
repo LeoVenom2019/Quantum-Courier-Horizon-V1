@@ -22,11 +22,11 @@ const VoidWarCore = () => {
   } = useDashboard();
 
   const reservoirs = [
-    { id: 'energy', name: 'Células Quânticas', raw: 'Energia', icon: Zap, color: 'text-yellow-400', bg: 'bg-yellow-400/10', border: 'border-yellow-400/20' },
-    { id: 'minerals', name: 'Núcleos Minerais Compactados', raw: 'Minérios', icon: Database, color: 'text-orange-400', bg: 'bg-orange-400/10', border: 'border-orange-400/20' },
-    { id: 'food', name: 'Rações de Colonização', raw: 'Alimentos', icon: Coffee, color: 'text-emerald-400', bg: 'bg-emerald-400/10', border: 'border-emerald-400/20' },
-    { id: 'meds', name: 'Kits Médicos Avançados', raw: 'Medicamentos', icon: Activity, color: 'text-red-400', bg: 'bg-red-400/10', border: 'border-red-400/20' },
-    { id: 'tech', name: 'Núcleos de Dados Multifatoriais', raw: 'Tecnologia', icon: Cpu, color: 'text-purple-400', bg: 'bg-purple-400/10', border: 'border-purple-400/20' }
+    { id: 'energy', name: 'Células Quânticas', raw: 'Energia', icon: Zap, color: 'text-yellow-400', bg: 'bg-yellow-400/10', border: 'border-yellow-400/20', bgImage: '/assets/rota3/void/quantic_cels.webp' },
+    { id: 'minerals', name: 'Núcleos Minerais Compactados', raw: 'Minérios', icon: Database, color: 'text-orange-400', bg: 'bg-orange-400/10', border: 'border-orange-400/20', bgImage: '/assets/rota3/void/minerals_void.webp' },
+    { id: 'food', name: 'Rações de Colonização', raw: 'Alimentos', icon: Coffee, color: 'text-emerald-400', bg: 'bg-emerald-400/10', border: 'border-emerald-400/20', bgImage: '/assets/rota3/void/colonies_food.webp' },
+    { id: 'meds', name: 'Kits Médicos Avançados', raw: 'Medicamentos', icon: Activity, color: 'text-red-400', bg: 'bg-red-400/10', border: 'border-red-400/20', bgImage: '/assets/rota3/void/medical_suplies.webp' },
+    { id: 'tech', name: 'Núcleos de Dados Multifatoriais', raw: 'Tecnologia', icon: Cpu, color: 'text-purple-400', bg: 'bg-purple-400/10', border: 'border-purple-400/20', bgImage: '/assets/rota3/void/multifactorial_data.webp' }
   ];
 
   return (
@@ -61,7 +61,11 @@ const VoidWarCore = () => {
 
               return (
                 <div key={res.id} className={`glass-panel border p-2 rounded-xl flex flex-col gap-1.5 transition-all relative overflow-hidden ${res.border} ${res.bg}`}>
-                  <div className="flex justify-between items-start">
+                  <div 
+                    className="absolute inset-0 bg-cover bg-center opacity-30 pointer-events-none mix-blend-overlay"
+                    style={{ backgroundImage: `url(${res.bgImage})` }}
+                  />
+                  <div className="flex justify-between items-start relative z-10">
                     <div className="flex items-center gap-2">
                       <div className={`p-1.5 rounded-lg bg-black/40 border ${res.border} ${res.color}`}>
                         <res.icon className="w-3.5 h-3.5" />
@@ -73,7 +77,7 @@ const VoidWarCore = () => {
                     </div>
                   </div>
 
-                  <div className="space-y-1.5">
+                  <div className="space-y-1.5 relative z-10">
                     <div className="flex justify-between items-end">
                       <div className="space-y-0">
                         <span className="text-[7px] text-white/40 uppercase tracking-widest">{t('rawResource')}</span>
@@ -119,7 +123,11 @@ const VoidWarCore = () => {
             })}
 
             <div className={`glass-panel border p-2 rounded-xl flex flex-col gap-1.5 transition-all relative overflow-hidden ${voidAutoShipmentUnlocked ? 'border-blue-500/40 bg-blue-500/10' : 'border-white/5 bg-white/5 hover:border-white/20'}`}>
-              <div className="flex justify-between items-start">
+              <div 
+                className="absolute inset-0 bg-cover bg-center opacity-30 pointer-events-none mix-blend-overlay"
+                style={{ backgroundImage: `url(/assets/rota3/void/drones_bg.webp)` }}
+              />
+              <div className="flex justify-between items-start relative z-10">
                 <div className="flex items-center gap-2">
                   <div className={`p-1.5 rounded-lg bg-black/40 border ${voidAutoShipmentUnlocked ? 'border-blue-500/40 text-blue-400' : 'border-white/10 text-white/40'}`}>
                     <Plane className="w-3.5 h-3.5" />
@@ -135,7 +143,7 @@ const VoidWarCore = () => {
                 </div>
               </div>
 
-              <div className="flex-1 flex flex-col justify-center gap-2">
+              <div className="flex-1 flex flex-col justify-center gap-2 relative z-10">
                 {!voidAutoShipmentUnlocked ? (
                   <div className="space-y-2">
                     <div className="flex flex-col gap-1 px-1">

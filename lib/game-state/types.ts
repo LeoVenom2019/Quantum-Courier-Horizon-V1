@@ -85,6 +85,13 @@ export interface Battle {
   playerDps?: number;
   enemyDps?: number;
   isBoss?: boolean;
+  isMeteorEventReward?: boolean;
+  meteoriteRewardValue?: number;
+  meteorRewardValue?: number;
+  meteoriteRewardTotal?: number;
+  meteorRewardTotal?: number;
+  destroyedMeteorites?: number;
+  destroyedMeteors?: number;
 }
 
 export interface BattleLogEntry {

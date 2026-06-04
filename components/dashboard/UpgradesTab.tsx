@@ -6,6 +6,7 @@ import { Zap, ChevronUp, RefreshCw, ArrowRight, Settings, Activity, Coins } from
 import { ROUTES, SHIPS, UPGRADES } from '@/lib/game-data';
 import { ROUTES_MAP, DOUBLE_ROUTE_COSTS, DOOM_P_COSTS } from '@/lib/game-constants';
 import { useDashboard } from './DashboardProvider';
+import { PremiumCanvasButton } from '../ui/PremiumCanvasButton';
 
 const HANGAR_VIDEO_IDS: Record<string, string> = {
   'Pulsar I': 'pulsar_I',
@@ -106,7 +107,7 @@ const UpgradesTab = memo(function UpgradesTab() {
             {isInterstellar && (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
                 {/* Extraction Technology Upgrade */}
-                <button
+                <PremiumCanvasButton
                   onClick={() => {
                     const cost = 10000 * Math.pow(2.5, extractionTechLevel);
                     if (qc >= cost && extractionTechLevel < 10) {
@@ -116,13 +117,9 @@ const UpgradesTab = memo(function UpgradesTab() {
                     }
                   }}
                   disabled={extractionTechLevel >= 10 || qc < (10000 * Math.pow(2.5, extractionTechLevel))}
-                  className={`p-2.5 rounded-lg border transition-all flex flex-col gap-1 h-full ${
-                    extractionTechLevel >= 10 
-                      ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 cursor-default' 
-                      : qc >= (10000 * Math.pow(2.5, extractionTechLevel))
-                        ? 'bg-orange-500/10 border-orange-500/30 text-orange-400 hover:bg-orange-500/20'
-                        : 'bg-white/5 border-white/10 text-slate-500 cursor-not-allowed opacity-50'
-                  }`}
+                  tone={extractionTechLevel >= 10 ? 'green' : qc >= (10000 * Math.pow(2.5, extractionTechLevel)) ? 'orange' : 'steel'}
+                  className="min-h-[94px] p-2.5"
+                  contentClassName={`flex-col gap-1 items-stretch ${extractionTechLevel >= 10 ? 'text-emerald-300' : qc >= (10000 * Math.pow(2.5, extractionTechLevel)) ? 'text-orange-300' : 'text-slate-500'}`}
                 >
                   <div className="flex justify-between items-center w-full">
                     <span className="text-base font-orbitron font-bold uppercase tracking-wider">{t('extractionTech')}</span>
@@ -133,10 +130,10 @@ const UpgradesTab = memo(function UpgradesTab() {
                       {formatValue(10000 * Math.pow(2.5, extractionTechLevel))} QC
                     </div>
                   )}
-                </button>
+                </PremiumCanvasButton>
 
                 {/* Solar Mapping Upgrade */}
-                <button
+                <PremiumCanvasButton
                   onClick={() => {
                     const cost = 10000 * Math.pow(2.5, solarMappingLevel);
                     if (qc >= cost && solarMappingLevel < 10) {
@@ -146,13 +143,9 @@ const UpgradesTab = memo(function UpgradesTab() {
                     }
                   }}
                   disabled={solarMappingLevel >= 10 || qc < (10000 * Math.pow(2.5, solarMappingLevel))}
-                  className={`p-2.5 rounded-lg border transition-all flex flex-col gap-1 h-full ${
-                    solarMappingLevel >= 10 
-                      ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 cursor-default' 
-                      : qc >= (10000 * Math.pow(2.5, solarMappingLevel))
-                        ? 'bg-orange-500/10 border-orange-500/30 text-orange-400 hover:bg-orange-500/20'
-                        : 'bg-white/5 border-white/10 text-slate-500 cursor-not-allowed opacity-50'
-                  }`}
+                  tone={solarMappingLevel >= 10 ? 'green' : qc >= (10000 * Math.pow(2.5, solarMappingLevel)) ? 'orange' : 'steel'}
+                  className="min-h-[94px] p-2.5"
+                  contentClassName={`flex-col gap-1 items-stretch ${solarMappingLevel >= 10 ? 'text-emerald-300' : qc >= (10000 * Math.pow(2.5, solarMappingLevel)) ? 'text-orange-300' : 'text-slate-500'}`}
                 >
                   <div className="flex justify-between items-center w-full">
                     <span className="text-base font-orbitron font-bold uppercase tracking-wider">{t('solarMapping')}</span>
@@ -163,10 +156,10 @@ const UpgradesTab = memo(function UpgradesTab() {
                       {formatValue(10000 * Math.pow(2.5, solarMappingLevel))} QC
                     </div>
                   )}
-                </button>
+                </PremiumCanvasButton>
 
                 {/* Double Route Upgrade (New) */}
-                <button
+                <PremiumCanvasButton
                   onClick={() => {
                     const cost = DOUBLE_ROUTE_COSTS[doubleRouteLevel];
                     if (qc >= cost && doubleRouteLevel < 5) {
@@ -176,13 +169,9 @@ const UpgradesTab = memo(function UpgradesTab() {
                     }
                   }}
                   disabled={doubleRouteLevel >= 5 || qc < (DOUBLE_ROUTE_COSTS[doubleRouteLevel] || 0)}
-                  className={`p-2.5 rounded-lg border transition-all flex flex-col gap-1 h-full ${
-                    doubleRouteLevel >= 5 
-                      ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 cursor-default' 
-                      : qc >= (DOUBLE_ROUTE_COSTS[doubleRouteLevel] || 0)
-                        ? 'bg-orange-500/10 border-orange-500/30 text-orange-400 hover:bg-orange-500/20'
-                        : 'bg-white/5 border-white/10 text-slate-500 cursor-not-allowed opacity-50'
-                  }`}
+                  tone={doubleRouteLevel >= 5 ? 'green' : qc >= (DOUBLE_ROUTE_COSTS[doubleRouteLevel] || 0) ? 'orange' : 'steel'}
+                  className="min-h-[94px] p-2.5"
+                  contentClassName={`flex-col gap-1 items-stretch ${doubleRouteLevel >= 5 ? 'text-emerald-300' : qc >= (DOUBLE_ROUTE_COSTS[doubleRouteLevel] || 0) ? 'text-orange-300' : 'text-slate-500'}`}
                 >
                   <div className="flex justify-between items-center w-full">
                     <span className="text-base font-orbitron font-bold uppercase tracking-wider">{t('doubleRoute')}</span>
@@ -193,10 +182,10 @@ const UpgradesTab = memo(function UpgradesTab() {
                       {formatValue(DOUBLE_ROUTE_COSTS[doubleRouteLevel])} QC
                     </div>
                   )}
-                </button>
+                </PremiumCanvasButton>
 
                 {/* Doom Protocol Upgrade (New) */}
-                <button
+                <PremiumCanvasButton
                   onClick={() => {
                     const cost = DOOM_P_COSTS[doomPLevel];
                     if (qc >= cost && doomPLevel < 10) {
@@ -206,13 +195,9 @@ const UpgradesTab = memo(function UpgradesTab() {
                     }
                   }}
                   disabled={doomPLevel >= 10 || qc < (DOOM_P_COSTS[doomPLevel] || 0)}
-                  className={`p-2.5 rounded-lg border transition-all flex flex-col gap-1 h-full ${
-                    doomPLevel >= 10 
-                      ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 cursor-default' 
-                      : qc >= (DOOM_P_COSTS[doomPLevel] || 0)
-                        ? 'bg-orange-500/10 border-orange-500/30 text-orange-400 hover:bg-orange-500/20'
-                        : 'bg-white/5 border-white/10 text-slate-500 cursor-not-allowed opacity-50'
-                  }`}
+                  tone={doomPLevel >= 10 ? 'green' : qc >= (DOOM_P_COSTS[doomPLevel] || 0) ? 'orange' : 'steel'}
+                  className="min-h-[94px] p-2.5"
+                  contentClassName={`flex-col gap-1 items-stretch ${doomPLevel >= 10 ? 'text-emerald-300' : qc >= (DOOM_P_COSTS[doomPLevel] || 0) ? 'text-orange-300' : 'text-slate-500'}`}
                 >
                   <div className="flex justify-between items-center w-full">
                     <span className="text-base font-orbitron font-bold uppercase tracking-wider">{t('doomP')}</span>
@@ -223,7 +208,7 @@ const UpgradesTab = memo(function UpgradesTab() {
                       {formatValue(DOOM_P_COSTS[doomPLevel])} QC
                     </div>
                   )}
-                </button>
+                </PremiumCanvasButton>
               </div>
             )}
 
@@ -286,17 +271,15 @@ const UpgradesTab = memo(function UpgradesTab() {
                 </div>
               </div>
 
-              <button
+              <PremiumCanvasButton
                 onClick={synthesizeAetherion}
-                className={`px-5 py-2 rounded-xl font-orbitron font-bold text-[15px] tracking-widest transition-all flex items-center gap-2 uppercase ${
-                  aetherionTubes > 0
-                  ? (isInterstellar ? 'bg-orange-500 text-black hover:bg-orange-400 shadow-[0_0_15px_rgba(249,115,22,0.4)]' : 'bg-cyan-500 text-black hover:bg-cyan-400 shadow-[0_0_15px_rgba(6,182,212,0.4)]')
-                  : 'bg-white/5 text-slate-600 border border-white/5'
-                }`}
+                tone={aetherionTubes > 0 ? (isInterstellar ? 'orange' : 'cyan') : 'steel'}
+                className="h-11 min-w-[218px] px-5 text-[15px] font-bold uppercase tracking-widest"
+                contentClassName={`gap-2 ${aetherionTubes > 0 ? (isInterstellar ? 'text-orange-100' : 'text-cyan-100') : 'text-slate-500'}`}
               >
                 <RefreshCw className={`w-3 h-3 ${aetherionTubes > 0 ? 'animate-spin-slow' : ''}`} />
                 {language === 'pt' ? 'SINTETIZAR ÉTERION' : 'SYNTHESIZE AETHERION'}
-              </button>
+              </PremiumCanvasButton>
             </div>
           </div>
 
@@ -309,13 +292,15 @@ const UpgradesTab = memo(function UpgradesTab() {
             const isMaxed = locationTech.engine >= 5 && locationTech.ai >= 6 && locationTech.value >= 5 && locationTech.rare >= 5;
 
             return (
-              <button
+              <PremiumCanvasButton
                 key={route.id}
                 onClick={() => {
                   setSelectedUpgradeLocation(route.id);
                   playSfx('open_window');
                 }}
-                className={`glass-panel ${getShipNeonBorder(ship.color)} rounded-xl p-4 hover:bg-white/5 transition-all text-left group relative h-full flex flex-col justify-center ${isMaxed ? 'opacity-90' : 'opacity-100'}`}
+                tone={isMaxed ? 'green' : (isInterstellar ? 'orange' : 'cyan')}
+                className={`p-4 text-left h-full min-h-[112px] ${isMaxed ? 'opacity-90' : 'opacity-100'}`}
+                contentClassName="items-center justify-center"
               >
                 {isMaxed && (
                   <div className={`absolute inset-0 bg-black/40 rounded-xl pointer-events-none -z-10`} />
@@ -334,7 +319,7 @@ const UpgradesTab = memo(function UpgradesTab() {
                     <ArrowRight className={`w-5 h-5 ${isInterstellar ? 'text-orange-500/40 group-hover:text-orange-400' : 'text-cyan-500/40 group-hover:text-cyan-400'} group-hover:translate-x-1 transition-all`} />
                   </div>
                 </div>
-              </button>
+              </PremiumCanvasButton>
             );
           })}
         </div>
@@ -342,15 +327,17 @@ const UpgradesTab = memo(function UpgradesTab() {
     ) : (
         <div className="flex flex-col h-full gap-4">
           {/* Back Button - Top Level */}
-          <button 
+          <PremiumCanvasButton
             onClick={() => {
               setSelectedUpgradeLocation(null);
               playSfx('close_window');
             }}
-            className={`text-lg font-orbitron font-bold ${isInterstellar ? 'text-orange-500 hover:text-orange-400' : 'text-cyan-500 hover:text-cyan-400'} flex items-center gap-2 uppercase tracking-widest shrink-0 w-fit`}
+            tone={isInterstellar ? 'orange' : 'cyan'}
+            className="h-10 w-fit min-w-[112px] px-4 text-lg font-bold uppercase tracking-widest shrink-0"
+            contentClassName={`gap-2 ${isInterstellar ? 'text-orange-200' : 'text-cyan-200'}`}
           >
             <ArrowRight className="w-4 h-4 rotate-180" /> {t('back')}
-          </button>
+          </PremiumCanvasButton>
 
           <div className="grid grid-cols-4 grid-rows-[auto_1fr_1fr] gap-6 flex-1 min-h-0">
             {/* ROW 1: Evolution Progress (Left 50%) + Title (Right 50%) */}
@@ -400,15 +387,15 @@ const UpgradesTab = memo(function UpgradesTab() {
                   </h2>
 
                   {/* Bulk Upgrade Button */}
-                  <motion.button
-                    whileHover={{ scale: 1.1 }}
-                    whileTap={{ scale: 0.9 }}
+                  <PremiumCanvasButton
                     onClick={() => buyAllUpgradesForShip(selectedUpgradeLocation!)}
-                    className="flex items-center justify-center w-12 h-12 rounded-full bg-emerald-500/20 border-2 border-emerald-500/50 text-emerald-400 hover:bg-emerald-500/40 transition-all shadow-[0_0_15px_rgba(16,185,129,0.2)]"
+                    tone="green"
+                    className="h-12 w-12"
+                    contentClassName="text-emerald-200"
                     title={language === 'pt' ? 'Melhorar Tudo' : 'Upgrade All'}
                   >
                     <ChevronUp className="w-8 h-8" />
-                  </motion.button>
+                  </PremiumCanvasButton>
                 </div>
               </div>
             </div>
@@ -492,24 +479,22 @@ const UpgradesTab = memo(function UpgradesTab() {
                   </div>
                   
                   <div className="mt-3 shrink-0">
-                    <button
+                    <PremiumCanvasButton
                       disabled={!canAfford || !nextTier}
                       onClick={() => buyUpgrade(selectedUpgradeLocation!, upgrade)}
-                      className={`w-full py-3 rounded-xl font-orbitron font-bold text-base tracking-[0.18em] transition-all flex items-center justify-center gap-2 uppercase border-b-4 relative overflow-hidden ${
-                        canAfford && nextTier
-                        ? (isInterstellar ? 'bg-orange-950 text-orange-400 border-orange-700' : 'bg-pink-950 text-pink-400 border-pink-800')
-                        : 'bg-white/5 text-slate-600 cursor-not-allowed border-slate-800'
-                      }`}
+                      tone={canAfford && nextTier ? (isInterstellar ? 'orange' : 'purple') : 'steel'}
+                      className="w-full h-[52px] text-base font-bold tracking-[0.18em] uppercase"
+                      contentClassName={`gap-2 ${canAfford && nextTier ? (isInterstellar ? 'text-orange-200' : 'text-pink-200') : 'text-slate-500'}`}
                     >
                       <div 
-                        className={`absolute inset-y-0 left-0 opacity-40 transition-all duration-500 ${isInterstellar ? 'bg-orange-500' : 'bg-pink-600'}`} 
+                        className={`pointer-events-none absolute inset-y-0 left-0 z-[1] opacity-25 transition-all duration-500 ${isInterstellar ? 'bg-orange-500' : 'bg-pink-600'}`} 
                         style={{ width: `${progressPercent}%` }}
                       />
                       <span className="relative z-10 flex items-center gap-2">
                         <Coins className="w-5 h-5" />
                         {nextTier ? formatValue(cost) : t('max').toUpperCase()}
                       </span>
-                    </button>
+                    </PremiumCanvasButton>
                   </div>
                 </div>
               );

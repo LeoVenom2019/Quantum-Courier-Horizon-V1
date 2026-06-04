@@ -27,23 +27,25 @@ body {
 
 #game-container {
     position: relative;
-    width: 960px;
-    height: 540px;
-    background: radial-gradient(circle at center, #020c1b 0%, #01040a 100%);
+    width: min(1268px, 98vw);
+    height: min(670px, 96vh);
+    padding: 92px 154px 38px;
+    background: url('/assets/games/ruptura_estelar/ruptura_canvas_bg.webp') center / cover no-repeat, #000;
     border: 1px solid rgba(6, 182, 212, 0.2);
+    border-radius: 12px;
     box-shadow: 0 0 50px rgba(0, 0, 0, 0.8);
-    display: flex;
-    flex-direction: column;
+    display: grid;
+    place-items: center;
     overflow: hidden;
 }
 
 #hud {
     position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 75px;
-    background: linear-gradient(to bottom, rgba(15, 23, 42, 0.95), transparent);
+    top: 20px;
+    left: 154px;
+    right: 154px;
+    height: 56px;
+    background: transparent;
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -144,6 +146,12 @@ body {
 
 canvas {
     display: block;
+    width: 960px;
+    height: 540px;
+    border: 1px solid rgba(6, 182, 212, 0.18);
+    box-shadow:
+        0 0 28px rgba(6, 182, 212, 0.08),
+        inset 0 0 34px rgba(6, 182, 212, 0.08);
 }
 
 #overlay {
@@ -234,7 +242,7 @@ canvas {
 
 #controls-hint {
     position: absolute;
-    bottom: 30px;
+    bottom: 24px;
     left: 0;
     right: 0;
     text-align: center;
@@ -244,6 +252,23 @@ canvas {
     pointer-events: none;
     text-transform: uppercase;
     font-weight: 700;
+}
+
+@media (max-width: 1120px) {
+    #game-container {
+        padding: 92px 28px 38px;
+    }
+
+    #hud {
+        left: 28px;
+        right: 28px;
+    }
+
+    canvas {
+        width: min(960px, calc(100vw - 56px));
+        height: auto;
+        aspect-ratio: 960 / 540;
+    }
 }
 
 .hidden {

@@ -69,10 +69,10 @@ const ColoniesTab = memo(({
         playSfx={playSfx}
         qc={economy.qc}
         formatValue={formatValue}
-        onEarnQC={(amount) => {
-          dispatch({ type: 'EARN_QC', payload: { amount, source: 'battle' } });
-          dispatch({ type: 'UPDATE_HISTORY', payload: { tier: 'NewEarth', field: 'qcFromBattles', amount } });
-          dispatch({ type: 'UPDATE_HISTORY', payload: { tier: 'NewEarth', field: 'qcTotalAcquired', amount } });
+        onEarnQC={(amount, source = 'battle') => {
+          dispatch({ type: 'EARN_QC', payload: { amount, source } });
+          dispatch({ type: 'UPDATE_HISTORY', payload: { tier: 'Earth', field: source === 'mission' ? 'qcFromMissions' : 'qcFromBattles', amount } });
+          dispatch({ type: 'UPDATE_HISTORY', payload: { tier: 'Earth', field: 'qcTotalAcquired', amount } });
         }}
         onSpendQC={(amount) => {
           dispatch({ type: 'SPEND_QC', payload: { amount } });

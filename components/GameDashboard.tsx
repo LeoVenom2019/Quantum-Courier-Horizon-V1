@@ -132,6 +132,11 @@ import {
   normalizeOwnedColonyCardIds,
   rollAnyMissingColonyCardReward,
 } from '@/lib/colony-cards';
+import {
+  NEW_EARTH_MISSIONS_STORAGE_KEY,
+  normalizeNewEarthMissionState,
+  recordNewEarthMissionEvent,
+} from '@/lib/new-earth-missions';
 import { LoreScreen, RobotVisual } from './LoreSystem';
 import Lottie from 'lottie-react';
 import EconomicGoals from './dashboard/EconomicGoals';
@@ -158,6 +163,7 @@ import TechnologyTab from './dashboard/TechnologyTab';
 import UpgradesTab from './dashboard/UpgradesTab';
 import BattleOverlay from './dashboard/BattleOverlay';
 import BattleLevelTab from './dashboard/BattleLevelTab';
+import { PremiumCanvasButton, type PremiumCanvasButtonTone } from './ui/PremiumCanvasButton';
 import VoidBattleArena, {
   VoidBattleEnemy,
   VoidBattleProjectile,
@@ -303,10 +309,12 @@ const NewEarthCardThumb = ({
   }
 
   return (
-    <button
+    <PremiumCanvasButton
       type="button"
       onClick={onClick}
-      className="group relative mx-auto aspect-[2/3] h-full min-h-0 overflow-hidden rounded-xl border border-cyan-300/25 bg-black text-left shadow-[0_0_18px_rgba(34,211,238,0.12)] transition hover:border-cyan-200/70"
+      tone="cyan"
+      className="group relative mx-auto aspect-[2/3] h-full min-h-0 rounded-xl"
+      contentClassName="block"
     >
       <img src={getCardBackgroundImage(card.rarity)} alt="" className="absolute inset-0 h-full w-full object-cover" />
       <div className="absolute inset-0 bg-gradient-to-t from-black/86 via-black/18 to-transparent" />
@@ -329,7 +337,7 @@ const NewEarthCardThumb = ({
           ))}
         </div>
       </div>
-    </button>
+    </PremiumCanvasButton>
   );
 };
 
@@ -375,15 +383,15 @@ const NewEarthCardDetail = ({
         exit={{ y: 12, scale: 0.98 }}
         className="relative flex h-[92%] w-full max-w-[520px] items-center justify-center"
       >
-        <button type="button" onClick={() => onNavigate(-1)} className="absolute left-0 top-1/2 z-20 -translate-y-1/2 rounded-full border border-white/10 bg-white/8 p-3 text-cyan-100 hover:bg-white/14">
+        <PremiumCanvasButton type="button" onClick={() => onNavigate(-1)} tone="cyan" className="absolute left-0 top-1/2 z-20 h-12 w-12 -translate-y-1/2 rounded-full" contentClassName="text-cyan-100">
           <ChevronLeft size={22} />
-        </button>
-        <button type="button" onClick={() => onNavigate(1)} className="absolute right-0 top-1/2 z-20 -translate-y-1/2 rounded-full border border-white/10 bg-white/8 p-3 text-cyan-100 hover:bg-white/14">
+        </PremiumCanvasButton>
+        <PremiumCanvasButton type="button" onClick={() => onNavigate(1)} tone="cyan" className="absolute right-0 top-1/2 z-20 h-12 w-12 -translate-y-1/2 rounded-full" contentClassName="text-cyan-100">
           <ChevronRight size={22} />
-        </button>
-        <button type="button" onClick={onClose} className="absolute right-4 top-4 z-20 rounded-full border border-white/10 bg-white/8 p-2 text-cyan-100 hover:bg-white/14">
+        </PremiumCanvasButton>
+        <PremiumCanvasButton type="button" onClick={onClose} tone="steel" className="absolute right-4 top-4 z-20 h-10 w-10 rounded-full" contentClassName="text-cyan-100">
           <X size={18} />
-        </button>
+        </PremiumCanvasButton>
 
         <div className="relative aspect-[2/3] h-full max-h-[760px] overflow-hidden rounded-[3.8%] border border-cyan-100/45 bg-black shadow-[0_0_45px_rgba(34,211,238,0.18)]">
           <img src={getCardBackgroundImage(card.rarity)} alt={card.name[language]} className="absolute inset-0 h-full w-full object-cover" />
@@ -656,6 +664,7 @@ const DashboardContent = memo(({
   const [formatNumbers, setFormatNumbers] = useState(false);
   const [arcadeScores, setArcadeScores] = useState<Record<string, number>>({});
   const arcadeScoresRef = React.useRef(arcadeScores);
+  const arcadeRunStartScoresRef = React.useRef<Record<string, number>>({});
   useEffect(() => {
     arcadeScoresRef.current = arcadeScores;
   }, [arcadeScores]);
@@ -1215,6 +1224,27 @@ const DashboardContent = memo(({
                     'bg-cyan-500/5';
   const themeGlow = isNeon ? 'shadow-[0_0_20px_rgba(219,39,119,0.6)]' : (isVoid ? 'shadow-[0_0_20px_rgba(168,85,247,0.6)]' : (isInterstellar ? 'shadow-[0_0_20px_rgba(234,88,12,0.6)]' : 'shadow-[0_0_15px_rgba(6,182,212,0.4)]'));
   const themeAccent = isNeon ? 'from-pink-600 to-purple-400' : (isVoid ? 'from-purple-600 to-fuchsia-400' : (isInterstellar ? 'from-red-600 via-orange-500 to-yellow-400' : 'from-cyan-600 to-cyan-400'));
+  const dashboardPremiumTone = useCallback((active = true, alert = false): PremiumCanvasButtonTone => {
+    if (alert) return 'red';
+    if (!active) return 'steel';
+    if (isEarth) return 'green';
+    if (isVoid) return 'purple';
+    if (isInterstellar) return 'orange';
+    return 'cyan';
+  }, [isEarth, isInterstellar, isVoid]);
+  const dashboardPremiumText = useCallback((active = true, alert = false) => {
+    if (alert) return 'text-red-100 drop-shadow-[0_0_12px_rgba(248,113,113,0.9)]';
+    if (active) {
+      if (isEarth) return 'text-emerald-100 drop-shadow-[0_0_13px_rgba(110,231,183,0.85)]';
+      if (isVoid) return 'text-purple-100 drop-shadow-[0_0_14px_rgba(192,132,252,0.95)] neon-text-purple';
+      if (isInterstellar) return 'text-orange-100 drop-shadow-[0_0_13px_rgba(251,146,60,0.85)]';
+      return 'text-cyan-100 drop-shadow-[0_0_13px_rgba(34,211,238,0.85)]';
+    }
+    if (isEarth) return 'text-emerald-200/60 group-hover:text-emerald-100';
+    if (isVoid) return 'text-purple-200/60 group-hover:text-purple-100';
+    if (isInterstellar) return 'text-orange-200/60 group-hover:text-orange-100';
+    return 'text-cyan-200/60 group-hover:text-cyan-100';
+  }, [isEarth, isInterstellar, isVoid]);
   const headerVisual = useMemo(() => {
     if (routeTier === 'Earth') {
       return {
@@ -1252,6 +1282,13 @@ const DashboardContent = memo(({
   const launchArcadeGame = useCallback(async (id: string) => {
     if (!isArcadeUnlocked) return;
     arcadeRewardSessionRef.current[id] = { guaranteedAwarded: false, chanceRolled: false };
+    try {
+      const key = `${id.replace(/-/g, '_')}_high_score`;
+      const storedRecord = Number(window.localStorage.getItem(key)) || 0;
+      arcadeRunStartScoresRef.current[id] = Math.max(Number(arcadeScoresRef.current[id]) || 0, storedRecord);
+    } catch {
+      arcadeRunStartScoresRef.current[id] = Number(arcadeScoresRef.current[id]) || 0;
+    }
     try {
       const savedCards = await GameStorage.load('colony_cards_data');
       const ownedIds = normalizeOwnedColonyCardIds(Array.isArray(savedCards) ? savedCards : undefined);
@@ -2780,6 +2817,44 @@ const DashboardContent = memo(({
     await awardArcadeCardReward(gameId, false);
   }, [awardArcadeCardReward]);
 
+  const recordArcadeMissionProgress = useCallback(async (gameId: string, score: number, previousRecord: number) => {
+    try {
+      const saved = await GameStorage.load(NEW_EARTH_MISSIONS_STORAGE_KEY);
+      const context = { unlockedArcadeIds: [gameId] };
+      const normalized = normalizeNewEarthMissionState(saved, context);
+      const result = recordNewEarthMissionEvent(normalized, {
+        type: 'arcade-score',
+        gameId,
+        score,
+        previousRecord,
+      });
+      if (!result.changed) return;
+      await GameStorage.save(result.state, NEW_EARTH_MISSIONS_STORAGE_KEY);
+      window.dispatchEvent(new CustomEvent('qch:new-earth-missions-updated', { detail: result.state }));
+    } catch (error) {
+      console.warn('Unable to update New Earth arcade mission progress', error);
+    }
+  }, []);
+
+  const recordArcadeActionMissionProgress = useCallback(async (gameId: string, actionId: string, amount = 1) => {
+    try {
+      const saved = await GameStorage.load(NEW_EARTH_MISSIONS_STORAGE_KEY);
+      const context = { unlockedArcadeIds: [gameId] };
+      const normalized = normalizeNewEarthMissionState(saved, context);
+      const result = recordNewEarthMissionEvent(normalized, {
+        type: 'arcade-action',
+        gameId,
+        actionId,
+        amount,
+      });
+      if (!result.changed) return;
+      await GameStorage.save(result.state, NEW_EARTH_MISSIONS_STORAGE_KEY);
+      window.dispatchEvent(new CustomEvent('qch:new-earth-missions-updated', { detail: result.state }));
+    } catch (error) {
+      console.warn('Unable to update New Earth arcade action mission progress', error);
+    }
+  }, []);
+
   useEffect(() => {
     // Load arcade scores from localStorage initially
     const scores: { [key: string]: number } = {};
@@ -2817,10 +2892,18 @@ const DashboardContent = memo(({
         }
       }
 
+      if (event.data.type === 'ARCADE_ACTION' && event.data.gameId && event.data.actionId && routeTierRef.current === 'Earth') {
+        recordArcadeActionMissionProgress(
+          String(event.data.gameId),
+          String(event.data.actionId),
+          Math.max(1, Math.floor(Number(event.data.amount) || 1))
+        );
+      }
+
       if (event.data.score !== undefined && event.data.gameId) {
         const gameId = event.data.gameId;
         const score = Number(event.data.score) || 0;
-        const isFinalScore = event.data.type === 'GAME_COMPLETE' || event.data.final === true;
+        const isFinalScore = event.data.type === 'GAME_COMPLETE' || event.data.type === 'GAME_OVER';
         evaluateArcadeCardReward(gameId, score, isFinalScore, event.data.victory);
 
         if (routeTierRef.current === 'Earth' && isFinalScore) {
@@ -2832,16 +2915,18 @@ const DashboardContent = memo(({
             'asteroid-miner': 'Asteroid Miner',
             'cyber-defense': 'Cyber Defense'
           };
-          const gameName = gameNames[gameId] || gameId;
-          const previousRecord = arcadeScoresRef.current[gameId] || 0;
+          const configuredArcade = MINI_GAMES_CONFIG.find(game => game.id === gameId);
+          const gameName = configuredArcade?.name?.[language as 'pt' | 'en'] || gameNames[gameId] || gameId;
+          const previousRecord = arcadeRunStartScoresRef.current[gameId] ?? arcadeScoresRef.current[gameId] ?? 0;
+          recordArcadeMissionProgress(gameId, score, previousRecord);
           const { years: evYear, months: evMonth } = getNewEarthCalendar(gameTimeSecondsRef.current);
 
           if (score > previousRecord) {
             // New Record Beaten!
-            const recordName = language === 'pt' ? `Recorde Quebrado em ${gameName}!` : `New Record in ${gameName}!`;
+            const recordName = language === 'pt' ? `Recorde Batido em ${gameName}!` : `New Record in ${gameName}!`;
             const recordDesc = language === 'pt'
-              ? `Uma nova marca histórica de ${score.toLocaleString()} pontos foi estabelecida no fliperama.`
-              : `A new historic mark of ${score.toLocaleString()} points was established in the arcade.`;
+              ? `${playerName || 'Jogador'} bateu seu recorde no jogo ${gameName}, com a incrível pontuação de ${score.toLocaleString()} pontos.`
+              : `${playerName || 'Player'} beat their record in ${gameName} with the incredible score of ${score.toLocaleString()} points.`;
 
             setEarthEvents(prev => {
               const filtered = prev.filter((ev: any) => !(ev?.permanent === true && ev?.type === 'arcade' && ev?.gameId === gameId));
@@ -2894,19 +2979,22 @@ const DashboardContent = memo(({
           }
         }
 
-        setArcadeScores(prev => {
-          if (!prev[gameId] || score > prev[gameId]) {
-            const key = `${gameId.replace(/-/g, '_')}_high_score`;
-            localStorage.setItem(key, String(score));
-            return { ...prev, [gameId]: score };
-          }
-          return prev;
-        });
+        if (isFinalScore) {
+          setArcadeScores(prev => {
+            if (!prev[gameId] || score > prev[gameId]) {
+              const key = `${gameId.replace(/-/g, '_')}_high_score`;
+              localStorage.setItem(key, String(score));
+              return { ...prev, [gameId]: score };
+            }
+            return prev;
+          });
+          delete arcadeRunStartScoresRef.current[gameId];
+        }
       }
     };
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, [evaluateArcadeCardReward, jukebox.stop, language]);
+  }, [evaluateArcadeCardReward, jukebox.stop, language, playerName, recordArcadeActionMissionProgress, recordArcadeMissionProgress]);
 
 
   const updateHistoryStats = useCallback((
@@ -6615,15 +6703,14 @@ const DashboardContent = memo(({
               </h2>
             </div>
 
-            <button
+            <PremiumCanvasButton
               onClick={handleNext}
-              className={`px-16 py-5 rounded-2xl font-orbitron font-black text-base tracking-[0.5em] transition-all hover:scale-105 active:scale-95 border-2 ${step.type === 'danger' ? 'bg-red-600 border-red-400 text-black shadow-[0_0_40px_rgba(239,68,68,0.5)]' :
-                  step.type === 'success' ? 'bg-emerald-600 border-emerald-400 text-black shadow-[0_0_40px_rgba(16,185,129,0.5)]' :
-                    'bg-purple-600 border-purple-400 text-white shadow-[0_0_40px_rgba(168,85,247,0.4)]'
-                }`}
+              tone={step.type === 'danger' ? 'red' : step.type === 'success' ? 'green' : 'purple'}
+              className="h-16 rounded-2xl"
+              contentClassName="px-16 text-base font-black uppercase tracking-[0.5em] text-white"
             >
               {language === 'pt' ? 'CONTINUAR' : 'CONTINUE'}
-            </button>
+            </PremiumCanvasButton>
           </motion.div>
         </AnimatePresence>
 
@@ -6693,15 +6780,17 @@ const DashboardContent = memo(({
                 <div className="absolute -bottom-1 -left-1 w-4 h-4 border-b-2 border-l-2 border-emerald-500/30" />
               </div>
 
-              <button
+              <PremiumCanvasButton
                 onClick={() => {
                   setShowFliperamasTutorial(false);
                   playSfx('click');
                 }}
-                className="w-full py-5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-black font-orbitron font-black text-base tracking-[0.3em] rounded-2xl transition-all shadow-[0_0_30px_rgba(16,185,129,0.4)] uppercase active:scale-[0.98] border-t border-white/20"
+                tone="green"
+                className="h-16 w-full rounded-2xl"
+                contentClassName="text-base font-black uppercase tracking-[0.3em] text-emerald-50"
               >
                 {language === 'pt' ? 'VAMOS NESSA' : 'LET\'S GO'}
-              </button>
+              </PremiumCanvasButton>
             </div>
           </motion.div>
         </div>
@@ -6741,15 +6830,17 @@ const DashboardContent = memo(({
                     <p className="text-[14px] text-emerald-400/60 font-mono uppercase tracking-widest">{t('projectEarthGoals')}</p>
                   </div>
                 </div>
-                <button
+                <PremiumCanvasButton
                   onClick={() => {
                     setShowRestorationModal(false);
                     playSfx('close_window');
                   }}
-                  className="p-2 hover:bg-white/10 rounded-full transition-colors text-slate-400 hover:text-white"
+                  tone="steel"
+                  className="h-11 w-11 rounded-full"
+                  contentClassName="text-slate-200"
                 >
                   <X className="w-6 h-6" />
-                </button>
+                </PremiumCanvasButton>
               </div>
 
               <div className="p-8 space-y-8 max-h-[70vh] overflow-y-auto custom-scrollbar">
@@ -6882,13 +6973,15 @@ const DashboardContent = memo(({
                           </span>
                         </div>
                       </div>
-                      <button
+                      <PremiumCanvasButton
                         onClick={() => !isRepairingRobot && setShowRobotModal(false)}
                         disabled={isRepairingRobot}
-                        className={`p-3 hover:bg-white/10 rounded-full transition-all ${isRepairingRobot ? 'opacity-0 cursor-default' : ''}`}
+                        tone="steel"
+                        className={`h-14 w-14 rounded-full ${isRepairingRobot ? 'opacity-0' : ''}`}
+                        contentClassName="text-white/50"
                       >
                         <X className="w-8 h-8 text-white/20" />
-                      </button>
+                      </PremiumCanvasButton>
                     </div>
 
                     <div className={`p-8 rounded-[2rem] border min-h-[160px] flex items-center ${isRobotRepaired ? 'bg-emerald-500/5 border-emerald-500/20' : 'bg-red-500/5 border-red-500/20'}`}>
@@ -6937,31 +7030,32 @@ const DashboardContent = memo(({
                           />
                         </div>
 
-                        <button
+                        <PremiumCanvasButton
                           onClick={handleRepairRobot}
                           disabled={isRobotRepaired || isRepairingRobot || voidResources.energy < 2500 || voidResources.tech < 2500}
-                          className={`w-full py-6 text-white font-orbitron font-black text-xl rounded-2xl transition-all uppercase tracking-[0.3em] flex items-center justify-center gap-4 ${isRepairingRobot
-                              ? 'bg-orange-600/50 cursor-not-allowed border border-orange-500/50'
-                              : 'bg-red-600 shadow-[0_0_40px_rgba(220,38,38,0.4)] hover:shadow-[0_0_50px_rgba(220,38,38,0.6)] active:scale-95 border-b-4 border-red-800'
-                            }`}
+                          tone={isRepairingRobot ? 'orange' : 'red'}
+                          className="h-20 w-full rounded-2xl"
+                          contentClassName="gap-4 text-xl font-black uppercase tracking-[0.3em] text-white"
                         >
                           {isRepairingRobot ? <Loader2 className="w-6 h-6 animate-spin" /> : <Wrench className="w-6 h-6" />}
                           {isRepairingRobot ? (language === 'pt' ? 'REPARANDO...' : 'REPAIRING...') : (language === 'pt' ? 'CONSERTAR' : 'REPAIR')}
-                        </button>
+                        </PremiumCanvasButton>
                       </div>
                     )}
 
                     {isRobotRepaired && (
-                      <button
+                      <PremiumCanvasButton
                         onClick={() => {
                           setShowRobotModal(false);
                           setShowBattleShipUpgradeModal(true);
                         }}
-                        className="w-full py-6 bg-emerald-600 text-white font-orbitron font-black text-xl rounded-2xl shadow-[0_0_40px_rgba(16,185,129,0.4)] hover:shadow-[0_0_50px_rgba(16,185,129,0.6)] active:scale-95 transition-all uppercase tracking-[0.3em] flex items-center justify-center gap-4 border-b-4 border-emerald-800"
+                        tone="green"
+                        className="h-20 w-full rounded-2xl"
+                        contentClassName="gap-4 text-xl font-black uppercase tracking-[0.3em] text-white"
                       >
                         <ArrowRight className="w-6 h-6" />
                         {language === 'pt' ? 'CONTINUAR' : 'CONTINUE'}
-                      </button>
+                      </PremiumCanvasButton>
                     )}
                   </div>
 
@@ -7043,15 +7137,17 @@ const DashboardContent = memo(({
                     </p>
                   </div>
                 </div>
-                <button
+                <PremiumCanvasButton
                   onClick={() => {
                     setShowBattleShipUpgradeModal(false);
                     playSfx('close_window');
                   }}
-                  className="p-2 hover:bg-white/10 rounded-full transition-all"
+                  tone="steel"
+                  className="h-11 w-11 rounded-full"
+                  contentClassName="text-white/50"
                 >
                   <X className="w-6 h-6 text-white/40" />
-                </button>
+                </PremiumCanvasButton>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8 relative z-10">
@@ -7676,42 +7772,36 @@ const DashboardContent = memo(({
                     </span>
                   </div>
                 )}
-                <button
+                <PremiumCanvasButton
                   onClick={() => {
                     jukebox.togglePlay();
                     playSfx(jukebox.isPlaying ? 'close_window' : 'open_window');
                   }}
-                  className={`relative px-4 py-1.5 rounded-full border text-base font-orbitron font-bold transition-all uppercase tracking-widest flex items-center gap-2 overflow-hidden group ${jukebox.isPlaying
-                      ? (isInterstellar
-                        ? 'bg-orange-500/20 border-orange-500/50 text-orange-400 shadow-[0_0_15px_rgba(249,115,22,0.4)]'
-                        : 'bg-cyan-500/20 border-cyan-500/50 text-cyan-400 shadow-[0_0_15px_rgba(6,182,212,0.4)]')
-                      : 'bg-white/5 border-white/10 text-slate-500'
-                    }`}
+                  tone={dashboardPremiumTone(jukebox.isPlaying)}
+                  className="h-9 rounded-full px-4"
+                  contentClassName={`gap-2 text-base font-orbitron font-bold uppercase tracking-widest ${dashboardPremiumText(jukebox.isPlaying)}`}
                   title={jukebox.isPlaying ? t('pauseMusic') : t('playMusic')}
                 >
                   <div className={`w-1.5 h-1.5 rounded-full ${jukebox.isPlaying
-                      ? (isInterstellar ? 'bg-orange-400 animate-pulse shadow-[0_0_8px_rgba(249,115,22,0.8)]' : 'bg-cyan-400 animate-pulse shadow-[0_0_8px_rgba(6,182,212,0.8)]')
+                      ? (isInterstellar ? 'bg-orange-400 animate-pulse shadow-[0_0_8px_rgba(249,115,22,0.8)]' : isEarth ? 'bg-emerald-400 animate-pulse shadow-[0_0_8px_rgba(52,211,153,0.8)]' : 'bg-cyan-400 animate-pulse shadow-[0_0_8px_rgba(6,182,212,0.8)]')
                       : 'bg-slate-600'
                     }`} />
                   {jukebox.isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
                   <span>{jukebox.isPlaying ? 'MUSIC ON' : 'MUSIC OFF'}</span>
-                </button>
+                </PremiumCanvasButton>
 
-                <button
+                <PremiumCanvasButton
                   onClick={() => {
                     const next = !formatNumbers;
                     setFormatNumbers(next);
                     playSfx(next ? 'open_window' : 'close_window');
                   }}
-                  className={`relative px-4 py-1.5 rounded-full border text-base font-orbitron font-bold transition-all uppercase tracking-widest flex items-center gap-2 overflow-hidden group ${formatNumbers
-                      ? (isInterstellar
-                        ? 'bg-orange-500/20 border-orange-500/50 text-orange-400 shadow-[0_0_15px_rgba(249,115,22,0.4)]'
-                        : 'bg-cyan-500/20 border-cyan-500/50 text-cyan-400 shadow-[0_0_15px_rgba(6,182,212,0.4)]')
-                      : 'bg-white/5 border-white/10 text-slate-500'
-                    }`}
+                  tone={dashboardPremiumTone(formatNumbers)}
+                  className="h-9 rounded-full px-4"
+                  contentClassName={`gap-2 text-base font-orbitron font-bold uppercase tracking-widest ${dashboardPremiumText(formatNumbers)}`}
                 >
                   <div className={`w-1.5 h-1.5 rounded-full ${formatNumbers
-                      ? (isInterstellar ? 'bg-orange-400 animate-pulse shadow-[0_0_8px_rgba(249,115,22,0.8)]' : 'bg-cyan-400 animate-pulse shadow-[0_0_8px_rgba(6,182,212,0.8)]')
+                      ? (isInterstellar ? 'bg-orange-400 animate-pulse shadow-[0_0_8px_rgba(249,115,22,0.8)]' : isEarth ? 'bg-emerald-400 animate-pulse shadow-[0_0_8px_rgba(52,211,153,0.8)]' : 'bg-cyan-400 animate-pulse shadow-[0_0_8px_rgba(6,182,212,0.8)]')
                       : 'bg-slate-600'
                     }`} />
                   <span>{formatNumbers ? 'NUM COMPACT' : 'NUM FULL'}</span>
@@ -7722,7 +7812,7 @@ const DashboardContent = memo(({
                       transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
                     />
                   )}
-                </button>
+                </PremiumCanvasButton>
                 {isEarth && (
                   <div className="flex items-center gap-4 px-4 py-1.5 bg-white/5 rounded-full border border-emerald-500/30 ml-auto mr-4 shadow-inner relative overflow-hidden group">
                     <div className="absolute inset-0 bg-emerald-500/5 group-hover:bg-emerald-500/10 transition-colors pointer-events-none" />
@@ -7966,26 +8056,26 @@ const DashboardContent = memo(({
                   if (isVoid && !['void_aircraft', 'void_battle', 'void_map', 'void_war', 'void_earth', 'history', 'exit'].includes(tab)) return null;
 
                   const isActive = activeTab === tab;
+                  const isAlertTab = tab === 'void_battle' && (typeof isVoidWarActive !== 'undefined' && isVoidWarActive);
 
                   return (
-                    <button
+                    <PremiumCanvasButton
                       key={tab}
                       onClick={() => {
                         handleDashboardTabChange(tab);
                       }}
-                      className={`flex-1 px-2 py-2.5 font-orbitron text-[15px] tracking-widest uppercase transition-all border-b-2 whitespace-nowrap relative ${isActive
-                          ? `${themeBorder} ${isVoid ? 'text-purple-100 drop-shadow-[0_0_15px_rgba(192,132,252,1)]' : themeText} ${themeBg} ${isVoid ? 'neon-text-purple' : ''}`
-                          : `border-transparent ${isInterstellar ? 'text-orange-500/40 hover:text-orange-500/80' : isVoid ? 'text-purple-400/60 hover:text-purple-100 hover:drop-shadow-[0_0_12px_rgba(192,132,252,0.8)]' : 'text-cyan-500/40 hover:text-cyan-500/80'}`
-                        } ${tab === 'void_battle' && (typeof isVoidWarActive !== 'undefined' && isVoidWarActive) ? 'animate-pulse bg-red-600/20 border-red-500 text-red-400' : ''}`}
+                      tone={dashboardPremiumTone(isActive, isAlertTab)}
+                      className={`h-full min-h-[42px] flex-1 rounded-none px-2 py-2.5 whitespace-nowrap ${isAlertTab ? 'animate-pulse shadow-[0_0_24px_rgba(239,68,68,0.45)]' : ''}`}
+                      contentClassName={`relative gap-2 text-[15px] font-orbitron font-bold tracking-widest uppercase ${dashboardPremiumText(isActive, isAlertTab)}`}
                     >
-                      {tab === 'void_earth' && isEarth ? (language === 'pt' ? 'Nova Terra' : 'New Earth') : t(tab)}
-                      {tab === 'void_battle' && (typeof isVoidWarActive !== 'undefined' && isVoidWarActive) && (
+                      <span className="truncate">{tab === 'void_earth' && isEarth ? (language === 'pt' ? 'Nova Terra' : 'New Earth') : t(tab)}</span>
+                      {isAlertTab && (
                         <span className="absolute top-1 right-1 w-1.5 h-1.5 bg-red-500 rounded-full animate-ping" />
                       )}
                       {tab === 'missions' && missions.some(m => m.completed && !m.claimed) && (
                         <span className="absolute top-1 right-1 w-1.5 h-1.5 bg-green-500 rounded-full animate-ping" />
                       )}
-                    </button>
+                    </PremiumCanvasButton>
                   );
                 });
               })()}
@@ -8033,16 +8123,18 @@ const DashboardContent = memo(({
                               {MINI_GAMES_CONFIG.find(g => g.id === activeMiniGameId)?.name[language as 'pt' | 'en']}
                             </span>
                           </div>
-                          <button
+                          <PremiumCanvasButton
                             onClick={() => {
                               setActiveMiniGameId(null);
                               addLog(language === 'pt' ? 'Fliperama encerrado. Partida contabilizada como derrota.' : 'Arcade closed. Run counted as a defeat.', 'warning');
                             }}
-                            className="flex h-9 w-9 items-center justify-center rounded-full border border-red-500/35 bg-red-500/10 text-red-300 transition-all hover:bg-red-500/20 hover:text-red-100"
+                            tone="red"
+                            className="h-9 w-9 rounded-full"
+                            contentClassName="text-red-100"
                             title={language === 'pt' ? 'Encerrar partida' : 'End run'}
                           >
                             <X className="h-5 w-5" />
-                          </button>
+                          </PremiumCanvasButton>
                         </div>
                         <div className="flex-1 bg-black rounded-xl overflow-hidden border border-white/10 shadow-2xl relative">
                           <iframe
@@ -8112,39 +8204,49 @@ const DashboardContent = memo(({
                     initial={{ opacity: 0, scale: 0.95 }}
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.95 }}
-                    className="max-w-md mx-auto space-y-4"
+                    className="relative flex items-center justify-center w-full h-full min-h-[500px] rounded-3xl overflow-hidden"
                   >
-                    <div className={`glass-panel ${isInterstellar ? 'neon-border-orange' : 'neon-border-cyan'} rounded-xl p-8 space-y-8 text-center`}>
-                      <div className="flex flex-col items-center gap-4">
+                    <img src="/assets/common/nebula_bg.png" alt="" className="absolute inset-0 h-full w-full object-cover opacity-80" />
+                    <div className="absolute inset-0 bg-black/40" />
+
+                    <div className={`relative max-w-md w-full glass-panel ${isInterstellar ? 'neon-border-orange' : 'neon-border-cyan'} rounded-2xl p-8 space-y-8 text-center overflow-hidden shadow-2xl`}>
+                      <img src="/assets/common/scifi_texture_bg.png" alt="" className="absolute inset-0 h-full w-full object-cover opacity-30" />
+                      <div className="absolute inset-0 bg-black/60" />
+
+                      <div className="relative z-10 flex flex-col items-center gap-4">
                         <div className={`w-16 h-16 rounded-full flex items-center justify-center ${isInterstellar ? 'bg-orange-500/20 text-orange-400 border-orange-500/30' : 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30'} border-2`}>
                           <LogOut className="w-8 h-8" />
                         </div>
                         <h2 className={`text-xl font-orbitron font-bold ${isInterstellar ? 'text-orange-400' : 'text-cyan-400'} uppercase tracking-widest`}>
                           {language === 'pt' ? 'Sair do jogo' : 'Exit Game'}
                         </h2>
-                        <p className="text-[14px] font-orbitron text-white/60 uppercase tracking-wider leading-relaxed">
+                        <p className="text-[14px] font-orbitron text-white/70 uppercase tracking-wider leading-relaxed">
                           {language === 'pt'
                             ? 'Isso te levará ao menu inicial e salvará seu progresso automaticamente. Todo o modo automático será desabilitado, descansando e esfriando os motores.'
                             : 'This will take you to the home menu and save your progress automatically. All automatic modes will be disabled, resting and cooling the engines.'}
                         </p>
                       </div>
 
-                      <div className="flex flex-col gap-4">
-                        <button
+                      <div className="relative z-10 flex flex-col gap-4">
+                        <PremiumCanvasButton
                           onClick={handleExit}
-                          className={`w-full py-4 ${isInterstellar ? 'bg-orange-500 hover:bg-orange-400 shadow-[0_0_20px_rgba(249,115,22,0.3)]' : 'bg-cyan-500 hover:bg-cyan-400 shadow-[0_0_20px_rgba(6,182,212,0.3)]'} text-black font-orbitron font-bold text-base tracking-widest rounded-lg transition-all uppercase`}
+                          tone={dashboardPremiumTone(true)}
+                          className="w-full py-4"
+                          contentClassName={`text-base font-orbitron font-bold tracking-widest uppercase ${dashboardPremiumText(true)}`}
                         >
                           {language === 'pt' ? 'CONFIRMAR E SAIR' : 'CONFIRM AND EXIT'}
-                        </button>
-                        <button
+                        </PremiumCanvasButton>
+                        <PremiumCanvasButton
                           onClick={() => {
                             playSfx('aba_click');
                             setActiveTab(isEarth ? 'colonies' : isVoid ? 'void_aircraft' : isInterstellar ? 'routes2' : 'routes');
                           }}
-                          className="w-full py-2 text-base font-orbitron text-slate-500 hover:text-white transition-colors uppercase tracking-widest"
+                          tone="steel"
+                          className="w-full py-2"
+                          contentClassName="text-base font-orbitron font-bold text-slate-300 uppercase tracking-widest"
                         >
                           {language === 'pt' ? 'VOLTAR' : 'BACK'}
-                        </button>
+                        </PremiumCanvasButton>
                       </div>
                     </div>
                   </motion.div>
@@ -8313,17 +8415,19 @@ const DashboardContent = memo(({
                             exit={{ opacity: 0, scale: 0.97, y: 18 }}
                             className="absolute inset-4 z-30 overflow-hidden rounded-3xl border border-emerald-300/25 bg-slate-950/94 p-4 shadow-[0_0_50px_rgba(16,185,129,0.2)] backdrop-blur-md"
                           >
-                            <button
+                            <PremiumCanvasButton
                               type="button"
                               onClick={() => {
                                 setSelectedNewEarthColonyId(null);
                                 setSelectedNewEarthCardIndex(null);
                                 playSfx('close_window');
                               }}
-                              className="absolute right-5 top-5 z-20 rounded-full border border-white/10 bg-white/5 p-2 text-cyan-100 hover:bg-white/10"
+                              tone="steel"
+                              className="absolute right-5 top-5 z-20 h-10 w-10 rounded-full"
+                              contentClassName="text-cyan-100"
                             >
                               <X size={18} />
-                            </button>
+                            </PremiumCanvasButton>
 
                             <div className="flex h-full flex-col gap-3">
                               <div className="pr-14">
@@ -8402,13 +8506,15 @@ const DashboardContent = memo(({
                                             <span className="rounded-full border border-cyan-300/20 bg-cyan-300/10 px-2.5 py-1 font-mono text-[9px] font-black uppercase tracking-[0.18em] text-cyan-100">
                                               {plan.progress}
                                             </span>
-                                            <button
+                                            <PremiumCanvasButton
                                               type="button"
                                               disabled
-                                              className="rounded-full border border-white/10 bg-white/5 px-3 py-1 font-mono text-[9px] font-black uppercase tracking-[0.18em] text-white/35"
+                                              tone="steel"
+                                              className="rounded-full px-3 py-1"
+                                              contentClassName="font-mono text-[9px] font-black uppercase tracking-[0.18em] text-white/35"
                                             >
                                               {language === 'pt' ? 'Resgatar' : 'Claim'}
-                                            </button>
+                                            </PremiumCanvasButton>
                                           </div>
                                         </div>
                                         <p className="mt-2 rounded-lg border border-emerald-300/15 bg-emerald-300/10 px-3 py-1 font-mono text-[9px] uppercase tracking-[0.18em] text-emerald-100">
@@ -8510,23 +8616,24 @@ const DashboardContent = memo(({
                 if (item.hide) return null;
                 const Icon = item.icon;
                 const isActive = activeTab === item.id;
+                const isAlertTab = item.id === 'void_battle' && isVoidWarActive;
+                const hasMissionReward = item.id === 'missions' && missions.some(m => m.completed && !m.claimed);
                 return (
-                  <button
+                  <PremiumCanvasButton
                     key={item.id}
                     onClick={() => {
                       handleDashboardTabChange(item.id);
                     }}
-                    className={`flex flex-col items-center gap-1 p-2 transition-all rounded-lg relative ${isActive
-                        ? (isInterstellar ? 'bg-orange-500/20 text-orange-400' : isVoid ? 'bg-purple-500/20 text-purple-100 drop-shadow-[0_0_15px_rgba(192,132,252,1)] neon-text-purple' : 'bg-cyan-500/20 text-cyan-400')
-                        : (isInterstellar ? 'text-orange-500/40' : isVoid ? 'text-purple-400/50' : 'text-cyan-500/40')
-                      }`}
+                    tone={dashboardPremiumTone(isActive, isAlertTab)}
+                    className={`min-h-[58px] flex-1 p-2 ${isAlertTab ? 'animate-pulse shadow-[0_0_20px_rgba(239,68,68,0.45)]' : ''}`}
+                    contentClassName={`flex-col gap-1 ${dashboardPremiumText(isActive, isAlertTab)}`}
                   >
-                    <Icon className={`w-5 h-5 ${isActive ? 'animate-pulse-glow' : ''}`} />
+                    <Icon className={`w-5 h-5 shrink-0 ${isActive || isAlertTab ? 'animate-pulse-glow' : ''}`} />
                     <span className="text-[15px] font-orbitron uppercase tracking-tighter">{item.label}</span>
-                    {(item.id === 'missions' && missions.some(m => m.completed && !m.claimed)) || (item.id === 'void_battle' && isVoidWarActive) && (
+                    {(hasMissionReward || isAlertTab) && (
                       <span className={`absolute top-1 right-1 w-1.5 h-1.5 ${item.id === 'void_battle' ? 'bg-red-500' : 'bg-green-500'} rounded-full animate-ping`} />
                     )}
-                  </button>
+                  </PremiumCanvasButton>
                 );
               })}
             </div>
@@ -9145,20 +9252,24 @@ const DashboardContent = memo(({
                       : 'Yes ends the defense as a defeat. No sends you immediately to the battle.'}
                   </p>
                   <div className="mt-7 grid w-full grid-cols-2 gap-3">
-                    <button
+                    <PremiumCanvasButton
                       type="button"
                       onClick={confirmArcadeOverDefense}
-                      className="rounded-xl border border-red-400/45 bg-red-500/20 px-4 py-3 font-orbitron text-sm font-black uppercase tracking-widest text-red-100 transition-all hover:bg-red-500 hover:text-white"
+                      tone="red"
+                      className="h-12 rounded-xl"
+                      contentClassName="px-4 text-sm font-black uppercase tracking-widest text-red-100"
                     >
                       {language === 'pt' ? 'Sim' : 'Yes'}
-                    </button>
-                    <button
+                    </PremiumCanvasButton>
+                    <PremiumCanvasButton
                       type="button"
                       onClick={goToRoute4DefenseFromArcadePrompt}
-                      className="rounded-xl border border-cyan-300/45 bg-cyan-300/15 px-4 py-3 font-orbitron text-sm font-black uppercase tracking-widest text-cyan-100 transition-all hover:bg-cyan-300 hover:text-black"
+                      tone="cyan"
+                      className="h-12 rounded-xl"
+                      contentClassName="px-4 text-sm font-black uppercase tracking-widest text-cyan-100"
                     >
                       {language === 'pt' ? 'Não' : 'No'}
-                    </button>
+                    </PremiumCanvasButton>
                   </div>
                 </div>
               </motion.div>
@@ -9242,12 +9353,14 @@ const DashboardContent = memo(({
                       })}
                     </div>
                   </div>
-                  <button
+                  <PremiumCanvasButton
                     onClick={() => setArcadeCardReward(null)}
-                    className="mt-7 rounded-2xl bg-emerald-400 px-8 py-4 font-orbitron text-sm font-black uppercase tracking-[0.35em] text-black transition-all hover:bg-emerald-300 active:scale-95"
+                    tone="green"
+                    className="mt-7 h-14 rounded-2xl"
+                    contentClassName="px-8 text-sm font-black uppercase tracking-[0.35em] text-emerald-50"
                   >
                     {language === 'pt' ? 'Registrar Carta' : 'Register Card'}
-                  </button>
+                  </PremiumCanvasButton>
                 </div>
               </motion.div>
             </motion.div>

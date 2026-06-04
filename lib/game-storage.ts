@@ -23,6 +23,9 @@ const SUPPLEMENTAL_LEGACY_KEYS: Partial<Record<ColonySaveStorageKey, string>> = 
   defense_special_loadout: 'defenseSpecialLoadout',
   colony_defense_threats: 'pendingDefenseThreats',
   arcade_card_reward_milestones: 'arcadeCardRewardMilestones',
+  new_earth_missions: 'newEarthMissions',
+  new_earth_submarines: 'newEarthSubmarines',
+  route4_qc_reset_done: 'route4QcResetDone',
 };
 
 const mergeSupplementalSaveValue = (key: ColonySaveStorageKey, localValue: any, mainValue: any): any => {
@@ -38,6 +41,10 @@ const mergeSupplementalSaveValue = (key: ColonySaveStorageKey, localValue: any, 
 
   if (key === 'route4_defense_battle_level') {
     return Math.max(1, Math.floor(Number(localValue) || 1), Math.floor(Number(mainValue) || 1));
+  }
+
+  if (key === 'route4_qc_reset_done') {
+    return Boolean(localValue) || Boolean(mainValue);
   }
 
   if (key === 'colony_card_levels') {

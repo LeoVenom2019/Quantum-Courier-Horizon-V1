@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>QCH Archer Lab</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700;900&family=Orbitron:wght@700;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <main class="lab-shell">
+    <header class="hud">
+      <div>
+        <span>Distância</span>
+        <strong id="distance">20m</strong>
+      </div>
+      <div>
+        <span>Acertos</span>
+        <strong id="hits">0</strong>
+      </div>
+      <div>
+        <span>Vento</span>
+        <strong id="wind">0.0</strong>
+      </div>
+      <div>
+        <span>Status</span>
+        <strong id="status">Puxe o arco</strong>
+      </div>
+    </header>
+
+    <section class="stage-wrap">
+      <canvas id="game" width="1280" height="720" aria-label="Laboratório do arqueiro"></canvas>
+    </section>
+
+    <footer class="controls">
+      <button id="drawButton" type="button">Puxar Arco</button>
+      <div class="power-frame">
+        <div id="powerFill"></div>
+      </div>
+      <button id="resetButton" type="button">Resetar</button>
+      <p>Segure <kbd>Espaço</kbd> ou o botão para puxar. Solte para disparar.</p>
+    </footer>
+  </main>
+
+  <script src="./script.js"></script>
+</body>
+</html>

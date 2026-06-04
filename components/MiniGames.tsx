@@ -7,6 +7,7 @@ import { MINI_GAMES_CONFIG } from '@/lib/mini-games-config';
 import ArcadeCard from './ArcadeCard';
 import { GameStorage } from '@/lib/game-storage';
 import { preloadAssetGroupPassive } from '@/lib/asset-preloader';
+import { PremiumCanvasButton } from './ui/PremiumCanvasButton';
 import {
   COLONY_CARD_CATALOG,
   ColonyCard,
@@ -313,12 +314,13 @@ export const MiniGames: React.FC<MiniGamesProps> = ({ onGameSelect, language, ar
         </div>
 
         <div className="flex items-center justify-end gap-6">
-          <button
+          <PremiumCanvasButton
             type="button"
             onClick={openWildcardCollection}
-            className="group relative flex items-center gap-3 overflow-hidden rounded-2xl border border-fuchsia-300/35 bg-black/45 px-3 py-2 shadow-[0_0_24px_rgba(217,70,239,0.16)] transition-all hover:border-cyan-200/70 hover:shadow-[0_0_32px_rgba(34,211,238,0.22)]"
+            tone="purple"
+            className="rounded-2xl"
+            contentClassName="gap-3 px-3 py-2"
           >
-            <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(34,211,238,0.16),rgba(217,70,239,0.18),rgba(250,204,21,0.14),rgba(34,211,238,0.16))] opacity-70" />
             <div className="relative h-12 w-9 overflow-hidden rounded-md border border-white/20 bg-black">
               <img src={WILDCARD_ICON_SRC} alt="" className="h-full w-full object-cover" />
             </div>
@@ -328,20 +330,18 @@ export const MiniGames: React.FC<MiniGamesProps> = ({ onGameSelect, language, ar
               <p className="font-mono text-[9px] text-cyan-200">{ownedWildcardCount}/{wildcardCards.length}</p>
             </div>
             <Sparkles className="relative h-4 w-4 text-cyan-200 transition-transform group-hover:scale-110" />
-          </button>
+          </PremiumCanvasButton>
 
           <div className="flex items-center gap-3">
-            <button 
+            <PremiumCanvasButton
               onClick={prevPage}
               disabled={currentPage === 0}
-              className={`p-2.5 rounded-full border transition-all ${
-                currentPage === 0 
-                ? 'border-white/5 text-white/10 cursor-not-allowed' 
-                : 'border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/20 hover:border-cyan-500 hover:scale-110 active:scale-95'
-              }`}
+              tone="cyan"
+              className="h-11 w-11 rounded-full"
+              contentClassName={currentPage === 0 ? 'text-white/20' : 'text-cyan-100'}
             >
               <ChevronLeft className="w-6 h-6" />
-            </button>
+            </PremiumCanvasButton>
 
             <div className="flex flex-col items-center">
               <span className="font-mono text-[8px] text-slate-500 tracking-[0.3em] uppercase mb-0.5">
@@ -352,17 +352,15 @@ export const MiniGames: React.FC<MiniGamesProps> = ({ onGameSelect, language, ar
               </span>
             </div>
 
-            <button 
+            <PremiumCanvasButton
               onClick={nextPage}
               disabled={currentPage === totalPages - 1}
-              className={`p-2.5 rounded-full border transition-all ${
-                currentPage === totalPages - 1 
-                ? 'border-white/5 text-white/10 cursor-not-allowed' 
-                : 'border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/20 hover:border-cyan-500 hover:scale-110 active:scale-95'
-              }`}
+              tone="cyan"
+              className="h-11 w-11 rounded-full"
+              contentClassName={currentPage === totalPages - 1 ? 'text-white/20' : 'text-cyan-100'}
             >
               <ChevronRight className="w-6 h-6" />
-            </button>
+            </PremiumCanvasButton>
           </div>
         </div>
       </div>
@@ -470,6 +468,7 @@ export const MiniGames: React.FC<MiniGamesProps> = ({ onGameSelect, language, ar
             animate={{ opacity: 1, scale: 1 }}
             className="relative w-full max-w-5xl overflow-hidden rounded-3xl border border-fuchsia-300/35 bg-zinc-950/95 p-6 shadow-[0_0_70px_rgba(217,70,239,0.22)]"
           >
+            <img src="/assets/rota4/cards/window_bg_gamer.png" alt="" className="absolute inset-0 h-full w-full object-cover opacity-25" />
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_10%,rgba(34,211,238,0.18),transparent_32%),radial-gradient(circle_at_80%_20%,rgba(217,70,239,0.16),transparent_34%),linear-gradient(135deg,rgba(250,204,21,0.08),transparent_42%)]" />
             <div className="relative mb-5 flex items-start justify-between gap-4">
               <div>
@@ -478,35 +477,41 @@ export const MiniGames: React.FC<MiniGamesProps> = ({ onGameSelect, language, ar
               </div>
               <div className="flex items-center gap-3">
                 <div className="flex items-center gap-2 rounded-full border border-white/10 bg-black/45 p-1">
-                  <button
+                  <PremiumCanvasButton
                     type="button"
                     onClick={() => changeWildcardPage(-1)}
                     disabled={safeWildcardPage === 0}
-                    className="rounded-full p-2 text-fuchsia-100 transition-all hover:bg-white/10 disabled:cursor-not-allowed disabled:text-white/15"
+                    tone="purple"
+                    className="h-10 w-10 rounded-full"
+                    contentClassName={safeWildcardPage === 0 ? 'text-white/20' : 'text-fuchsia-100'}
                     aria-label={language === 'pt' ? 'Página anterior' : 'Previous page'}
                   >
                     <ChevronLeft className="h-5 w-5" />
-                  </button>
+                  </PremiumCanvasButton>
                   <span className="min-w-14 text-center font-mono text-[10px] font-black uppercase tracking-widest text-cyan-100">
                     {safeWildcardPage + 1}/{wildcardTotalPages}
                   </span>
-                  <button
+                  <PremiumCanvasButton
                     type="button"
                     onClick={() => changeWildcardPage(1)}
                     disabled={safeWildcardPage >= wildcardTotalPages - 1}
-                    className="rounded-full p-2 text-fuchsia-100 transition-all hover:bg-white/10 disabled:cursor-not-allowed disabled:text-white/15"
+                    tone="purple"
+                    className="h-10 w-10 rounded-full"
+                    contentClassName={safeWildcardPage >= wildcardTotalPages - 1 ? 'text-white/20' : 'text-fuchsia-100'}
                     aria-label={language === 'pt' ? 'Próxima página' : 'Next page'}
                   >
                     <ChevronRight className="h-5 w-5" />
-                  </button>
+                  </PremiumCanvasButton>
                 </div>
-                <button
+                <PremiumCanvasButton
                   type="button"
                   onClick={closeWildcardCollection}
-                  className="rounded-full border border-white/10 bg-black/45 p-2 text-slate-400 transition-colors hover:text-white"
+                  tone="steel"
+                  className="h-10 w-10 rounded-full"
+                  contentClassName="text-slate-200"
                 >
                   <X className="h-5 w-5" />
-                </button>
+                </PremiumCanvasButton>
               </div>
             </div>
 
@@ -523,17 +528,25 @@ export const MiniGames: React.FC<MiniGamesProps> = ({ onGameSelect, language, ar
                 const owned = ownedCardIds.includes(card.id);
                 const arcade = MINI_GAMES_CONFIG.find(game => game.id === card.unlocksArcadeId);
                 return (
-                  <button
+                  <PremiumCanvasButton
                     type="button"
                     onClick={() => openWildcardCard(card)}
                     key={card.id}
-                    className={`relative min-h-[150px] overflow-hidden rounded-2xl border p-3 text-left transition-all hover:scale-[1.01] active:scale-[0.99] ${
+                    tone={owned ? 'purple' : 'steel'}
+                    className={`relative min-h-[150px] rounded-2xl ${
                       owned
-                        ? 'border-fuchsia-200/60 bg-fuchsia-300/10 shadow-[0_0_24px_rgba(217,70,239,0.16)]'
-                        : 'border-zinc-700 bg-black/35 opacity-65 grayscale'
+                        ? 'shadow-[0_0_24px_rgba(217,70,239,0.16)]'
+                        : 'opacity-65 grayscale'
                     }`}
+                    contentClassName="block p-3 text-left"
                   >
-                    <div className="flex gap-3">
+                    {owned && (
+                      <>
+                        <img src="/assets/rota4/cards/card_bg_gamer.png" alt="" className="absolute inset-0 h-full w-full object-cover opacity-20 group-hover:opacity-30 transition-opacity" />
+                        <div className="absolute inset-0 bg-fuchsia-300/10" />
+                      </>
+                    )}
+                    <div className="flex gap-3 relative z-10">
                       <div className="h-28 w-20 shrink-0 overflow-hidden rounded-lg border border-white/15 bg-black">
                         <img src={WILDCARD_CARD_BACKGROUND_SRC} alt="" className="h-full w-full object-cover" />
                       </div>
@@ -553,7 +566,7 @@ export const MiniGames: React.FC<MiniGamesProps> = ({ onGameSelect, language, ar
                         )}
                       </div>
                     </div>
-                  </button>
+                  </PremiumCanvasButton>
                 );
               })}
               </motion.div>
@@ -573,37 +586,44 @@ export const MiniGames: React.FC<MiniGamesProps> = ({ onGameSelect, language, ar
                     exit={{ scale: 0.94, y: 12 }}
                     className="relative grid h-[min(720px,calc(100vh-2rem))] w-full max-w-5xl gap-8 overflow-hidden rounded-3xl border border-fuchsia-200/45 bg-zinc-950 p-6 pt-16 shadow-[0_0_80px_rgba(217,70,239,0.28)] md:grid-cols-[360px_minmax(0,1fr)] md:grid-rows-[1fr]"
                   >
+                    <img src="/assets/rota4/cards/window_bg_gamer.png" alt="" className="absolute inset-0 h-full w-full object-cover opacity-25" />
                     <div className="absolute inset-0 bg-[radial-gradient(circle_at_25%_12%,rgba(34,211,238,0.18),transparent_34%),radial-gradient(circle_at_86%_20%,rgba(217,70,239,0.16),transparent_36%),linear-gradient(135deg,rgba(250,204,21,0.08),transparent_46%)]" />
                     {wildcardCards.length > 1 && (
                       <div className="absolute left-5 top-4 z-10 flex items-center gap-2 rounded-full border border-white/10 bg-black/65 p-1 shadow-[0_0_22px_rgba(0,0,0,0.35)]">
-                        <button
+                        <PremiumCanvasButton
                           type="button"
                           onClick={() => navigateWildcardCard(-1)}
-                          className="rounded-full p-2 text-zinc-300 transition-all hover:bg-white/10 hover:text-white"
+                          tone="steel"
+                          className="h-10 w-10 rounded-full"
+                          contentClassName="text-zinc-200"
                           aria-label={language === 'pt' ? 'Carta anterior' : 'Previous card'}
                         >
                           <ChevronLeft className="h-5 w-5" />
-                        </button>
+                        </PremiumCanvasButton>
                         <span className="min-w-12 text-center font-mono text-[10px] font-bold uppercase tracking-widest text-zinc-400">
                           {selectedWildcardIndex + 1}/{wildcardCards.length}
                         </span>
-                        <button
+                        <PremiumCanvasButton
                           type="button"
                           onClick={() => navigateWildcardCard(1)}
-                          className="rounded-full p-2 text-zinc-300 transition-all hover:bg-white/10 hover:text-white"
+                          tone="steel"
+                          className="h-10 w-10 rounded-full"
+                          contentClassName="text-zinc-200"
                           aria-label={language === 'pt' ? 'Próxima carta' : 'Next card'}
                         >
                           <ChevronRight className="h-5 w-5" />
-                        </button>
+                        </PremiumCanvasButton>
                       </div>
                     )}
-                    <button
+                    <PremiumCanvasButton
                       type="button"
                       onClick={closeWildcardCard}
-                      className="absolute right-4 top-4 z-10 rounded-full border border-white/10 bg-black/50 p-2 text-slate-400 transition-colors hover:text-white"
+                      tone="steel"
+                      className="absolute right-4 top-4 z-10 h-10 w-10 rounded-full"
+                      contentClassName="text-slate-200"
                     >
                       <X className="h-5 w-5" />
-                    </button>
+                    </PremiumCanvasButton>
 
                     <div className="relative self-center justify-self-start aspect-[2/3] w-full max-w-[320px] overflow-hidden rounded-[4%] border border-white/20 bg-black shadow-[0_0_48px_rgba(217,70,239,0.18)]">
                       <img src={WILDCARD_CARD_BACKGROUND_SRC} alt="" className="absolute inset-0 h-full w-full object-cover" />
@@ -687,12 +707,14 @@ export const MiniGames: React.FC<MiniGamesProps> = ({ onGameSelect, language, ar
                   {language === 'pt' ? 'Especificações da Missão' : 'Mission Specifications'}
                 </span>
               </div>
-              <button 
+              <PremiumCanvasButton
                 onClick={() => setSelectedGameInfo(null)}
-                className="p-2 hover:bg-white/5 rounded-full transition-colors"
+                tone="steel"
+                className="h-10 w-10 rounded-full"
+                contentClassName="text-slate-300"
               >
                 <X className="w-5 h-5 text-slate-500" />
-              </button>
+              </PremiumCanvasButton>
             </div>
 
             <div className="space-y-6">
@@ -769,24 +791,22 @@ export const MiniGames: React.FC<MiniGamesProps> = ({ onGameSelect, language, ar
                 </p>
               </div>
 
-              <button
+              <PremiumCanvasButton
                 onClick={() => {
                   if (!unlockedArcadeIds.has(selectedGameInfo.id)) return;
                   onGameSelect(selectedGameInfo.id);
                   setSelectedGameInfo(null);
                 }}
                 disabled={!unlockedArcadeIds.has(selectedGameInfo.id)}
-                className={`w-full py-4 rounded-2xl font-orbitron font-black uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-3 ${
-                  unlockedArcadeIds.has(selectedGameInfo.id)
-                    ? 'bg-cyan-600 text-white hover:bg-cyan-500 shadow-[0_0_20px_rgba(6,182,212,0.3)]'
-                    : 'bg-zinc-800 text-zinc-500 cursor-not-allowed border border-zinc-700'
-                }`}
+                tone={unlockedArcadeIds.has(selectedGameInfo.id) ? 'cyan' : 'steel'}
+                className="h-14 w-full rounded-2xl"
+                contentClassName={`gap-3 text-[12px] font-black uppercase tracking-[0.2em] ${unlockedArcadeIds.has(selectedGameInfo.id) ? 'text-white' : 'text-zinc-500'}`}
               >
                 <Play className="w-5 h-5" />
                 {unlockedArcadeIds.has(selectedGameInfo.id)
                   ? (language === 'pt' ? 'Iniciar Missão' : 'Start Mission')
                   : (language === 'pt' ? 'Carta Bloqueada' : 'Card Locked')}
-              </button>
+              </PremiumCanvasButton>
             </div>
           </motion.div>
         </div>

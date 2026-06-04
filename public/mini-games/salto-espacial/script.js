@@ -15,6 +15,9 @@ const CELL_SIZE = 32;
 const COLOR_HEAD = '#06b6d4';
 const COLOR_BG = '#000000';
 const SOUND_DEAD = '/assets/games/flipers_sfx/snake_dead.ogg';
+const WORMHOLE_SCORE = 1000;
+const WORMHOLE_BACKGROUNDS = Array.from({ length: 8 }, (_, index) => `/assets/games/salto_espacial/bg_${index + 1}.webp`);
+const BACKGROUND_FADE_MS = 900;
 
 function getArcadePerks() {
     try {
@@ -72,6 +75,17 @@ const FOOD_TYPES = [
         score: 400,
         growth: 3,
         weight: 8
+    },
+    {
+        id: 'wormhole',
+        name: 'Buraco de Minhoca',
+        color: '#7dd3fc',
+        glow: 'rgba(125, 211, 252, 1)',
+        flash: 'rgba(14, 165, 233, 0.2)',
+        sound: '/assets/games/flipers_sfx/space_jump_jump.ogg',
+        score: WORMHOLE_SCORE,
+        growth: 0,
+        weight: 6
     }
 ];
 
@@ -87,12 +101,21 @@ let requestID = null;
 let highScore = parseInt(localStorage.getItem('salto_espacial_high_score')) || 0;
 let emergencyLives = HAS_EXTRA_LIFE ? 1 : 0;
 let recoveryCountdownUntil = 0;
+let respawnRestoreLength = 0;
 
 // Visual systems
 let stars = [];
 let particles = [];
 let foodPulse = 0;
 const soundCache = new Map();
+const backgroundImages = WORMHOLE_BACKGROUNDS.map(src => {
+    const img = new Image();
+    img.src = src;
+    return img;
+});
+let currentBackgroundIndex = -1;
+let previousBackgroundIndex = -1;
+let backgroundFadeStartedAt = 0;
 
 function createStars() {
     stars = [];
@@ -142,6 +165,10 @@ function init() {
     score = 0;
     emergencyLives = HAS_EXTRA_LIFE ? 1 : 0;
     recoveryCountdownUntil = 0;
+    respawnRestoreLength = 0;
+    currentBackgroundIndex = -1;
+    previousBackgroundIndex = -1;
+    backgroundFadeStartedAt = 0;
     tickSpeed = 160;
     updateScore(0);
     spawnFood();
@@ -163,6 +190,15 @@ function updateScore(newScore) {
     }, '*');
 }
 
+function notifyArcadeAction(actionId, amount = 1) {
+    window.parent.postMessage({
+        type: 'ARCADE_ACTION',
+        gameId: 'salto-espacial',
+        actionId,
+        amount
+    }, '*');
+}
+
 function spawnFood() {
     let newFood;
     while (true) {
@@ -180,6 +216,10 @@ function spawnFood() {
 function addScore(basePoints) {
     const multiplier = HAS_SCORE_BOOST ? 1.5 : 1;
     updateScore(score + Math.round(basePoints * multiplier));
+}
+
+function addRawScore(points) {
+    updateScore(score + points);
 }
 
 function playSound(path, volume = 0.75) {
@@ -289,8 +329,7 @@ function buildCornerRespawnRoute(targetLength) {
 }
 
 function rebuildSnakeInSafeZone() {
-    const length = Math.max(3, snake.length);
-    const rebuilt = buildCornerRespawnRoute(length)
+    const rebuilt = buildCornerRespawnRoute(3)
         .map(segment => ({ x: segment.x, y: segment.y, px: segment.x, py: segment.y }));
 
     snake = rebuilt;
@@ -299,12 +338,34 @@ function rebuildSnakeInSafeZone() {
     spawnFood();
 }
 
+function teleportSnakeThroughWormhole(originX, originY) {
+    previousBackgroundIndex = currentBackgroundIndex;
+    let nextBackgroundIndex = Math.floor(Math.random() * backgroundImages.length);
+    if (backgroundImages.length > 1 && nextBackgroundIndex === currentBackgroundIndex) {
+        nextBackgroundIndex = (nextBackgroundIndex + 1 + Math.floor(Math.random() * (backgroundImages.length - 1))) % backgroundImages.length;
+    }
+    currentBackgroundIndex = nextBackgroundIndex;
+    backgroundFadeStartedAt = performance.now();
+
+    snake = snake.map(segment => ({
+        ...segment,
+        px: segment.x,
+        py: segment.y
+    }));
+    lastTickTime = performance.now();
+
+    spawnBurst(originX * CELL_SIZE + CELL_SIZE / 2, originY * CELL_SIZE + CELL_SIZE / 2, '#7dd3fc', 44, 2.4, 60, 4);
+    spawnBurst(originX * CELL_SIZE + CELL_SIZE / 2, originY * CELL_SIZE + CELL_SIZE / 2, '#bae6fd', 52, 2.1, 68, 4);
+}
+
 function consumeEmergencyLife() {
     if (emergencyLives <= 0) return false;
 
+    const defeatedLength = Math.max(3, snake.length);
     emergencyLives--;
     playSound(SOUND_DEAD, 0.45);
     rebuildSnakeInSafeZone();
+    respawnRestoreLength = defeatedLength;
     recoveryCountdownUntil = performance.now() + 3000;
     lastTickTime = performance.now();
     spawnBurst(
@@ -363,7 +424,6 @@ function update() {
     if (nextX === food.x && nextY === food.y) {
         const foodType = food.type || FOOD_TYPES[0];
         playTakeSound(foodType);
-        addScore(foodType.score);
         spawnParticle(
             food.x * CELL_SIZE + CELL_SIZE / 2,
             food.y * CELL_SIZE + CELL_SIZE / 2,
@@ -380,6 +440,19 @@ function update() {
             24 + foodType.growth * 8,
             2 + foodType.growth
         );
+
+        if (foodType.id === 'wormhole') {
+            addRawScore(WORMHOLE_SCORE);
+            teleportSnakeThroughWormhole(food.x, food.y);
+            notifyArcadeAction('void-portal');
+            spawnFood();
+
+            ctx.fillStyle = foodType.flash;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            return;
+        }
+
+        addScore(foodType.score);
         
         // Add new head
         snake.unshift({ x: nextX, y: nextY, px: head.x, py: head.y });
@@ -398,19 +471,22 @@ function update() {
         if (tickSpeed > 70) tickSpeed -= 1.5;
     } else {
         // Move all segments
+        const tail = snake[snake.length - 1];
         for (let i = snake.length - 1; i > 0; i--) {
             snake[i].x = snake[i-1].x;
             snake[i].y = snake[i-1].y;
         }
         snake[0].x = nextX;
         snake[0].y = nextY;
+
+        if (respawnRestoreLength > snake.length && tail) {
+            snake.push({ x: tail.x, y: tail.y, px: tail.px, py: tail.py });
+        }
     }
 }
 
 function draw(interp) {
-    // Clear canvas with subtle trail
-    ctx.fillStyle = COLOR_BG;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    drawBackground();
 
     drawStars();
     drawGrid();
@@ -423,6 +499,68 @@ function draw(interp) {
     drawSnake(interp);
 
     drawWildcardHud();
+}
+
+function drawImageCover(img, alpha = 1) {
+    if (!img || !img.complete || img.naturalWidth === 0) return false;
+
+    const canvasRatio = canvas.width / canvas.height;
+    const imageRatio = img.naturalWidth / img.naturalHeight;
+    let sx = 0;
+    let sy = 0;
+    let sw = img.naturalWidth;
+    let sh = img.naturalHeight;
+
+    if (imageRatio > canvasRatio) {
+        sw = img.naturalHeight * canvasRatio;
+        sx = (img.naturalWidth - sw) / 2;
+    } else {
+        sh = img.naturalWidth / canvasRatio;
+        sy = (img.naturalHeight - sh) / 2;
+    }
+
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.drawImage(img, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
+    ctx.restore();
+    return true;
+}
+
+function drawBackgroundLayer(index, alpha = 1) {
+    if (index < 0) {
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        ctx.fillStyle = COLOR_BG;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.restore();
+        return;
+    }
+
+    if (!drawImageCover(backgroundImages[index], alpha)) {
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        ctx.fillStyle = COLOR_BG;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.restore();
+    }
+}
+
+function drawBackground() {
+    const fadeProgress = backgroundFadeStartedAt
+        ? Math.min(1, (performance.now() - backgroundFadeStartedAt) / BACKGROUND_FADE_MS)
+        : 1;
+
+    if (fadeProgress < 1) {
+        drawBackgroundLayer(previousBackgroundIndex, 1);
+        drawBackgroundLayer(currentBackgroundIndex, fadeProgress);
+    } else {
+        drawBackgroundLayer(currentBackgroundIndex, 1);
+    }
+
+    ctx.save();
+    ctx.fillStyle = currentBackgroundIndex >= 0 ? 'rgba(0, 0, 0, 0.38)' : 'rgba(0, 0, 0, 0.18)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.restore();
 }
 
 function drawWildcardHud() {
@@ -517,6 +655,52 @@ function drawFood() {
     const radius = CELL_SIZE / 3 + breathe / 2;
     
     ctx.save();
+    if (foodType.id === 'wormhole') {
+        const rotation = foodPulse * 1.7;
+        const coreRadius = Math.max(5, radius * 0.58);
+        const ringRadius = radius + 9 + Math.sin(foodPulse * 1.4) * 2;
+        const gradient = ctx.createRadialGradient(centerX, centerY, coreRadius * 0.2, centerX, centerY, ringRadius + 8);
+
+        gradient.addColorStop(0, 'rgba(0, 0, 0, 1)');
+        gradient.addColorStop(0.34, 'rgba(2, 6, 23, 0.98)');
+        gradient.addColorStop(0.52, 'rgba(14, 165, 233, 0.78)');
+        gradient.addColorStop(0.72, 'rgba(192, 132, 252, 0.44)');
+        gradient.addColorStop(1, 'rgba(125, 211, 252, 0)');
+
+        ctx.shadowBlur = 24 + breathe;
+        ctx.shadowColor = '#38bdf8';
+        ctx.fillStyle = gradient;
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, ringRadius + 8, 0, Math.PI * 2);
+        ctx.fill();
+
+        for (let i = 0; i < 3; i++) {
+            ctx.save();
+            ctx.translate(centerX, centerY);
+            ctx.rotate(rotation + i * Math.PI / 3);
+            ctx.strokeStyle = i === 1 ? 'rgba(216, 180, 254, 0.72)' : 'rgba(125, 211, 252, 0.78)';
+            ctx.lineWidth = 2.2 - i * 0.35;
+            ctx.beginPath();
+            ctx.ellipse(0, 0, ringRadius + i * 2, ringRadius * (0.34 + i * 0.08), 0, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.restore();
+        }
+
+        ctx.shadowBlur = 18;
+        ctx.shadowColor = '#000';
+        ctx.fillStyle = '#000';
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, coreRadius, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.88)';
+        ctx.beginPath();
+        ctx.arc(centerX + coreRadius * 0.34, centerY - coreRadius * 0.42, 2.2, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+        return;
+    }
+
     ctx.shadowBlur = 18 + breathe;
     ctx.shadowColor = foodType.color;
     ctx.strokeStyle = foodType.glow;

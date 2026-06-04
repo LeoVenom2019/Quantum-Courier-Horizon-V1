@@ -198,6 +198,62 @@
   100% { background-position: 200% 0; }
 }
 
+@keyframes premium-button-sweep {
+  0% {
+    transform: translateX(-175%) skewX(-14deg);
+    opacity: 0;
+  }
+  16% {
+    opacity: 0.9;
+  }
+  52% {
+    opacity: 0.58;
+  }
+  100% {
+    transform: translateX(360%) skewX(-14deg);
+    opacity: 0;
+  }
+}
+
+@keyframes void-ship-aura {
+  0%, 100% {
+    transform: scale(0.96);
+    opacity: 0.22;
+  }
+  50% {
+    transform: scale(1.05);
+    opacity: 0.52;
+  }
+}
+
+@keyframes void-ship-sweep {
+  0% {
+    transform: translate3d(-145%, 68%, 0) rotate(-18deg);
+    opacity: 0;
+  }
+  20% {
+    opacity: 0.58;
+  }
+  62% {
+    opacity: 0.34;
+  }
+  100% {
+    transform: translate3d(190%, -74%, 0) rotate(-18deg);
+    opacity: 0;
+  }
+}
+
+@keyframes void-ship-spark {
+  0%, 100% {
+    transform: translate3d(0, 0, 0) scale(0.7);
+    opacity: 0.18;
+  }
+  45% {
+    transform: translate3d(var(--spark-x, 12px), var(--spark-y, -10px), 0) scale(1.25);
+    opacity: 0.9;
+  }
+}
+
 @keyframes float {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-10px); }
@@ -240,6 +296,34 @@
 @keyframes star-move {
   0% { transform: translateX(120%); }
   100% { transform: translateX(-120%); }
+}
+
+@keyframes deliveryStarPulse {
+  0%, 100% {
+    transform: scale(0.78);
+    opacity: 0.5;
+  }
+  45% {
+    transform: scale(1.28);
+    opacity: 1;
+  }
+}
+
+@keyframes deliveryStarDrift {
+  0% {
+    transform: translate3d(0, 0, 0);
+    opacity: 0;
+  }
+  12% {
+    opacity: 0.82;
+  }
+  72% {
+    opacity: 0.62;
+  }
+  100% {
+    transform: translate3d(var(--delivery-star-x, 96px), var(--delivery-star-y, -72px), 0);
+    opacity: 0;
+  }
 }
 
 .star-animation {

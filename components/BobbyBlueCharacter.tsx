@@ -14,10 +14,10 @@ interface BobbyBlueCharacterProps {
 const VARIANT_VIDEOS: Record<BobbyBlueVariant, string> = {
   idle: '/videos/bobby_blue/bobby_blue_victory.webm', // Using victory as a happy idle for now
   speaking: '/videos/bobby_blue/bobby_blue_victory.webm',
-  glitch: '/videos/bobby_blue/bobby_blue_in_trouble.webm',
+  glitch: '/videos/bobby_blue/bobby_blue_game_intro_glitch.webm',
   victory: '/videos/bobby_blue/bobby_blue_victory.webm',
   warning: '/videos/bobby_blue/bobby_blue_in_trouble.webm',
-  intro: '/videos/bobby_blue/bobby_blue_victory.webm',
+  intro: '/videos/bobby_blue/bobby_blue_game_intro.webm',
 };
 
 export const BobbyBlueCharacter = ({ 
@@ -27,6 +27,7 @@ export const BobbyBlueCharacter = ({
 }: BobbyBlueCharacterProps) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const videoSrc = VARIANT_VIDEOS[variant];
+  const isGameIntro = variant === 'glitch' || variant === 'intro';
 
   useEffect(() => {
     if (videoRef.current) {
@@ -42,7 +43,7 @@ export const BobbyBlueCharacter = ({
       className={`relative ${className}`}
     >
       {/* Cinematic Frame */}
-      <div className="relative w-64 h-64 md:w-80 md:h-80 mx-auto">
+      <div className={`relative mx-auto ${isGameIntro ? 'w-[min(86vw,560px)] aspect-video' : 'w-64 h-64 md:w-80 md:h-80'}`}>
         {/* Outer Ring Decoration */}
         <div className="absolute -inset-4 border border-cyan-500/10 rounded-full animate-[spin_20s_linear_infinite] pointer-events-none" />
         <div className="absolute -inset-8 border border-cyan-500/5 rounded-full animate-[spin_30s_linear_infinite_reverse] pointer-events-none" />
@@ -60,7 +61,7 @@ export const BobbyBlueCharacter = ({
               loop
               muted
               playsInline
-              className={`w-full h-full object-cover ${variant === 'glitch' ? 'filter hue-rotate-90 contrast-125' : ''}`}
+              className={`w-full h-full object-cover ${variant === 'glitch' && !isGameIntro ? 'filter hue-rotate-90 contrast-125' : ''}`}
             />
           </div>
 

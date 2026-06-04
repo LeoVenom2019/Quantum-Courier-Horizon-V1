@@ -182,9 +182,9 @@ const VoidMap: React.FC<VoidMapProps> = ({
                 <div className="flex gap-2">
                    <button
                      onClick={() => donateQCToPOI(poi.id)}
-                     disabled={qcDonations >= 10}
+                     disabled={qcDonations >= 500000}
                      className={`px-3 py-1.5 rounded-lg flex flex-col items-center gap-0.5 transition-all border ${
-                       qcDonations >= 10 
+                       qcDonations >= 500000
                          ? 'border-slate-800 bg-slate-900/50 text-slate-600' 
                          : 'border-yellow-500/40 bg-yellow-500/10 text-yellow-400 hover:bg-yellow-500/20 active:scale-95 shadow-[0_0_15px_rgba(234,179,8,0.1)]'
                      }`}
@@ -195,7 +195,7 @@ const VoidMap: React.FC<VoidMapProps> = ({
                      </div>
                      <div className="flex gap-0.5">
                         {[...Array(10)].map((_, i) => (
-                          <div key={i} className={`w-1 h-1 rounded-full ${i < qcDonations ? 'bg-yellow-400' : 'bg-white/10'}`} />
+                          <div key={i} className={`w-1 h-1 rounded-full ${i < Math.floor(qcDonations / 50000) ? 'bg-yellow-400' : 'bg-white/10'}`} />
                         ))}
                      </div>
                    </button>

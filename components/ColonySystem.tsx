@@ -33,6 +33,7 @@ import { GameStorage } from '@/lib/game-storage';
 import { MINI_GAMES_CONFIG } from '@/lib/mini-games-config';
 import { preloadAssetGroupPassive } from '@/lib/asset-preloader';
 import NewEarthDefenseBattle, { BattleResultSummary } from './NewEarthDefenseBattle';
+import { PremiumCanvasButton } from './ui/PremiumCanvasButton';
 import {
   BATTLE_CARD_SLOTS,
   BATTLE_STAT_CONFIG,
@@ -57,6 +58,7 @@ import {
   getCardStyle,
   getPoliticalEffects,
   getPoliticalPassiveBonuses,
+  getOwnedArcadeIdsFromCards,
   calculateBattleShipStats,
   calculateBattleStatTotals,
   canEquipBattleCardWithElementRule,
@@ -64,8 +66,21 @@ import {
   isPoliticalCard,
   normalizeOwnedColonyCardIds,
   rollBattleCardReward,
+  rollAnyMissingColonyCardReward,
   TRINITY_REACTOR_CARD_ID,
+  MAX_COLONY_CARD_LEVEL,
 } from '@/lib/colony-cards';
+import {
+  NEW_EARTH_MISSIONS_STORAGE_KEY,
+  NEW_EARTH_MISSION_QC_REWARD_MULTIPLIER,
+  NewEarthMissionState,
+  createDefaultNewEarthMissionState,
+  markNewEarthMissionCycleRewardClaimed,
+  markNewEarthMissionClaimed,
+  normalizeNewEarthMissionState,
+  refreshNewEarthMissionBoard,
+  recordNewEarthMissionEvent,
+} from '@/lib/new-earth-missions';
 
 // --- Types ---
 
@@ -162,6 +177,33 @@ const getMiniBattleCardStyle = (card: ColonyCard, equipped: boolean) => {
   return styles[card.rarity] || styles.common;
 };
 
+const getBattleCardButtonTone = (card?: ColonyCard | null) => {
+  if (!card) return 'steel';
+  const tones: Record<string, 'steel' | 'cyan' | 'purple' | 'orange' | 'red'> = {
+    common: 'steel',
+    rare: 'cyan',
+    epic: 'purple',
+    legendary: 'orange',
+    mythic: 'red',
+  };
+  return tones[card.rarity] || 'steel';
+};
+
+const getBattleCardTextTone = (card?: ColonyCard | null) => {
+  if (!card) return 'text-zinc-500';
+  const tones: Record<string, string> = {
+    common: 'text-zinc-200/75',
+    rare: 'text-cyan-100/80',
+    epic: 'text-violet-100/80',
+    legendary: 'text-orange-100/80',
+    mythic: 'text-rose-100/80',
+  };
+  return tones[card.rarity] || 'text-zinc-200/75';
+};
+
+const DEFENSE_SPECIAL_BUTTON_SELECTED_CLASS = 'border-amber-400/80 bg-gradient-to-br from-amber-600/34 via-stone-950/92 to-yellow-800/22 shadow-[0_0_28px_rgba(217,119,6,0.42)] ring-1 ring-amber-200/75';
+const DEFENSE_SPECIAL_BUTTON_UNSELECTED_CLASS = 'border-stone-500/35 bg-gradient-to-br from-stone-800/18 via-zinc-950/92 to-amber-950/10 opacity-70 saturate-50 shadow-[0_0_12px_rgba(68,64,60,0.24)]';
+
 interface DefenseSpecial {
   id: DefenseSpecialId;
   name: Record<'en' | 'pt', string>;
@@ -191,6 +233,11 @@ const ROUTE4_ROBOTS_50_SFX = `${ROUTE4_SEARCH_SFX_BASE}/50_robots.ogg`;
 const ROUTE4_ROBOTS_250_SFX = `${ROUTE4_SEARCH_SFX_BASE}/250_robots.ogg`;
 const ROUTE4_HANGAR_OPEN_SFX = `${ROUTE4_SEARCH_SFX_BASE}/hangar_open_door.ogg`;
 const ROUTE4_HANGAR_CLOSE_SFX = `${ROUTE4_SEARCH_SFX_BASE}/hangar_close_door.ogg`;
+const ROUTE4_QUEST_REWARD_SFX = `${ROUTE4_SEARCH_SFX_BASE}/quest_reward.ogg`;
+const ROUTE4_QUESTS_RENEW_SFX = `${ROUTE4_SEARCH_SFX_BASE}/quests_renew.ogg`;
+const ROUTE4_SPECIAL_EQUIP_SFX = `${ROUTE4_SEARCH_SFX_BASE}/equip_special.ogg`;
+const ROUTE4_SPECIAL_UNEQUIP_SFX = `${ROUTE4_SEARCH_SFX_BASE}/unequip_special.ogg`;
+const ROUTE4_CANT_EQUIP_SFX = `${ROUTE4_SEARCH_SFX_BASE}/cant_equip.ogg`;
 const HORIZON_LEVEL_UP_SFX = '/assets/rota4/battles/player/horizon/horizon_level_up.ogg';
 const route4SearchSfxCache = new Map<string, HTMLAudioElement>();
 const route4BattleSfxCache = new Map<string, HTMLAudioElement>();
@@ -273,7 +320,7 @@ export interface ColonySystemProps {
   playSfx?: (type: string, config?: any) => void;
   onBuildingComplete?: (type: ConstructionType, level: number) => void;
   qc?: number;
-  onEarnQC?: (amount: number) => void;
+  onEarnQC?: (amount: number, source?: 'battle' | 'mission') => void;
   onSpendQC?: (amount: number) => void;
   onDefenseThreatAlertChange?: (alert: { title: string; remainingSeconds: number } | null) => void;
   openDefenseRequest?: number;
@@ -413,19 +460,19 @@ const CONSTRUCTION_SUPPLY_COST: Record<ConstructionType, Partial<ColonySupplies>
 const DEFENSE_SPECIALS: DefenseSpecial[] = [
   {
     id: 'apocalypse-laser',
-    name: { en: 'Apocalypse Laser', pt: 'Apocalipse Laser' },
+    name: { en: 'Horizon Laser', pt: 'Horizon Laser' },
     description: {
-      en: 'Route 3 special: a sustained beam for deleting priority threats.',
-      pt: 'Especial da Rota 3: feixe sustentado para apagar ameaças prioritárias.',
+      en: 'Route 4 special: a sustained Horizon beam for deleting priority threats.',
+      pt: 'Especial da Rota 4: feixe sustentado Horizon para apagar ameaças prioritárias.',
     },
     implemented: true,
   },
   {
     id: 'hellfire-barrage',
-    name: { en: 'Hellfire Barrage', pt: 'Hellfire Barrage' },
+    name: { en: 'Horizon Barrage', pt: 'Horizon Barrage' },
     description: {
-      en: 'Route 3 special: a heavy missile rain for pressure windows.',
-      pt: 'Especial da Rota 3: chuva pesada de mísseis para janelas de pressão.',
+      en: 'Route 4 special: a heavy Horizon barrage for pressure windows.',
+      pt: 'Especial da Rota 4: barragem pesada Horizon para janelas de pressão.',
     },
     implemented: true,
   },
@@ -480,6 +527,15 @@ const createInitialConstructions = () => (
     order: idx,
     lastProgressAt: undefined,
   }))
+);
+
+const isColonyReadyForPopulation = (constructions: Construction[] = []) => (
+  (Object.keys(CONSTRUCTION_CONFIG) as ConstructionType[]).every(type => (
+    constructions.some(construction => (
+      construction.type === type &&
+      (construction.isComplete || construction.level >= 10)
+    ))
+  ))
 );
 
 const COLONY_BLUEPRINTS: Array<{
@@ -643,6 +699,7 @@ export const cleanColoniesData = (data: any, language: 'en' | 'pt'): Colony[] =>
       sectors,
       equippedCards: sanitizePoliticalEquippedCards(col.equippedCards || {}),
       constructions: finalConstructions.sort((a, b) => a.order - b.order),
+      isHabitable: isColonyReadyForPopulation(finalConstructions),
     };
   });
 
@@ -809,9 +866,14 @@ const ColonyCardView = ({
   }
 
   return (
-    <button onClick={onClick} className={className}>
+    <PremiumCanvasButton
+      onClick={onClick}
+      tone={isEquipped ? 'green' : 'steel'}
+      className={className}
+      contentClassName="items-stretch"
+    >
       {content}
-    </button>
+    </PremiumCanvasButton>
   );
 };
 
@@ -828,10 +890,6 @@ const ClaimCardView = ({
   onClaim: () => void;
   tone: 'emerald' | 'cyan';
 }) => {
-  const enabledClass = tone === 'emerald'
-    ? 'bg-emerald-400 text-black hover:bg-emerald-300'
-    : 'bg-cyan-300 text-black hover:bg-cyan-200';
-
   return (
     <div className={`relative overflow-hidden rounded-2xl border p-3 ${requirement.met ? getCardStyle(card.rarity, getCardClass(card)) : 'border-zinc-800 bg-black/30 opacity-80'}`}>
       <div className="flex items-start justify-between gap-2">
@@ -846,15 +904,15 @@ const ClaimCardView = ({
             {requirement.label}
           </p>
         </div>
-        <button
+        <PremiumCanvasButton
           onClick={onClaim}
           disabled={!requirement.met}
-          className={`shrink-0 rounded-xl px-3 py-2 text-[10px] font-orbitron font-black uppercase tracking-widest transition-all ${
-            requirement.met ? enabledClass : 'bg-zinc-800 text-zinc-600 cursor-not-allowed'
-          }`}
+          tone={requirement.met ? (tone === 'emerald' ? 'green' : 'cyan') : 'steel'}
+          className="h-10 shrink-0 rounded-xl"
+          contentClassName={`px-3 text-[10px] font-black uppercase tracking-widest ${requirement.met ? 'text-white' : 'text-zinc-500'}`}
         >
           {requirement.met ? (language === 'pt' ? 'Reivindicar' : 'Claim') : (language === 'pt' ? 'Bloqueada' : 'Locked')}
-        </button>
+        </PremiumCanvasButton>
       </div>
     </div>
   );
@@ -927,12 +985,14 @@ const AcquisitionEventOverlay = ({
           </div>
         )}
 
-        <button
+        <PremiumCanvasButton
           onClick={onClose}
-          className="relative z-10 w-full rounded-2xl bg-emerald-400 px-5 py-4 text-black font-orbitron font-black uppercase tracking-[0.24em] hover:bg-emerald-300 transition-all"
+          tone="green"
+          className="relative z-10 h-14 w-full rounded-2xl"
+          contentClassName="px-5 text-[12px] font-black uppercase tracking-[0.24em] text-emerald-50"
         >
           {language === 'pt' ? 'Registrar no Conselho' : 'Register in Council'}
-        </button>
+        </PremiumCanvasButton>
       </motion.div>
     </div>
   );
@@ -976,34 +1036,40 @@ const CardDetailOverlay = ({
         className={`relative w-full max-w-5xl overflow-hidden rounded-[2rem] border border-white/15 bg-zinc-950 shadow-[0_0_80px_rgba(34,211,238,0.12)] ${getCardStyle(card.rarity, getCardClass(card))}`}
       >
         <div className="absolute inset-0 opacity-40 bg-[radial-gradient(circle_at_20%_0%,rgba(255,255,255,0.2),transparent_34%),radial-gradient(circle_at_80%_20%,rgba(45,212,191,0.18),transparent_30%)]" />
-        <button
+        <PremiumCanvasButton
           onClick={onClose}
-          className="absolute right-4 top-4 z-20 rounded-full border border-white/10 bg-black/45 p-2 text-zinc-300 transition-all hover:border-white/25 hover:text-white"
+          tone="steel"
+          className="absolute right-4 top-4 z-20 h-10 w-10 rounded-full"
+          contentClassName="text-zinc-200"
           aria-label={language === 'pt' ? 'Fechar carta' : 'Close card'}
         >
           <X size={18} />
-        </button>
+        </PremiumCanvasButton>
         {onNavigate && navigationLabel && (
           <div className="absolute left-5 top-4 z-20 flex items-center gap-2 rounded-full border border-white/10 bg-black/65 p-1 shadow-[0_0_22px_rgba(0,0,0,0.35)]">
-            <button
+            <PremiumCanvasButton
               type="button"
               onClick={() => onNavigate(-1)}
-              className="rounded-full p-2 text-zinc-300 transition-all hover:bg-white/10 hover:text-white"
+              tone="steel"
+              className="h-9 w-9 rounded-full"
+              contentClassName="text-zinc-200"
               aria-label={language === 'pt' ? 'Carta anterior' : 'Previous card'}
             >
               <ChevronLeft size={18} />
-            </button>
+            </PremiumCanvasButton>
             <span className="min-w-12 text-center font-mono text-[10px] font-bold uppercase tracking-widest text-zinc-400">
               {navigationLabel}
             </span>
-            <button
+            <PremiumCanvasButton
               type="button"
               onClick={() => onNavigate(1)}
-              className="rounded-full p-2 text-zinc-300 transition-all hover:bg-white/10 hover:text-white"
+              tone="steel"
+              className="h-9 w-9 rounded-full"
+              contentClassName="text-zinc-200"
               aria-label={language === 'pt' ? 'Próxima carta' : 'Next card'}
             >
               <ChevronRight size={18} />
-            </button>
+            </PremiumCanvasButton>
           </div>
         )}
 
@@ -1079,25 +1145,23 @@ const CardDetailOverlay = ({
             </div>
 
             <div className="flex flex-col gap-2 sm:flex-row">
-              <button
+              <PremiumCanvasButton
                 onClick={onConfirm}
                 disabled={isBlocked}
-                className={`flex-1 rounded-2xl px-5 py-4 text-sm font-orbitron font-black uppercase tracking-[0.22em] transition-all ${
-                  isBlocked
-                    ? 'cursor-not-allowed border border-zinc-700 bg-zinc-900 text-zinc-600'
-                    : action === 'remove'
-                    ? 'border border-red-300/35 bg-red-400/15 text-red-100 hover:bg-red-400/25'
-                    : 'bg-emerald-400 text-black hover:bg-emerald-300'
-                }`}
+                tone={isBlocked ? 'steel' : action === 'remove' ? 'red' : 'green'}
+                className="h-14 flex-1 rounded-2xl"
+                contentClassName={`px-5 text-sm font-black uppercase tracking-[0.22em] ${isBlocked ? 'text-zinc-500' : 'text-white'}`}
               >
                 {isBlocked ? (language === 'pt' ? 'Retire a carta atual' : 'Remove current card') : confirmLabel}
-              </button>
-              <button
+              </PremiumCanvasButton>
+              <PremiumCanvasButton
                 onClick={onClose}
-                className="rounded-2xl border border-white/10 bg-black/35 px-5 py-4 text-sm font-orbitron font-black uppercase tracking-[0.22em] text-zinc-300 transition-all hover:border-white/25 hover:text-white"
+                tone="steel"
+                className="h-14 rounded-2xl"
+                contentClassName="px-5 text-sm font-black uppercase tracking-[0.22em] text-zinc-200"
               >
                 {language === 'pt' ? 'Voltar' : 'Back'}
-              </button>
+              </PremiumCanvasButton>
             </div>
           </div>
         </div>
@@ -1138,7 +1202,7 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
       setActiveColonyId(selectedColonyId);
     }
   }, [selectedColonyId]);
-  const [activeView, setActiveView] = useState<'colony' | 'searches'>('colony');
+  const [activeView, setActiveView] = useState<'colony' | 'searches' | 'missions'>('colony');
   const [isLoaded, setIsLoaded] = useState(false);
   const [isSuppliesLoaded, setIsSuppliesLoaded] = useState(false);
   const [isSearchLoaded, setIsSearchLoaded] = useState(false);
@@ -1174,6 +1238,8 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
   const [defenseAlertTick, setDefenseAlertTick] = useState(0);
   const [battleCardCodexPage, setBattleCardCodexPage] = useState(0);
   const [selectedCard, setSelectedCard] = useState<{ card: ColonyCard; action: 'equip' | 'remove'; slot?: ColonyCardSlot | BattleCardSlot; blockedBy?: string } | null>(null);
+  const [newEarthMissions, setNewEarthMissions] = useState<NewEarthMissionState>(() => createDefaultNewEarthMissionState());
+  const [isNewEarthMissionsLoaded, setIsNewEarthMissionsLoaded] = useState(false);
   const colonySuppliesRef = useRef<ColonySupplies>(DEFAULT_COLONY_SUPPLIES);
   const earthPopulationRef = useRef(earthPopulation);
   const setEarthPopulationRef = useRef(setEarthPopulation);
@@ -1185,8 +1251,51 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
   const defenseAlertsPausedAtRef = useRef<number | null>(null);
   const lastBuildingLevelsRef = useRef<Record<string, Record<string, number>>>({});
 
-  const t = (en: string, pt: string) => language === 'pt' ? pt : en;
+  const t = useCallback((en: string, pt: string) => language === 'pt' ? pt : en, [language]);
   const effectiveActiveColonyId = activeColonyId ?? colonies[0]?.id ?? null;
+  const newEarthMissionContext = useMemo(() => {
+    const unlockedArcadeIds = Array.from(getOwnedArcadeIdsFromCards(ownedCardIds));
+    const ownedCardIdSet = new Set(ownedCardIds);
+    const hasMissingCards = COLONY_CARD_CATALOG.some(card => !ownedCardIdSet.has(card.id));
+    const upgradeableCards = ownedCardIds
+      .map(id => getCardById(id))
+      .filter((card): card is ColonyCard => Boolean(card))
+      .filter(card => isBattleCard(card) || isPoliticalCard(card))
+      .map(card => ({
+        id: card.id,
+        name: card.name,
+        level: getCardLevel(card.id, cardLevels),
+      }))
+      .filter(card => card.level < MAX_COLONY_CARD_LEVEL);
+    const submarineColoniesReady = colonies.some(colony => (
+      (colony.id === 'colony-2' || colony.id === 'colony-4') &&
+      isColonyReadyForPopulation(colony.constructions)
+    ));
+
+    return {
+      unlockedArcadeIds,
+      hasMissingCards,
+      canRunLandSearch: true,
+      canRunSeaSearch: true,
+      canDefendSearches: pendingDefenseThreats.length > 0 || Boolean(activeDefenseThreat),
+      canUseSubmarines: submarineColoniesReady,
+      upgradeableCards,
+      colonies: colonies.map(colony => ({
+        id: colony.id,
+        allBaseConstructionsComplete: isColonyReadyForPopulation(colony.constructions),
+        completedConstructions: (Object.keys(CONSTRUCTION_CONFIG) as ConstructionType[]).reduce((acc, type) => ({
+          ...acc,
+          [type]: Math.max(0, ...colony.constructions
+            .filter(construction => construction.type === type)
+            .map(construction => Math.max(0, Math.floor(Number(construction.level) || 0)))),
+        }), {} as Partial<Record<ConstructionType, number>>),
+      })),
+    };
+  }, [activeDefenseThreat, cardLevels, colonies, ownedCardIds, pendingDefenseThreats.length]);
+  const newEarthMissionContextRef = useRef(newEarthMissionContext);
+  useEffect(() => {
+    newEarthMissionContextRef.current = newEarthMissionContext;
+  }, [newEarthMissionContext]);
   const formatSearchTime = (seconds: number) => {
     const safeSeconds = Math.max(0, Math.ceil(seconds));
     const minutes = Math.floor(safeSeconds / 60);
@@ -1423,6 +1532,36 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
   }, []);
 
   useEffect(() => {
+    let mounted = true;
+    GameStorage.load(NEW_EARTH_MISSIONS_STORAGE_KEY).then(saved => {
+      if (!mounted) return;
+      const context = newEarthMissionContextRef.current;
+      setNewEarthMissions(refreshNewEarthMissionBoard(
+        normalizeNewEarthMissionState(saved, context),
+        context
+      ));
+      setIsNewEarthMissionsLoaded(true);
+    });
+
+    const handleMissionUpdate = (event: Event) => {
+      const customEvent = event as CustomEvent<NewEarthMissionState>;
+      if (customEvent.detail) {
+        const context = newEarthMissionContextRef.current;
+        setNewEarthMissions(refreshNewEarthMissionBoard(
+          normalizeNewEarthMissionState(customEvent.detail, context),
+          context
+        ));
+      }
+    };
+
+    window.addEventListener('qch:new-earth-missions-updated', handleMissionUpdate);
+    return () => {
+      mounted = false;
+      window.removeEventListener('qch:new-earth-missions-updated', handleMissionUpdate);
+    };
+  }, []);
+
+  useEffect(() => {
     if (!isLoaded || !isOwnedCardsLoaded) return;
     GameStorage.save(ownedCardIds, 'colony_cards_data');
   }, [ownedCardIds, isLoaded, isOwnedCardsLoaded]);
@@ -1481,6 +1620,39 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
     if (!isLoaded || !isThreatsLoaded) return;
     GameStorage.save(pendingDefenseThreats.slice(0, MAX_PENDING_DEFENSE_THREATS), 'colony_defense_threats');
   }, [pendingDefenseThreats, isLoaded, isThreatsLoaded]);
+
+  useEffect(() => {
+    if (!isLoaded || !isNewEarthMissionsLoaded) return;
+    GameStorage.save(newEarthMissions, NEW_EARTH_MISSIONS_STORAGE_KEY);
+  }, [newEarthMissions, isLoaded, isNewEarthMissionsLoaded]);
+
+  useEffect(() => {
+    if (!isLoaded || !isNewEarthMissionsLoaded) return;
+    setNewEarthMissions(prev => {
+      const next = refreshNewEarthMissionBoard(
+        normalizeNewEarthMissionState(prev, newEarthMissionContext),
+        newEarthMissionContext
+      );
+      if (next.cycle !== prev.cycle && prev.cycle > 0) {
+        playRoute4UiSfx(ROUTE4_QUESTS_RENEW_SFX);
+      }
+      return JSON.stringify(next) === JSON.stringify(prev) ? prev : next;
+    });
+  }, [isLoaded, isNewEarthMissionsLoaded, newEarthMissionContext]);
+
+  useEffect(() => {
+    if (!isLoaded || !isNewEarthMissionsLoaded) return;
+    const timer = window.setInterval(() => {
+      setNewEarthMissions(prev => {
+        const next = refreshNewEarthMissionBoard(prev, newEarthMissionContext);
+        if (next.cycle !== prev.cycle && prev.cycle > 0) {
+          playRoute4UiSfx(ROUTE4_QUESTS_RENEW_SFX);
+        }
+        return JSON.stringify(next) === JSON.stringify(prev) ? prev : next;
+      });
+    }, 15000);
+    return () => window.clearInterval(timer);
+  }, [isLoaded, isNewEarthMissionsLoaded, newEarthMissionContext]);
 
   useEffect(() => {
     if (defenseAlertsPaused) {
@@ -1554,6 +1726,29 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
     });
   }, [isLoaded, setColonies]);
 
+  const recordNewEarthMissionProgress = useCallback((event: Parameters<typeof recordNewEarthMissionEvent>[1]) => {
+    let completedCount = 0;
+    setNewEarthMissions(prev => {
+      const result = recordNewEarthMissionEvent(normalizeNewEarthMissionState(prev, newEarthMissionContext), event);
+      completedCount = result.completedMissionIds.length;
+      return result.changed ? result.state : prev;
+    });
+    if (completedCount > 0) {
+      setCardFeedback(t('New Earth mission completed', 'Missão da Nova Terra concluída'));
+    }
+  }, [newEarthMissionContext, t]);
+
+  useEffect(() => {
+    const handleNewEarthMissionEvent = (event: Event) => {
+      const detail = (event as CustomEvent<Parameters<typeof recordNewEarthMissionEvent>[1]>).detail;
+      if (!detail?.type) return;
+      recordNewEarthMissionProgress(detail);
+    };
+
+    window.addEventListener('qch:new-earth-mission-event', handleNewEarthMissionEvent);
+    return () => window.removeEventListener('qch:new-earth-mission-event', handleNewEarthMissionEvent);
+  }, [recordNewEarthMissionProgress]);
+
   const triggerSearchThreatCheck = useCallback((search: ActiveColonySearch) => {
     if (search.threatCheckedAt || Date.now() < search.threatCheckAt || Date.now() >= search.endsAt) return;
     const checkedAt = Date.now();
@@ -1614,6 +1809,7 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
       return next;
     });
     setSearchRemainingSeconds(prev => ({ ...prev, [search.searchKey]: 0 }));
+    recordNewEarthMissionProgress({ type: 'search-complete', searchId: search.id });
     setLastSearchReport(resourcesSettledByDefense
       ? t(`${search.title} returned after hostile contact. Resolve the defense to secure its resources.`, `${search.title} retornou após contato hostil. Resolva a defesa para garantir os recursos.`)
       : t(`${search.title} completed. ${rewardText}`, `${search.title} concluída. ${rewardText}`)
@@ -1622,7 +1818,7 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
       ? t('Search completed with pending defense', 'Busca concluída com defesa pendente')
       : t('Search completed', 'Busca concluída')
     );
-  }, [language, t]);
+  }, [language, recordNewEarthMissionProgress, t]);
 
   useEffect(() => {
     const activeList = Object.values(activeSearches).filter(Boolean) as ActiveColonySearch[];
@@ -1636,7 +1832,10 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
         nextRemaining[search.searchKey] = remaining;
         if (remaining <= 0) completeSearch(search);
       });
-      setSearchRemainingSeconds(prev => ({ ...prev, ...nextRemaining }));
+      setSearchRemainingSeconds(prev => {
+        const changed = Object.entries(nextRemaining).some(([key, value]) => prev[key] !== value);
+        return changed ? { ...prev, ...nextRemaining } : prev;
+      });
     };
 
     updateSearchClock();
@@ -1775,17 +1974,32 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
     
     colonies.forEach(colony => {
       const colonyPrevLevels = lastBuildingLevelsRef.current[colony.id] || {};
+      const hasLevelBaseline = Object.prototype.hasOwnProperty.call(lastBuildingLevelsRef.current, colony.id);
       const newLevels: Record<string, number> = {};
       
       colony.constructions.forEach(con => {
         const prevLevel = colonyPrevLevels[con.type] || 0;
         if (con.level > prevLevel) {
           // If level increased, notify and count years
-          if (prevLevel > 0) { // Don't notify on initial load (level 0 to level X)
+          if (hasLevelBaseline) {
             totalYearsToAdd += (con.level - prevLevel);
             // Notify for EACH level gained if multiple
             for (let l = prevLevel + 1; l <= con.level; l++) {
               if (onBuildingComplete) onBuildingComplete(con.type, l);
+              let completedMission = false;
+              setNewEarthMissions(prev => {
+                const result = recordNewEarthMissionEvent(normalizeNewEarthMissionState(prev, newEarthMissionContext), {
+                  type: 'construction-complete',
+                  colonyId: colony.id,
+                  constructionType: con.type,
+                  completedCount: l,
+                });
+                completedMission = result.completedMissionIds.length > 0;
+                return result.changed ? result.state : prev;
+              });
+              if (completedMission) {
+                setCardFeedback(t('New Earth mission completed', 'Missão da Nova Terra concluída'));
+              }
             }
           }
         }
@@ -1798,7 +2012,7 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
     if (totalYearsToAdd > 0) {
       onAddYear(totalYearsToAdd);
     }
-  }, [colonies, onAddYear, onBuildingComplete, isLoaded]);
+  }, [colonies, onAddYear, onBuildingComplete, isLoaded, newEarthMissionContext, t]);
 
   const activeColony = useMemo(() => 
     colonies.find(c => c.id === effectiveActiveColonyId) || null
@@ -2005,7 +2219,7 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
           return {
             ...colony,
             constructions: updatedConstructions,
-            isHabitable: updatedConstructions.every(c => c.level >= 10)
+            isHabitable: isColonyReadyForPopulation(updatedConstructions)
           };
         });
 
@@ -2025,9 +2239,20 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
       let nextEarthPopulation: number | null = null;
       setColonies(prevColonies => {
         const habitableColonies = prevColonies.filter(colony => (
-          colony.isHabitable && colony.constructions.every(construction => construction.isComplete)
+          isColonyReadyForPopulation(colony.constructions)
         ));
-        if (habitableColonies.length === 0) return prevColonies;
+        if (habitableColonies.length === 0) {
+          const lockedPopulation = prevColonies.reduce((sum, colony) => (
+            sum + Math.max(0, Math.floor(colony.population || 0))
+          ), 0);
+          if (lockedPopulation <= 0) return prevColonies;
+          nextEarthPopulation = Math.max(0, Math.floor(earthPopulationRef.current + lockedPopulation));
+          return prevColonies.map(colony => (
+            colony.population > 0
+              ? { ...colony, population: 0, isHabitable: isColonyReadyForPopulation(colony.constructions) }
+              : colony
+          ));
+        }
 
         const currentColonyPopulation = prevColonies.reduce((sum, colony) => sum + Math.max(0, Math.floor(colony.population || 0)), 0);
         const totalPopulation = Math.max(0, Math.floor(earthPopulationRef.current + currentColonyPopulation));
@@ -2050,10 +2275,13 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
         const nextColonies = prevColonies.map(colony => {
           const currentPopulation = Math.max(0, Math.floor(colony.population || 0));
           if (!scoreByColony.has(colony.id)) {
-            assignedColonialPopulation += currentPopulation;
-            if (currentPopulation === colony.population) return colony;
+            if (currentPopulation <= 0 && colony.isHabitable === isColonyReadyForPopulation(colony.constructions)) return colony;
             hasPopulationChanges = true;
-            return { ...colony, population: currentPopulation };
+            return {
+              ...colony,
+              population: 0,
+              isHabitable: isColonyReadyForPopulation(colony.constructions),
+            };
           }
 
           const targetPopulation = basePerColony + Math.floor(bonusShareTotal * (scoreByColony.get(colony.id)! / totalScore));
@@ -2061,9 +2289,10 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
           const migrationStep = Math.sign(delta) * Math.min(Math.abs(delta), Math.max(1, Math.ceil(Math.abs(delta) * 0.08)));
           const nextPopulation = Math.max(0, currentPopulation + migrationStep);
           assignedColonialPopulation += nextPopulation;
-          if (nextPopulation === colony.population) return colony;
+          const isHabitable = isColonyReadyForPopulation(colony.constructions);
+          if (nextPopulation === colony.population && colony.isHabitable === isHabitable) return colony;
           hasPopulationChanges = true;
-          return { ...colony, population: nextPopulation };
+          return { ...colony, population: nextPopulation, isHabitable };
         });
 
         nextEarthPopulation = Math.max(0, totalPopulation - assignedColonialPopulation);
@@ -2301,6 +2530,104 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
     return true;
   };
 
+  const claimNewEarthMission = useCallback((missionId: string) => {
+    const mission = newEarthMissions.missions.find(item => item.id === missionId);
+    if (!mission || !mission.completed || mission.claimed) return;
+
+    const completesCycle = !newEarthMissions.cycleRewardClaimed && newEarthMissions.missions.every(item => item.claimed || item.id === missionId);
+    const claimed = markNewEarthMissionClaimed(newEarthMissions, missionId);
+    const withCycleReward = completesCycle ? markNewEarthMissionCycleRewardClaimed(claimed) : claimed;
+    const claimedMissionState = refreshNewEarthMissionBoard(withCycleReward, newEarthMissionContext);
+
+    setNewEarthMissions(claimedMissionState);
+    GameStorage.save(claimedMissionState, NEW_EARTH_MISSIONS_STORAGE_KEY);
+
+    playRoute4UiSfx(ROUTE4_QUEST_REWARD_SFX);
+    if (claimedMissionState.cycle !== newEarthMissions.cycle) {
+      setTimeout(() => playRoute4UiSfx(ROUTE4_QUESTS_RENEW_SFX), 800);
+    }
+
+    const reward = mission.reward;
+    if (reward.qc) {
+      onEarnQC?.(reward.qc, 'mission');
+    }
+
+    if (reward.supplies) {
+      const nextSupplies = applySupplyDelta(colonySuppliesRef.current, reward.supplies);
+      colonySuppliesRef.current = nextSupplies;
+      setColonySupplies(nextSupplies);
+    }
+
+    if (reward.colonyBonus) {
+      const targetColonyId = reward.colonyBonus.colonyId === 'active'
+        ? effectiveActiveColonyId
+        : reward.colonyBonus.colonyId;
+      if (targetColonyId) {
+        setColonies(prev => prev.map(colony => (
+          colony.id === targetColonyId
+            ? {
+              ...colony,
+              sectors: {
+                ...DEFAULT_COLONY_SECTORS,
+                ...(colony.sectors || {}),
+                [reward.colonyBonus!.sector]: Math.min(
+                  100,
+                  Math.max(0, Number(colony.sectors?.[reward.colonyBonus!.sector] ?? DEFAULT_COLONY_SECTORS[reward.colonyBonus!.sector]) + reward.colonyBonus!.value)
+                ),
+              },
+            }
+            : colony
+        )));
+      }
+    }
+
+    if (reward.missingCard) {
+      const card = rollAnyMissingColonyCardReward(ownedCardIds);
+      if (card) {
+        const nextOwned = normalizeOwnedColonyCardIds([...ownedCardIds, card.id]);
+        setOwnedCardIds(nextOwned);
+        GameStorage.save(nextOwned, 'colony_cards_data');
+        setCardEvent(card);
+        playSfx?.('claim_card');
+      } else {
+        onEarnQC?.(35000, 'mission');
+      }
+    }
+
+    if (completesCycle) {
+      const roll = Math.floor(Math.random() * 4);
+      if (roll === 0) {
+        onEarnQC?.(Math.round(35000 * NEW_EARTH_MISSION_QC_REWARD_MULTIPLIER), 'mission');
+      } else if (roll === 1) {
+        const nextSupplies = applySupplyDelta(colonySuppliesRef.current, { materials: 22, tech: 14, biomass: 12 });
+        colonySuppliesRef.current = nextSupplies;
+        setColonySupplies(nextSupplies);
+      } else {
+        const sectors: ColonySectorId[] = roll === 2 ? ['happiness'] : ['health', 'security'];
+        const sector = sectors[Math.floor(Math.random() * sectors.length)];
+        if (effectiveActiveColonyId) {
+          setColonies(prev => prev.map(colony => (
+            colony.id === effectiveActiveColonyId
+              ? {
+                ...colony,
+                sectors: {
+                  ...DEFAULT_COLONY_SECTORS,
+                  ...(colony.sectors || {}),
+                  [sector]: Math.min(100, Math.max(0, Number(colony.sectors?.[sector] ?? DEFAULT_COLONY_SECTORS[sector]) + 5)),
+                },
+              }
+              : colony
+          )));
+        }
+      }
+    }
+
+    setCardFeedback(completesCycle
+      ? t('Mission board completed. Extra bonus granted.', 'Painel de missões concluído. Bônus extra concedido.')
+      : t('Mission reward claimed', 'Recompensa da missão resgatada')
+    );
+  }, [newEarthMissions, newEarthMissionContext, onEarnQC, effectiveActiveColonyId, setColonies, ownedCardIds, playSfx, t]);
+
   const resolveDefenseVictory = useCallback((summary?: BattleResultSummary) => {
     if (!activeDefenseThreat) return;
     const reward = rollBattleCardReward(ownedCardIds, Math.random, legendaryBattleCardPity);
@@ -2333,7 +2660,7 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
       playRoute4BattleSfx(HORIZON_LEVEL_UP_SFX, 0.78);
     }
     setDefenseBattleLevel(prev => Math.max(1, Math.floor(prev)) + 1);
-    onEarnQC?.(battleQc);
+    onEarnQC?.(battleQc, 'battle');
     if (activeDefenseThreat.sourceSearchKey) {
       setActiveSearches(prev => {
         const search = prev[activeDefenseThreat.sourceSearchKey || ''];
@@ -2349,6 +2676,9 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
     }
     setPendingDefenseThreats(prev => prev.filter(threat => threat.id !== activeDefenseThreat.id));
     setActiveDefenseThreat(null);
+    recordNewEarthMissionProgress({ type: 'defense-victory' });
+    recordNewEarthMissionProgress({ type: 'defense-kills', amount: kills });
+    recordNewEarthMissionProgress({ type: 'defense-bosses', amount: Math.max(1, Math.floor(Number(summary?.bossesDefeated) || 1)) });
 
     if (reward) {
       const nextOwned = normalizeOwnedColonyCardIds([...ownedCardIds, reward.id]);
@@ -2369,7 +2699,7 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
       `Threat neutralized: +${battleXp} XP and +${formatValue(battleQc)} QC`,
       `Ameaça neutralizada: +${battleXp} XP e +${formatValue(battleQc)} QC`
     ));
-  }, [activeDefenseThreat, ownedCardIds, playSfx, legendaryBattleCardPity, onEarnQC, formatValue]);
+  }, [activeDefenseThreat, ownedCardIds, playSfx, legendaryBattleCardPity, onEarnQC, formatValue, recordNewEarthMissionProgress]);
 
   const resolveDefenseDefeat = useCallback(() => {
     const retryUntil = Date.now() + DEFENSE_THREAT_RESPONSE_SECONDS * 1000;
@@ -2443,6 +2773,10 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
   const seaSearchLevel = searchUpgradeLevels.sea || 0;
   const landSearchRewards = applySearchUpgradeRewards({ materials: 27, food: 18, biomass: 9, meds: 5, tech: 3 }, landSearchLevel);
   const seaSearchRewards = applySearchUpgradeRewards({ biomass: 21, food: 15, meds: 11, materials: 9, tech: 6 }, seaSearchLevel);
+  const activeColonyReadyForPopulation = isColonyReadyForPopulation(activeColony.constructions);
+  const displayedActiveColonyPopulation = activeColonyReadyForPopulation
+    ? Math.max(0, Math.floor(activeColony.population || 0))
+    : 0;
   const searchOptions: ColonySearchOption[] = [
     {
       id: 'land',
@@ -2543,11 +2877,16 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
 
   const toggleDefenseSpecial = (specialId: DefenseSpecialId) => {
     setSelectedSpecialIds(prev => {
-      if (prev.includes(specialId)) return prev.filter(id => id !== specialId);
+      if (prev.includes(specialId)) {
+        playRoute4UiSfx(ROUTE4_SPECIAL_UNEQUIP_SFX);
+        return prev.filter(id => id !== specialId);
+      }
       if (prev.length >= 2) {
         setCardFeedback(t('Only two specials can be equipped', 'Apenas dois especiais podem ser equipados'));
+        playRoute4UiSfx(ROUTE4_CANT_EQUIP_SFX);
         return prev;
       }
+      playRoute4UiSfx(ROUTE4_SPECIAL_EQUIP_SFX);
       return [...prev, specialId];
     });
   };
@@ -2612,17 +2951,22 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
                   <p className="font-mono text-[10px] uppercase tracking-[0.38em] text-red-200">{t('New Earth Aerial Defense', 'Defesa Aérea da Nova Terra')}</p>
                   <h3 className="font-orbitron text-xl font-black uppercase tracking-tight text-white">{t('Horizon Defense Hangar', 'Hangar de Defesa Horizon')}</h3>
                 </div>
-                <button
+                <PremiumCanvasButton
                   type="button"
                   onClick={closeDefenseHangar}
-                  className="rounded-2xl border border-white/10 bg-white/5 p-3 text-zinc-400 transition-all hover:text-white"
+                  tone="steel"
+                  className="h-11 w-11 rounded-2xl text-zinc-200"
+                  contentClassName="text-zinc-200"
                 >
                   <X size={18} />
-                </button>
+                </PremiumCanvasButton>
               </div>
 
               <div className="grid min-h-0 flex-1 grid-cols-[1.05fr_1fr_1fr] gap-3 p-4">
-                <section className="flex min-h-0 flex-col rounded-2xl border border-red-300/25 bg-red-300/10 p-3">
+                <section 
+                  className="flex min-h-0 flex-col rounded-2xl border border-red-300/25 p-3 bg-cover bg-center"
+                  style={{ backgroundImage: "linear-gradient(to bottom, rgba(15, 10, 10, 0.4), rgba(15, 10, 10, 0.6)), url('/assets/rota4/layout_cap4/hangar_bg_left.webp')" }}
+                >
                   <div className="relative flex min-h-[210px] items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-black/45">
                     <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(239,68,68,0.18),transparent_58%)]" />
                     <img
@@ -2686,7 +3030,10 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
                   </div>
                 </section>
 
-                <section className="grid min-h-0 grid-rows-[auto_1.05fr_1.7fr_0.8fr] gap-3 rounded-2xl border border-white/10 bg-black/35 p-3">
+                <section 
+                  className="grid min-h-0 grid-rows-[auto_1.05fr_1.7fr_0.8fr] gap-3 rounded-2xl border border-white/10 p-3 bg-cover bg-center"
+                  style={{ backgroundImage: "linear-gradient(to bottom, rgba(15, 10, 10, 0.4), rgba(15, 10, 10, 0.6)), url('/assets/rota4/layout_cap4/hangar_bg_center.webp')" }}
+                >
                   <div>
                     <p className="font-mono text-[10px] uppercase tracking-[0.32em] text-red-200">{t('Battle Plan', 'Plano de Batalha')}</p>
                     <h4 className="font-orbitron text-base font-black uppercase text-white">{t('Specials and Cards', 'Especiais e Cartas')}</h4>
@@ -2696,22 +3043,20 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
                     {DEFENSE_SPECIALS.map(special => {
                       const selected = selectedSpecialIds.includes(special.id);
                       return (
-                        <button
+                        <PremiumCanvasButton
                           key={special.id}
                           type="button"
                           onClick={() => toggleDefenseSpecial(special.id)}
-                          className={`flex min-h-0 flex-col justify-between rounded-xl border p-3 text-left transition-all ${
-                            selected
-                              ? 'border-red-300/70 bg-red-300/20 text-white'
-                              : 'border-white/10 bg-white/5 text-zinc-400 hover:border-red-300/40 hover:text-white'
-                          }`}
+                          tone={selected ? 'brown' : 'steel'}
+                          className={`min-h-0 rounded-xl ${selected ? DEFENSE_SPECIAL_BUTTON_SELECTED_CLASS : DEFENSE_SPECIAL_BUTTON_UNSELECTED_CLASS}`}
+                          contentClassName={`flex h-full flex-col items-stretch justify-between p-3 text-left ${selected ? 'text-white' : 'text-stone-300/72'}`}
                         >
                           <div className="flex items-center justify-between gap-2">
-                            <span className="font-orbitron text-[10px] font-black uppercase leading-tight">{special.name[language]}</span>
-                            <span className={`h-2 w-2 shrink-0 rounded-full ${selected ? 'bg-red-300' : special.implemented ? 'bg-emerald-300' : 'bg-zinc-600'}`} />
+                            <span className={`font-orbitron text-[10px] font-black uppercase leading-tight ${selected ? 'text-amber-50' : 'text-stone-300/75'}`}>{special.name[language]}</span>
+                            <span className={`h-2 w-2 shrink-0 rounded-full ${selected ? 'bg-amber-200 shadow-[0_0_10px_rgba(251,191,36,0.8)]' : special.implemented ? 'border border-stone-400/45 bg-stone-950/70' : 'bg-zinc-700'}`} />
                           </div>
-                          <p className="mt-2 line-clamp-2 text-[10px] leading-snug opacity-70">{special.description[language]}</p>
-                        </button>
+                          <p className={`mt-2 line-clamp-2 text-[10px] leading-snug ${selected ? 'text-amber-100/78' : 'text-stone-400/70'}`}>{special.description[language]}</p>
+                        </PremiumCanvasButton>
                       );
                     })}
                   </div>
@@ -2720,20 +3065,22 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
                     {BATTLE_CARD_SLOTS.map(slot => {
                       const card = getCardById(battleLoadout[slot]);
                       return (
-                        <button
+                        <PremiumCanvasButton
                           key={slot}
                           type="button"
                           onClick={() => card && unequipBattleCard(slot)}
-                          className={`flex min-h-0 flex-col justify-between rounded-xl border p-3 text-left ${card ? getCardStyle(card.rarity, getCardClass(card)) : 'border-dashed border-red-300/25 bg-black/35'}`}
+                          tone={getBattleCardButtonTone(card)}
+                          className={`min-h-0 rounded-xl ${card ? getCardStyle(card.rarity, getCardClass(card)) : ''}`}
+                          contentClassName="flex h-full flex-col items-stretch justify-between p-3 text-left"
                         >
-                          <p className="font-mono text-[8px] uppercase tracking-[0.2em] text-red-200/70">{BATTLE_SLOT_LABEL[slot][language]}</p>
+                          <p className={`font-mono text-[8px] uppercase tracking-[0.2em] ${getBattleCardTextTone(card)}`}>{BATTLE_SLOT_LABEL[slot][language]}</p>
                           <p className={`mt-2 line-clamp-2 font-orbitron text-[10px] font-black uppercase leading-tight ${card ? 'text-white' : 'text-zinc-600'}`}>
                             {card ? card.name[language] : t('Empty slot', 'Slot vazio')}
                           </p>
-                          <p className="mt-2 font-mono text-[8px] uppercase tracking-widest text-zinc-500">
+                          <p className={`mt-2 font-mono text-[8px] uppercase tracking-widest ${card ? getBattleCardTextTone(card) : 'text-zinc-500'}`}>
                             {card ? t('Click to remove', 'Clique para retirar') : t('Battle card', 'Carta de batalha')}
                           </p>
-                        </button>
+                        </PremiumCanvasButton>
                       );
                     })}
                   </div>
@@ -2751,7 +3098,10 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
                   </div>
                 </section>
 
-                <section className="flex min-h-0 flex-col rounded-2xl border border-white/10 bg-black/35 p-4">
+                <section 
+                  className="flex min-h-0 flex-col rounded-2xl border border-white/10 p-4 bg-cover bg-center"
+                  style={{ backgroundImage: "linear-gradient(to bottom, rgba(15, 10, 10, 0.4), rgba(15, 10, 10, 0.6)), url('/assets/rota4/layout_cap4/hangar_bg_right.webp')" }}
+                >
                   <p className="font-mono text-[10px] uppercase tracking-[0.32em] text-red-200">{t('Operational Board', 'Quadro Operacional')}</p>
                   <h4 className="font-orbitron text-lg font-black uppercase text-white">{t('Threats and Reserve', 'Ameaças e Reserva')}</h4>
 
@@ -2770,7 +3120,7 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
                             <p className="font-orbitron text-[10px] font-black uppercase text-white">{threat.sourceTitle}</p>
                             <span className="rounded-full border border-red-300/25 bg-black/30 px-2 py-0.5 font-mono text-[9px] text-red-100">{threat.threatChance}%</span>
                           </div>
-                          <button
+                          <PremiumCanvasButton
                             type="button"
                             onClick={() => {
                               closeDefenseHangar();
@@ -2781,10 +3131,12 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
                               onDefenseThreatAlertChange?.(null);
                               setActiveDefenseThreat(threat);
                             }}
-                            className="mt-3 w-full rounded-lg border border-red-300/30 bg-red-300/20 px-3 py-2 font-orbitron text-[10px] font-black uppercase tracking-widest text-white transition-all hover:bg-red-300 hover:text-black"
+                            tone="red"
+                            className="mt-3 h-9 w-full rounded-lg"
+                            contentClassName="px-3 text-[10px] font-black uppercase tracking-widest text-white"
                           >
                             {t('Launch Defense', 'Iniciar Defesa')}
-                          </button>
+                          </PremiumCanvasButton>
                         </div>
                       )) : (
                         <p className="rounded-xl border border-dashed border-zinc-700 bg-black/20 p-3 text-center font-mono text-[10px] uppercase tracking-widest text-zinc-500">
@@ -2802,31 +3154,35 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
                       </div>
                       {battleCardCodexPageCount > 1 && (
                         <div className="flex items-center gap-1">
-                          <button
+                          <PremiumCanvasButton
                             type="button"
                             onClick={() => {
                               playSfx?.('view_card');
                               setBattleCardCodexPage(prev => (prev - 1 + battleCardCodexPageCount) % battleCardCodexPageCount);
                             }}
-                            className="rounded-lg border border-white/10 bg-white/5 p-1.5 text-zinc-400 transition-all hover:border-red-300/40 hover:text-white"
+                            tone="steel"
+                            className="h-8 w-8 rounded-lg"
+                            contentClassName="text-zinc-200"
                             aria-label={t('Previous battle card page', 'Página anterior de cartas de batalha')}
                           >
                             <ChevronLeft size={14} />
-                          </button>
+                          </PremiumCanvasButton>
                           <span className="min-w-9 text-center font-mono text-[9px] uppercase tracking-widest text-zinc-500">
                             {activeBattleCardCodexPage + 1}/{battleCardCodexPageCount}
                           </span>
-                          <button
+                          <PremiumCanvasButton
                             type="button"
                             onClick={() => {
                               playSfx?.('view_card');
                               setBattleCardCodexPage(prev => (prev + 1) % battleCardCodexPageCount);
                             }}
-                            className="rounded-lg border border-white/10 bg-white/5 p-1.5 text-zinc-400 transition-all hover:border-red-300/40 hover:text-white"
+                            tone="steel"
+                            className="h-8 w-8 rounded-lg"
+                            contentClassName="text-zinc-200"
                             aria-label={t('Next battle card page', 'Próxima página de cartas de batalha')}
                           >
                             <ChevronRight size={14} />
-                          </button>
+                          </PremiumCanvasButton>
                         </div>
                       )}
                     </div>
@@ -2834,16 +3190,18 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
                       {ownedBattleCards.length > 0 ? visibleBattleCodexCards.map(card => {
                         const equipped = BATTLE_CARD_SLOTS.some(slot => battleLoadout[slot] === card.id);
                         return (
-                          <button
+                          <PremiumCanvasButton
                             key={card.id}
                             type="button"
                             onClick={() => openBattleCardDetails(card, equipped ? 'remove' : 'equip', BATTLE_CARD_SLOTS.find(slot => battleLoadout[slot] === card.id))}
-                            className={`min-h-[76px] rounded-xl border px-2.5 py-2 text-left transition-all ${getMiniBattleCardStyle(card, equipped)}`}
+                            tone={getBattleCardButtonTone(card)}
+                            className={`min-h-[76px] rounded-xl ${getMiniBattleCardStyle(card, equipped)}`}
+                            contentClassName="flex h-full flex-col items-stretch justify-center px-2.5 py-2 text-left"
                           >
                             <div className="flex items-start justify-between gap-2">
                               <p className="line-clamp-2 font-orbitron text-[9px] font-black uppercase leading-tight text-white">{card.name[language]}</p>
                               <span className={`shrink-0 rounded-full border px-1.5 py-0.5 font-mono text-[7px] uppercase tracking-widest ${
-                                equipped ? 'border-emerald-300/35 bg-emerald-300/10 text-emerald-200' : 'border-white/20 text-zinc-200/80'
+                                equipped ? `${getBattleCardTextTone(card)} border-white/25 bg-white/10` : 'border-white/20 text-zinc-200/80'
                               }`}>
                                 {equipped ? 'ON' : RARITY_LABEL[card.rarity]?.[language] || card.rarity}
                               </span>
@@ -2855,7 +3213,7 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
                                 </span>
                               ))}
                             </div>
-                          </button>
+                          </PremiumCanvasButton>
                         );
                       }) : (
                         <p className="col-span-2 row-span-3 flex items-center justify-center rounded-xl border border-dashed border-red-300/20 bg-black/25 p-3 text-center font-mono text-[10px] uppercase tracking-widest text-zinc-500">
@@ -2899,9 +3257,9 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
             <h2 className="font-orbitron text-xl font-black uppercase tracking-tight text-white">{t('Colonies', 'Colônias')}</h2>
           </div>
 
-          <div className="grid grid-cols-2 gap-1 rounded-2xl border border-white/10 bg-black/40 p-1 md:grid-cols-5 xl:w-[820px]">
+          <div className="grid grid-cols-2 gap-1 rounded-2xl border border-white/10 bg-black/40 p-1 md:grid-cols-6 xl:w-[920px]">
             {colonies.map(colony => (
-              <button
+              <PremiumCanvasButton
                 key={colony.id}
                 type="button"
                 onClick={() => {
@@ -2912,34 +3270,170 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
                     setSelectedColonyId(colony.id);
                   }
                 }}
-                className={`rounded-xl px-3 py-2 text-[10px] font-orbitron font-black uppercase tracking-widest transition-all ${
-                  activeView === 'colony' && effectiveActiveColonyId === colony.id
-                    ? 'bg-emerald-300 text-black shadow-[0_0_18px_rgba(52,211,153,0.22)]'
-                    : 'text-zinc-500 hover:bg-white/5 hover:text-zinc-200'
+                tone={activeView === 'colony' && effectiveActiveColonyId === colony.id ? 'green' : 'steel'}
+                className="h-10 rounded-xl"
+                contentClassName={`px-3 text-[10px] font-black uppercase tracking-widest ${
+                  activeView === 'colony' && effectiveActiveColonyId === colony.id ? 'text-emerald-50' : 'text-zinc-300'
                 }`}
               >
                 {colony.name.replace('Colônia ', '').replace(' Colony', '')}
-              </button>
+              </PremiumCanvasButton>
             ))}
-            <button
+            <PremiumCanvasButton
               type="button"
               onClick={() => {
                 playRoute4UiSfx(ROUTE4_COLONIES_TAB_SFX);
                 setActiveView('searches');
               }}
-              className={`rounded-xl px-3 py-2 text-[10px] font-orbitron font-black uppercase tracking-widest transition-all ${
-                activeView === 'searches'
-                  ? 'bg-cyan-300 text-black shadow-[0_0_18px_rgba(34,211,238,0.22)]'
-                  : 'text-zinc-500 hover:bg-white/5 hover:text-zinc-200'
-              }`}
+              tone={activeView === 'searches' ? 'cyan' : 'steel'}
+              className="h-10 rounded-xl"
+              contentClassName={`px-3 text-[10px] font-black uppercase tracking-widest ${activeView === 'searches' ? 'text-cyan-50' : 'text-zinc-300'}`}
             >
               {t('Searches', 'Buscas')}
-            </button>
+            </PremiumCanvasButton>
+            <PremiumCanvasButton
+              type="button"
+              onClick={() => {
+                playRoute4UiSfx(ROUTE4_COLONIES_TAB_SFX);
+                setActiveView('missions');
+              }}
+              tone={activeView === 'missions' ? 'amber' : 'steel'}
+              className="h-10 rounded-xl"
+              contentClassName={`px-3 text-[10px] font-black uppercase tracking-widest ${activeView === 'missions' ? 'text-amber-50' : 'text-zinc-300'}`}
+            >
+              {t('Missions', 'Missões')}
+            </PremiumCanvasButton>
           </div>
         </div>
       </div>
 
-      {activeView === 'colony' ? (
+      {activeView === 'missions' ? (
+        <div className="flex flex-1 flex-col overflow-hidden rounded-2xl border border-amber-300/20 bg-zinc-950/70 p-5">
+          <div className="mb-4 flex shrink-0 items-start justify-between gap-4">
+            <div>
+              <p className="font-mono text-[10px] uppercase tracking-[0.35em] text-amber-300">{t('New Earth Assignments', 'Designações da Nova Terra')}</p>
+              <h3 className="font-orbitron text-xl font-black uppercase tracking-tight text-white">{t('Mission Board', 'Painel de Missões')}</h3>
+            </div>
+            <div className="rounded-xl border border-amber-300/25 bg-amber-300/10 px-3 py-2 text-right">
+              <p className="font-mono text-[9px] uppercase tracking-widest text-amber-200/80">{t('Ready', 'Prontas')}</p>
+              <p className="font-orbitron text-lg font-black text-white">
+                {newEarthMissions.missions.filter(mission => mission.completed && !mission.claimed).length}
+              </p>
+            </div>
+          </div>
+
+          <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 overflow-y-auto pr-1 xl:grid-cols-2">
+            {newEarthMissions.missions.map(mission => {
+              const getMissionBg = (m: any) => {
+                if (m.eventType === 'search-complete') return m.searchId === 'sea' ? 'bg_sea_search.webp' : 'bg_land_search.webp';
+                if (m.eventType === 'construction-complete') return 'bg_construction.webp';
+                if (m.eventType.startsWith('submarine')) return 'bg_submarine.webp';
+                if (m.eventType.startsWith('arcade')) return 'bg_arcade.webp';
+                if (m.eventType === 'card-upgrade') return 'bg_card_upgrade.webp';
+                if (m.eventType.startsWith('defense')) return 'bg_hangar_defense.webp';
+                return 'bg_land_search.webp';
+              };
+              const bgUrl = `/assets/rota4/missions/${getMissionBg(mission)}`;
+              const rewardParts = [
+                mission.reward.qc ? `+${formatValue?.(mission.reward.qc) || mission.reward.qc} QC` : null,
+                mission.reward.supplies ? Object.entries(mission.reward.supplies).map(([key, value]) => `+${value} ${SUPPLY_CONFIG[key as ColonySupplyId].label[language]}`).join(' · ') : null,
+                mission.reward.missingCard ? t('Undiscovered card', 'Carta não descoberta') : null,
+                mission.reward.colonyBonus ? `+${mission.reward.colonyBonus.value} ${SECTOR_CONFIG[mission.reward.colonyBonus.sector].label[language]}` : null,
+              ].filter(Boolean).join(' · ');
+              const progressPercent = Math.min(100, (mission.progress / mission.target) * 100);
+              if (mission.claimed) {
+                return (
+                  <div
+                    key={mission.id}
+                    className="flex min-h-[188px] flex-col justify-between rounded-2xl border border-white/8 p-4 opacity-55 grayscale bg-cover bg-center"
+                    style={{ backgroundImage: `linear-gradient(to bottom, rgba(9, 9, 11, 0.8), rgba(9, 9, 11, 0.95)), url('${bgUrl}')` }}
+                  >
+                    <div>
+                      <p className="font-mono text-[10px] uppercase tracking-[0.24em] text-zinc-500">
+                        {t('Assignment completed', 'Designação concluída')}
+                      </p>
+                      <h4 className="mt-1 font-orbitron text-lg font-black uppercase text-zinc-500">
+                        {t('Slot awaiting renewal', 'Slot aguardando renovação')}
+                      </h4>
+                    </div>
+                    <div>
+                      <div className="h-2 overflow-hidden rounded-full border border-white/10 bg-zinc-900">
+                        <div className="h-full rounded-full bg-zinc-600" style={{ width: '100%' }} />
+                      </div>
+                      <PremiumCanvasButton
+                        type="button"
+                        disabled
+                        tone="steel"
+                        className="mt-4 h-10 rounded-xl"
+                        contentClassName="px-3 text-[11px] font-black uppercase tracking-[0.2em] text-zinc-500"
+                      >
+                        {t('Reward claimed', 'Recompensa resgatada')}
+                      </PremiumCanvasButton>
+                    </div>
+                  </div>
+                );
+              }
+
+              return (
+                <div
+                  key={mission.id}
+                  className="flex min-h-[188px] flex-col rounded-2xl border border-white/10 p-4 bg-cover bg-center"
+                  style={{ backgroundImage: `linear-gradient(to bottom, rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.8)), url('${bgUrl}')` }}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="font-mono text-[10px] uppercase tracking-[0.24em] text-amber-200/70">{mission.objectiveLabel[language]}</p>
+                      <h4 className="mt-1 font-orbitron text-lg font-black uppercase text-white">{mission.title[language]}</h4>
+                    </div>
+                    <span className={`rounded-lg border px-2 py-1 font-mono text-[10px] uppercase tracking-widest ${
+                      mission.claimed
+                        ? 'border-emerald-300/25 bg-emerald-300/10 text-emerald-200'
+                        : mission.completed
+                          ? 'border-amber-300/40 bg-amber-300/15 text-amber-100'
+                          : 'border-cyan-300/25 bg-cyan-300/10 text-cyan-200'
+                    }`}>
+                      {mission.claimed ? t('Claimed', 'Resgatada') : mission.completed ? t('Ready', 'Pronta') : `${mission.progress}/${mission.target}`}
+                    </span>
+                  </div>
+
+                  <p className="mt-2 text-sm leading-snug text-zinc-400">{mission.description[language]}</p>
+                  <div className="mt-4 h-2 overflow-hidden rounded-full border border-white/10 bg-zinc-900">
+                    <div className="h-full rounded-full bg-amber-300 shadow-[0_0_14px_rgba(251,191,36,0.35)]" style={{ width: `${progressPercent}%` }} />
+                  </div>
+                  <p className="mt-3 font-mono text-[10px] uppercase tracking-widest text-zinc-500">{rewardParts}</p>
+
+                  <PremiumCanvasButton
+                    type="button"
+                    onClick={() => claimNewEarthMission(mission.id)}
+                    disabled={!mission.completed || mission.claimed}
+                    tone={mission.completed && !mission.claimed ? 'green' : 'steel'}
+                    className="mt-auto h-10 rounded-xl"
+                    contentClassName={`px-3 text-[11px] font-black uppercase tracking-[0.2em] ${mission.completed && !mission.claimed ? 'text-emerald-50' : 'text-zinc-400'}`}
+                  >
+                    {mission.claimed ? t('Reward Claimed', 'Recompensa Resgatada') : t('Claim Reward', 'Resgatar Recompensa')}
+                  </PremiumCanvasButton>
+                </div>
+              );
+            })}
+            {newEarthMissions.missions.length === 0 && (
+              <div className="col-span-full flex min-h-[220px] flex-col items-center justify-center rounded-2xl border border-white/10 bg-black/35 p-6 text-center">
+                <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-amber-200/70">{t('No valid assignments', 'Sem designações válidas')}</p>
+                <h4 className="mt-3 font-orbitron text-2xl font-black uppercase text-white">{t('Systems analyzing the colony', 'Sistemas analisando a colônia')}</h4>
+                <p className="mt-3 max-w-lg text-sm text-zinc-400">
+                  {t('New missions will appear when there are objectives the player can actually complete.', 'Novas missões aparecerão quando houver objetivos que o jogador realmente consiga concluir.')}
+                </p>
+              </div>
+            )}
+          </div>
+          {newEarthMissions.renewAvailableAt && newEarthMissions.missions.every(mission => mission.claimed) && (
+            <div className="mt-3 shrink-0 rounded-xl border border-amber-300/20 bg-amber-300/10 px-4 py-2 text-center font-mono text-[10px] uppercase tracking-[0.22em] text-amber-100">
+              {Date.now() >= newEarthMissions.renewAvailableAt
+                ? t('Renewal available soon', 'Renovação disponível em instantes')
+                : `${t('Next assignments in', 'Próximas designações em')} ${formatSearchTime((newEarthMissions.renewAvailableAt - Date.now()) / 1000)}`}
+            </div>
+          )}
+        </div>
+      ) : activeView === 'colony' ? (
         <div className="flex flex-1 flex-col gap-3 overflow-hidden rounded-2xl border border-zinc-800/50 bg-zinc-900/20 p-4">
           <div className="grid shrink-0 grid-cols-1 gap-2 md:grid-cols-3">
             <div className="relative overflow-hidden rounded-xl border border-blue-400/25 bg-black/45 p-3">
@@ -2973,10 +3467,10 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
               <div className="relative z-10">
                 <p className="font-mono text-[10px] uppercase tracking-[0.24em] text-emerald-300/80">{t('Population', 'População')}</p>
                 <div className="mt-2 flex items-center justify-between gap-3">
-                  <h3 className={`font-orbitron text-base font-black drop-shadow-[0_0_10px_rgba(0,0,0,0.8)] ${activeColony.population > 0 ? 'text-emerald-300' : 'text-zinc-400'}`}>
-                    {activeColony.population.toLocaleString()}
+                  <h3 className={`font-orbitron text-base font-black drop-shadow-[0_0_10px_rgba(0,0,0,0.8)] ${displayedActiveColonyPopulation > 0 ? 'text-emerald-300' : 'text-zinc-400'}`}>
+                    {displayedActiveColonyPopulation.toLocaleString()}
                   </h3>
-                  <Users className={`h-5 w-5 ${activeColony.isHabitable ? 'text-emerald-300/70' : 'text-zinc-500/70'}`} />
+                  <Users className={`h-5 w-5 ${activeColonyReadyForPopulation ? 'text-emerald-300/70' : 'text-zinc-500/70'}`} />
                 </div>
               </div>
             </div>
@@ -3095,24 +3589,28 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
                            <span className="text-white text-[12px]">{con.assignedConstructors.toLocaleString()}</span>
                         </div>
                         <div className="flex gap-2">
-                           <button 
+                           <PremiumCanvasButton
                              onClick={() => {
                                if (updateConstructors(con.id, 50)) playRoute4UiSfx(ROUTE4_ROBOTS_50_SFX);
                              }}
                              disabled={!hasSuppliesFor50 || availableConstructors < 50}
-                             className="flex-1 py-2 rounded-xl bg-blue-600/20 border border-blue-500/40 text-blue-400 hover:bg-blue-600 hover:text-white font-black text-[12px] uppercase tracking-widest transition-all disabled:cursor-not-allowed disabled:border-zinc-700 disabled:bg-zinc-900/70 disabled:text-zinc-600"
+                             tone="blue"
+                             className="h-9 flex-1 rounded-xl"
+                             contentClassName="text-[12px] font-black uppercase tracking-widest text-blue-50"
                            >
                               +50
-                           </button>
-                           <button 
+                           </PremiumCanvasButton>
+                           <PremiumCanvasButton
                              onClick={() => {
                                if (updateConstructors(con.id, 250)) playRoute4UiSfx(ROUTE4_ROBOTS_250_SFX);
                              }}
                              disabled={!hasSuppliesFor250 || availableConstructors < 50}
-                             className="flex-1 py-2 rounded-xl bg-zinc-800/80 hover:bg-zinc-700 text-zinc-300 font-bold text-[12px] transition-colors border border-white/5 disabled:cursor-not-allowed disabled:opacity-30"
+                             tone="steel"
+                             className="h-9 flex-1 rounded-xl"
+                             contentClassName="text-[12px] font-bold text-zinc-100"
                            >
                               +250
-                           </button>
+                           </PremiumCanvasButton>
                         </div>
                       </div>
                     </div>
@@ -3254,16 +3752,18 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
                       <p className="mt-1 font-mono text-[9px] uppercase tracking-widest text-red-200">+{option.upgradeThreatBonus}% {t('Risk', 'Risco')}</p>
                     </div>
                   </div>
-                  <button
+                  <PremiumCanvasButton
                     type="button"
                     onClick={() => upgradeSearch(option.id)}
                     disabled={option.upgradeLevel >= MAX_SEARCH_UPGRADE_LEVEL || qc < option.upgradeCost}
-                    className="mt-3 w-full rounded-xl border border-white/10 bg-white/10 px-3 py-2 font-orbitron text-[10px] font-black uppercase tracking-[0.2em] text-white transition-all hover:border-emerald-300/50 hover:bg-emerald-300 hover:text-black disabled:cursor-not-allowed disabled:border-zinc-700 disabled:bg-zinc-900 disabled:text-zinc-600"
+                    tone="green"
+                    className="mt-3 h-10 w-full rounded-xl"
+                    contentClassName="px-3 text-[10px] font-black uppercase tracking-[0.2em] text-emerald-50"
                   >
                     {option.upgradeLevel >= MAX_SEARCH_UPGRADE_LEVEL
                       ? 'MAX'
                       : `${t('Upgrade', 'Melhorar')} · ${formatValue(option.upgradeCost)} QC`}
-                  </button>
+                  </PremiumCanvasButton>
                 </div>
 
                 <div className="mt-2 rounded-2xl border border-white/10 bg-black/35 p-3">
@@ -3282,15 +3782,17 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
 
                 <div className="mt-auto grid grid-cols-3 gap-1.5">
                   {searchSlots.map(slot => (
-                    <button
+                    <PremiumCanvasButton
                       key={`${option.id}-start-${slot.slotIndex}`}
                       type="button"
                       onClick={() => handleRunSearch(option, slot.slotIndex)}
                       disabled={Boolean(slot.activeSearch)}
-                      className={`rounded-2xl border px-2 py-3 font-orbitron text-[11px] font-black uppercase tracking-[0.14em] transition-all disabled:cursor-not-allowed disabled:border-zinc-700 disabled:bg-zinc-900 disabled:text-zinc-600 ${slot.style}`}
+                      tone={option.id === 'sea' ? 'cyan' : 'green'}
+                      className="h-12 rounded-2xl"
+                      contentClassName="px-2 text-[11px] font-black uppercase tracking-[0.14em] text-white"
                     >
                       {slot.activeSearch ? formatSearchTime(searchRemainingSeconds[slot.searchKey] || 0) : `Start ${slot.slotIndex + 1}`}
-                    </button>
+                    </PremiumCanvasButton>
                   ))}
                 </div>
                 </div>
@@ -3340,13 +3842,15 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
                 </div>
               </div>
 
-              <button
+              <PremiumCanvasButton
                 type="button"
                 onClick={openDefenseHangar}
-                className="mt-auto rounded-2xl border border-red-300/40 bg-red-300/20 px-4 py-3 font-orbitron text-[12px] font-black uppercase tracking-[0.22em] text-white transition-all hover:bg-red-300 hover:text-black"
+                tone="red"
+                className="mt-auto h-12 rounded-2xl"
+                contentClassName="px-4 text-[12px] font-black uppercase tracking-[0.22em] text-white"
               >
                 {t('Open Hangar', 'Abrir Hangar')}
-              </button>
+              </PremiumCanvasButton>
               </div>
             </div>
           </div>

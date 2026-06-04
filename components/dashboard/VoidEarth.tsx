@@ -22,11 +22,11 @@ const VoidEarth: React.FC<VoidEarthProps> = ({
   const isComplete = totalProgress >= 100;
 
   const resourceNodes = [
-    { id: 'energy', name: language === 'pt' ? 'Células Quânticas' : 'Quantum Cells', icon: Zap, color: 'text-yellow-400', border: 'border-yellow-400/20', bg: 'bg-yellow-400/5' },
-    { id: 'minerals', name: language === 'pt' ? 'Núcleos Minerais' : 'Mineral Cores', icon: Database, color: 'text-orange-400', border: 'border-orange-400/20', bg: 'bg-orange-400/5' },
-    { id: 'tech', name: language === 'pt' ? 'Dados Multifatoriais' : 'Multifactorial Data', icon: Cpu, color: 'text-purple-400', border: 'border-purple-400/20', bg: 'bg-purple-400/5' },
-    { id: 'food', name: language === 'pt' ? 'Rações de Colonização' : 'Colonization Rations', icon: Coffee, color: 'text-emerald-400', border: 'border-emerald-400/20', bg: 'bg-emerald-400/5' },
-    { id: 'meds', name: language === 'pt' ? 'Kits Médicos Avançados' : 'Advanced Medical Kits', icon: Activity, color: 'text-red-400', border: 'border-red-400/20', bg: 'bg-red-400/5' }
+    { id: 'energy', name: language === 'pt' ? 'Células Quânticas' : 'Quantum Cells', icon: Zap, color: 'text-yellow-400', border: 'border-yellow-400/20', bg: 'bg-yellow-400/5', bgImage: '/assets/rota3/void/quantic_cels.webp' },
+    { id: 'minerals', name: language === 'pt' ? 'Núcleos Minerais' : 'Mineral Cores', icon: Database, color: 'text-orange-400', border: 'border-orange-400/20', bg: 'bg-orange-400/5', bgImage: '/assets/rota3/void/minerals_void.webp' },
+    { id: 'tech', name: language === 'pt' ? 'Dados Multifatoriais' : 'Multifactorial Data', icon: Cpu, color: 'text-purple-400', border: 'border-purple-400/20', bg: 'bg-purple-400/5', bgImage: '/assets/rota3/void/multifactorial_data.webp' },
+    { id: 'food', name: language === 'pt' ? 'Rações de Colonização' : 'Colonization Rations', icon: Coffee, color: 'text-emerald-400', border: 'border-emerald-400/20', bg: 'bg-emerald-400/5', bgImage: '/assets/rota3/void/colonies_food.webp' },
+    { id: 'meds', name: language === 'pt' ? 'Kits Médicos Avançados' : 'Advanced Medical Kits', icon: Activity, color: 'text-red-400', border: 'border-red-400/20', bg: 'bg-red-400/5', bgImage: '/assets/rota3/void/medical_suplies.webp' }
   ];
 
   return (
@@ -140,7 +140,11 @@ const VoidEarth: React.FC<VoidEarthProps> = ({
             const isNodeComplete = progress >= 100;
             return (
               <div key={node.id} className={`glass-panel border p-4 rounded-xl flex flex-col justify-between transition-all relative overflow-hidden min-h-0 ${isNodeComplete ? 'border-emerald-500/40 bg-emerald-500/5 shadow-[0_0_18px_rgba(16,185,129,0.08)]' : `border-white/10 ${node.bg} hover:border-white/20`}`}>
-                <div className="flex justify-between items-start gap-3 shrink-0">
+                <div 
+                  className="absolute inset-0 bg-cover bg-center opacity-30 pointer-events-none mix-blend-overlay"
+                  style={{ backgroundImage: `url(${node.bgImage})` }}
+                />
+                <div className="flex justify-between items-start gap-3 shrink-0 relative z-10">
                   <div className="flex items-center gap-3 min-w-0">
                     <div className={`p-2 rounded-lg bg-black/60 border border-white/10 ${node.color} shrink-0`}>
                       <node.icon className="w-4 h-4" />
@@ -155,7 +159,7 @@ const VoidEarth: React.FC<VoidEarthProps> = ({
                   </div>
                 </div>
 
-                <div className="flex-1 flex flex-col justify-end gap-3 min-h-0 pt-4">
+                <div className="flex-1 flex flex-col justify-end gap-3 min-h-0 pt-4 relative z-10">
                   <div className="flex items-center justify-between bg-black/40 px-3 py-2 rounded-lg border border-white/5">
                     <span className="text-[9px] text-white/35 uppercase tracking-widest font-mono leading-none">
                       {language === 'pt' ? 'Progresso recebido' : 'Received progress'}
@@ -174,7 +178,11 @@ const VoidEarth: React.FC<VoidEarthProps> = ({
 
           {/* 6th Card: Earth Asset WebP */}
           <div className="glass-panel border border-emerald-500/25 bg-emerald-500/5 rounded-xl flex flex-col relative overflow-hidden group min-h-0 shadow-[0_0_24px_rgba(16,185,129,0.08)]">
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(16,185,129,0.1),transparent_70%)]" />
+            <div 
+              className="absolute inset-0 bg-cover bg-center opacity-30 pointer-events-none mix-blend-overlay transition-transform duration-700 group-hover:scale-105"
+              style={{ backgroundImage: `url(/assets/rota3/void/earth_bg.webp)` }}
+            />
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(16,185,129,0.1),transparent_70%)] z-0" />
             
             <div className="flex-1 relative flex items-center justify-center min-h-0 overflow-hidden">
               <motion.div

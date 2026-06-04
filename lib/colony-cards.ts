@@ -481,7 +481,25 @@ export const rollAnyMissingColonyCardReward = (
   const owned = new Set(ownedIds);
   const pool = COLONY_CARD_CATALOG.filter(card => !owned.has(card.id));
   if (pool.length === 0) return null;
-  return pool[Math.floor(random() * pool.length)];
+
+  const missingPoliticalMythics = pool.filter(card => isPoliticalCard(card) && card.rarity === 'mythic');
+  if (missingPoliticalMythics.length > 0 && random() < 0.35) {
+    return missingPoliticalMythics[Math.floor(random() * missingPoliticalMythics.length)];
+  }
+
+  const getRewardWeight = (card: ColonyCard) => {
+    if (isPoliticalCard(card) && card.rarity === 'mythic') return 24;
+    if (card.rarity === 'legendary') return 8;
+    if (card.rarity === 'epic') return 10;
+    if (card.rarity === 'rare') return 12;
+    return 14;
+  };
+  const totalWeight = pool.reduce((sum, card) => sum + getRewardWeight(card), 0);
+  let roll = random() * totalWeight;
+  return pool.find(card => {
+    roll -= getRewardWeight(card);
+    return roll <= 0;
+  }) || pool[pool.length - 1];
 };
 
 export const COLONY_CARD_CATALOG: ColonyCard[] = [

@@ -106,6 +106,7 @@ interface LoreScreenProps {
   completeText: string;
   videoSrc?: string;
   imageSrc?: string;
+  bgImage?: string;
 }
 
 export const LoreScreen = React.memo(({ 
@@ -117,7 +118,8 @@ export const LoreScreen = React.memo(({
   theme,
   completeText,
   videoSrc,
-  imageSrc
+  imageSrc,
+  bgImage
 }: LoreScreenProps) => {
   const isTitle = lines[currentIndex].startsWith('Ano') || lines[currentIndex].startsWith('Prólogo') || lines[currentIndex].startsWith('---');
   const accentClass = theme === 'purple' ? 'text-purple-400' : 'text-orange-400';
@@ -133,6 +135,12 @@ export const LoreScreen = React.memo(({
       exit={{ opacity: 0 }}
       className="fixed inset-0 z-[2000] bg-black flex items-center justify-center p-8 overflow-hidden"
     >
+      {bgImage && (
+        <div 
+          className="absolute inset-0 bg-cover bg-center opacity-40 pointer-events-none"
+          style={{ backgroundImage: `url(${bgImage})` }}
+        />
+      )}
       <LoreBackground />
 
       <div className="max-w-4xl w-full space-y-8 relative z-10">

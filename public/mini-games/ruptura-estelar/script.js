@@ -12,6 +12,9 @@ const WIDTH = 960;
 const HEIGHT = 540;
 const PLAYER_SPEED = 5.5;
 const BULLET_SPEED = 14;
+const SHIELD_WAVE_SPEED = BULLET_SPEED * 0.5;
+const SHIELD_WAVE_THICKNESS = 46;
+const PLAYER_DEATH_SEQUENCE_FRAMES = 96;
 const BULLET_COOLDOWN_NORMAL = 12;
 const BULLET_COOLDOWN_OVERDRIVE = 6;
 const ENEMY_SPAWN_INTERVAL_MIN = 15;
@@ -39,8 +42,61 @@ const SFX = {
     bossShot: `${SFX_BASE}/ruptura_estelar_boss_shot.ogg`,
     enemyExplosion: `${SFX_BASE}/ruptura_estelar_enemy_explosion.ogg`,
     playerExplosion: `${SFX_BASE}/ruptura_estelar_player_explosion.ogg`,
+    barrierExplosion: `${SFX_BASE}/barrier_explosion.ogg`,
+    ruptureLastExplosion: `${SFX_BASE}/rupture_last_explosion.ogg`,
 };
 const audioCache = new Map();
+const RUPTURA_ASSET_BASE = '/assets/games/ruptura_estelar';
+const ENEMY_METEOR_ASSETS = [
+    { id: 'meteor1', src: `${RUPTURA_ASSET_BASE}/ruptura_meteor1.webp`, color: '#f97316', smoke: 'rgba(249,115,22,0.28)', canRotate: false },
+    { id: 'meteor2', src: `${RUPTURA_ASSET_BASE}/ruptura_meteor2.webp`, color: '#fb923c', smoke: 'rgba(251,146,60,0.26)', canRotate: false },
+    { id: 'meteor3', src: `${RUPTURA_ASSET_BASE}/ruptura_meteor3.webp`, color: '#facc15', smoke: 'rgba(250,204,21,0.22)', canRotate: false },
+    { id: 'meteor4', src: `${RUPTURA_ASSET_BASE}/ruptura_meteor4.webp`, color: '#ef4444', smoke: 'rgba(239,68,68,0.24)', canRotate: false },
+    { id: 'meteorite1', src: `${RUPTURA_ASSET_BASE}/ruptura_meteorite1.webp`, color: '#38bdf8', smoke: 'rgba(56,189,248,0.22)', canRotate: true },
+    { id: 'meteorite2', src: `${RUPTURA_ASSET_BASE}/ruptura_meteorite2.webp`, color: '#a78bfa', smoke: 'rgba(167,139,250,0.24)', canRotate: true },
+    { id: 'meteorite3', src: `${RUPTURA_ASSET_BASE}/ruptura_meteorite3.webp`, color: '#22c55e', smoke: 'rgba(34,197,94,0.22)', canRotate: true },
+    { id: 'meteorite4', src: `${RUPTURA_ASSET_BASE}/ruptura_meteorite4.webp`, color: '#e5e7eb', smoke: 'rgba(229,231,235,0.2)', canRotate: true },
+].map(config => {
+    const image = new Image();
+    image.src = config.src;
+    return { ...config, image };
+});
+const PLAYER_SHIP_ASSETS = {
+    shopter: `${RUPTURA_ASSET_BASE}/battle_shopter_ruptura.webp`,
+    airship: `${RUPTURA_ASSET_BASE}/battle_airship_ruptura.webp`,
+};
+const playerShipImages = Object.fromEntries(Object.entries(PLAYER_SHIP_ASSETS).map(([key, src]) => {
+    const image = new Image();
+    image.src = src;
+    return [key, image];
+}));
+const RUPTURA_PHASES = [
+    { id: 1, ship: 'shopter', background: `${RUPTURA_ASSET_BASE}/1bg_beach_ruptura.webp`, enemySpeed: 0.5, playerSpeed: 0.6 },
+    { id: 2, ship: 'shopter', background: `${RUPTURA_ASSET_BASE}/2bg_city_ruptura.webp`, enemySpeed: 0.55, playerSpeed: 0.65 },
+    { id: 3, ship: 'shopter', background: `${RUPTURA_ASSET_BASE}/3bg_montain_ruptura.webp`, enemySpeed: 0.6, playerSpeed: 0.7 },
+    { id: 4, ship: 'shopter', background: `${RUPTURA_ASSET_BASE}/4bg_desert_ruptura.webp`, enemySpeed: 0.65, playerSpeed: 0.75 },
+    { id: 5, ship: 'airship', background: `${RUPTURA_ASSET_BASE}/5bg_nebula_ruptura.webp`, enemySpeed: 0.7, playerSpeed: 0.8 },
+    { id: 6, ship: 'airship', background: `${RUPTURA_ASSET_BASE}/6bg_saturn_ruptura.webp`, enemySpeed: 0.75, playerSpeed: 0.85 },
+    { id: 7, ship: 'airship', background: `${RUPTURA_ASSET_BASE}/7bg_space_ruptura.webp`, enemySpeed: 0.85, playerSpeed: 0.9 },
+    { id: 8, ship: 'airship', background: `${RUPTURA_ASSET_BASE}/8bg_earth_ruptura.webp`, enemySpeed: 1, playerSpeed: 1 },
+].map(config => {
+    const image = new Image();
+    image.src = config.background;
+    return { ...config, image };
+});
+const BOSS_ASSETS = [
+    { id: 'boss1', src: `${RUPTURA_ASSET_BASE}/boos_1_ruptura.webp`, color: '#ef4444', health: 60, behavior: 'aggressive' },
+    { id: 'boss2', src: `${RUPTURA_ASSET_BASE}/boos_2_ruptura.webp`, color: '#3b82f6', health: 80, behavior: 'burst' },
+    { id: 'boss3', src: `${RUPTURA_ASSET_BASE}/boos_3_ruptura.webp`, color: '#a855f7', health: 70, behavior: 'oscillate' },
+    { id: 'boss4', src: `${RUPTURA_ASSET_BASE}/boos_4_ruptura.webp`, color: '#f59e0b', health: 90, behavior: 'burst' },
+].map(config => {
+    const image = new Image();
+    image.src = config.src;
+    return { ...config, image };
+});
+const PHASE_BOSS_WARNING_FRAMES = 17 * 60;
+const PHASE_BOSS_SPAWN_FRAMES = 20 * 60;
+const BACKGROUND_FADE_FRAMES = 90;
 
 function playSfx(path, volume = 0.55) {
     if (!path) return;
@@ -73,6 +129,9 @@ let shakeTime = 0;
 let screenFlash = 0;
 let redFlash = 0; // Boss warning flash
 let emergencyShieldCharges = HAS_EMERGENCY_SHIELD ? 1 : 0;
+let playerDestroyed = false;
+let playerDeathTimer = 0;
+let finalResultShown = false;
 
 // New Systems
 let playerLevel = 1;
@@ -83,8 +142,11 @@ let comboTimer = 0;
 const COMBO_MAX_TIME = 120; // 2 seconds at 60fps
 
 let bossWarningTimer = 0;
-let bossCounter = 0;
-const BOSS_INTERVAL = 5000; // score threshold
+let currentPhaseIndex = 0;
+let phaseFrame = 0;
+let phaseBossSpawned = false;
+let phaseTransitionFrame = 0;
+let previousPhaseIndex = 0;
 
 let player = {
     x: 80,
@@ -101,6 +163,7 @@ let bullets = [];
 let enemyBullets = []; // Lasers from bosses
 let enemies = [];
 let particles = [];
+let shieldWaves = [];
 let stars = [[], [], []]; // 3 layers for parallax
 
 const keys = {
@@ -152,6 +215,9 @@ function init() {
     screenFlash = 0;
     redFlash = 0;
     emergencyShieldCharges = HAS_EMERGENCY_SHIELD ? 1 : 0;
+    playerDestroyed = false;
+    playerDeathTimer = 0;
+    finalResultShown = false;
     
     playerLevel = 1;
     xp = 0;
@@ -159,7 +225,11 @@ function init() {
     comboCount = 0;
     comboTimer = 0;
     bossWarningTimer = 0;
-    bossCounter = 0;
+    currentPhaseIndex = 0;
+    previousPhaseIndex = 0;
+    phaseFrame = 0;
+    phaseBossSpawned = false;
+    phaseTransitionFrame = 0;
 
     player.x = 80;
     player.y = HEIGHT / 2;
@@ -172,6 +242,7 @@ function init() {
     enemyBullets = [];
     enemies = [];
     particles = [];
+    shieldWaves = [];
     
     updateScore(0);
     updateStatus();
@@ -190,6 +261,15 @@ function updateScore(val) {
         type: 'SCORE_UPDATE', 
         gameId: 'ruptura-estelar', 
         score: score 
+    }, '*');
+}
+
+function notifyArcadeAction(actionId, amount = 1) {
+    window.parent.postMessage({
+        type: 'ARCADE_ACTION',
+        gameId: 'ruptura-estelar',
+        actionId,
+        amount
     }, '*');
 }
 
@@ -221,14 +301,37 @@ function updateStatus() {
     }
 }
 
+function getCurrentPhase() {
+    return RUPTURA_PHASES[currentPhaseIndex] || RUPTURA_PHASES[0];
+}
+
+function getPhaseEnemySpeedMultiplier() {
+    return getCurrentPhase().enemySpeed || 1;
+}
+
+function getPhasePlayerSpeedMultiplier() {
+    return getCurrentPhase().playerSpeed || 1;
+}
+
+function getCurrentShipImage() {
+    return playerShipImages[getCurrentPhase().ship] || playerShipImages.shopter;
+}
+
+function advancePhase() {
+    previousPhaseIndex = currentPhaseIndex;
+    currentPhaseIndex = (currentPhaseIndex + 1) % RUPTURA_PHASES.length;
+    phaseFrame = 0;
+    phaseBossSpawned = false;
+    bossWarningTimer = 0;
+    phaseTransitionFrame = BACKGROUND_FADE_FRAMES;
+    enemyBullets = [];
+    updateStatus();
+}
+
 function spawnEnemy(isBoss = false) {
     if (isBoss) {
-        const types = [
-            { type: 'boss1', color: COLOR_RED, health: 60, behavior: 'aggressive' },
-            { type: 'boss2', color: COLOR_BLUE, health: 80, behavior: 'burst' },
-            { type: 'boss3', color: COLOR_PURPLE, health: 70, behavior: 'oscillate' }
-        ];
-        const config = types[Math.floor(Math.random() * types.length)];
+        if (enemies.some(enemy => enemy.isBoss)) return;
+        const config = BOSS_ASSETS[Math.floor(Math.random() * BOSS_ASSETS.length)];
         
         enemies.push({
             x: WIDTH + 120,
@@ -236,7 +339,7 @@ function spawnEnemy(isBoss = false) {
             width: 100,
             height: 100,
             speed: 1.5,
-            type: config.type,
+            type: config.id,
             color: config.color,
             hp: config.health * difficultyFactor,
             maxHp: config.health * difficultyFactor,
@@ -249,6 +352,7 @@ function spawnEnemy(isBoss = false) {
             shootCooldown: 120,
             burstCount: 0,
             burstTimer: 0,
+            bossVisual: config,
             entryMode: true
         });
         return;
@@ -273,6 +377,7 @@ function spawnEnemy(isBoss = false) {
         hp = 3;
     }
 
+    const meteorVisual = ENEMY_METEOR_ASSETS[Math.floor(Math.random() * ENEMY_METEOR_ASSETS.length)];
     enemies.push({
         x: WIDTH + 50,
         y: Math.random() * (HEIGHT - 120) + 60,
@@ -287,6 +392,9 @@ function spawnEnemy(isBoss = false) {
         oscillationSpeed: 0.05 + Math.random() * 0.1,
         pulseRoll: Math.random() * Math.PI,
         visualFlash: 0,
+        rotation: meteorVisual.canRotate ? Math.random() * Math.PI * 2 : 0,
+        rotationSpeed: meteorVisual.canRotate ? (Math.random() - 0.5) * 0.045 : 0,
+        meteorVisual,
         isBoss: false
     });
 }
@@ -310,8 +418,53 @@ function spawnExplosion(x, y, color, count = 30, explosive = false) {
             isTrail: false
         });
     }
-    screenFlash = explosive ? 10 : 5;
+    screenFlash = explosive ? 3 : 1.5;
     shakeTime = explosive ? 15 : 8;
+}
+
+function spawnShieldWave(x, y) {
+    shieldWaves.push({
+        x,
+        y,
+        radius: 18,
+        previousRadius: 0,
+        maxRadius: Math.hypot(WIDTH, HEIGHT) + 160,
+        speed: SHIELD_WAVE_SPEED,
+        thickness: SHIELD_WAVE_THICKNESS,
+        alpha: 1,
+        seed: Math.random() * Math.PI * 2,
+        age: 0,
+    });
+    screenFlash = Math.max(screenFlash, 10);
+    shakeTime = Math.max(shakeTime, 24);
+    spawnExplosion(x, y, COLOR_CYAN, 54, true);
+}
+
+function spawnPlayerFinalExplosion() {
+    playSfx(SFX.ruptureLastExplosion, 0.94);
+    screenFlash = 14;
+    shakeTime = 34;
+
+    spawnExplosion(player.x, player.y, '#ffffff', 52, true);
+    spawnExplosion(player.x, player.y, COLOR_CYAN, 66, true);
+    spawnExplosion(player.x, player.y, COLOR_RED, 42, true);
+
+    for (let i = 0; i < 90; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const force = 4 + Math.random() * 20;
+        const heat = Math.random();
+        particles.push({
+            x: player.x + (Math.random() - 0.5) * 34,
+            y: player.y + (Math.random() - 0.5) * 26,
+            vx: Math.cos(angle) * force + 1.8,
+            vy: Math.sin(angle) * force,
+            life: 30 + Math.random() * 45,
+            maxLife: 75,
+            size: 2 + Math.random() * 8,
+            color: heat > 0.68 ? '#ffffff' : heat > 0.34 ? '#fb923c' : COLOR_CYAN,
+            isTrail: Math.random() > 0.55
+        });
+    }
 }
 
 function spawnTrail(x, y, color, isOverdrive) {
@@ -331,6 +484,107 @@ function spawnTrail(x, y, color, isOverdrive) {
     }
 }
 
+function updateStars() {
+    stars.forEach((layer, idx) => {
+        layer.forEach(s => {
+            s.x -= s.speed * (overdriveActive ? 1.8 : 1);
+            if (s.x < -10) s.x = WIDTH + 10;
+            if (idx === 2) s.pulse += s.pulseSpeed;
+        });
+    });
+}
+
+function updateParticles() {
+    for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i];
+        p.x += p.vx;
+        p.y += p.vy;
+        p.life--;
+        if (p.life <= 0) particles.splice(i, 1);
+    }
+}
+
+function defeatEnemyByShieldWave(enemy, index) {
+    playSfx(SFX.enemyExplosion, enemy.isBoss ? 0.76 : 0.58);
+    spawnExplosion(enemy.x, enemy.y, enemy.color, enemy.isBoss ? 42 : 26, enemy.isBoss);
+    enemies.splice(index, 1);
+
+    comboCount++;
+    comboTimer = COMBO_MAX_TIME;
+    addKillScore((enemy.isBoss ? 2000 : 100) + comboCount * 20);
+    xp += enemy.isBoss ? 500 : 50;
+    if (enemy.isBoss) {
+        notifyArcadeAction('boss-destroyed');
+        advancePhase();
+    }
+}
+
+function updateShieldWaves() {
+    for (let i = shieldWaves.length - 1; i >= 0; i--) {
+        const wave = shieldWaves[i];
+        wave.age++;
+        wave.previousRadius = wave.radius;
+        wave.radius += wave.speed;
+        wave.alpha = Math.max(0, 1 - (wave.radius / wave.maxRadius));
+
+        for (let p = 0; p < 4; p++) {
+            const angle = wave.seed + wave.age * 0.11 + p * Math.PI * 0.5 + Math.sin(wave.age * 0.07 + p) * 0.26;
+            particles.push({
+                x: wave.x + Math.cos(angle) * wave.radius,
+                y: wave.y + Math.sin(angle) * wave.radius,
+                vx: Math.cos(angle) * (1.2 + Math.random() * 2.6),
+                vy: Math.sin(angle) * (1.2 + Math.random() * 2.6),
+                life: 14 + Math.random() * 18,
+                maxLife: 32,
+                size: 1.5 + Math.random() * 4.5,
+                color: Math.random() > 0.5 ? '#ffffff' : COLOR_CYAN,
+                isTrail: true
+            });
+        }
+
+        for (let j = enemies.length - 1; j >= 0; j--) {
+            const enemy = enemies[j];
+            const distance = Math.hypot(enemy.x - wave.x, enemy.y - wave.y);
+            const hitRadius = Math.max(enemy.width || 0, enemy.height || 0) * 0.5;
+            if (distance + hitRadius >= wave.previousRadius && distance - hitRadius <= wave.radius + wave.thickness) {
+                defeatEnemyByShieldWave(enemy, j);
+            }
+        }
+
+        for (let j = enemyBullets.length - 1; j >= 0; j--) {
+            const bullet = enemyBullets[j];
+            const distance = Math.hypot(bullet.x - wave.x, bullet.y - wave.y);
+            if (distance >= wave.previousRadius - 18 && distance <= wave.radius + wave.thickness) {
+                spawnExplosion(bullet.x, bullet.y, bullet.color || COLOR_CYAN, 10);
+                enemyBullets.splice(j, 1);
+            }
+        }
+
+        if (wave.radius > wave.maxRadius) {
+            shieldWaves.splice(i, 1);
+        }
+    }
+}
+
+function updateVisualEffects() {
+    updateShieldWaves();
+    updateParticles();
+    if (shakeTime > 0) shakeTime--;
+    if (screenFlash > 0) screenFlash--;
+    if (phaseTransitionFrame > 0) phaseTransitionFrame--;
+}
+
+function updateDeathSequence() {
+    updateStars();
+    updateVisualEffects();
+    bullets = bullets.filter(b => b.x < WIDTH + 50);
+    bullets.forEach(b => { b.x += b.speed * 0.35; });
+    playerDeathTimer--;
+    if (playerDeathTimer <= 0) {
+        showFinalArcadeResult();
+    }
+}
+
 function handleInput() {
     let dx = 0;
     let dy = 0;
@@ -339,8 +593,9 @@ function handleInput() {
     if (keys.a || keys.ArrowLeft) dx -= 0.6;
     if (keys.d || keys.ArrowRight) dx += 0.8;
 
-    player.vx = dx * PLAYER_SPEED;
-    player.vy = dy * PLAYER_SPEED;
+    const phasePlayerSpeed = getPhasePlayerSpeedMultiplier();
+    player.vx = dx * PLAYER_SPEED * phasePlayerSpeed;
+    player.vy = dy * PLAYER_SPEED * phasePlayerSpeed;
 
     player.x += player.vx;
     player.y += player.vy;
@@ -356,6 +611,7 @@ function fireAuto() {
         const bX = player.x + 20;
         const bY = player.y;
         const isExplosive = playerLevel === 4;
+        const phaseBulletSpeed = BULLET_SPEED * getPhasePlayerSpeedMultiplier();
         playSfx(SFX.playerShot, overdriveActive ? 0.315 : 0.375);
         
         // Multi-shot based on Level and Overdrive
@@ -363,43 +619,43 @@ function fireAuto() {
             // Level-based OD patterns
             if (playerLevel === 1) {
                 // OD Yellow (Pattern 1)
-                bullets.push({ x: bX, y: bY, w: 24, h: 6, speed: BULLET_SPEED, explosive: false });
+                bullets.push({ x: bX, y: bY, w: 24, h: 6, speed: phaseBulletSpeed, explosive: false });
             } else if (playerLevel === 2) {
                 // OD Cyan (4 shots)
-                bullets.push({ x: bX, y: bY - 12, w: 24, h: 6, speed: BULLET_SPEED, explosive: false });
-                bullets.push({ x: bX, y: bY - 4, w: 24, h: 6, speed: BULLET_SPEED, explosive: false });
-                bullets.push({ x: bX, y: bY + 4, w: 24, h: 6, speed: BULLET_SPEED, explosive: false });
-                bullets.push({ x: bX, y: bY + 12, w: 24, h: 6, speed: BULLET_SPEED, explosive: false });
+                bullets.push({ x: bX, y: bY - 12, w: 24, h: 6, speed: phaseBulletSpeed, explosive: false });
+                bullets.push({ x: bX, y: bY - 4, w: 24, h: 6, speed: phaseBulletSpeed, explosive: false });
+                bullets.push({ x: bX, y: bY + 4, w: 24, h: 6, speed: phaseBulletSpeed, explosive: false });
+                bullets.push({ x: bX, y: bY + 12, w: 24, h: 6, speed: phaseBulletSpeed, explosive: false });
             } else if (playerLevel === 3) {
                 // OD Red (5 shots)
-                bullets.push({ x: bX, y: bY - 16, w: 24, h: 6, speed: BULLET_SPEED, explosive: false });
-                bullets.push({ x: bX, y: bY - 8, w: 24, h: 6, speed: BULLET_SPEED, explosive: false });
-                bullets.push({ x: bX, y: bY, w: 24, h: 6, speed: BULLET_SPEED, explosive: false });
-                bullets.push({ x: bX, y: bY + 8, w: 24, h: 6, speed: BULLET_SPEED, explosive: false });
-                bullets.push({ x: bX, y: bY + 16, w: 24, h: 6, speed: BULLET_SPEED, explosive: false });
+                bullets.push({ x: bX, y: bY - 16, w: 24, h: 6, speed: phaseBulletSpeed, explosive: false });
+                bullets.push({ x: bX, y: bY - 8, w: 24, h: 6, speed: phaseBulletSpeed, explosive: false });
+                bullets.push({ x: bX, y: bY, w: 24, h: 6, speed: phaseBulletSpeed, explosive: false });
+                bullets.push({ x: bX, y: bY + 8, w: 24, h: 6, speed: phaseBulletSpeed, explosive: false });
+                bullets.push({ x: bX, y: bY + 16, w: 24, h: 6, speed: phaseBulletSpeed, explosive: false });
             } else if (playerLevel === 4) {
                 // OD Black (5 explosive shots)
-                bullets.push({ x: bX, y: bY - 16, w: 30, h: 8, speed: BULLET_SPEED, explosive: true });
-                bullets.push({ x: bX, y: bY - 8, w: 30, h: 8, speed: BULLET_SPEED, explosive: true });
-                bullets.push({ x: bX, y: bY, w: 30, h: 8, speed: BULLET_SPEED, explosive: true });
-                bullets.push({ x: bX, y: bY + 8, w: 30, h: 8, speed: BULLET_SPEED, explosive: true });
-                bullets.push({ x: bX, y: bY + 16, w: 30, h: 8, speed: BULLET_SPEED, explosive: true });
+                bullets.push({ x: bX, y: bY - 16, w: 30, h: 8, speed: phaseBulletSpeed, explosive: true });
+                bullets.push({ x: bX, y: bY - 8, w: 30, h: 8, speed: phaseBulletSpeed, explosive: true });
+                bullets.push({ x: bX, y: bY, w: 30, h: 8, speed: phaseBulletSpeed, explosive: true });
+                bullets.push({ x: bX, y: bY + 8, w: 30, h: 8, speed: phaseBulletSpeed, explosive: true });
+                bullets.push({ x: bX, y: bY + 16, w: 30, h: 8, speed: phaseBulletSpeed, explosive: true });
             }
         } else {
             // Normal shooting patterns
             if (playerLevel === 1) {
-                bullets.push({ x: bX, y: bY, w: 24, h: 6, speed: BULLET_SPEED, explosive: false });
+                bullets.push({ x: bX, y: bY, w: 24, h: 6, speed: phaseBulletSpeed, explosive: false });
             } else if (playerLevel === 2) {
-                bullets.push({ x: bX, y: bY - 8, w: 18, h: 5, speed: BULLET_SPEED, explosive: false });
-                bullets.push({ x: bX, y: bY + 8, w: 18, h: 5, speed: BULLET_SPEED, explosive: false });
+                bullets.push({ x: bX, y: bY - 8, w: 18, h: 5, speed: phaseBulletSpeed, explosive: false });
+                bullets.push({ x: bX, y: bY + 8, w: 18, h: 5, speed: phaseBulletSpeed, explosive: false });
             } else if (playerLevel === 3) {
-                bullets.push({ x: bX, y: bY - 12, w: 18, h: 5, speed: BULLET_SPEED, explosive: false });
-                bullets.push({ x: bX, y: bY, w: 18, h: 5, speed: BULLET_SPEED, explosive: false });
-                bullets.push({ x: bX, y: bY + 12, w: 18, h: 5, speed: BULLET_SPEED, explosive: false });
+                bullets.push({ x: bX, y: bY - 12, w: 18, h: 5, speed: phaseBulletSpeed, explosive: false });
+                bullets.push({ x: bX, y: bY, w: 18, h: 5, speed: phaseBulletSpeed, explosive: false });
+                bullets.push({ x: bX, y: bY + 12, w: 18, h: 5, speed: phaseBulletSpeed, explosive: false });
             } else if (playerLevel === 4) {
-                bullets.push({ x: bX, y: bY - 12, w: 24, h: 6, speed: BULLET_SPEED, explosive: true });
-                bullets.push({ x: bX, y: bY, w: 24, h: 6, speed: BULLET_SPEED, explosive: true });
-                bullets.push({ x: bX, y: bY + 12, w: 24, h: 6, speed: BULLET_SPEED, explosive: true });
+                bullets.push({ x: bX, y: bY - 12, w: 24, h: 6, speed: phaseBulletSpeed, explosive: true });
+                bullets.push({ x: bX, y: bY, w: 24, h: 6, speed: phaseBulletSpeed, explosive: true });
+                bullets.push({ x: bX, y: bY + 12, w: 24, h: 6, speed: phaseBulletSpeed, explosive: true });
             }
         }
         
@@ -417,8 +673,14 @@ function fireAuto() {
 
 function update() {
     framesCount++;
+    phaseFrame++;
     difficultyFactor = 1 + framesCount / 9000;
     player.pulse += 0.1;
+
+    if (playerDestroyed) {
+        updateDeathSequence();
+        return;
+    }
 
     handleInput();
     fireAuto();
@@ -432,32 +694,26 @@ function update() {
         updateStatus();
     }
 
-    // Boss Warning & Spawning
-    if (bossWarningTimer > 0) {
+    // Phase Boss Warning & Spawning
+    const activeBosses = enemies.filter(en => en.isBoss).length;
+    if (!phaseBossSpawned && phaseFrame >= PHASE_BOSS_WARNING_FRAMES && phaseFrame < PHASE_BOSS_SPAWN_FRAMES) {
+        bossWarningTimer = PHASE_BOSS_SPAWN_FRAMES - phaseFrame;
+        redFlash = Math.sin(framesCount * 0.2) * 20;
+        shakeTime = 5;
+    } else if (!phaseBossSpawned && phaseFrame >= PHASE_BOSS_SPAWN_FRAMES && activeBosses === 0) {
+        phaseBossSpawned = true;
+        bossWarningTimer = 0;
+        spawnEnemy(true);
+        redFlash = 0;
+    } else if (bossWarningTimer > 0) {
         bossWarningTimer--;
         redFlash = Math.sin(framesCount * 0.2) * 20; // Pulsing red warning
         shakeTime = 5;
-        if (bossWarningTimer === 0) {
-            spawnEnemy(true);
-            // Chance for dual bosses as score increases
-            if (score > 10000 && Math.random() > 0.5) {
-                setTimeout(() => spawnEnemy(true), 1000);
-            }
-            redFlash = 0;
-        }
-    } else if (score >= bossCounter + BOSS_INTERVAL) {
-        bossCounter += BOSS_INTERVAL;
-        bossWarningTimer = 180; // 3 seconds
+    } else {
+        redFlash = 0;
     }
 
-    // Parallax Stars
-    stars.forEach((layer, idx) => {
-        layer.forEach(s => {
-            s.x -= s.speed * (overdriveActive ? 1.8 : 1);
-            if (s.x < -10) s.x = WIDTH + 10;
-            if (idx === 2) s.pulse += s.pulseSpeed;
-        });
-    });
+    updateStars();
 
     // Combo System
     if (comboTimer > 0) {
@@ -492,7 +748,6 @@ function update() {
     }
 
     // Enemies & Bosses
-    const activeBosses = enemies.filter(en => en.isBoss).length;
     spawnTimer--;
     if (spawnTimer <= 0 && bossWarningTimer === 0) {
         // Slow down normal spawns if bosses are present
@@ -503,27 +758,29 @@ function update() {
 
     for (let i = enemies.length - 1; i >= 0; i--) {
         const e = enemies[i];
+        const phaseEnemySpeed = getPhaseEnemySpeedMultiplier();
         e.pulseRoll += 0.1;
+        if (!e.isBoss) e.rotation += e.rotationSpeed || 0;
         if (e.visualFlash > 0) e.visualFlash--;
 
         if (e.isBoss) {
             // Boss Movement Logic
             if (e.entryMode) {
-                e.x -= e.speed * 2;
+                e.x -= e.speed * 2 * phaseEnemySpeed;
                 if (e.x < WIDTH - 150) e.entryMode = false;
             } else {
                 if (e.behavior === 'oscillate') {
                     e.oscillation += e.oscillationSpeed;
                     e.y = HEIGHT / 2 + Math.sin(e.oscillation) * (HEIGHT / 3);
                 } else if (e.behavior === 'burst') {
-                    e.x -= 0.2; // Slow back movement
+                    e.x -= 0.2 * phaseEnemySpeed; // Slow back movement
                     e.oscillation += e.oscillationSpeed * 0.5;
-                    e.y += Math.sin(e.oscillation) * 1.2;
+                    e.y += Math.sin(e.oscillation) * 1.2 * phaseEnemySpeed;
                 } else if (e.behavior === 'aggressive') {
                     const dy = player.y - e.y;
-                    e.y += Math.sign(dy) * 1.5;
+                    e.y += Math.sign(dy) * 1.5 * phaseEnemySpeed;
                     e.oscillation += 0.05;
-                    e.x += Math.cos(e.oscillation) * 0.5;
+                    e.x += Math.cos(e.oscillation) * 0.5 * phaseEnemySpeed;
                 }
             }
 
@@ -550,15 +807,15 @@ function update() {
                 }
             }
         } else if (e.type === 'kamikaze') {
-            e.x -= e.speed;
+            e.x -= e.speed * phaseEnemySpeed;
             const dy = (player.y - e.y);
-            e.y += Math.sign(dy) * 2.2;
+            e.y += Math.sign(dy) * 2.2 * phaseEnemySpeed;
         } else if (e.type === 'tank') {
-            e.x -= e.speed;
+            e.x -= e.speed * phaseEnemySpeed;
             e.oscillation += e.oscillationSpeed;
-            e.y += Math.sin(e.oscillation) * 1.8;
+            e.y += Math.sin(e.oscillation) * 1.8 * phaseEnemySpeed;
         } else {
-            e.x -= e.speed;
+            e.x -= e.speed * phaseEnemySpeed;
         }
 
         if (e.x < -150) enemies.splice(i, 1);
@@ -592,6 +849,7 @@ function update() {
                     comboCount++;
                     comboTimer = COMBO_MAX_TIME;
                     const comboBonus = comboCount * 20;
+                    const defeatedBoss = e.isBoss;
 
                     playSfx(SFX.enemyExplosion, e.isBoss ? 0.82 : 0.7);
                     spawnExplosion(e.x, e.y, e.color, 30, b.explosive || e.isBoss);
@@ -605,6 +863,10 @@ function update() {
                         overdriveValue += e.isBoss ? 20 : 2.5;
                         if (overdriveValue >= OVERDRIVE_THRESHOLD) activateOverdrive();
                         updateStatus();
+                    }
+                    if (defeatedBoss) {
+                        notifyArcadeAction('boss-destroyed');
+                        advancePhase();
                     }
                     break;
                 }
@@ -629,17 +891,7 @@ function update() {
         spawnTrail(player.x - 20, player.y, odColor, overdriveActive);
     }
 
-    // Particles
-    for (let i = particles.length - 1; i >= 0; i--) {
-        const p = particles[i];
-        p.x += p.vx;
-        p.y += p.vy;
-        p.life--;
-        if (p.life <= 0) particles.splice(i, 1);
-    }
-
-    if (shakeTime > 0) shakeTime--;
-    if (screenFlash > 0) screenFlash--;
+    updateVisualEffects();
     if (player.bulletCooldown > 0) player.bulletCooldown--;
 }
 
@@ -686,7 +938,7 @@ function deactivateOverdrive() {
 
 function spawnBossLaser(e) {
     const angle = Math.atan2(player.y - e.y, player.x - e.x);
-    const speed = 7; // Similar to kamikaze
+    const speed = 7 * getPhaseEnemySpeedMultiplier(); // Similar to kamikaze
     playSfx(SFX.bossShot, 0.58);
     enemyBullets.push({
         x: e.x - e.width/2,
@@ -694,6 +946,178 @@ function spawnBossLaser(e) {
         vx: Math.cos(angle) * speed,
         vy: Math.sin(angle) * speed,
         color: e.color
+    });
+}
+
+function drawMeteorEnemy(e, pulse) {
+    const visual = e.meteorVisual || ENEMY_METEOR_ASSETS[0];
+    const tailLength = Math.max(54, e.width * (e.type === 'kamikaze' ? 2.5 : 2.05));
+    const tailHeight = Math.max(18, e.height * 0.72);
+
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    const flame = ctx.createLinearGradient(e.x + e.width * 0.2, e.y, e.x + tailLength, e.y);
+    flame.addColorStop(0, e.visualFlash > 0 ? 'rgba(255,255,255,0.72)' : visual.smoke);
+    flame.addColorStop(0.35, visual.smoke);
+    flame.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = flame;
+    ctx.beginPath();
+    ctx.ellipse(e.x + tailLength * 0.42, e.y, tailLength, tailHeight, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    for (let i = 0; i < 3; i++) {
+        ctx.globalAlpha = 0.18 - i * 0.035;
+        ctx.fillStyle = visual.color;
+        ctx.beginPath();
+        ctx.ellipse(
+            e.x + e.width * (0.75 + i * 0.55),
+            e.y + Math.sin(framesCount * 0.08 + e.pulseRoll + i) * (4 + i),
+            tailLength * (0.28 - i * 0.04),
+            tailHeight * (0.34 - i * 0.04),
+            0,
+            0,
+            Math.PI * 2
+        );
+        ctx.fill();
+    }
+    ctx.restore();
+
+    ctx.save();
+    ctx.translate(e.x, e.y);
+    ctx.rotate(e.rotation || 0);
+    ctx.globalAlpha = e.visualFlash > 0 ? 0.72 : 1;
+    ctx.shadowBlur = 16 + pulse;
+    ctx.shadowColor = visual.color;
+
+    const drawSize = Math.max(e.width, e.height) + Math.max(0, pulse * 0.45);
+    if (visual.image.complete && visual.image.naturalWidth > 0) {
+        ctx.filter = e.visualFlash > 0 ? 'brightness(1.65) saturate(1.25)' : 'none';
+        ctx.drawImage(visual.image, -drawSize / 2, -drawSize / 2, drawSize, drawSize);
+        ctx.filter = 'none';
+    } else {
+        ctx.fillStyle = visual.color;
+        ctx.beginPath();
+        ctx.arc(0, 0, drawSize / 2, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    ctx.restore();
+}
+
+function drawPhaseBackgroundImage(phaseIndex, alpha = 1) {
+    const phase = RUPTURA_PHASES[phaseIndex] || RUPTURA_PHASES[0];
+    const image = phase.image;
+    if (!image.complete || image.naturalWidth <= 0) return;
+
+    const scale = Math.max(WIDTH / image.naturalWidth, HEIGHT / image.naturalHeight);
+    const drawWidth = image.naturalWidth * scale;
+    const drawHeight = image.naturalHeight * scale;
+    const drawX = (WIDTH - drawWidth) / 2;
+    const drawY = (HEIGHT - drawHeight) / 2;
+
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.drawImage(image, drawX, drawY, drawWidth, drawHeight);
+    ctx.restore();
+}
+
+function drawPhaseBackground() {
+    drawPhaseBackgroundImage(currentPhaseIndex, 1);
+    if (phaseTransitionFrame > 0) {
+        drawPhaseBackgroundImage(previousPhaseIndex, phaseTransitionFrame / BACKGROUND_FADE_FRAMES);
+    }
+
+    ctx.fillStyle = getCurrentPhase().ship === 'airship'
+        ? 'rgba(1,4,10,0.32)'
+        : 'rgba(1,4,10,0.24)';
+    ctx.fillRect(0, 0, WIDTH, HEIGHT);
+}
+
+function drawShieldWaves() {
+    shieldWaves.forEach(wave => {
+        const drawJaggedRing = (radius, amplitude, segments, color, width, alpha, phaseOffset = 0) => {
+            ctx.save();
+            ctx.globalAlpha = alpha;
+            ctx.strokeStyle = color;
+            ctx.lineWidth = width;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            ctx.shadowBlur = 22 + width * 0.6;
+            ctx.shadowColor = color;
+            ctx.beginPath();
+            for (let i = 0; i <= segments; i++) {
+                const angle = (i / segments) * Math.PI * 2;
+                const ripple =
+                    Math.sin(angle * 7 + wave.age * 0.18 + wave.seed + phaseOffset) * amplitude +
+                    Math.sin(angle * 13 - wave.age * 0.11 + wave.seed * 1.7) * amplitude * 0.38;
+                const r = radius + ripple;
+                const x = wave.x + Math.cos(angle) * r;
+                const y = wave.y + Math.sin(angle) * r;
+                if (i === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            }
+            ctx.stroke();
+            ctx.restore();
+        };
+
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.globalAlpha = Math.max(0, wave.alpha * 0.18);
+        const innerGlow = ctx.createRadialGradient(wave.x, wave.y, Math.max(1, wave.radius * 0.18), wave.x, wave.y, wave.radius + wave.thickness * 1.35);
+        innerGlow.addColorStop(0, 'rgba(6,182,212,0)');
+        innerGlow.addColorStop(0.72, 'rgba(6,182,212,0.08)');
+        innerGlow.addColorStop(0.9, 'rgba(255,255,255,0.22)');
+        innerGlow.addColorStop(1, 'rgba(6,182,212,0)');
+        ctx.fillStyle = innerGlow;
+        ctx.beginPath();
+        ctx.arc(wave.x, wave.y, wave.radius + wave.thickness * 1.6, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.globalAlpha = Math.max(0, wave.alpha * 0.52);
+        ctx.strokeStyle = 'rgba(103,232,249,0.62)';
+        ctx.shadowBlur = 44;
+        ctx.shadowColor = COLOR_CYAN;
+        ctx.lineWidth = wave.thickness * 0.82;
+        ctx.setLineDash([34, 18, 8, 16]);
+        ctx.lineDashOffset = -wave.age * 2.4;
+        ctx.beginPath();
+        ctx.arc(wave.x, wave.y, wave.radius + Math.sin(wave.age * 0.3) * 3, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+
+        drawJaggedRing(wave.radius - wave.thickness * 0.25, 7, 96, 'rgba(255,255,255,0.92)', 4, wave.alpha * 0.88, 0);
+        drawJaggedRing(wave.radius + wave.thickness * 0.35, 13, 112, 'rgba(34,211,238,0.82)', 7, wave.alpha * 0.62, 1.1);
+        drawJaggedRing(wave.radius + wave.thickness * 0.9, 18, 80, 'rgba(14,165,233,0.42)', 12, wave.alpha * 0.32, 2.3);
+
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.globalAlpha = Math.max(0, wave.alpha * 0.7);
+        ctx.strokeStyle = 'rgba(255,255,255,0.78)';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([18, 28]);
+        ctx.lineDashOffset = wave.age * 3.2;
+        ctx.beginPath();
+        ctx.arc(wave.x, wave.y, wave.radius + wave.thickness * 1.25, 0, Math.PI * 2);
+        ctx.stroke();
+
+        for (let i = 0; i < 14; i++) {
+            const angle = wave.seed + i * ((Math.PI * 2) / 14) + Math.sin(wave.age * 0.09 + i) * 0.12;
+            const spokeLength = 28 + Math.sin(wave.age * 0.18 + i) * 16;
+            const startRadius = wave.radius - wave.thickness * 0.15;
+            const endRadius = wave.radius + spokeLength;
+            ctx.globalAlpha = Math.max(0, wave.alpha * (0.18 + (i % 3) * 0.06));
+            ctx.strokeStyle = i % 2 ? 'rgba(255,255,255,0.62)' : 'rgba(34,211,238,0.72)';
+            ctx.lineWidth = 1.2 + (i % 4);
+            ctx.setLineDash([]);
+            ctx.beginPath();
+            ctx.moveTo(wave.x + Math.cos(angle) * startRadius, wave.y + Math.sin(angle) * startRadius);
+            ctx.lineTo(wave.x + Math.cos(angle) * endRadius, wave.y + Math.sin(angle) * endRadius);
+            ctx.stroke();
+        }
+        ctx.restore();
     });
 }
 
@@ -707,6 +1131,7 @@ function draw() {
 
     ctx.fillStyle = COLOR_BG;
     ctx.fillRect(0, 0, WIDTH, HEIGHT);
+    drawPhaseBackground();
 
     // Stars
     stars.forEach((layer, idx) => {
@@ -793,9 +1218,30 @@ function draw() {
     enemies.forEach(e => {
         const pulse = Math.sin(e.pulseRoll) * (e.isBoss ? 10 : 4);
         const color = e.visualFlash > 0 ? '#fff' : e.color;
+        if (!e.isBoss) {
+            drawMeteorEnemy(e, pulse);
+            return;
+        }
         ctx.fillStyle = color;
         ctx.shadowBlur = (e.isBoss ? 40 : 15) + pulse;
         ctx.shadowColor = e.color;
+
+        if (e.bossVisual?.image?.complete && e.bossVisual.image.naturalWidth > 0) {
+            ctx.save();
+            ctx.translate(e.x, e.y);
+            const hover = Math.sin(framesCount * 0.045 + e.oscillation) * 4;
+            const drawWidth = e.width * 1.45 + pulse;
+            const drawHeight = e.height * 1.45 + pulse;
+            ctx.globalAlpha = e.visualFlash > 0 ? 0.78 : 1;
+            ctx.shadowBlur = 44 + pulse;
+            ctx.shadowColor = e.color;
+            ctx.filter = e.visualFlash > 0 ? 'brightness(1.7) saturate(1.2)' : 'none';
+            ctx.drawImage(e.bossVisual.image, -drawWidth / 2, -drawHeight / 2 + hover, drawWidth, drawHeight);
+            ctx.filter = 'none';
+            ctx.restore();
+            ctx.shadowBlur = 0;
+            return;
+        }
         
         ctx.beginPath();
         if (e.isBoss) {
@@ -838,8 +1284,10 @@ function draw() {
         ctx.shadowBlur = 0;
     });
 
+    drawShieldWaves();
+
     // Player
-    drawPlayer();
+    if (!playerDestroyed) drawPlayer();
 
     // UI: Combo
     if (comboCount > 1) {
@@ -899,6 +1347,33 @@ function drawPlayer() {
         ctx.fill();
         ctx.restore();
     }
+
+    const shipImage = getCurrentShipImage();
+    if (shipImage?.complete && shipImage.naturalWidth > 0) {
+        const shipKind = getCurrentPhase().ship;
+        const drawWidth = shipKind === 'airship' ? 72 : 58;
+        const drawHeight = shipKind === 'airship' ? 44 : 48;
+        const engineColor = shipKind === 'airship' ? COLOR_BLUE : COLOR_CYAN;
+        const eSize = (overdriveActive ? (playerLevel === 4 ? 50 : 38) : 22) + Math.random() * 8;
+        const grad = ctx.createLinearGradient(-drawWidth / 2 - eSize, 0, -drawWidth / 2 + 6, 0);
+        grad.addColorStop(0, 'rgba(255,255,255,0)');
+        grad.addColorStop(0.55, overdriveActive ? shipColor : engineColor);
+        grad.addColorStop(1, '#ffffff');
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.fillStyle = grad;
+        ctx.fillRect(-drawWidth / 2 - eSize, -drawHeight * 0.22, eSize, drawHeight * 0.44);
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.shadowBlur = (overdriveActive ? 32 : 18) + pulse;
+        ctx.shadowColor = shipColor === '#111' ? '#fff' : shipColor;
+        ctx.drawImage(shipImage, -drawWidth / 2, -drawHeight / 2, drawWidth, drawHeight);
+        if (overdriveActive && playerLevel === 4) {
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(-drawWidth / 2 - 4, -drawHeight / 2 - 4, drawWidth + 8, drawHeight + 8);
+        }
+        ctx.restore();
+        return;
+    }
     
     ctx.shadowBlur = (overdriveActive ? (playerLevel === 4 ? 40 : 30) : 20) + pulse;
     ctx.shadowColor = shipColor === '#111' ? '#fff' : shipColor;
@@ -937,8 +1412,19 @@ function drawPlayer() {
 }
 
 function gameOver() {
-    if (!gameActive) return;
-    playSfx(SFX.playerExplosion, 0.82);
+    if (!gameActive || playerDestroyed) return;
+    playerDestroyed = true;
+    playerDeathTimer = PLAYER_DEATH_SEQUENCE_FRAMES;
+    overdriveActive = false;
+    overdriveTimer = 0;
+    enemyBullets = [];
+    spawnPlayerFinalExplosion();
+    updateStatus();
+}
+
+function showFinalArcadeResult() {
+    if (finalResultShown) return;
+    finalResultShown = true;
     gameActive = false;
     finalScoreElement.innerText = score.toLocaleString('pt-BR');
     localStorage.setItem('ruptura_estelar_high_score', Math.max(score, parseInt(localStorage.getItem('ruptura_estelar_high_score')) || 0).toString());
@@ -963,8 +1449,10 @@ function absorbPlayerHit(x = player.x, y = player.y) {
     if (emergencyShieldCharges <= 0) return false;
 
     emergencyShieldCharges--;
+    playSfx(SFX.barrierExplosion, 0.9);
     screenFlash = 4;
     shakeTime = 10;
+    spawnShieldWave(player.x, player.y);
     spawnExplosion(x, y, COLOR_CYAN, 28);
     updateStatus();
     return true;

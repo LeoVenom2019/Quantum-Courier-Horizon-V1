@@ -28,7 +28,7 @@ export const initialCombatState: CombatState = {
     'poi-4': { minerals: 0, energy: 0, food: 0, tech: 0, meds: 0 }
   },
   isVoidWarActive: false,
-  voidWarProgress: { currentSector: 1, currentBattle: 1 },
+  voidWarProgress: { currentSector: 0, currentBattle: 0 },
   robotRepairProgress: 0,
   isRobotRepaired: false,
   voidPOIQCDonations: {},

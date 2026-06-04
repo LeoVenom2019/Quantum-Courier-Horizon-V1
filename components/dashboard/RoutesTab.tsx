@@ -111,17 +111,52 @@ const RoutesTab = memo(() => {
 
           const shipAvailable = currentlyInUse < totalOwned;
 
+          const routeBgMap: Record<string, string> = {
+            'terra': '/assets/texturas/bg_route1_terra.webp',
+            'lua': '/assets/texturas/bg_route1_lua.webp',
+            'venus': '/assets/texturas/bg_route1_venus.webp',
+            'marte': '/assets/texturas/bg_route1_marte.webp',
+            'mercurio': '/assets/texturas/bg_route1_mercurio.webp',
+            'jupiter': '/assets/texturas/bg_route1_jupiter.webp',
+            'saturno': '/assets/texturas/bg_route1_saturno.webp',
+            'urano': '/assets/texturas/bg_route1_urano.webp',
+            'netuno': '/assets/texturas/bg_route1_netuno.webp',
+            'alpha-centauri': '/assets/texturas/bg_route2_alpha_centauri.webp',
+            'proxima-centauri': '/assets/texturas/bg_route2_proxima_centauri.webp',
+            'barnards-star': '/assets/texturas/bg_route2_barnards_star.webp',
+            'wolf-359': '/assets/texturas/bg_route2_wolf_359.webp',
+            'lalande-21185': '/assets/texturas/bg_route2_lalande_21185.webp',
+            'sirius': '/assets/texturas/bg_route2_sirius.webp',
+            'luyten-726-8': '/assets/texturas/bg_route2_luyten_726_8.webp',
+            'ross-154': '/assets/texturas/bg_route2_ross_154.webp',
+            'epsilon-eridani': '/assets/texturas/bg_route2_epsilon_eridani.webp',
+          };
+          const bgImage = routeBgMap[route.id];
+
           return (
             <div 
               key={route.id}
               className={`group relative glass-panel rounded-xl transition-all flex flex-col h-full overflow-hidden ${
                 isPurchased 
-                ? `${isInterstellar ? 'neon-border-orange' : 'neon-border-cyan'} bg-black/60 hover:bg-white/5` 
+                ? `${isInterstellar ? 'neon-border-orange' : 'neon-border-cyan'} bg-black/60 hover:border-white/30 hover:shadow-[0_0_20px_rgba(6,182,212,0.15)]` 
                 : 'border-white/5 bg-black/40 opacity-50'
               }`}
             >
+              {bgImage && isPurchased && (
+                <div 
+                  className="absolute inset-0 z-0 opacity-40 mix-blend-overlay group-hover:opacity-70 transition-opacity pointer-events-none"
+                  style={{ 
+                    backgroundImage: `url(${bgImage})`,
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center',
+                    maskImage: 'linear-gradient(to bottom, black 60%, transparent 95%)',
+                    WebkitMaskImage: 'linear-gradient(to bottom, black 60%, transparent 95%)'
+                  }}
+                />
+              )}
+
               {!isPurchased && (
-                <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-black/90 backdrop-blur-[2px] p-4 text-center">
+                <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/90 backdrop-blur-[2px] p-4 text-center">
                   {!conditionsMet ? (
                     <>
                       <Shield className="w-8 h-8 text-slate-600 mb-3" />
@@ -151,7 +186,7 @@ const RoutesTab = memo(() => {
               )}
 
               {/* Card Content with Internal Padding */}
-              <div className="p-3 flex flex-col flex-1">
+              <div className="relative z-10 p-3 flex flex-col flex-1">
                 <div className="flex justify-between items-start mb-3">
                   <div className="min-w-0 flex-1">
                     <h3 className={`font-orbitron text-base font-black text-white ${isInterstellar ? 'group-hover:neon-text-orange text-orange-200' : 'group-hover:neon-text-cyan text-cyan-100'} transition-colors truncate leading-none uppercase tracking-[0.1em]`}>{t(route.name as any)}</h3>

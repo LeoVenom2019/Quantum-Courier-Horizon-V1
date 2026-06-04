@@ -1509,7 +1509,7 @@ export default function GameHome() {
           playerName={playerName}
           onReturnToMenu={async () => {
             setView('landing');
-            jukeboxState.stop();
+            jukeboxState.stop({ rememberPreference: false });
             const hasSavedGame = await GameStorage.load('time_travel_save');
             setHasSave(!!hasSavedGame);
             
@@ -1950,7 +1950,7 @@ export default function GameHome() {
         isOpen={showJukeboxModal} 
         onClose={() => {
           setShowJukeboxModal(false);
-          jukeboxState.stop();
+          jukeboxState.stop({ rememberPreference: false });
         }} 
         language={language}
         {...jukeboxState} 

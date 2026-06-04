@@ -37,6 +37,12 @@ export type SFXType =
   | 'start_engine_2'
   | 'open_window'
   | 'close_window'
+  | 'open_window_void'
+  | 'close_window_void'
+  | 'donation_1_void'
+  | 'donation_2_void'
+  | 'donation_3_void'
+  | 'full_void'
   | 'ask_window'
   | 'bip_scanner'
   | 'eterion_fuell'
@@ -45,6 +51,7 @@ export type SFXType =
   | 'mining_stones'
   | 'serve_glass'
   | 'alert_alert'
+  | 'songs_of_war'
   | 'warning_gaming'
   | 'alien_explosion_zero' | 'alien_explosion_1' | 'alien_explosion_2' | 'alien_explosion_3' | 'alien_explosion_4' | 'alien_explosion_5' | 'alien_explosion_6' | 'alien_explosion_7' | 'alien_explosion_8' | 'alien_explosion_9'
   | 'boss_explosion_zero' | 'boss_explosion_1' | 'boss_explosion_2' | 'boss_explosion_3' | 'boss_explosion_4' | 'boss_explosion_5' | 'boss_explosion_6' | 'boss_explosion_7' | 'boss_explosion_8' | 'boss_explosion_9'
@@ -62,6 +69,7 @@ export type SFXType =
   | 'unequip_card'
   | 'view_card'
   | 'buy'
+  | 'insert_coins'
   | 'game_over';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -93,6 +101,12 @@ const SFX_PATHS: Partial<Record<string, string>> = {
   start_engine_2: '/audio/sfx/start_engine_2.ogg',
   open_window: '/audio/sfx/open_window.ogg',
   close_window: '/audio/sfx/close_window.ogg',
+  open_window_void: '/audio/sfx/open_window_void.ogg',
+  close_window_void: '/audio/sfx/close_window_void.ogg',
+  donation_1_void: '/audio/sfx/donation_1_void.ogg',
+  donation_2_void: '/audio/sfx/donation_2_void.ogg',
+  donation_3_void: '/audio/sfx/donation_3_void.ogg',
+  full_void: '/audio/sfx/full_void.ogg',
   ask_window: '/audio/sfx/ask_window.ogg',
   bip_scanner: '/audio/sfx/bip_scanner.ogg',
   eterion_fuell: '/audio/sfx/eterion_fuell.ogg',
@@ -101,7 +115,9 @@ const SFX_PATHS: Partial<Record<string, string>> = {
   mining_stones: '/audio/sfx/mining_stones.ogg',
   serve_glass: '/audio/sfx/serve_glass.ogg',
   alert_alert: '/audio/sfx/alert_alert.ogg',
+  songs_of_war: '/audio/sfx/songs_of_war.ogg',
   warning_gaming: '/assets/rota4/SFX_new_land/warning_gaming.ogg',
+  insert_coins: '/assets/games/flipers_sfx/insert_coins.ogg',
   // Void Monster SFX
   alien_explosion_zero: '/audio/sfx/void/alien_explosion_zero.ogg',
   boss_explosion_zero: '/audio/sfx/void/boss_explosion_zero.ogg',

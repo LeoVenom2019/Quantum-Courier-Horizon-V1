@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
 import { Info, Play, ImageOff, LockKeyhole } from 'lucide-react';
+import { PremiumCanvasButton } from './ui/PremiumCanvasButton';
 
 interface ArcadeCardProps {
   titulo: string;
@@ -128,33 +129,35 @@ const ArcadeCard: React.FC<ArcadeCardProps> = ({
           </div>
         </div>
 
-        <button
+        <PremiumCanvasButton
           type="button"
           onClick={(event) => {
             event.stopPropagation();
             if (isAvailable) onPlay();
           }}
           disabled={!isAvailable}
-          className="absolute left-[24%] right-[24%] bottom-[13.5%] z-40 rounded-xl border border-white/20 bg-black/35 px-3 py-2.5 font-orbitron text-[10px] font-black uppercase tracking-[0.28em] text-white opacity-0 shadow-[0_0_20px_rgba(0,0,0,0.6)] backdrop-blur-sm transition-all hover:opacity-100 focus:opacity-100 active:scale-95 disabled:cursor-not-allowed disabled:text-zinc-500 group-hover:opacity-90"
+          tone={isAvailable ? 'cyan' : 'steel'}
+          className="absolute left-[24%] right-[24%] bottom-[13.5%] z-40 h-10 rounded-xl opacity-95 focus:opacity-100"
+          contentClassName={`gap-2 px-3 py-2.5 text-[10px] font-black uppercase tracking-[0.28em] ${isAvailable ? 'text-white' : 'text-zinc-500'}`}
           style={isAvailable ? { boxShadow: `0 0 18px ${corPrimaria}88` } : undefined}
         >
-          <span className="flex items-center justify-center gap-2">
-            <Play className="h-4 w-4 fill-current" />
-            {language === 'pt' ? 'Iniciar' : 'Play'}
-          </span>
-        </button>
+          <Play className="h-4 w-4 fill-current" />
+          {language === 'pt' ? 'Iniciar' : 'Play'}
+        </PremiumCanvasButton>
 
-        <button
+        <PremiumCanvasButton
           type="button"
           onClick={(event) => {
             event.stopPropagation();
             onInfo();
           }}
-          className="absolute right-[8%] top-[57%] z-50 flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-black/45 text-slate-300 opacity-0 backdrop-blur-sm transition-all hover:border-white/25 hover:text-white focus:opacity-100 group-hover:opacity-90"
+          tone="steel"
+          className="absolute right-3 top-3 z-50 h-9 w-9 rounded-full opacity-90 focus:opacity-100"
+          contentClassName="text-cyan-100"
           aria-label={language === 'pt' ? 'Informações do fliperama' : 'Arcade information'}
         >
           <Info className="h-4 w-4" />
-        </button>
+        </PremiumCanvasButton>
 
         {!isAvailable && (
           <div className="absolute inset-0 z-50 flex flex-col items-center justify-center rounded-[1.25rem] bg-black/65 px-5 text-center backdrop-blur-[2px]">

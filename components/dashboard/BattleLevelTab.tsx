@@ -18,6 +18,8 @@ import {
   Zap 
 } from 'lucide-react';
 import { useDashboard } from './DashboardProvider';
+import { PremiumCanvasButton } from '../ui/PremiumCanvasButton';
+import { getDoomPBonus, getPoliceBonus } from '@/lib/game-constants';
 
 interface BattleLevelTabProps {
   setSelectedReward: (reward: any) => void;
@@ -59,7 +61,7 @@ const BattleLevelTab = memo(({
     upgradeBattleLevel
   } = useDashboard();
 
-  const { battleLevel, radarLevel, privatePoliceLevel, routeTier, shipLevel, shipXP, captureLevel } = progression;
+  const { battleLevel, radarLevel, privatePoliceLevel, routeTier, shipLevel, shipXP, captureLevel, doomPLevel } = progression;
   const { qc } = economy;
 
   const isInterstellar = routeTier === 'Interstellar';
@@ -83,6 +85,19 @@ const BattleLevelTab = memo(({
   const captureCosts = [100000000, 200000000, 300000000, 500000000, 750000000, 1000000000, 2000000000, 3000000000, 4000000000, 5000000000];
   const captureCost = captureCosts[captureLevel];
   const canUpgradeCapture = qc >= captureCost && captureLevel < 10;
+
+  const estimatedEnemyTier = Math.max(1, battleLevel);
+  const estimatedEnemyHp = 50 + (estimatedEnemyTier * 60) + 25;
+  let estimatedPlayerHp = 100 + (battleLevel * 150);
+  if (battleLevel >= 25) estimatedPlayerHp = Math.floor(estimatedPlayerHp * 1.25);
+  let estimatedPlayerDps = (10 + battleLevel * 10) / 2;
+  if (battleLevel >= 20) estimatedPlayerDps *= 1.5;
+  if (battleLevel >= 25) estimatedPlayerDps *= 1.5;
+  const estimatedEnemyDps = (8 + estimatedEnemyTier * 6) / 2.5;
+  const estimatedPlayerTimeToKill = estimatedEnemyHp / Math.max(1, estimatedPlayerDps);
+  const estimatedEnemyTimeToKill = estimatedPlayerHp / Math.max(1, estimatedEnemyDps);
+  const estimatedBaseWinChance = Math.floor((estimatedEnemyTimeToKill / (estimatedPlayerTimeToKill + estimatedEnemyTimeToKill)) * 100);
+  const autoSkipWinChance = Math.min(100, Math.max(0, estimatedBaseWinChance + getDoomPBonus(doomPLevel) + getPoliceBonus(privatePoliceLevel)));
 
   const baseCooldown = 60000;
   let currentCooldown = battleLevel >= 5 ? baseCooldown / 2 : baseCooldown;
@@ -170,33 +185,37 @@ const BattleLevelTab = memo(({
             </div>
 
             <div className="grid grid-cols-2 gap-4 w-full px-4">
-              <button
+              <PremiumCanvasButton
                 onClick={findBattle}
                 disabled={battleLevel < 1 || isScanning || isCooldownActive}
-                className={`py-3 rounded-xl border transition-all flex items-center justify-center gap-2 font-black uppercase tracking-widest text-[14px] relative overflow-hidden group ${
+                tone={battleLevel >= 1 && !isScanning && !isCooldownActive ? 'cyan' : 'steel'}
+                className={`h-12 text-[14px] font-black uppercase tracking-widest ${
                   battleLevel >= 1 && !isScanning && !isCooldownActive
-                  ? 'bg-cyan-600 text-white border-cyan-400 shadow-[0_0_20px_rgba(6,182,212,0.4)] hover:bg-cyan-500 scale-105 active:scale-95'
-                  : 'bg-white/5 border-white/10 text-slate-600 cursor-not-allowed'
+                  ? 'text-cyan-50 shadow-[0_7px_0_rgba(14,116,144,0.65),0_14px_18px_rgba(0,0,0,0.32)] hover:brightness-110 active:shadow-[0_3px_0_rgba(14,116,144,0.72),0_7px_10px_rgba(0,0,0,0.3)]'
+                  : 'text-slate-500'
                 }`}
+                contentClassName="gap-2"
               >
                 <Search className={`w-4 h-4 ${isScanning ? 'animate-spin' : ''}`} />
                 {isScanning ? (language === 'pt' ? 'Buscando...' : 'Scanning...') : (language === 'pt' ? 'Escanear' : 'Scan')}
-              </button>
+              </PremiumCanvasButton>
               
-              <button
+              <PremiumCanvasButton
                 onClick={upgradeRadar}
                 disabled={!canUpgradeRadar}
-                className={`py-3 rounded-xl border transition-all flex items-center justify-center gap-2 font-black uppercase tracking-widest text-[14px] relative overflow-hidden group ${
+                tone={canUpgradeRadar ? 'orange' : 'steel'}
+                className={`h-12 text-[14px] font-black uppercase tracking-widest ${
                   canUpgradeRadar
-                  ? 'bg-orange-600 text-white border-orange-400 shadow-[0_0_20px_rgba(249,115,22,0.4)] hover:bg-orange-500 scale-105 active:scale-95'
-                  : 'bg-white/5 border-white/10 text-slate-600 cursor-not-allowed'
+                  ? 'text-orange-50 shadow-[0_7px_0_rgba(154,52,18,0.65),0_14px_18px_rgba(0,0,0,0.32)] hover:brightness-110 active:shadow-[0_3px_0_rgba(154,52,18,0.72),0_7px_10px_rgba(0,0,0,0.3)]'
+                  : 'text-slate-500'
                 }`}
+                contentClassName="gap-2"
               >
                 <ArrowUpCircle className="w-4 h-4" />
                 {radarLevel < 8 
                   ? (language === 'pt' ? `Melhorar (${formatValue(radarUpgradeCost)})` : `Upgrade (${formatValue(radarUpgradeCost)})`)
                   : t('max')}
-              </button>
+              </PremiumCanvasButton>
             </div>
           </div>
 
@@ -209,8 +228,9 @@ const BattleLevelTab = memo(({
                     boxShadow: ["0 0 0px rgba(59, 130, 246, 0)", "0 0 10px rgba(59, 130, 246, 0.4)", "0 0 0px rgba(59, 130, 246, 0)"]
                   }}
                   transition={{ duration: 2, repeat: Infinity }}
-                  className={`w-10 h-10 rounded-xl bg-blue-500/20 border border-blue-500/40 flex items-center justify-center hover:bg-blue-500/30 transition-colors cursor-pointer`}
+                  className="relative isolate flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl border border-blue-400/50 bg-blue-950/90 shadow-[inset_0_1px_0_rgba(255,255,255,0.2),0_5px_0_rgba(30,64,175,0.7),0_10px_16px_rgba(0,0,0,0.35)] transition-all hover:brightness-110 active:translate-y-[2px] active:shadow-[inset_0_1px_0_rgba(255,255,255,0.18),0_2px_0_rgba(30,64,175,0.75),0_5px_10px_rgba(0,0,0,0.32)]"
                 >
+                  <span className="absolute inset-0 bg-gradient-to-b from-blue-300/22 via-blue-500/10 to-black/35" />
                   <ShieldAlert className="w-5 h-5 text-blue-400" />
                 </motion.button>
                 <div>
@@ -222,7 +242,7 @@ const BattleLevelTab = memo(({
                   </p>
                 </div>
               </div>
-              <button
+              <PremiumCanvasButton
                 onClick={() => {
                   if (canUpgradePrivatePolice) {
                     dispatch({ type: 'SPEND_QC', payload: { amount: privatePoliceCost } });
@@ -232,16 +252,17 @@ const BattleLevelTab = memo(({
                   }
                 }}
                 disabled={!canUpgradePrivatePolice}
-                className={`px-5 py-2 rounded-xl font-bold transition-all text-[14px] ${
+                tone={canUpgradePrivatePolice ? 'blue' : 'steel'}
+                className={`h-10 min-w-[162px] px-5 text-[14px] font-bold ${
                   canUpgradePrivatePolice 
-                  ? 'bg-blue-600 text-white hover:bg-blue-500 shadow-[0_0_15px_rgba(37,99,235,0.3)]' 
-                  : 'bg-white/5 text-slate-600 cursor-not-allowed'
+                  ? 'text-blue-50 shadow-[0_6px_0_rgba(30,64,175,0.65),0_12px_18px_rgba(0,0,0,0.3)] hover:brightness-110 active:shadow-[0_3px_0_rgba(30,64,175,0.72),0_6px_10px_rgba(0,0,0,0.28)]' 
+                  : 'text-slate-500'
                 }`}
               >
                 {privatePoliceLevel < 6 
                   ? `${t('upgrade')} (${formatValue(privatePoliceCost)})`
                   : t('max')}
-              </button>
+              </PremiumCanvasButton>
             </div>
 
           </div>
@@ -264,10 +285,18 @@ const BattleLevelTab = memo(({
                 </div>
                 <button
                   onClick={toggleAutoSkipRandomBattles}
-                  className={`relative w-12 h-6 rounded-full transition-all duration-300 ${autoSkipRandomBattles ? 'bg-orange-500' : 'bg-slate-700'}`}
+                  className={`relative h-6 w-12 rounded-full border transition-all duration-300 shadow-[inset_0_1px_2px_rgba(255,255,255,0.18),0_4px_0_rgba(0,0,0,0.35),0_8px_12px_rgba(0,0,0,0.25)] active:translate-y-[1px] ${autoSkipRandomBattles ? 'border-orange-300/70 bg-gradient-to-b from-orange-400 to-orange-700' : 'border-slate-400/25 bg-gradient-to-b from-slate-600 to-slate-900'}`}
                 >
-                  <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all duration-300 ${autoSkipRandomBattles ? 'left-7' : 'left-1'}`} />
+                  <div className={`absolute top-1 h-4 w-4 rounded-full bg-gradient-to-b from-white to-slate-300 shadow-[0_1px_5px_rgba(0,0,0,0.55)] transition-all duration-300 ${autoSkipRandomBattles ? 'left-7' : 'left-1'}`} />
                 </button>
+                <div className="min-w-[86px] text-right">
+                  <div className="text-[9px] font-orbitron font-bold uppercase tracking-widest text-slate-500">
+                    {language === 'pt' ? 'Vitória' : 'Victory'}
+                  </div>
+                  <div className="text-[15px] font-mono font-black text-orange-300 leading-none">
+                    {autoSkipWinChance}%
+                  </div>
+                </div>
               </div>
             </div>
           )}
@@ -299,18 +328,20 @@ const BattleLevelTab = memo(({
                     {battleLevel < (routeTier === 'Solar' ? 25 : 55) ? `${formatValue(upgradeCost)} QC` : t('max')}
                   </div>
                 </div>
-                <button
+                <PremiumCanvasButton
                   onClick={upgradeBattleLevel}
                   disabled={!canUpgrade}
-                  className={`px-6 py-2.5 rounded-xl font-bold transition-all text-[14px] flex items-center justify-center gap-2 ${
+                  tone={canUpgrade ? 'purple' : 'steel'}
+                  className={`h-11 min-w-[142px] px-6 text-[14px] font-bold ${
                     canUpgrade 
-                    ? 'bg-purple-600 text-white hover:bg-purple-500 shadow-[0_0_20px_rgba(147,51,234,0.4)] scale-105 active:scale-95' 
-                    : 'bg-white/5 text-slate-600 cursor-not-allowed'
+                    ? 'text-purple-50 shadow-[0_6px_0_rgba(88,28,135,0.65),0_12px_18px_rgba(0,0,0,0.3)] hover:brightness-110 active:shadow-[0_3px_0_rgba(88,28,135,0.72),0_6px_10px_rgba(0,0,0,0.28)]' 
+                    : 'text-slate-500'
                   }`}
+                  contentClassName="gap-2"
                 >
                   <ArrowUpCircle className="w-4 h-4" />
                   {language === 'pt' ? 'Melhorar' : 'Upgrade'}
-                </button>
+                </PremiumCanvasButton>
               </div>
             </div>
           </div>
@@ -337,7 +368,7 @@ const BattleLevelTab = memo(({
                 { level: 50, title: language === 'pt' ? 'Fadiga' : 'Fatigue', description: language === 'pt' ? 'Sintetiza Etérion automaticamente no Reator Heliosingular quando a CCE estiver com nível crítico! Requer Tubos de Etérion Bruto. Pode ser desativado.' : 'Automatically synthesizes Etérion in the Heliosingular Reactor when CCE is at critical level! Requires Raw Etérion Tubes. Can be disabled.', color: 'purple', toggleable: true },
                 { level: 55, title: 'Kombat Wortal', description: language === 'pt' ? 'Retira totalmente o tempo de espera do Radar, o jogador pode buscar batalhas sempre que quiser, porém deixará de ganhar Etérion nas recompensas, ganhando apenas QC.' : 'Completely removes Radar waiting time, the player can search for battles whenever they want, but will stop earning Etérion in rewards, earning only QC.', color: 'purple' }
               ]).map(reward => (
-                <button 
+                <PremiumCanvasButton
                   key={reward.level} 
                   onClick={() => {
                     if (battleLevel >= reward.level) {
@@ -345,11 +376,14 @@ const BattleLevelTab = memo(({
                       playSfx('ask_window');
                     }
                   }}
-                  className={`flex flex-col items-center gap-2 p-3 rounded-xl border transition-all ${
+                  disabled={battleLevel < reward.level}
+                  tone={battleLevel >= reward.level ? (routeTier === 'Solar' ? 'green' : 'purple') : 'steel'}
+                  className={`h-full min-h-[100px] p-3 ${
                     battleLevel >= reward.level 
-                    ? (routeTier === 'Solar' ? 'bg-emerald-500/10 border-emerald-500/30 hover:bg-emerald-500/20' : 'bg-purple-500/10 border-purple-500/30 hover:bg-purple-500/20') + ' cursor-pointer' 
-                    : 'bg-white/5 border-white/5 opacity-40 cursor-not-allowed'
+                    ? 'shadow-[0_5px_0_rgba(0,0,0,0.42),0_10px_14px_rgba(0,0,0,0.22)] hover:brightness-110 active:shadow-[0_2px_0_rgba(0,0,0,0.5),0_5px_9px_rgba(0,0,0,0.22)]' 
+                    : 'text-slate-500'
                   }`}
+                  contentClassName="flex-col gap-2"
                 >
                   <div className={`text-base font-black ${battleLevel >= reward.level ? (routeTier === 'Solar' ? 'text-emerald-400' : 'text-purple-400') : 'text-slate-500'}`}>
                     LVL {reward.level}
@@ -360,7 +394,7 @@ const BattleLevelTab = memo(({
                   {battleLevel >= reward.level && (
                     <div className={`w-2 h-2 rounded-full mt-1 shadow-lg ${routeTier === 'Solar' ? 'bg-emerald-400 shadow-emerald-500/50' : 'bg-purple-400 shadow-purple-500/50'}`} />
                   )}
-                </button>
+                </PremiumCanvasButton>
               ))}
             </div>
           </div>
@@ -444,8 +478,9 @@ const BattleLevelTab = memo(({
                               boxShadow: ["0 0 0px rgba(249, 115, 22, 0)", "0 0 10px rgba(249, 115, 22, 0.4)", "0 0 0px rgba(249, 115, 22, 0)"]
                             }}
                             transition={{ duration: 2, repeat: Infinity }}
-                            className="w-8 h-8 rounded-lg bg-orange-500/20 flex items-center justify-center border border-orange-500/30 hover:bg-orange-500/30 transition-colors cursor-pointer"
+                            className="relative isolate flex h-8 w-8 items-center justify-center overflow-hidden rounded-lg border border-orange-300/55 bg-orange-950/90 shadow-[inset_0_1px_0_rgba(255,255,255,0.2),0_4px_0_rgba(154,52,18,0.65),0_8px_12px_rgba(0,0,0,0.32)] transition-all hover:brightness-110 active:translate-y-[2px] active:shadow-[inset_0_1px_0_rgba(255,255,255,0.18),0_2px_0_rgba(154,52,18,0.72),0_4px_8px_rgba(0,0,0,0.3)]"
                           >
+                            <span className="absolute inset-0 bg-gradient-to-b from-orange-300/24 via-orange-500/10 to-black/34" />
                             <Zap className="w-4 h-4 text-orange-400" />
                           </motion.button>
                           <div>
@@ -453,7 +488,7 @@ const BattleLevelTab = memo(({
                             <span className="text-[14px] text-orange-400 font-mono">Lvl {captureLevel}/10</span>
                           </div>
                         </div>
-                        <button
+                        <PremiumCanvasButton
                           onClick={() => {
                             if (canUpgradeCapture) {
                               dispatch({ type: 'SPEND_QC', payload: { amount: captureCost } });
@@ -463,14 +498,15 @@ const BattleLevelTab = memo(({
                             }
                           }}
                           disabled={!canUpgradeCapture}
-                          className={`px-4 py-1.5 rounded-lg font-bold text-base transition-all ${
+                          tone={canUpgradeCapture ? 'orange' : 'steel'}
+                          className={`h-9 min-w-[112px] px-4 text-base font-bold ${
                             canUpgradeCapture 
-                            ? 'bg-orange-600 text-white hover:bg-orange-500 shadow-[0_0_10px_rgba(249,115,22,0.3)]' 
-                            : 'bg-white/5 text-slate-600 cursor-not-allowed'
+                            ? 'text-orange-50 shadow-[0_5px_0_rgba(154,52,18,0.6),0_10px_14px_rgba(0,0,0,0.28)] hover:brightness-110 active:shadow-[0_2px_0_rgba(154,52,18,0.68),0_5px_8px_rgba(0,0,0,0.24)]' 
+                            : 'text-slate-500'
                           }`}
                         >
                           {captureLevel < 10 ? `${formatValue(captureCost)} QC` : t('max')}
-                        </button>
+                        </PremiumCanvasButton>
                       </div>
 
                       <div className="grid grid-cols-2 gap-3">

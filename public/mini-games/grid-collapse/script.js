@@ -336,6 +336,7 @@ function arenaSweep(lastPieceType) {
         if (isCollapse) {
             gamePaused = true;
             activeEvent = { type: 'GRID COLLAPSE', life: 2.0, color: COLORS[lastPieceType] };
+            notifyArcadeAction('grid-collapse');
             screenShake = 30;
 
             // Sync colors of pieces in the lines to be cleared
@@ -445,6 +446,15 @@ function updateScore() {
         type: 'SCORE_UPDATE', 
         gameId: 'grid-collapse', 
         score: score 
+    }, '*');
+}
+
+function notifyArcadeAction(actionId, amount = 1) {
+    window.parent.postMessage({
+        type: 'ARCADE_ACTION',
+        gameId: 'grid-collapse',
+        actionId,
+        amount
     }, '*');
 }
 

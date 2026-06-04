@@ -6,6 +6,8 @@ import { motion } from 'motion/react';
 import { Radar, Sword, Crosshair, Trophy, Database, X, Skull, Shield, Zap, Target, ArrowUpCircle, Bot, TrendingUp, Star } from 'lucide-react';
 import VoidBattleArena from '../../VoidBattleArena';
 import { useDashboard } from '../DashboardProvider';
+import { PremiumCanvasButton } from '../../ui/PremiumCanvasButton';
+import { PremiumStaticCard } from '../../ui/PremiumStaticCard';
 
 interface VoidBattleTabProps {
   isVoid: boolean;
@@ -24,6 +26,7 @@ interface VoidBattleTabProps {
   setVoidWarProgress: (progress: any | ((p: any) => any)) => void;
   voidWarProgress: any;
   setShowVoidWarMap: (show: boolean) => void;
+  startVoidBattleOverride?: () => void;
 }
 
 const VoidBattleTab = memo(function VoidBattleTab({
@@ -42,8 +45,10 @@ const VoidBattleTab = memo(function VoidBattleTab({
   setVoidAircraftAutoToggles,
   setVoidWarProgress,
   voidWarProgress,
-  setShowVoidWarMap
+  setShowVoidWarMap,
+  startVoidBattleOverride
 }: VoidBattleTabProps) {
+  const isVoidBattleUrgent = isVoidWarActive || voidWarAlertActive;
   const {
     progression,
     economy,
@@ -65,11 +70,12 @@ const VoidBattleTab = memo(function VoidBattleTab({
     setVoidBattleResult,
     getEffectiveVoidStats,
     selectVoidBattle,
-    startVoidBattle,
+    startVoidBattle: dashboardStartVoidBattle,
     repairVoidBattleShip,
     upgradeVoidBattleShip,
     upgradeVoidBattleShipRarity
   } = useDashboard();
+  const startVoidBattle = startVoidBattleOverride || dashboardStartVoidBattle;
 
   const handleUpdateResources = (newResources: any) => {
     // Calculate deltas and dispatch
@@ -88,6 +94,13 @@ const VoidBattleTab = memo(function VoidBattleTab({
   const stats = voidBattleShipStats;
 
   const effectiveStats = getEffectiveVoidStats(voidBattleShipStats);
+  const activeBattleEnemies = React.useMemo(() => {
+    if (!activeVoidBattle) return [];
+    return Array.isArray(activeVoidBattle.enemies)
+      ? activeVoidBattle.enemies
+      : [activeVoidBattle];
+  }, [activeVoidBattle]);
+  const activeBattleEnemyQueue = React.useMemo(() => activeVoidBattle?.enemyQueue || [], [activeVoidBattle]);
 
   const hpPercent = (stats.hp / effectiveStats.maxHp) * 100;
   const shieldPercent = (stats.shield / effectiveStats.maxShield) * 100;
@@ -143,6 +156,58 @@ const VoidBattleTab = memo(function VoidBattleTab({
   };
 
   const rStyle = getRarityStyle(stats.rarity);
+  const rarityFrameStyle = {
+    common: {
+      label: language === 'pt' ? 'Comum' : 'Common',
+      border: 'border-red-400/60',
+      glow: 'shadow-[0_0_46px_rgba(248,113,113,0.24),inset_0_0_70px_rgba(127,29,29,0.28)]',
+      accent: 'from-red-400/70 via-white/35 to-red-500/70',
+      text: 'text-red-200',
+      chip: 'border-red-400/40 bg-red-500/10 text-red-100',
+    },
+    rare: {
+      label: language === 'pt' ? 'Rara' : 'Rare',
+      border: 'border-blue-400/65',
+      glow: 'shadow-[0_0_54px_rgba(96,165,250,0.32),inset_0_0_80px_rgba(30,64,175,0.28)]',
+      accent: 'from-blue-300/80 via-cyan-100/45 to-blue-500/75',
+      text: 'text-blue-100',
+      chip: 'border-blue-300/45 bg-blue-500/12 text-blue-100',
+    },
+    elite: {
+      label: language === 'pt' ? 'Épica' : 'Epic',
+      border: 'border-purple-400/70',
+      glow: 'shadow-[0_0_62px_rgba(168,85,247,0.34),inset_0_0_90px_rgba(88,28,135,0.3)]',
+      accent: 'from-purple-300/80 via-fuchsia-100/45 to-purple-600/75',
+      text: 'text-purple-100',
+      chip: 'border-purple-300/45 bg-purple-500/12 text-purple-100',
+    },
+    legendary: {
+      label: language === 'pt' ? 'Lendária' : 'Legendary',
+      border: 'border-orange-300/75',
+      glow: 'shadow-[0_0_68px_rgba(251,146,60,0.36),inset_0_0_95px_rgba(154,52,18,0.32)]',
+      accent: 'from-orange-300/85 via-yellow-100/50 to-amber-500/80',
+      text: 'text-orange-100',
+      chip: 'border-orange-300/50 bg-orange-500/14 text-orange-100',
+    },
+    mythic: {
+      label: language === 'pt' ? 'Mítica' : 'Mythic',
+      border: 'border-white/75',
+      glow: 'shadow-[0_0_80px_rgba(255,255,255,0.28),0_0_120px_rgba(239,68,68,0.24),inset_0_0_110px_rgba(127,29,29,0.34)]',
+      accent: 'from-white/90 via-red-200/65 to-slate-300/85',
+      text: 'text-white',
+      chip: 'border-white/50 bg-white/12 text-white',
+    },
+  }[stats.rarity as 'common' | 'rare' | 'elite' | 'legendary' | 'mythic'] || {
+    label: language === 'pt' ? 'Comum' : 'Common',
+    border: 'border-red-400/60',
+    glow: 'shadow-[0_0_46px_rgba(248,113,113,0.24),inset_0_0_70px_rgba(127,29,29,0.28)]',
+    accent: 'from-red-400/70 via-white/35 to-red-500/70',
+    text: 'text-red-200',
+    chip: 'border-red-400/40 bg-red-500/10 text-red-100',
+  };
+  const battleShipShowcaseImage = stats.rarity === 'mythic'
+    ? '/assets/rota3/void/mitic_eclipse/mitic_eclipse_neutral.webp'
+    : '/images/ships/battle/player-battle.webp';
 
   if (voidBattleStatus === 'searching') {
     return (
@@ -163,20 +228,40 @@ const VoidBattleTab = memo(function VoidBattleTab({
 
   if (voidBattleStatus === 'choosing') {
     return (
-      <div className="space-y-4">
-        <div className="flex justify-between items-center">
+      <div className="space-y-4 relative min-h-full rounded-2xl overflow-hidden p-6 border border-white/5 shadow-2xl">
+        <div
+          className="absolute inset-0 bg-cover bg-center opacity-30 mix-blend-overlay pointer-events-none"
+          style={{ backgroundImage: `url('/assets/rota3/void/bg_void_battle_main.webp')` }}
+        />
+        <div className="absolute inset-0 bg-gradient-to-br from-black/80 via-black/60 to-black/90 pointer-events-none" />
+
+        <div className="relative z-10 flex justify-between items-center">
           <h3 className="text-lg font-orbitron font-black text-white tracking-widest uppercase">{t('targetsDetected')}</h3>
-          <button
+          <PremiumCanvasButton
             onClick={() => setVoidBattleStatus('idle')}
-            className="px-3 py-1.5 bg-white/5 border border-white/10 rounded-lg text-[15px] font-orbitron text-white/60 hover:text-white transition-all uppercase tracking-widest"
+            tone="steel"
+            className="h-9 min-w-[124px] px-3 text-[13px] uppercase tracking-widest"
+            contentClassName="text-white/70"
           >
             {t('cancelSearch')}
-          </button>
+          </PremiumCanvasButton>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="relative z-10 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {voidBattleOptions.map(enemy => (
-            <div key={enemy.id} className="glass-panel border border-white/10 rounded-2xl p-4 space-y-5 bg-gradient-to-br from-red-500/5 via-black to-black hover:border-red-500/40 transition-all group overflow-hidden relative">
-              <div className="flex gap-4 items-center">
+            <div key={enemy.id} className="glass-panel border border-white/10 rounded-2xl p-4 space-y-5 hover:border-red-500/40 transition-all group overflow-hidden relative bg-black shadow-lg">
+              <div
+                className="absolute inset-0 bg-cover bg-center opacity-40 group-hover:opacity-60 transition-opacity duration-500 mix-blend-overlay pointer-events-none"
+                style={{
+                  backgroundImage: `url('/assets/rota3/void/${
+                    enemy.type === 'Boss' ? 'bg_void_battle_boss.webp' :
+                    enemy.type === 'Elite' ? 'bg_void_battle_elite.webp' :
+                    'bg_void_battle_common.webp'
+                  }')`
+                }}
+              />
+              <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/40 to-black/90 pointer-events-none" />
+
+              <div className="relative z-10 flex gap-4 items-center">
                 <div className="relative w-20 h-20 shrink-0 bg-white/5 rounded-xl border border-white/10 flex items-center justify-center overflow-hidden group-hover:border-red-500/30 transition-all">
                   <div className="absolute inset-0 bg-gradient-to-tr from-red-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                   <Image
@@ -203,7 +288,7 @@ const VoidBattleTab = memo(function VoidBattleTab({
                 </div>
               </div>
 
-              <div className="space-y-3 pt-2 border-t border-white/5">
+              <div className="relative z-10 space-y-3 pt-2 border-t border-white/5">
                  <div className="space-y-1.5">
                    <div className="flex justify-between text-[13px] font-orbitron font-bold leading-none">
                      <span className="text-white/30 uppercase tracking-tighter">Escudo</span>
@@ -233,13 +318,17 @@ const VoidBattleTab = memo(function VoidBattleTab({
                  </div>
               </div>
 
-              <button
-                onClick={() => selectVoidBattle(enemy)}
-                className="w-full py-3 bg-red-600 text-white font-orbitron font-black text-base rounded-xl hover:bg-red-500 transition-all uppercase tracking-[0.2em] shadow-[0_4px_15px_rgba(239,68,68,0.3)] group-hover:scale-[1.02] active:scale-95 flex items-center justify-center gap-2"
-              >
-                <Sword className="w-4 h-4" />
-                {t('attackTarget')}
-              </button>
+              <div className="relative z-10">
+                <PremiumCanvasButton
+                  onClick={() => selectVoidBattle(enemy)}
+                  tone="red"
+                  className="w-full h-12 text-base font-black uppercase tracking-[0.2em]"
+                  contentClassName="gap-2 text-white"
+                >
+                  <Sword className="w-4 h-4" />
+                  {t('attackTarget')}
+                </PremiumCanvasButton>
+              </div>
             </div>
           ))}
         </div>
@@ -249,14 +338,11 @@ const VoidBattleTab = memo(function VoidBattleTab({
 
   if (voidBattleStatus === 'fighting' && activeVoidBattle) {
     const effectiveStats = getEffectiveVoidStats(voidBattleShipStats);
-    const activeEnemies = Array.isArray(activeVoidBattle.enemies)
-      ? activeVoidBattle.enemies
-      : [activeVoidBattle];
-    const queuedEnemies = activeVoidBattle.enemyQueue || [];
+    const isInvasionSectorBattle = (isVoidWarActive || voidWarAlertActive) && (activeVoidBattle.locationId ?? 0) > 0;
 
     return (
       <VoidBattleArena
-        initialEnemies={activeEnemies}
+        initialEnemies={activeBattleEnemies}
         playerShipStats={effectiveStats}
         voidResources={combat.voidResources}
         routeTier={routeTier}
@@ -297,13 +383,20 @@ const VoidBattleTab = memo(function VoidBattleTab({
                }
              }
 
+             const rawReward = result?.reward || 0;
              const rarityQCBonus = { common: 1, rare: 1.3, elite: 1.4, legendary: 1.5, mythic: 1.6 }[voidBattleShipStats.rarity as 'common' | 'rare' | 'elite' | 'legendary' | 'mythic'] || 1;
-             const finalReward = Math.floor((result?.reward || 0) * voidBattleShipStats.lootEfficiency * rarityQCBonus);
+             const finalReward = result?.isMeteorEventReward
+               ? Math.floor(rawReward)
+               : Math.floor(rawReward * voidBattleShipStats.lootEfficiency * rarityQCBonus);
 
              setVoidBattleResult({
                reward: finalReward,
                destroyedMeteors: result?.destroyedMeteors || 0,
-               destroyedMeteorites: result?.destroyedMeteorites || 0
+               destroyedMeteorites: result?.destroyedMeteorites || 0,
+               meteoriteRewardValue: result?.meteoriteRewardValue,
+               meteorRewardValue: result?.meteorRewardValue,
+               meteoriteRewardTotal: result?.meteoriteRewardTotal,
+               meteorRewardTotal: result?.meteorRewardTotal
              });
 
              dispatch({ type: 'EARN_QC', payload: { amount: finalReward, source: 'battle' } });
@@ -324,7 +417,9 @@ const VoidBattleTab = memo(function VoidBattleTab({
         addLog={addLog as any}
         formatValue={formatValue as any}
         isGroupBattle={activeVoidBattle.isGroupBattle || false}
-        enemyQueue={queuedEnemies}
+        enemyQueue={activeBattleEnemyQueue}
+        meteoriteRewardValue={Math.floor((activeVoidBattle.qc || 0) * 0.05)}
+        disableMeteorEvent={isInvasionSectorBattle}
         onExitBattle={() => {
           setVoidBattleShipStats((prev: any) => ({
             ...prev,
@@ -357,15 +452,17 @@ const VoidBattleTab = memo(function VoidBattleTab({
             className="absolute top-0 left-0 w-60 h-1 bg-gradient-to-r from-transparent via-emerald-400 to-transparent"
           />
 
-          <button
+          <PremiumCanvasButton
             onClick={() => {
               setVoidBattleStatus('idle');
               stopSfx('bobby_blue_theme_victory');
             }}
-            className="absolute top-6 right-6 p-3 rounded-full bg-white/5 border border-white/10 text-white/40 hover:bg-white/10 hover:text-white transition-all z-30"
+            tone="steel"
+            className="absolute top-6 right-6 h-12 w-12 z-30"
+            contentClassName="text-white/60"
           >
             <X className="w-6 h-6" />
-          </button>
+          </PremiumCanvasButton>
 
           <div className="text-center space-y-2">
             <motion.div
@@ -377,7 +474,7 @@ const VoidBattleTab = memo(function VoidBattleTab({
                 {t('victory')}
               </h2>
               <p className="text-base lg:text-xl text-emerald-400/60 font-mono uppercase tracking-[0.5em] mt-2">
-                {language === 'pt' ? 'Setor Neutralizado • Ameaça Eliminada' : 'Sector Neutralized • Threat Eliminated'}
+                {language === 'pt' ? 'Setor Neutralizado • Ameaça Elimindada' : 'Sector Neutralized • Threat Eliminated'}
               </p>
             </motion.div>
           </div>
@@ -433,12 +530,22 @@ const VoidBattleTab = memo(function VoidBattleTab({
                       <div className="text-xl font-orbitron text-orange-400">
                         {voidBattleResult?.destroyedMeteorites || 0}
                       </div>
+                      {voidBattleResult?.meteoriteRewardTotal !== undefined && (
+                        <div className="text-[12px] font-orbitron text-emerald-300">
+                          {language === 'pt' ? 'Meteoritos' : 'Meteorites'} x {voidBattleResult?.destroyedMeteorites || 0} = {formatValue(voidBattleResult?.meteoriteRewardTotal || 0)} QC
+                        </div>
+                      )}
                     </div>
                     <div className="text-right space-y-1">
                       <span className="text-[10px] text-white/40 uppercase tracking-widest">{language === 'pt' ? 'Meteoros Destruídos' : 'Meteors Destroyed'}</span>
                       <div className="text-xl font-orbitron text-red-500">
                         {voidBattleResult?.destroyedMeteors || 0}
                       </div>
+                      {voidBattleResult?.meteorRewardTotal !== undefined && (
+                        <div className="text-[12px] font-orbitron text-emerald-300">
+                          {language === 'pt' ? 'Meteoros' : 'Meteors'} x {voidBattleResult?.destroyedMeteors || 0} = {formatValue(voidBattleResult?.meteorRewardTotal || 0)} QC
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
@@ -457,17 +564,17 @@ const VoidBattleTab = memo(function VoidBattleTab({
                 </div>
               </div>
 
-              <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
+              <PremiumCanvasButton
                 onClick={() => {
                   setVoidBattleStatus('idle');
                   stopSfx('bobby_blue_theme_victory');
                 }}
-                className="w-full py-5 lg:py-6 bg-white text-black font-orbitron font-black text-lg lg:text-xl rounded-2xl shadow-[0_0_30px_rgba(255,255,255,0.2)] transition-all uppercase tracking-[0.3em]"
+                tone="green"
+                className="w-full min-h-[64px] rounded-2xl text-lg lg:text-xl font-black uppercase tracking-[0.3em]"
+                contentClassName="text-emerald-100"
               >
                 {t('backToRadar')}
-              </motion.button>
+              </PremiumCanvasButton>
             </motion.div>
           </div>
         </div>
@@ -494,15 +601,17 @@ const VoidBattleTab = memo(function VoidBattleTab({
             className="absolute top-0 left-0 w-60 h-1 bg-gradient-to-r from-transparent via-red-500 to-transparent"
           />
 
-          <button
+          <PremiumCanvasButton
             onClick={() => {
               setVoidBattleStatus('idle');
               stopSfx('game_over');
             }}
-            className="absolute top-6 right-6 p-3 rounded-full bg-white/5 border border-white/10 text-white/40 hover:bg-white/10 hover:text-white transition-all z-30"
+            tone="steel"
+            className="absolute top-6 right-6 h-12 w-12 z-30"
+            contentClassName="text-white/60"
           >
             <X className="w-6 h-6" />
-          </button>
+          </PremiumCanvasButton>
 
           <div className="text-center space-y-2">
             <motion.div
@@ -576,17 +685,17 @@ const VoidBattleTab = memo(function VoidBattleTab({
                 </div>
               </div>
 
-              <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
+              <PremiumCanvasButton
                 onClick={() => {
                   setVoidBattleStatus('idle');
                   stopSfx('game_over');
                 }}
-                className="w-full py-5 lg:py-6 bg-red-600 text-white font-orbitron font-black text-lg lg:text-xl rounded-2xl shadow-[0_0_30px_rgba(220,38,38,0.3)] transition-all uppercase tracking-[0.3em]"
+                tone="red"
+                className="w-full min-h-[64px] rounded-2xl text-lg lg:text-xl font-black uppercase tracking-[0.3em]"
+                contentClassName="text-white"
               >
                 {t('backToRadar')}
-              </motion.button>
+              </PremiumCanvasButton>
             </motion.div>
           </div>
         </div>
@@ -595,7 +704,13 @@ const VoidBattleTab = memo(function VoidBattleTab({
   }
 
   return (
-    <div className={`h-full flex flex-col lg:flex-row gap-6 items-stretch overflow-hidden relative ${stats.rarity === 'mythic' ? 'bg-black' : ''}`}>
+    <div className={`h-full flex flex-col lg:flex-row gap-6 items-stretch overflow-hidden relative rounded-2xl ${stats.rarity === 'mythic' ? 'bg-black' : 'bg-black/60'} border border-white/5`}>
+      <div
+        className="absolute inset-0 bg-cover bg-center opacity-30 mix-blend-overlay pointer-events-none"
+        style={{ backgroundImage: `url('/assets/rota3/void/bg_void_battle_main.webp')` }}
+      />
+      <div className="absolute inset-0 bg-gradient-to-br from-black/80 via-black/60 to-black/90 pointer-events-none" />
+
       {stats.rarity === 'mythic' && (
         <motion.div
           animate={{
@@ -610,11 +725,11 @@ const VoidBattleTab = memo(function VoidBattleTab({
         />
       )}
 
-      <div className="w-full lg:w-1/4 flex flex-col gap-4">
+      <div className="w-full lg:w-[34%] flex flex-col gap-4 min-h-0 h-full">
         <motion.div
           initial={{ opacity: 0, x: -50 }}
           animate={{ opacity: 1, x: 0 }}
-          className="aspect-square glass-panel border-2 border-red-500/30 rounded-[2rem] relative overflow-hidden bg-black shadow-[0_0_50px_rgba(239,68,68,0.15)] group shrink-0"
+          className="aspect-square lg:aspect-auto lg:flex-1 glass-panel border-2 border-red-500/30 rounded-[2rem] relative overflow-hidden bg-black shadow-[0_0_50px_rgba(239,68,68,0.15)] group min-h-0"
         >
           <video
             src="/videos/bobby_blue/void_battle_preview.webm"
@@ -622,7 +737,7 @@ const VoidBattleTab = memo(function VoidBattleTab({
             loop
             muted
             playsInline
-            className="absolute inset-0 w-full h-full object-cover opacity-70 group-hover:opacity-90 transition-opacity duration-700"
+            className="absolute inset-0 w-full h-full object-contain opacity-80 group-hover:opacity-95 transition-opacity duration-700"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-red-500/10" />
 
@@ -649,9 +764,14 @@ const VoidBattleTab = memo(function VoidBattleTab({
       <motion.div
         initial={{ opacity: 0, x: 50 }}
         animate={{ opacity: 1, x: 0 }}
-        className="w-full lg:w-3/4 flex flex-col gap-4 overflow-y-auto pr-2 custom-scrollbar min-h-0"
+        className="w-full lg:w-[66%] flex flex-col gap-3 overflow-hidden pr-2 min-h-0"
       >
-        <div className="glass-panel border border-white/10 rounded-3xl p-6 space-y-4 bg-white/5 relative overflow-hidden shrink-0">
+        <PremiumStaticCard
+          tone={stats.rarity === 'mythic' ? 'steel' : 'red'}
+          density="standard"
+          className="rounded-3xl shrink-0"
+          contentClassName="p-5 space-y-3"
+        >
           <div className="flex justify-between items-start gap-4">
             <div className="space-y-1">
               <div className="flex items-center gap-3">
@@ -672,31 +792,35 @@ const VoidBattleTab = memo(function VoidBattleTab({
                 </h2>
 
                 {isVoid && isRobotRepaired && (
-                  <button
+                  <PremiumCanvasButton
                     onClick={() => {
                       setShowBattleShipUpgradeModal(true);
                       playSfx('ask_window');
                     }}
-                    className="flex items-center gap-2 px-4 py-1.5 bg-emerald-500/20 border border-emerald-500/40 rounded-xl text-emerald-400 hover:bg-emerald-500/30 transition-all group shadow-[0_0_15px_rgba(16,185,129,0.1)]"
+                    tone="green"
+                    className="h-9 min-w-[158px] px-4 text-[10px] font-bold uppercase tracking-wider"
+                    contentClassName="gap-2 text-emerald-200"
                   >
-                    <Zap className="w-4 h-4 group-hover:scale-125 transition-transform" />
+                    <Zap className="w-4 h-4" />
                     <span className="text-[10px] font-orbitron font-bold uppercase tracking-wider">{t('upgradeBattleShip')}</span>
-                  </button>
+                  </PremiumCanvasButton>
                 )}
 
                 {stats.upgrades.damage >= 5 && stats.upgrades.shield >= 5 && stats.upgrades.crit >= 5 && stats.upgrades.loot >= 5 && stats.rarity !== 'mythic' && (
-                  <button
+                  <PremiumCanvasButton
                     onClick={upgradeVoidBattleShipRarity}
-                    className="flex items-center gap-2 px-4 py-1.5 bg-blue-500/20 border border-blue-500/40 rounded-xl text-blue-400 hover:bg-blue-500/30 transition-all group shadow-[0_0_15px_rgba(59,130,246,0.1)]"
+                    tone="blue"
+                    className="h-10 min-w-[126px] px-4 text-[9px] font-black uppercase tracking-wider"
+                    contentClassName="gap-2 text-blue-200"
                   >
-                    <ArrowUpCircle className="w-4 h-4 group-hover:scale-125 transition-transform" />
+                    <ArrowUpCircle className="w-4 h-4" />
                     <div className="flex flex-col items-start leading-none">
                       <span className="text-[9px] font-orbitron font-black uppercase tracking-wider">{t('upgradeRarity')}</span>
                       <span className="text-[8px] font-mono opacity-60">
                         {stats.rarity === 'common' ? '5k T/E' : stats.rarity === 'rare' ? '10k T/E' : stats.rarity === 'elite' ? '15k T/E' : '20k T/E'}
                       </span>
                     </div>
-                  </button>
+                  </PremiumCanvasButton>
                 )}
               </div>
               <p className={`text-xs font-mono uppercase tracking-[0.3em] transition-all duration-700 opacity-60 ${rStyle.subtext}`}>{t('sovereignOfVoid')}</p>
@@ -721,11 +845,11 @@ const VoidBattleTab = memo(function VoidBattleTab({
           </div>
 
           {(voidWarAlertActive) && !isRobotRepaired && (
-            <motion.button
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
+            <PremiumCanvasButton
               onClick={() => setShowRobotModal(true)}
-              className="w-full py-3 bg-yellow-500/10 border-2 border-yellow-500/30 rounded-2xl flex items-center justify-center gap-4 group hover:bg-yellow-500/20 hover:border-yellow-500/50 transition-all animate-pulse shadow-[0_0_20px_rgba(234,179,8,0.1)]"
+              tone="amber"
+              className="w-full min-h-[56px] rounded-2xl animate-pulse"
+              contentClassName="gap-4 text-yellow-200"
             >
               <div className="relative">
                 <Bot className="w-6 h-6 text-yellow-400 group-hover:rotate-12 transition-transform" />
@@ -735,10 +859,10 @@ const VoidBattleTab = memo(function VoidBattleTab({
                 <span className="text-yellow-400 font-orbitron text-xs font-black tracking-[0.2em] uppercase">{t('defectiveRobot')}</span>
                 <span className="text-[9px] text-yellow-400/60 font-mono uppercase tracking-widest">{language === 'pt' ? 'REPARO DE EMERGÊNCIA DISPONÍVEL' : 'EMERGENCY REPAIR AVAILABLE'}</span>
               </div>
-              <div className="ml-auto px-4 py-1 bg-yellow-500 text-black font-orbitron font-black text-[10px] rounded-lg tracking-widest group-hover:scale-105 transition-transform">
+              <div className="ml-auto px-4 py-1 bg-yellow-500/90 text-black font-orbitron font-black text-[10px] rounded-lg tracking-widest">
                 FIX NOW
               </div>
-            </motion.button>
+            </PremiumCanvasButton>
           )}
 
           <div className="space-y-2 relative">
@@ -757,106 +881,186 @@ const VoidBattleTab = memo(function VoidBattleTab({
               />
             </div>
           </div>
-        </div>
+        </PremiumStaticCard>
 
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 shrink-0">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 shrink-0">
           {[
-            { id: 'damage', name: t('weaponSystem'), value: (effectiveStats.damage || 100).toFixed(0), icon: Sword, color: 'text-orange-400' },
-            { id: 'crit_dmg', name: t('criticalDamage'), value: (effectiveStats.criticalDamage || ((effectiveStats.damage || 100) * (effectiveStats.critDamageMultiplier || 2))).toFixed(0), icon: Zap, color: 'text-yellow-400' },
-            { id: 'crit', name: t('weaknessScanner'), value: `${((effectiveStats.critChance || 0.1) * 100).toFixed(0)}%`, icon: Target, color: 'text-red-400' },
-            { id: 'loot', name: t('avarice'), value: `${((stats.lootEfficiency || 0.8) * 100).toFixed(0)}%`, icon: TrendingUp, color: 'text-emerald-400' }
+            { id: 'damage', name: language === 'pt' ? 'Sistema de Armas' : t('weaponSystem'), value: (effectiveStats.damage || 100).toFixed(0), icon: Sword, color: 'text-orange-400', tone: 'orange' as const },
+            { id: 'crit_dmg', name: language === 'pt' ? 'Dano Crítico' : t('criticalDamage'), value: (effectiveStats.criticalDamage || ((effectiveStats.damage || 100) * (effectiveStats.critDamageMultiplier || 2))).toFixed(0), icon: Zap, color: 'text-yellow-400', tone: 'amber' as const },
+            { id: 'crit', name: language === 'pt' ? 'Scanner de Fraqueza' : t('weaknessScanner'), value: `${((effectiveStats.critChance || 0.1) * 100).toFixed(0)}%`, icon: Target, color: 'text-red-400', tone: 'red' as const },
+            { id: 'loot', name: language === 'pt' ? 'Avarícia' : t('avarice'), value: `${((stats.lootEfficiency || 0.8) * 100).toFixed(0)}%`, icon: TrendingUp, color: 'text-emerald-400', tone: 'green' as const }
           ].map(s => (
-            <div key={s.name} className="bg-white/5 border border-white/10 rounded-2xl p-4 flex flex-col gap-1 transition-all hover:bg-white/10">
+            <PremiumStaticCard
+              key={s.name}
+              tone={s.tone}
+              density="compact"
+              className="rounded-2xl"
+              contentClassName="p-3 flex flex-col gap-1"
+            >
               <div className="flex items-center gap-2">
                 <s.icon className={`w-3 h-3 ${s.color}`} />
-                <span className="text-[10px] text-white/40 uppercase tracking-widest">{s.name}</span>
+                <span className="truncate text-[10px] text-white/45 uppercase tracking-widest">{s.name}</span>
               </div>
               <div className={`text-xl font-orbitron font-bold ${rStyle.text}`}>{s.value}</div>
-            </div>
+            </PremiumStaticCard>
           ))}
         </div>
 
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 shrink-0">
-          {[
-            { id: 'damage', name: t('weaponSystem'), desc: `+10% ${t('dmgBonus')}`, icon: Sword, max: 5 },
-            { id: 'shield', name: t('reinforcedShields'), desc: `+15% ${t('shield')}`, icon: Shield, max: 5 },
-            { id: 'crit', name: t('weaknessScanner'), desc: `+10% ${t('criticalChance')}`, icon: Target, max: 5 },
-            { id: 'loot', name: t('avarice'), desc: `+25% Loot QC`, icon: TrendingUp, max: 5 }
-          ].map(upg => {
-            const maxLevel = upg.max;
-            const level = stats.upgrades[upg.id as keyof typeof stats.upgrades];
-            const isMax = level >= maxLevel;
-            const getUpgradeCost = (lvl: number) => {
-              if (lvl < 5) {
-                return [{ tech: 100, energy: 100, minerals: 100 }, { tech: 350, energy: 350, minerals: 350 }, { tech: 600, energy: 600, minerals: 600 }, { tech: 850, energy: 850, minerals: 850 }, { tech: 1150, energy: 1150, minerals: 1150 }][lvl];
-              }
-              const mult = lvl - 4;
-              return { tech: 1150 + mult * 500, energy: 1150 + mult * 500, minerals: 1150 + mult * 500 };
-            };
-            const cost = !isMax ? getUpgradeCost(level) : null;
-            const canAfford = cost && (combat.voidResources?.tech || 0) >= cost.tech && (combat.voidResources?.energy || 0) >= cost.energy && (combat.voidResources?.minerals || 0) >= cost.minerals;
+        <div className="grid flex-1 grid-cols-1 gap-4 overflow-hidden xl:grid-cols-[minmax(0,0.56fr)_minmax(420px,0.44fr)]">
+          <div className="grid h-full min-h-0 grid-cols-2 grid-rows-3 gap-2.5">
+              {[
+                { id: 'damage', name: t('weaponSystem'), desc: `+10% ${t('dmgBonus')}`, icon: Sword, max: 5 },
+                { id: 'shield', name: t('reinforcedShields'), desc: `+15% ${t('shield')}`, icon: Shield, max: 5 },
+                { id: 'crit', name: language === 'pt' ? 'Scanner de Fraqueza' : t('weaknessScanner'), desc: language === 'pt' ? '+10% Chance Crítica' : `+10% ${t('criticalChance')}`, icon: Target, max: 5 },
+                { id: 'loot', name: language === 'pt' ? 'Avarícia' : t('avarice'), desc: language === 'pt' ? '+25% Saque QC' : `+25% Loot QC`, icon: TrendingUp, max: 5 }
+              ].map(upg => {
+                const maxLevel = upg.max;
+                const level = stats.upgrades[upg.id as keyof typeof stats.upgrades];
+                const isMax = level >= maxLevel;
+                const getUpgradeCost = (lvl: number) => {
+                  if (lvl < 5) {
+                    return [{ tech: 100, energy: 100, minerals: 100 }, { tech: 350, energy: 350, minerals: 350 }, { tech: 600, energy: 600, minerals: 600 }, { tech: 850, energy: 850, minerals: 850 }, { tech: 1150, energy: 1150, minerals: 1150 }][lvl];
+                  }
+                  const mult = lvl - 4;
+                  return { tech: 1150 + mult * 500, energy: 1150 + mult * 500, minerals: 1150 + mult * 500 };
+                };
+                const cost = !isMax ? getUpgradeCost(level) : null;
+                const canAfford = cost && (combat.voidResources?.tech || 0) >= cost.tech && (combat.voidResources?.energy || 0) >= cost.energy && (combat.voidResources?.minerals || 0) >= cost.minerals;
 
-            return (
-              <button
-                key={upg.id}
-                onClick={() => upgradeVoidBattleShip(upg.id as any)}
-                disabled={isMax || !canAfford || isVoidWarActive || voidWarAlertActive}
-                className={`glass-panel border p-4 rounded-2xl flex flex-col justify-between transition-all relative overflow-hidden text-left ${
-                  isMax ? 'border-emerald-500/30 bg-emerald-500/5 opacity-80' :
-                  (canAfford && !isVoidWarActive && !voidWarAlertActive) ? 'border-red-500/20 hover:border-red-500/50 hover:bg-white/5' :
-                  'border-white/5 opacity-40 grayscale pointer-events-none'
-                }`}
-              >
-                <div className="flex justify-between items-start">
-                  <div className="p-2 rounded-lg bg-red-500/10 border border-red-500/20">
-                    <upg.icon className="w-4 h-4 text-red-400" />
-                  </div>
-                  <div className="text-[10px] font-mono text-red-500/60 font-bold">LVL {level}/{maxLevel}</div>
-                </div>
-                <div className="mt-2">
-                  <h4 className="text-xs font-orbitron font-bold text-white uppercase tracking-wider line-clamp-1">{upg.name}</h4>
-                  <p className="text-[9px] text-white/40 uppercase tracking-widest">{upg.desc}</p>
-                </div>
-                {!isMax && cost && (
-                  <div className="mt-3 pt-3 border-t border-white/5 grid grid-cols-1 gap-1">
-                    <div className="flex justify-between text-[8px] uppercase tracking-widest">
-                      <span className={(combat.voidResources?.tech || 0) >= cost.tech ? 'text-cyan-400' : 'text-red-400'}>{cost.tech} Tech</span>
-                      <span className={(combat.voidResources?.energy || 0) >= cost.energy ? 'text-yellow-400' : 'text-red-400'}>{cost.energy} En</span>
+                return (
+                  <PremiumCanvasButton
+                    key={upg.id}
+                    onClick={() => upgradeVoidBattleShip(upg.id as any)}
+                    disabled={isMax || !canAfford || isVoidWarActive || voidWarAlertActive}
+                    disabledVisual={isMax ? 'tone' : 'muted'}
+                    tone={isMax ? 'green' : (canAfford && !isVoidWarActive && !voidWarAlertActive) ? 'red' : 'steel'}
+                    className={`h-full min-h-[86px] p-2.5 text-left ${
+                      isMax ? 'shadow-[0_0_24px_rgba(74,222,128,0.18),inset_0_0_18px_rgba(16,185,129,0.12)]' :
+                      (canAfford && !isVoidWarActive && !voidWarAlertActive) ? '' :
+                      'grayscale'
+                    }`}
+                    contentClassName="flex-col items-stretch justify-between"
+                  >
+                    <div className="flex justify-between items-start">
+                      <div className={`p-1.5 rounded-lg border ${isMax ? 'bg-emerald-400/10 border-emerald-300/30 shadow-[0_0_12px_rgba(52,211,153,0.25)]' : 'bg-red-500/10 border-red-500/20'}`}>
+                        <upg.icon className={`w-3.5 h-3.5 ${isMax ? 'text-emerald-300' : 'text-red-400'}`} />
+                      </div>
+                      {isMax ? (
+                        <div className="flex items-center gap-1.5 rounded-md border border-emerald-300/40 bg-emerald-300/10 px-2 py-1 shadow-[0_0_14px_rgba(74,222,128,0.22)]">
+                          <Star className="h-3 w-3 fill-emerald-300 text-emerald-200" />
+                          <span className="font-orbitron text-[10px] font-black uppercase tracking-[0.22em] text-emerald-100 drop-shadow-[0_0_8px_rgba(110,231,183,0.8)]">MAX</span>
+                        </div>
+                      ) : (
+                        <div className="text-[9px] font-mono text-red-500/60 font-bold">LVL {level}/{maxLevel}</div>
+                      )}
                     </div>
-                  </div>
-                )}
-              </button>
-            );
-          })}
-        </div>
+                    <div className="mt-1.5">
+                      <h4 className={`text-[11px] font-orbitron font-bold uppercase tracking-wider line-clamp-1 ${isMax ? 'text-emerald-50 drop-shadow-[0_0_8px_rgba(110,231,183,0.5)]' : 'text-white'}`}>{upg.name}</h4>
+                      <p className={`text-[9px] uppercase tracking-widest ${isMax ? 'text-emerald-200/60' : 'text-white/40'}`}>{upg.desc}</p>
+                    </div>
+                    {isMax ? (
+                      <div className="mt-1.5 pt-1.5 border-t border-emerald-300/20">
+                        <div className="flex items-center justify-between text-[8px] uppercase tracking-[0.22em]">
+                          <span className="text-emerald-200/70">{language === 'pt' ? 'Melhoria completa' : 'Upgrade complete'}</span>
+                          <span className="text-emerald-300 font-orbitron font-black">5/5</span>
+                        </div>
+                      </div>
+                    ) : cost && (
+                      <div className="mt-1.5 pt-1.5 border-t border-white/5 grid grid-cols-1 gap-1">
+                        <div className="flex justify-between text-[8px] uppercase tracking-widest">
+                          <span className={(combat.voidResources?.tech || 0) >= cost.tech ? 'text-cyan-400' : 'text-red-400'}>{cost.tech} Tech</span>
+                          <span className={(combat.voidResources?.energy || 0) >= cost.energy ? 'text-yellow-400' : 'text-red-400'}>{cost.energy} En</span>
+                        </div>
+                      </div>
+                    )}
+                  </PremiumCanvasButton>
+                );
+              })}
+              <PremiumCanvasButton
+                onClick={voidWarAlertActive ? () => startVoidBattle() : isVoidWarActive ? () => { playSfx('kill_enemys_botton'); setShowVoidWarMap(true); } : () => startVoidBattle()}
+                disabled={stats.hp <= 0}
+                tone="red"
+                className={`h-full min-h-[86px] rounded-2xl text-sm lg:text-base font-black uppercase tracking-[0.26em] ${isVoidBattleUrgent ? 'animate-pulse shadow-[0_0_28px_rgba(239,68,68,0.42)]' : ''}`}
+                contentClassName="gap-3 text-white"
+              >
+                {isVoidBattleUrgent ? <Skull className="w-5 h-5" /> : <Crosshair className="w-5 h-5" />}
+                {isVoidBattleUrgent ? t('eliminateEnemies') : t('searchCombat')}
+              </PremiumCanvasButton>
 
-        <div className="flex gap-4 items-center mt-auto pt-4 shrink-0">
-          <button
-            onClick={isVoidWarActive ? () => { playSfx('kill_enemys_botton'); setShowVoidWarMap(true); } : () => startVoidBattle()}
-            disabled={stats.hp <= 0}
-            className={`flex-[2] py-4 font-orbitron font-black rounded-2xl transition-all active:scale-95 uppercase tracking-[0.3em] flex items-center justify-center gap-4 disabled:opacity-50 disabled:cursor-not-allowed text-lg ${
-              isVoidWarActive
-                ? 'bg-red-600 text-white shadow-[0_0_40px_rgba(220,38,38,0.6)] animate-pulse border-2 border-red-400'
-                : 'bg-gradient-to-r from-red-700 to-red-600 text-white shadow-[0_0_30px_rgba(239,68,68,0.4)] hover:shadow-[0_0_40px_rgba(239,68,68,0.6)]'
-            }`}
-          >
-            {isVoidWarActive ? <Skull className="w-6 h-6" /> : <Crosshair className="w-6 h-6" />}
-            {isVoidWarActive || voidWarAlertActive ? t('eliminateEnemies') : t('searchCombat')}
-          </button>
+              <PremiumCanvasButton
+                onClick={repairVoidBattleShip}
+                disabled={stats.hp >= getEffectiveVoidStats(stats).maxHp && (stats.shield || 0) >= (getEffectiveVoidStats(stats).maxShield || 1000)}
+                tone="steel"
+                className="h-full min-h-[86px] rounded-2xl font-bold uppercase tracking-[0.2em]"
+                contentClassName="text-white"
+              >
+                <div className="flex flex-col items-center">
+                  <span className="text-[14px]">{t('repair')}</span>
+                  <span className="text-[8px] text-white/40 group-hover:text-white/60">
+                    {stats.hp < getEffectiveVoidStats(stats).maxHp ? '1.5k Ener | 1.5k Tech' : '1k Ener | 1k Tech'}
+                  </span>
+                </div>
+              </PremiumCanvasButton>
+          </div>
 
-          <button
-            onClick={repairVoidBattleShip}
-            disabled={stats.hp >= getEffectiveVoidStats(stats).maxHp && (stats.shield || 0) >= (getEffectiveVoidStats(stats).maxShield || 1000)}
-            className="flex-1 py-4 bg-white/10 text-white font-orbitron font-bold rounded-2xl hover:bg-white/20 transition-all border border-white/20 active:scale-95 uppercase tracking-[0.2em] disabled:opacity-50 disabled:cursor-not-allowed group relative overflow-hidden"
+          <motion.div
+            initial={{ opacity: 0, scale: 0.96 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 0.15 }}
+            className={`relative hidden h-full min-h-[292px] w-full self-stretch justify-self-end overflow-hidden rounded-[1.65rem] border-2 bg-black/80 xl:block ${rarityFrameStyle.border} ${rarityFrameStyle.glow}`}
           >
-            <div className="flex flex-col items-center">
-              <span className="text-[14px]">{t('repair')}</span>
-              <span className="text-[8px] text-white/40 group-hover:text-white/60">
-                {stats.hp < getEffectiveVoidStats(stats).maxHp ? '1.5k Ener | 1.5k Tech' : '1k Ener | 1k Tech'}
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_20%,rgba(255,255,255,0.16),transparent_48%),linear-gradient(135deg,rgba(255,255,255,0.08),transparent_34%,rgba(255,255,255,0.04)_65%,transparent)]" />
+            <div className={`absolute left-5 right-5 top-5 h-px bg-gradient-to-r ${rarityFrameStyle.accent}`} />
+            <div className={`absolute bottom-5 left-5 right-5 h-px bg-gradient-to-r ${rarityFrameStyle.accent}`} />
+            <div className="absolute inset-3 rounded-[1.2rem] border border-white/10" />
+            <div className="absolute -left-16 top-1/4 h-28 w-28 rounded-full bg-white/10 blur-3xl" />
+            <div className="absolute -right-12 bottom-10 h-32 w-32 rounded-full bg-red-500/10 blur-3xl" />
+            <div className={`absolute left-[14%] top-[18%] h-[58%] w-[72%] rounded-full bg-gradient-to-r ${rarityFrameStyle.accent} opacity-30 blur-3xl mix-blend-screen animate-[void-ship-aura_3.8s_ease-in-out_infinite]`} />
+            <div className="absolute inset-0 z-[2] overflow-hidden rounded-[inherit] mix-blend-screen">
+              <div className={`absolute left-0 top-0 h-[34%] w-[58%] bg-gradient-to-r ${rarityFrameStyle.accent} blur-md animate-[void-ship-sweep_4.2s_ease-in-out_infinite]`} />
+            </div>
+            <Image
+              src={battleShipShowcaseImage}
+              alt={stats.rarity === 'mythic' ? 'Eclipse' : t('battleShip')}
+              fill
+              sizes="520px"
+              className="z-[1] object-contain px-7 py-12 drop-shadow-[0_0_24px_rgba(255,255,255,0.18)] animate-[void-ship-aura_5.2s_ease-in-out_infinite]"
+            />
+            <div className="absolute inset-0 z-[3] pointer-events-none">
+              {[
+                ['18%', '28%', '18px', '-12px', '0s'],
+                ['72%', '30%', '-16px', '10px', '0.7s'],
+                ['64%', '67%', '14px', '-16px', '1.25s'],
+                ['32%', '70%', '-10px', '12px', '1.8s'],
+                ['48%', '20%', '12px', '14px', '2.3s'],
+              ].map(([left, top, sparkX, sparkY, delay], index) => (
+                <span
+                  key={`ship-spark-${index}`}
+                  className={`absolute h-1.5 w-1.5 rounded-full bg-white shadow-[0_0_12px_rgba(255,255,255,0.9)] animate-[void-ship-spark_2.8s_ease-in-out_infinite] ${rarityFrameStyle.text}`}
+                  style={{
+                    left,
+                    top,
+                    animationDelay: delay,
+                    ['--spark-x' as any]: sparkX,
+                    ['--spark-y' as any]: sparkY,
+                  }}
+                />
+              ))}
+            </div>
+            <div className="absolute left-4 top-4 z-[4] flex items-center gap-2">
+              <Star className={`h-4 w-4 ${rarityFrameStyle.text}`} />
+              <span className={`rounded-lg border px-2.5 py-1 text-[9px] font-orbitron font-black uppercase tracking-[0.22em] ${rarityFrameStyle.chip}`}>
+                {rarityFrameStyle.label}
               </span>
             </div>
-            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
-          </button>
+            <div className={`absolute bottom-4 left-4 right-4 z-[4] text-center font-orbitron text-[10px] font-black uppercase tracking-[0.28em] ${rarityFrameStyle.text}`}>
+              {stats.rarity === 'mythic' ? 'Eclipse Prime' : 'Battle Core'}
+            </div>
+            <div className="absolute left-0 top-0 h-10 w-10 border-l-2 border-t-2 border-white/30 rounded-tl-[1.55rem]" />
+            <div className="absolute right-0 top-0 h-10 w-10 border-r-2 border-t-2 border-white/30 rounded-tr-[1.55rem]" />
+            <div className="absolute bottom-0 left-0 h-10 w-10 border-b-2 border-l-2 border-white/30 rounded-bl-[1.55rem]" />
+            <div className="absolute bottom-0 right-0 h-10 w-10 border-b-2 border-r-2 border-white/30 rounded-br-[1.55rem]" />
+          </motion.div>
         </div>
       </motion.div>
     </div>

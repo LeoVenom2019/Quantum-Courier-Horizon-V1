@@ -286,6 +286,7 @@ function disarmCell(r, c) {
         cell.el.classList.add('disarmed', 'ripple');
         cell.el.innerHTML = '⚡';
         foundMines++;
+        notifyArcadeAction('perfect-bomb-disarm');
         timer += 20;
         combo++;
         
@@ -345,6 +346,15 @@ function updateDisplays() {
     } else {
         timerDisplay.style.color = 'var(--color-accent)';
     }
+}
+
+function notifyArcadeAction(actionId, amount = 1) {
+    window.parent.postMessage({
+        type: 'ARCADE_ACTION',
+        gameId: 'danger-zoom-zones',
+        actionId,
+        amount
+    }, '*');
 }
 
 function triggerBump(el) {

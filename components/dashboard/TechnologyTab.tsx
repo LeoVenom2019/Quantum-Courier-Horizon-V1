@@ -6,6 +6,7 @@ import { Cpu, Lock, Check, Zap, Rocket, Search, ChevronRight, ChevronLeft, Trend
 import { TECHNOLOGIES, SHIPS, EXTRACTION_POINTS } from '@/lib/game-data';
 import { EXTRACTION_PRODUCTION_COSTS } from '@/lib/game-constants';
 import { useDashboard } from './DashboardProvider';
+import { PremiumCanvasButton } from '../ui/PremiumCanvasButton';
 
 const TechnologyTab = memo(() => {
   const { 
@@ -85,26 +86,26 @@ const TechnologyTab = memo(() => {
 
         {isInterstellar && (
           <div className="flex bg-black/40 p-1 rounded-xl border border-white/10">
-            <button
+            <PremiumCanvasButton
               onClick={() => setTechSubTab('ships')}
-              className={`px-4 py-2 rounded-lg text-[14px] font-bold transition-all ${
-                techSubTab === 'ships' ? 'bg-white/10 text-white' : 'text-white/40 hover:text-white/60'
-              }`}
+              tone={techSubTab === 'ships' ? 'indigo' : 'steel'}
+              className="h-9 px-4 text-[14px] font-bold"
+              contentClassName={techSubTab === 'ships' ? 'text-white' : 'text-white/50'}
             >
               {t('research')}
-            </button>
-            <button
+            </PremiumCanvasButton>
+            <PremiumCanvasButton
               onClick={() => {
                 if (allTechUnlocked) setTechSubTab('extraction');
               }}
-              className={`px-4 py-2 rounded-lg text-[14px] font-bold transition-all ${
-                techSubTab === 'extraction' ? 'bg-orange-500/20 text-orange-400' : 
-                allTechUnlocked ? 'text-white/40 hover:text-white/60' : 'text-white/10 cursor-not-allowed'
-              }`}
+              disabled={!allTechUnlocked}
+              tone={techSubTab === 'extraction' ? 'orange' : 'steel'}
+              className="h-9 px-4 text-[14px] font-bold"
+              contentClassName={techSubTab === 'extraction' ? 'text-orange-200' : allTechUnlocked ? 'text-white/50' : 'text-white/20'}
             >
               {language === 'pt' ? 'Extração' : 'Extraction'}
               {!allTechUnlocked && <Lock className="w-3 h-3 inline ml-1 mb-0.5" />}
-            </button>
+            </PremiumCanvasButton>
           </div>
         )}
       </div>
@@ -174,62 +175,64 @@ const TechnologyTab = memo(() => {
 
                       {/* Action Grid */}
                       <div className="grid grid-cols-2 gap-2">
-                        <button
+                        <PremiumCanvasButton
                           onClick={() => upgradeExtractionProduction(point.id)}
                           disabled={prodLevel >= 6 || qc < picaretaCost}
-                          className={`p-2 rounded-xl border transition-all flex flex-col items-center justify-center gap-1 ${
-                            prodLevel >= 6 ? 'opacity-40 border-white/5 bg-white/5 text-slate-500' :
-                            qc >= picaretaCost ? 'border-orange-500/30 bg-orange-500/10 text-orange-400 hover:bg-orange-500/20' : 'border-white/5 bg-white/5 text-slate-600'
-                          }`}
+                          tone={prodLevel >= 6 || qc < picaretaCost ? 'steel' : 'orange'}
+                          className="min-h-[64px] p-2"
+                          contentClassName={`flex-col gap-1 ${prodLevel >= 6 || qc < picaretaCost ? 'text-slate-500' : 'text-orange-300'}`}
                         >
                           <TrendingUp className="w-4 h-4" />
                           <span className="text-[10px] font-bold">{prodLevel >= 6 ? 'MAX' : formatValue(picaretaCost)}</span>
-                        </button>
+                        </PremiumCanvasButton>
 
-                        <button
+                        <PremiumCanvasButton
                           onClick={() => upgradeExtractionCompression(point.id)}
                           disabled={compLevel >= 10 || qc < compCost}
-                          className={`p-2 rounded-xl border transition-all flex flex-col items-center justify-center gap-1 ${
-                            compLevel >= 10 ? 'opacity-40 border-white/5 bg-white/5 text-slate-500' :
-                            qc >= compCost ? 'border-indigo-500/30 bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500/20' : 'border-white/5 bg-white/5 text-slate-600'
-                          }`}
+                          tone={compLevel >= 10 || qc < compCost ? 'steel' : 'indigo'}
+                          className="min-h-[64px] p-2"
+                          contentClassName={`flex-col gap-1 ${compLevel >= 10 || qc < compCost ? 'text-slate-500' : 'text-indigo-300'}`}
                         >
                           <Zap className="w-4 h-4" />
                           <span className="text-[10px] font-bold">{compLevel >= 10 ? 'MAX' : formatValue(compCost)}</span>
-                        </button>
+                        </PremiumCanvasButton>
 
-                        <button
+                        <PremiumCanvasButton
                           onClick={() => isAutoSellUnlocked ? toggleExtractionAutoSell(point.id) : buyExtractionAutoSell(point.id)}
-                          className={`p-2 rounded-xl border transition-all flex flex-col items-center justify-center gap-1 ${
-                            isAutoSellUnlocked 
-                              ? (isAutoSell ? 'border-emerald-500/40 bg-emerald-500/20 text-emerald-400' : 'border-white/10 bg-white/5 text-slate-500')
-                              : (qc >= autoSellCost ? 'border-amber-500/30 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20' : 'border-white/5 bg-white/5 text-slate-600')
+                          tone={isAutoSellUnlocked ? (isAutoSell ? 'green' : 'steel') : (qc >= autoSellCost ? 'amber' : 'steel')}
+                          className="min-h-[64px] p-2"
+                          contentClassName={`flex-col gap-1 ${
+                            isAutoSellUnlocked
+                              ? (isAutoSell ? 'text-emerald-300' : 'text-slate-400')
+                              : (qc >= autoSellCost ? 'text-amber-300' : 'text-slate-500')
                           }`}
                         >
                           <Rocket className="w-4 h-4" />
                           <span className="text-[10px] font-bold">{isAutoSellUnlocked ? (isAutoSell ? 'AUTO ON' : 'AUTO OFF') : formatValue(autoSellCost)}</span>
-                        </button>
+                        </PremiumCanvasButton>
 
-                        <button
+                        <PremiumCanvasButton
                           onClick={(e) => sellExtractionPointPacks(point.id, e as any)}
                           disabled={packs < 100}
-                          className={`p-2 rounded-xl border transition-all flex flex-col items-center justify-center gap-1 ${
-                            packs >= 100 ? 'border-emerald-500/40 bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30' : 'border-white/5 bg-white/5 text-slate-700'
-                          }`}
+                          tone={packs >= 100 ? 'green' : 'steel'}
+                          className="min-h-[64px] p-2"
+                          contentClassName={`flex-col gap-1 ${packs >= 100 ? 'text-emerald-300' : 'text-slate-500'}`}
                         >
                           <Coins className="w-4 h-4" />
                           <span className="text-[10px] font-bold">{packs >= 100 ? t('sell') : 'MIN. 100'}</span>
-                        </button>
+                        </PremiumCanvasButton>
                       </div>
                     </div>
                   ) : (
                     <div className="space-y-3">
-                      <button
+                      <PremiumCanvasButton
                         onClick={() => researchPoint(point.id)}
                         disabled={qc < point.cost || (!!researchingExtractionPoint && researchingExtractionPoint.id !== point.id)}
-                        className={`w-full py-3 rounded-xl font-bold uppercase transition-all flex items-center justify-center gap-2 ${
-                          (!!researchingExtractionPoint && researchingExtractionPoint.id === point.id) ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/40' :
-                          qc >= point.cost ? 'bg-orange-500 text-black hover:bg-orange-400 shadow-[0_0_15px_rgba(249,115,22,0.3)]' : 'bg-white/5 text-slate-600'
+                        tone={(!!researchingExtractionPoint && researchingExtractionPoint.id === point.id) ? 'amber' : qc >= point.cost ? 'orange' : 'steel'}
+                        className="w-full h-12 text-[14px] font-bold uppercase"
+                        contentClassName={`gap-2 ${
+                          (!!researchingExtractionPoint && researchingExtractionPoint.id === point.id) ? 'text-yellow-200' :
+                          qc >= point.cost ? 'text-orange-100' : 'text-slate-500'
                         }`}
                       >
                         {(researchingExtractionPoint && researchingExtractionPoint.id === point.id) ? t('researching') : (
@@ -238,7 +241,7 @@ const TechnologyTab = memo(() => {
                             {t('researchPoint')}
                           </>
                         )}
-                      </button>
+                      </PremiumCanvasButton>
 
                       {researchingExtractionPoint && researchingExtractionPoint.id === point.id && (
                         <div className="space-y-2">
@@ -250,15 +253,17 @@ const TechnologyTab = memo(() => {
                                 animate={{ width: `${Math.min(100, ((Date.now() - researchingExtractionPoint.startTime) / (point.researchTime)) * 100)}%` }}
                               />
                             </div>
-                            <button 
+                            <PremiumCanvasButton
                               onClick={() => boostResearchExtractionPoint(point.id)}
-                              className="ml-3 p-2 bg-yellow-500/20 border border-yellow-500/40 rounded-lg text-yellow-400 hover:bg-yellow-500/30 transition-all flex items-center gap-2"
+                              tone="amber"
+                              className="ml-3 h-9 min-w-[98px] px-2"
+                              contentClassName="gap-2 text-yellow-200"
                             >
                               <Zap className="w-3 h-3 animate-pulse" />
                               <span className="text-[10px] font-bold font-mono">
                                 {formatValue(Math.floor(point.cost * (getEconomicMultipliers().cost) * 0.75))} QC
                               </span>
-                            </button>
+                            </PremiumCanvasButton>
                           </div>
                         </div>
                       )}
@@ -268,9 +273,11 @@ const TechnologyTab = memo(() => {
               );
             })}
             <div className="flex items-center justify-center">
-              <button
+              <PremiumCanvasButton
                 onClick={() => setExtractionPageIndex(extractionPageIndex === 0 ? 1 : 0)}
-                className="group relative flex flex-col items-center gap-2 p-6 rounded-2xl border border-orange-500/20 bg-orange-900/5 hover:bg-orange-500/10 hover:border-orange-500/40 transition-all duration-300 transform hover:scale-105"
+                tone="orange"
+                className="min-h-[132px] max-w-[230px] p-6"
+                contentClassName="flex-col gap-2 text-orange-300"
               >
                 <div className="relative">
                   {extractionPageIndex === 0 ? <ChevronRight className="w-10 h-10 text-orange-400" /> : <ChevronLeft className="w-10 h-10 text-orange-400" />}
@@ -278,7 +285,7 @@ const TechnologyTab = memo(() => {
                 <span className="text-base font-orbitron font-bold text-orange-400 uppercase tracking-widest">
                   {extractionPageIndex === 0 ? (language === 'pt' ? 'Ver outros 4 pontos' : 'View other 4 points') : (language === 'pt' ? 'Voltar para os 5 pontos' : 'Back to 5 points')}
                 </span>
-              </button>
+              </PremiumCanvasButton>
             </div>
           </div>
         </div>
@@ -314,15 +321,17 @@ const TechnologyTab = memo(() => {
                       <Check className="w-4 h-4" />
                     </div>
                   ) : isResearching ? (
-                    <button 
+                    <PremiumCanvasButton
                       onClick={() => boostResearch()}
-                      className="shrink-0 group relative h-8 px-3 rounded-lg flex items-center justify-center gap-2 border bg-yellow-500/20 border-yellow-500/40 text-yellow-400 overflow-hidden hover:bg-yellow-500/30 transition-all cursor-pointer active:scale-95"
+                      tone="amber"
+                      className="shrink-0 h-8 px-3"
+                      contentClassName="gap-2 text-yellow-200"
                     >
                       <Zap className="w-4 h-4 animate-pulse" />
                       <span className="text-[12px] font-bold font-mono">
                         {formatValue(Math.floor(tech.cost * multipliers.cost * 0.75))}
                       </span>
-                    </button>
+                    </PremiumCanvasButton>
                   ) : (
                     <div className="shrink-0 w-8 h-8 rounded-lg flex items-center justify-center border bg-white/5 border-white/10 text-slate-600">
                       <Lock className="w-4 h-4" />
@@ -337,15 +346,15 @@ const TechnologyTab = memo(() => {
                   </div>
 
                   {isNext && !isResearching && (
-                    <button
+                    <PremiumCanvasButton
                       onClick={() => buyTech(tech.level)}
                       disabled={qc < cost}
-                      className={`w-full py-2 rounded-lg font-orbitron font-bold text-[14px] transition-all uppercase ${
-                        qc >= cost ? 'bg-indigo-600 text-white hover:bg-indigo-500' : 'bg-white/5 text-slate-600'
-                      }`}
+                      tone={qc >= cost ? 'indigo' : 'steel'}
+                      className="w-full h-10 text-[14px] font-bold uppercase"
+                      contentClassName={qc >= cost ? 'text-indigo-100' : 'text-slate-500'}
                     >
                       {t('research')} ({formatValue(cost)})
-                    </button>
+                    </PremiumCanvasButton>
                   )}
                   
                   {isResearching && researchingTech && (

@@ -44,6 +44,10 @@ export interface VoidBattleEnemy {
   isExploding?: boolean;
   originalId?: string; // For asset lookup when id is unique per instance
   lastShot?: number;
+  spriteSuffix?: string;
+  previousSpriteSuffix?: string;
+  spriteTransitionStartedAt?: number;
+  shootSpriteUntil?: number;
 }
 
 export interface VoidBattleParticle {
@@ -153,6 +157,7 @@ export interface VoidBattleState {
   laserBeamWidth: number;
   laserFlashAlpha: number;
   laserResidualBurnLife: number;
+  laserLastDamageTick: number;
   playerShotDuckedUntil: number;
   fireballs: any[];
   trailParts: any[];
@@ -237,6 +242,10 @@ const BOSS_INTROS: Record<number, {
 };
 
 const randomInt = ([min, max]: [number, number]) => Math.floor(min + Math.random() * (max - min + 1));
+const BOSS_SPRITE_FADE_MS = 110;
+const BOSS_SHOOT_SPRITE_MS = 320;
+const HELLFIRE_IMPACT_DAMAGE_MULTIPLIER = 6;
+const HELLFIRE_BURN_TICK_DAMAGE_MULTIPLIER = 0.35;
 
 const VoidBattleHUD = memo(function VoidBattleHUD({ hud, playerMaxHp, playerMaxShield, displayEnemy, t, isGroupBattle, routeTier }: any) {
   const isVoid = routeTier === 'Void';
@@ -300,6 +309,8 @@ export interface VoidBattleArenaProps {
   enemyQueue?: VoidBattleEnemy[];
   activeShipImage?: string;
   onExitBattle?: () => void;
+  meteoriteRewardValue?: number;
+  disableMeteorEvent?: boolean;
 }
 
 // Gerar estrelas uma única vez — 3 camadas de parallax
@@ -358,15 +369,23 @@ const VoidBattleArena = memo(function VoidBattleArena({
   battleLevel,
   enemyQueue,
   activeShipImage,
-  onExitBattle
+  onExitBattle,
+  meteoriteRewardValue = 0,
+  disableMeteorEvent = false
 }: VoidBattleArenaProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 800, height: 500 });
   const isBossEncounter = initialEnemies.some(enemy => enemy.type === 'Boss')
     || (enemyQueue || []).some(enemy => enemy.type === 'Boss');
+  const canStartMeteorEvent = !disableMeteorEvent
+    && !isBossEncounter
+    && initialEnemies.length === 1
+    && (enemyQueue || []).length === 0;
   const bossIntro = routeTier === 'Void' && isBossEncounter ? BOSS_INTROS[locationId] : undefined;
   const [showBossIntro, setShowBossIntro] = useState(Boolean(bossIntro));
+  const meteoriteQcValue = Math.max(0, Math.floor(meteoriteRewardValue || 0));
+  const meteorQcValue = meteoriteQcValue * 3;
 
   useEffect(() => {
     const handleResize = () => {
@@ -432,8 +451,9 @@ const VoidBattleArena = memo(function VoidBattleArena({
     laserBeamWidth: 0,
     laserFlashAlpha: 0,
     laserResidualBurnLife: 0,
+    laserLastDamageTick: 0,
     playerShotDuckedUntil: 0,
-    meteorEvent: !isBossEncounter && Math.random() < 0.3 ? {
+    meteorEvent: canStartMeteorEvent && Math.random() < 0.3 ? {
       active: true,
       startTime: Date.now() + 500, // Começa quase imediatamente
       lastSpawn: 0,
@@ -501,6 +521,18 @@ const VoidBattleArena = memo(function VoidBattleArena({
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [assetsLoaded, setAssetsLoaded] = useState(false);
   const [videoReady, setVideoReady] = useState(false);
+  const battleAssetKey = JSON.stringify({
+    locationId,
+    routeTier,
+    activeShipImage: activeShipImage || '',
+    playerRarity: playerShipStats.rarity || 'common',
+    enemies: [...initialEnemies, ...(enemyQueue || [])].map(enemy => ({
+      id: enemy.id,
+      type: enemy.type,
+      image: enemy.image,
+      assetBaseName: enemy.assetBaseName || '',
+    })),
+  });
 
   // Load Images (Sprites)
   useEffect(() => {
@@ -572,17 +604,31 @@ const VoidBattleArena = memo(function VoidBattleArena({
           baseName = 'monster-elite';
         }
 
-        const assetLocKey = e.type === 'Elite' ? 'zero' : locKey;
+        const hasDirectionalSprites = e.type === 'Boss';
+        const assetLocKey = hasDirectionalSprites ? locKey : 'zero';
         const baseSrc = `/assets/rota3/void/${assetLocKey}/${baseName}`;
         const fallbackBaseSrc = `/assets/rota3/void/zero/${baseName}`;
 
-        imagesToLoad.push(
-          { id: `${e.id}_neutral`, src: `${baseSrc}_neutral.webp`, fallback: `${fallbackBaseSrc}_neutral.webp` },
-          { id: `${e.id}_up`, src: `${baseSrc}_up.webp`, fallback: `${fallbackBaseSrc}_neutral.webp` },
-          { id: `${e.id}_down`, src: `${baseSrc}_down.webp`, fallback: `${fallbackBaseSrc}_neutral.webp` },
-          { id: `${e.id}_forward`, src: `${baseSrc}_forward.webp`, fallback: `${fallbackBaseSrc}_neutral.webp` },
-          { id: `${e.id}_backward`, src: `${baseSrc}_backward.webp`, fallback: `${fallbackBaseSrc}_neutral.webp` }
-        );
+        if (hasDirectionalSprites) {
+          const hasShootSprite = routeTier === 'Void' && locationId === 5;
+          imagesToLoad.push(
+            { id: `${e.id}_neutral`, src: `${baseSrc}_neutral.webp`, fallback: `${fallbackBaseSrc}_neutral.webp` },
+            { id: `${e.id}_up`, src: `${baseSrc}_up.webp`, fallback: `${fallbackBaseSrc}_neutral.webp` },
+            { id: `${e.id}_down`, src: `${baseSrc}_down.webp`, fallback: `${fallbackBaseSrc}_neutral.webp` },
+            { id: `${e.id}_forward`, src: `${baseSrc}_forward.webp`, fallback: `${fallbackBaseSrc}_neutral.webp` },
+            { id: `${e.id}_backward`, src: `${baseSrc}_backward.webp`, fallback: `${fallbackBaseSrc}_neutral.webp` },
+            ...(hasShootSprite ? [{ id: `${e.id}_shoot`, src: `${baseSrc}_shoot.webp`, fallback: `${baseSrc}_neutral.webp` }] : [])
+          );
+        } else {
+          const neutralSrc = `${baseSrc}_neutral.webp`;
+          imagesToLoad.push(
+            { id: `${e.id}_neutral`, src: neutralSrc, fallback: `${fallbackBaseSrc}_neutral.webp` },
+            { id: `${e.id}_up`, src: neutralSrc, fallback: `${fallbackBaseSrc}_neutral.webp` },
+            { id: `${e.id}_down`, src: neutralSrc, fallback: `${fallbackBaseSrc}_neutral.webp` },
+            { id: `${e.id}_forward`, src: neutralSrc, fallback: `${fallbackBaseSrc}_neutral.webp` },
+            { id: `${e.id}_backward`, src: neutralSrc, fallback: `${fallbackBaseSrc}_neutral.webp` }
+          );
+        }
       } else {
         // For Solar and Interstellar, use the ship image directly for all states
         imagesToLoad.push(
@@ -603,7 +649,7 @@ const VoidBattleArena = memo(function VoidBattleArena({
     return () => {
       cancelled = true;
     };
-  }, [locationId, initialEnemies, activeShipImage, enemyQueue, playerShipStats.rarity, routeTier]);
+  }, [battleAssetKey]);
 
   // Load and Prepare Video Background
   useEffect(() => {
@@ -742,6 +788,7 @@ const VoidBattleArena = memo(function VoidBattleArena({
       s.laserArcs = [];
       s.laserEmbers = [];
       s.laserResidualBurnLife = 0;
+      s.laserLastDamageTick = 0;
 
       // Initial Charge Particles
       const startX = (s.playerX / 100) * (canvasRef.current?.width || 0) + 120;
@@ -1203,7 +1250,7 @@ const VoidBattleArena = memo(function VoidBattleArena({
 
       // Dano imediato nos inimigos próximos
       const SPLASH_PX = 90 * (cWidth / 800);
-      const immDmg = playerShipStatsRef.current.damage * 12;
+      const immDmg = playerShipStatsRef.current.damage * HELLFIRE_IMPACT_DAMAGE_MULTIPLIER;
 
       s.enemies.forEach(en => {
         if (en.hp <= 0) return;
@@ -1489,6 +1536,8 @@ const VoidBattleArena = memo(function VoidBattleArena({
       const CHARGE_DURATION = 1200;
       const FIRING_DURATION = 1400; // Total length of the firing sequence
       const COLLAPSE_DURATION = 2500; // Much longer for residual effects
+      const LASER_DAMAGE_TICK_MS = 200;
+      const LASER_DAMAGE_PER_TICK = playerShipStats.damage * 4.0;
       const LASER_COLORS = ["#ff00ff", "#ff3355", "#00ffff", "#ffffff"];
 
       const getLaserStart = () => ({ x: (s.playerX / 100) * cWidth + 120, y: (s.playerY / 100) * cHeight });
@@ -1515,6 +1564,7 @@ const VoidBattleArena = memo(function VoidBattleArena({
           s.laserFlashAlpha = 1.2; // BLINDING FLASH AT START
           s.shake.x = 45; s.shake.y = 45; // Camera suffered!
           s.laserImpactPos = { x: end.x, y: end.y };
+          s.laserLastDamageTick = now - LASER_DAMAGE_TICK_MS;
           s.shockwaves.push({ x: start.x, y: start.y, radius: 50, alpha: 1, speed: 25, thickness: 15, color: '#fff' });
       } else if (s.laserState === 'firing' && elapsed > FIRING_DURATION) {
           s.laserState = 'collapse';
@@ -1677,18 +1727,24 @@ const VoidBattleArena = memo(function VoidBattleArena({
           ctx.restore();
 
           // Damage Logic
-          const dmg = (playerShipStats.damage * 4.0) / 60;
-          s.enemies.forEach(e => {
-              const ex = (e.x / 100) * cWidth;
-              if (e.hp > 0 && Math.abs((e.y / 100) * cHeight - start.y) < 90 && ex > (start.x - 50) && ex < end.x + 50) {
-                  const tDmg = dmg * deltaTime;
-                  if (e.shield > 0) {
-                      const sD = Math.min(e.shield, tDmg); e.shield -= sD;
-                      const rem = tDmg - sD; if (rem > 0) e.hp = Math.max(0, e.hp - rem);
-                  } else { e.hp = Math.max(0, e.hp - tDmg); }
-                  if (s.frameCount % 12 === 0) createDamageNumber(e.x, e.y - 15, dmg * 60, true, 'player');
-              }
-          });
+          if (now - s.laserLastDamageTick >= LASER_DAMAGE_TICK_MS) {
+            s.laserLastDamageTick = now;
+            s.enemies.forEach(e => {
+                const ex = (e.x / 100) * cWidth;
+                if (e.hp > 0 && Math.abs((e.y / 100) * cHeight - start.y) < 90 && ex > (start.x - 50) && ex < end.x + 50) {
+                    let remainingDamage = LASER_DAMAGE_PER_TICK;
+                    if (e.shield > 0) {
+                        const shieldDamage = Math.min(e.shield, remainingDamage);
+                        e.shield -= shieldDamage;
+                        remainingDamage -= shieldDamage;
+                    }
+                    if (remainingDamage > 0) {
+                        e.hp = Math.max(0, e.hp - remainingDamage);
+                    }
+                    createDamageNumber(e.x, e.y - 15, LASER_DAMAGE_PER_TICK, true, 'player');
+                }
+            });
+          }
 
           s.shake.x = 15 + Math.random() * 15; s.shake.y = 15 + Math.random() * 15;
       }
@@ -2060,23 +2116,6 @@ const VoidBattleArena = memo(function VoidBattleArena({
                 imageIndex: Math.floor(Math.random() * 2) + 1
               });
 
-              // Spawn extra enemies during event (max 3 extra)
-              if (s.meteorEvent.extraEnemiesSpawned < 3 && Math.random() < 0.15) {
-                const enemyToClone = initialEnemies[Math.floor(Math.random() * initialEnemies.length)];
-                if (enemyToClone) {
-                   s.enemies.push({
-                     ...enemyToClone,
-                     id: `extra-${now}-${Math.random()}`,
-                     originalId: enemyToClone.id,
-                     x: 105,
-                     y: 10 + Math.random() * 80,
-                     hp: enemyToClone.hp * 0.5,
-                     maxHp: enemyToClone.maxHp * 0.5,
-                     vx: -0.2 - Math.random() * 0.2
-                   });
-                   s.meteorEvent.extraEnemiesSpawned++;
-                }
-              }
             }
           }
         }
@@ -2122,7 +2161,8 @@ const VoidBattleArena = memo(function VoidBattleArena({
 
                   createExplosionEffect(m.x, m.y, '#fbbf24');
                   playSfx('enemy_explosion');
-                  s.totalRewardAccumulated = (s.totalRewardAccumulated || 0) + (m.type === 'meteor' ? 50 : 20);
+                  const meteorReward = m.type === 'meteor' ? meteorQcValue : meteoriteQcValue;
+                  s.totalRewardAccumulated = (s.totalRewardAccumulated || 0) + meteorReward;
                   return false;
                 }
             }
@@ -2180,6 +2220,9 @@ const VoidBattleArena = memo(function VoidBattleArena({
             const dist = Math.hypot(dx, dy) || 1;
             const bossConfig = routeTier === 'Void' && enemy.type === 'Boss' ? BOSS_INTROS[locationId] : undefined;
             const projectileDamage = bossConfig ? randomInt(bossConfig.damage) : enemy.damage;
+            if (bossConfig?.attack === 'moltenIron' && locationId === 5) {
+              enemy.shootSpriteUntil = now + BOSS_SHOOT_SPRITE_MS;
+            }
 
             s.projectiles.push({
               id: `ep-${now}-${enemy.id}`,
@@ -2347,7 +2390,7 @@ const VoidBattleArena = memo(function VoidBattleArena({
             const ey = (en.y / 100) * cHeight;
             const d = Math.hypot(ex - bx, ey - by);
             if (d < bz.radius) {
-              const dmg = playerShipStatsRef.current.damage * 1.5 * deltaTime;
+              const dmg = playerShipStatsRef.current.damage * HELLFIRE_BURN_TICK_DAMAGE_MULTIPLIER * deltaTime;
               applyPlayerDamageToEnemy(en, dmg);
               // Add visible damage number for DoT
             }
@@ -2501,7 +2544,29 @@ const VoidBattleArena = memo(function VoidBattleArena({
           let y = (enemy.y / 100) * cHeight;
           const assetId = enemy.originalId || enemy.id;
           let spriteSuffix = '_neutral';
-          if (Math.abs(enemy.vy || 0) > 0.05) spriteSuffix = (enemy.vy || 0) < 0 ? '_up' : '_down';
+          if (enemy.type === 'Boss' && routeTier === 'Void') {
+            const shootImg = assetsRef.current[`${assetId}_shoot`];
+            if (now < (enemy.shootSpriteUntil || 0) && shootImg && shootImg.width > 0) {
+              spriteSuffix = '_shoot';
+            } else {
+              const vx = enemy.vx || 0;
+              const vy = enemy.vy || 0;
+              const absX = Math.abs(vx);
+              const absY = Math.abs(vy);
+
+              if (absY > absX && absY > 0.02) spriteSuffix = vy < 0 ? '_up' : '_down';
+              else if (absX > 0.02) spriteSuffix = vx < 0 ? '_forward' : '_backward';
+            }
+
+            if (!enemy.spriteSuffix) enemy.spriteSuffix = spriteSuffix;
+            if (enemy.spriteSuffix !== spriteSuffix) {
+              enemy.previousSpriteSuffix = enemy.spriteSuffix;
+              enemy.spriteSuffix = spriteSuffix;
+              enemy.spriteTransitionStartedAt = now;
+            }
+          } else if (Math.abs(enemy.vy || 0) > 0.05) {
+            spriteSuffix = (enemy.vy || 0) < 0 ? '_up' : '_down';
+          }
           const eImg = assetsRef.current[`${assetId}${spriteSuffix}`] || assetsRef.current[`${assetId}_neutral`];
 
           if (eImg && eImg.width > 0) {
@@ -2511,8 +2576,10 @@ const VoidBattleArena = memo(function VoidBattleArena({
               else if (enemy.type === 'Elite') baseSize *= 1.25;
               const imgW = baseSize;
               const imgH = eImg.height * (imgW / eImg.width);
-              y += Math.sin(now / 400 + enemy.y) * 10;
-              x += Math.cos(now / 600 + enemy.x) * 5;
+              if (enemy.type !== 'Boss') {
+                y += Math.sin(now / 400 + enemy.y) * 10;
+                x += Math.cos(now / 600 + enemy.x) * 5;
+              }
 
               ctx.save();
               ctx.globalAlpha = 0.3;
@@ -2520,7 +2587,34 @@ const VoidBattleArena = memo(function VoidBattleArena({
               ctx.fillStyle = enemy.type === 'Padrão' ? '#a855f7' : '#f43f5e';
               ctx.beginPath(); ctx.arc(x, y, 40, 0, Math.PI * 2); ctx.fill();
               ctx.restore();
-              ctx.drawImage(eImg, x - imgW/2, y - imgH/2, imgW, imgH);
+
+              if (enemy.type === 'Boss') {
+                const previousImg = enemy.previousSpriteSuffix
+                  ? assetsRef.current[`${assetId}${enemy.previousSpriteSuffix}`]
+                  : undefined;
+                const transitionStartedAt = enemy.spriteTransitionStartedAt || 0;
+                const fadeProgress = transitionStartedAt
+                  ? Math.min(1, (now - transitionStartedAt) / BOSS_SPRITE_FADE_MS)
+                  : 1;
+
+                if (previousImg && previousImg.width > 0 && fadeProgress < 1) {
+                  ctx.save();
+                  ctx.globalAlpha = 1 - fadeProgress;
+                  ctx.drawImage(previousImg, x - imgW/2, y - imgH/2, imgW, imgH);
+                  ctx.restore();
+
+                  ctx.save();
+                  ctx.globalAlpha = fadeProgress;
+                  ctx.drawImage(eImg, x - imgW/2, y - imgH/2, imgW, imgH);
+                  ctx.restore();
+                } else {
+                  ctx.drawImage(eImg, x - imgW/2, y - imgH/2, imgW, imgH);
+                  enemy.previousSpriteSuffix = undefined;
+                  enemy.spriteTransitionStartedAt = undefined;
+                }
+              } else {
+                ctx.drawImage(eImg, x - imgW/2, y - imgH/2, imgW, imgH);
+              }
             } else {
               // PNG Original para Rotas 1 e 2
               const imgW = 110;
@@ -2770,34 +2864,26 @@ const VoidBattleArena = memo(function VoidBattleArena({
       // Win/Loss detection
       if (!battleFinished) {
         const allEnemiesDead = s.enemies.every(e => e.hp <= 0);
+        const isMeteorSurvivalEvent = Boolean(s.meteorEvent?.active);
+        const meteorEventRunning = Boolean(s.meteorEvent?.active && now - s.meteorEvent.startTime < 25000);
 
         if (allEnemiesDead) {
-          if (s.enemyQueue && s.enemyQueue.length > 0) {
+          if (isMeteorSurvivalEvent && meteorEventRunning) {
+            // In meteor events, the single enemy is only the opener.
+            // After it dies, the player survives the shower and earns QC from destroyed rocks.
+          } else if (!isMeteorSurvivalEvent && s.enemyQueue && s.enemyQueue.length > 0) {
              s.enemies.forEach(e => { s.totalRewardAccumulated = (s.totalRewardAccumulated || 0) + (e.qc || 0); });
              const nextEnemy = s.enemyQueue.shift();
              if (nextEnemy) {
                s.enemies = [{ ...nextEnemy, isExploding: false }];
                s.lastEnemyAttack = now;
              }
-          } else if (s.meteorEvent?.active && (now - s.meteorEvent.startTime < 25000)) {
-             // Caso meteoritos ativos e sem fila, respawna um inimigo aleatório do pool inicial
-             s.enemies.forEach(e => { s.totalRewardAccumulated = (s.totalRewardAccumulated || 0) + (e.qc || 0); });
-             const enemyTemplate = initialEnemies[Math.floor(Math.random() * initialEnemies.length)];
-             if (enemyTemplate) {
-               s.enemies = [{
-                 ...enemyTemplate,
-                 id: `respawn-${now}-${Math.random()}`,
-                 hp: enemyTemplate.hp * 0.7, // Um pouco mais fraco para manter o ritmo
-                 maxHp: enemyTemplate.maxHp * 0.7,
-                 x: 105,
-                 isExploding: false
-               }];
-               s.lastEnemyAttack = now;
-             }
           } else {
             if (!s.victoryExplosionStart) {
               s.victoryExplosionStart = now;
-              s.enemies.forEach(e => { s.totalRewardAccumulated = (s.totalRewardAccumulated || 0) + (e.qc || 0); });
+              if (!isMeteorSurvivalEvent) {
+                s.enemies.forEach(e => { s.totalRewardAccumulated = (s.totalRewardAccumulated || 0) + (e.qc || 0); });
+              }
               s.enemies.forEach(e => { e.qc = 0; });
 
               if (routeTier === 'Void') {
@@ -2812,7 +2898,12 @@ const VoidBattleArena = memo(function VoidBattleArena({
                 playerHp: s.playerHp,
                 playerShield: s.playerShield,
                 destroyedMeteors: s.destroyedMeteors,
-                destroyedMeteorites: s.destroyedMeteorites
+                destroyedMeteorites: s.destroyedMeteorites,
+                isMeteorEventReward: isMeteorSurvivalEvent,
+                meteoriteRewardValue: meteoriteQcValue,
+                meteorRewardValue: meteorQcValue,
+                meteoriteRewardTotal: s.destroyedMeteorites * meteoriteQcValue,
+                meteorRewardTotal: s.destroyedMeteors * meteorQcValue
               });
             }
           }
@@ -2867,7 +2958,7 @@ const VoidBattleArena = memo(function VoidBattleArena({
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
-  }, [assetsLoaded, triggerAttack, onBattleEnd, playSfx, stopSfx, dimensions, routeTier, triggerAbility, playerShipStats, locationId, videoReady, showBossIntro, activeShipImage, addLog, initialEnemies, language]);
+  }, [assetsLoaded, triggerAttack, onBattleEnd, playSfx, stopSfx, dimensions, routeTier, triggerAbility, playerShipStats, locationId, videoReady, showBossIntro, activeShipImage, addLog, initialEnemies, language, meteoriteQcValue, meteorQcValue]);
 
   if (!assetsLoaded) {
     return (
