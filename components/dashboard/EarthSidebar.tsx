@@ -181,6 +181,35 @@ const EarthSidebar: React.FC<EarthSidebarProps> = ({
     },
   } : null;
 
+  const activeMuralAudioRef = React.useRef<HTMLAudioElement | null>(null);
+
+  const playRandomMuralAudio = (type: 'open' | 'close') => {
+    try {
+      const activeAudio = activeMuralAudioRef.current;
+      if (activeAudio && !activeAudio.paused && !activeAudio.ended) return;
+
+      const maxIndex = type === 'open' ? 34 : 24;
+      const randomIndex = Math.floor(Math.random() * maxIndex) + 1;
+      const audioPath = `/audio/sfx/bobby_blue/mural ${type}/${type}_mural_${randomIndex}.ogg`;
+      const audio = new Audio(audioPath);
+      audio.volume = 0.8;
+      activeMuralAudioRef.current = audio;
+      audio.onended = () => {
+        if (activeMuralAudioRef.current === audio) {
+          activeMuralAudioRef.current = null;
+        }
+      };
+      audio.play().catch(e => {
+        if (activeMuralAudioRef.current === audio) {
+          activeMuralAudioRef.current = null;
+        }
+        console.log('Audio play failed:', e);
+      });
+    } catch (e) {
+      console.log('Error playing audio', e);
+    }
+  };
+
   return (
     <div className={`glass-panel border-2 ${isComplete ? 'border-emerald-500/50' : 'border-emerald-500/20'} rounded-xl flex-1 flex flex-col overflow-hidden bg-emerald-500/5 transition-all duration-500`}>
       {/* Header with Project Name and Progress */}
@@ -246,6 +275,7 @@ const EarthSidebar: React.FC<EarthSidebarProps> = ({
             onClick={() => {
               setPermanentHistoryPage(0);
               setShowPermanentHistory(true);
+              playRandomMuralAudio('open');
             }}
             tone="green"
             className="w-full rounded-xl"
@@ -355,7 +385,10 @@ const EarthSidebar: React.FC<EarthSidebarProps> = ({
                 </div>
                 <PremiumCanvasButton
                   type="button"
-                  onClick={() => setShowPermanentHistory(false)}
+                  onClick={() => {
+                    setShowPermanentHistory(false);
+                    playRandomMuralAudio('close');
+                  }}
                   tone="steel"
                   className="h-10 w-10 rounded-full"
                   contentClassName="text-cyan-100"

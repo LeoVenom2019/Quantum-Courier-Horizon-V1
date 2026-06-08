@@ -72,7 +72,6 @@ import {
 } from '@/lib/colony-cards';
 import {
   NEW_EARTH_MISSIONS_STORAGE_KEY,
-  NEW_EARTH_MISSION_QC_REWARD_MULTIPLIER,
   NewEarthMissionState,
   createDefaultNewEarthMissionState,
   markNewEarthMissionCycleRewardClaimed,
@@ -238,9 +237,18 @@ const ROUTE4_QUESTS_RENEW_SFX = `${ROUTE4_SEARCH_SFX_BASE}/quests_renew.ogg`;
 const ROUTE4_SPECIAL_EQUIP_SFX = `${ROUTE4_SEARCH_SFX_BASE}/equip_special.ogg`;
 const ROUTE4_SPECIAL_UNEQUIP_SFX = `${ROUTE4_SEARCH_SFX_BASE}/unequip_special.ogg`;
 const ROUTE4_CANT_EQUIP_SFX = `${ROUTE4_SEARCH_SFX_BASE}/cant_equip.ogg`;
+const NEW_EARTH_MISSION_COMPLETE_SFX_COUNT = 10;
+const BOBBY_BLUE_WARNING_SFX_COUNT = 9;
 const HORIZON_LEVEL_UP_SFX = '/assets/rota4/battles/player/horizon/horizon_level_up.ogg';
 const route4SearchSfxCache = new Map<string, HTMLAudioElement>();
 const route4BattleSfxCache = new Map<string, HTMLAudioElement>();
+
+type NewEarthMissionCycleBonusAnimation = {
+  cycle: number;
+  bonus: number;
+  draining: boolean;
+  revealed: boolean;
+} | null;
 
 const playRoute4SearchSfx = (id: ColonyExpeditionId, slotIndex: number) => {
   if (typeof Audio === 'undefined') return;
@@ -268,6 +276,11 @@ const playRoute4UiSfx = (src: string, volume = 0.68) => {
   const instance = audio.cloneNode(true) as HTMLAudioElement;
   instance.volume = volume;
   instance.play().catch(() => {});
+};
+
+const playRandomBobbyBlueWarningSfx = () => {
+  const randomWarningIndex = Math.floor(Math.random() * BOBBY_BLUE_WARNING_SFX_COUNT) + 1;
+  playRoute4UiSfx(`/audio/sfx/bobby_blue/warnings/warning_${randomWarningIndex}.ogg`, 0.8);
 };
 
 const playRoute4BattleSfx = (src: string, volume = 0.74) => {
@@ -1240,6 +1253,7 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
   const [selectedCard, setSelectedCard] = useState<{ card: ColonyCard; action: 'equip' | 'remove'; slot?: ColonyCardSlot | BattleCardSlot; blockedBy?: string } | null>(null);
   const [newEarthMissions, setNewEarthMissions] = useState<NewEarthMissionState>(() => createDefaultNewEarthMissionState());
   const [isNewEarthMissionsLoaded, setIsNewEarthMissionsLoaded] = useState(false);
+  const [newEarthMissionCycleBonusAnimation, setNewEarthMissionCycleBonusAnimation] = useState<NewEarthMissionCycleBonusAnimation>(null);
   const colonySuppliesRef = useRef<ColonySupplies>(DEFAULT_COLONY_SUPPLIES);
   const earthPopulationRef = useRef(earthPopulation);
   const setEarthPopulationRef = useRef(setEarthPopulation);
@@ -1250,6 +1264,9 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
   const handledAbandonDefenseRequestRef = useRef(0);
   const defenseAlertsPausedAtRef = useRef<number | null>(null);
   const lastBuildingLevelsRef = useRef<Record<string, Record<string, number>>>({});
+  const newEarthMissionCycleBonusTimeoutRef = useRef<number | null>(null);
+  const scheduledNewEarthMissionCycleBonusRef = useRef<number | null>(null);
+  const paidNewEarthMissionCycleBonusRef = useRef<number | null>(null);
 
   const t = useCallback((en: string, pt: string) => language === 'pt' ? pt : en, [language]);
   const effectiveActiveColonyId = activeColonyId ?? colonies[0]?.id ?? null;
@@ -1292,10 +1309,31 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
       })),
     };
   }, [activeDefenseThreat, cardLevels, colonies, ownedCardIds, pendingDefenseThreats.length]);
+
+  const newEarthMissionCycleCompletedCount = useMemo(() => (
+    newEarthMissions.missions.filter(mission => mission.completed).length
+  ), [newEarthMissions.missions]);
+
+  const newEarthMissionCycleBonusValue = useMemo(() => (
+    newEarthMissions.missions.reduce((total, mission) => total + (Number(mission.reward.qc) || 0), 0)
+  ), [newEarthMissions.missions]);
+
+  const isNewEarthMissionCycleComplete = newEarthMissions.missions.length >= 4
+    && newEarthMissions.missions.every(mission => mission.completed);
+
   const newEarthMissionContextRef = useRef(newEarthMissionContext);
+  const onEarnQCRef = useRef(onEarnQC);
+  const tRef = useRef(t);
+
   useEffect(() => {
     newEarthMissionContextRef.current = newEarthMissionContext;
   }, [newEarthMissionContext]);
+
+  useEffect(() => {
+    onEarnQCRef.current = onEarnQC;
+    tRef.current = t;
+  }, [onEarnQC, t]);
+
   const formatSearchTime = (seconds: number) => {
     const safeSeconds = Math.max(0, Math.ceil(seconds));
     const minutes = Math.floor(safeSeconds / 60);
@@ -1626,6 +1664,66 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
     GameStorage.save(newEarthMissions, NEW_EARTH_MISSIONS_STORAGE_KEY);
   }, [newEarthMissions, isLoaded, isNewEarthMissionsLoaded]);
 
+  useEffect(() => () => {
+    if (newEarthMissionCycleBonusTimeoutRef.current) {
+      window.clearTimeout(newEarthMissionCycleBonusTimeoutRef.current);
+    }
+    scheduledNewEarthMissionCycleBonusRef.current = null;
+  }, []);
+
+  useEffect(() => {
+    if (!isLoaded || !isNewEarthMissionsLoaded) return;
+    if (!isNewEarthMissionCycleComplete || newEarthMissions.cycleRewardClaimed) return;
+
+    const bonus = newEarthMissionCycleBonusValue;
+    const cycle = newEarthMissions.cycle;
+
+    if (
+      paidNewEarthMissionCycleBonusRef.current === cycle
+      || scheduledNewEarthMissionCycleBonusRef.current === cycle
+    ) return;
+
+    if (newEarthMissionCycleBonusTimeoutRef.current) {
+      window.clearTimeout(newEarthMissionCycleBonusTimeoutRef.current);
+    }
+
+    scheduledNewEarthMissionCycleBonusRef.current = cycle;
+    setNewEarthMissionCycleBonusAnimation({ cycle, bonus, draining: true, revealed: false });
+
+    newEarthMissionCycleBonusTimeoutRef.current = window.setTimeout(() => {
+      if (paidNewEarthMissionCycleBonusRef.current === cycle) {
+        scheduledNewEarthMissionCycleBonusRef.current = null;
+        newEarthMissionCycleBonusTimeoutRef.current = null;
+        return;
+      }
+      paidNewEarthMissionCycleBonusRef.current = cycle;
+
+      if (bonus > 0) {
+        onEarnQCRef.current?.(bonus, 'mission');
+      }
+      setNewEarthMissions(prev => {
+        const isSameCompletedCycle = prev.cycle === cycle
+          && !prev.cycleRewardClaimed
+          && prev.missions.length >= 4
+          && prev.missions.every(mission => mission.completed);
+        return isSameCompletedCycle ? markNewEarthMissionCycleRewardClaimed(prev) : prev;
+      });
+      setNewEarthMissionCycleBonusAnimation({ cycle, bonus, draining: false, revealed: true });
+      setCardFeedback(
+        tRef.current('New Earth mission board bonus credited.', 'Bônus final do painel de missões creditado.')
+      );
+      scheduledNewEarthMissionCycleBonusRef.current = null;
+      newEarthMissionCycleBonusTimeoutRef.current = null;
+    }, 2000);
+  }, [
+    isLoaded,
+    isNewEarthMissionsLoaded,
+    isNewEarthMissionCycleComplete,
+    newEarthMissions.cycle,
+    newEarthMissions.cycleRewardClaimed,
+    newEarthMissionCycleBonusValue,
+  ]);
+
   useEffect(() => {
     if (!isLoaded || !isNewEarthMissionsLoaded) return;
     setNewEarthMissions(prev => {
@@ -1726,6 +1824,14 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
     });
   }, [isLoaded, setColonies]);
 
+  const playNewEarthMissionCompleteVoice = useCallback(() => {
+    const randomMissionIndex = Math.floor(Math.random() * NEW_EARTH_MISSION_COMPLETE_SFX_COUNT) + 1;
+    playSfx?.(`new_earth_mission_complete_${randomMissionIndex}`, {
+      category: 'ui',
+      exclusiveKey: 'new-earth-mission-complete',
+    });
+  }, [playSfx]);
+
   const recordNewEarthMissionProgress = useCallback((event: Parameters<typeof recordNewEarthMissionEvent>[1]) => {
     let completedCount = 0;
     setNewEarthMissions(prev => {
@@ -1735,8 +1841,9 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
     });
     if (completedCount > 0) {
       setCardFeedback(t('New Earth mission completed', 'Missão da Nova Terra concluída'));
+      playNewEarthMissionCompleteVoice();
     }
-  }, [newEarthMissionContext, t]);
+  }, [newEarthMissionContext, playNewEarthMissionCompleteVoice, t]);
 
   useEffect(() => {
     const handleNewEarthMissionEvent = (event: Event) => {
@@ -1773,6 +1880,8 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
     }));
 
     if (!attacked) return;
+
+    playRandomBobbyBlueWarningSfx();
 
     const threat: PendingDefenseThreat = {
       id: `threat-${search.searchKey}-${checkedAt}-${Math.random().toString(36).slice(2, 8)}`,
@@ -1999,6 +2108,7 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
               });
               if (completedMission) {
                 setCardFeedback(t('New Earth mission completed', 'Missão da Nova Terra concluída'));
+                playNewEarthMissionCompleteVoice();
               }
             }
           }
@@ -2012,7 +2122,7 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
     if (totalYearsToAdd > 0) {
       onAddYear(totalYearsToAdd);
     }
-  }, [colonies, onAddYear, onBuildingComplete, isLoaded, newEarthMissionContext, t]);
+  }, [colonies, onAddYear, onBuildingComplete, isLoaded, newEarthMissionContext, playNewEarthMissionCompleteVoice, t]);
 
   const activeColony = useMemo(() => 
     colonies.find(c => c.id === effectiveActiveColonyId) || null
@@ -2534,10 +2644,10 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
     const mission = newEarthMissions.missions.find(item => item.id === missionId);
     if (!mission || !mission.completed || mission.claimed) return;
 
-    const completesCycle = !newEarthMissions.cycleRewardClaimed && newEarthMissions.missions.every(item => item.claimed || item.id === missionId);
+    const completesCycle = newEarthMissions.missions.length > 0
+      && newEarthMissions.missions.every(item => item.claimed || item.id === missionId);
     const claimed = markNewEarthMissionClaimed(newEarthMissions, missionId);
-    const withCycleReward = completesCycle ? markNewEarthMissionCycleRewardClaimed(claimed) : claimed;
-    const claimedMissionState = refreshNewEarthMissionBoard(withCycleReward, newEarthMissionContext);
+    const claimedMissionState = refreshNewEarthMissionBoard(claimed, newEarthMissionContext);
 
     setNewEarthMissions(claimedMissionState);
     GameStorage.save(claimedMissionState, NEW_EARTH_MISSIONS_STORAGE_KEY);
@@ -2594,36 +2704,8 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
       }
     }
 
-    if (completesCycle) {
-      const roll = Math.floor(Math.random() * 4);
-      if (roll === 0) {
-        onEarnQC?.(Math.round(35000 * NEW_EARTH_MISSION_QC_REWARD_MULTIPLIER), 'mission');
-      } else if (roll === 1) {
-        const nextSupplies = applySupplyDelta(colonySuppliesRef.current, { materials: 22, tech: 14, biomass: 12 });
-        colonySuppliesRef.current = nextSupplies;
-        setColonySupplies(nextSupplies);
-      } else {
-        const sectors: ColonySectorId[] = roll === 2 ? ['happiness'] : ['health', 'security'];
-        const sector = sectors[Math.floor(Math.random() * sectors.length)];
-        if (effectiveActiveColonyId) {
-          setColonies(prev => prev.map(colony => (
-            colony.id === effectiveActiveColonyId
-              ? {
-                ...colony,
-                sectors: {
-                  ...DEFAULT_COLONY_SECTORS,
-                  ...(colony.sectors || {}),
-                  [sector]: Math.min(100, Math.max(0, Number(colony.sectors?.[sector] ?? DEFAULT_COLONY_SECTORS[sector]) + 5)),
-                },
-              }
-              : colony
-          )));
-        }
-      }
-    }
-
     setCardFeedback(completesCycle
-      ? t('Mission board completed. Extra bonus granted.', 'Painel de missões concluído. Bônus extra concedido.')
+      ? t('Mission board renewed.', 'Painel de missões renovado.')
       : t('Mission reward claimed', 'Recompensa da missão resgatada')
     );
   }, [newEarthMissions, newEarthMissionContext, onEarnQC, effectiveActiveColonyId, setColonies, ownedCardIds, playSfx, t]);
@@ -2890,6 +2972,17 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
       return [...prev, specialId];
     });
   };
+
+  const missionCycleDisplayTotal = Math.max(4, newEarthMissions.missions.length || 4);
+  const missionCycleBaseProgress = Math.min(
+    100,
+    (Math.min(newEarthMissionCycleCompletedCount, missionCycleDisplayTotal) / missionCycleDisplayTotal) * 100
+  );
+  const missionCycleBonusIsDraining = Boolean(
+    newEarthMissionCycleBonusAnimation?.draining
+    && newEarthMissionCycleBonusAnimation.cycle === newEarthMissions.cycle
+  );
+  const missionCycleProgressDisplay = missionCycleBonusIsDraining ? 0 : missionCycleBaseProgress;
 
   return (
     <div className="flex flex-col h-full space-y-3 overflow-hidden">
@@ -3309,12 +3402,27 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
 
       {activeView === 'missions' ? (
         <div className="flex flex-1 flex-col overflow-hidden rounded-2xl border border-amber-300/20 bg-zinc-950/70 p-5">
-          <div className="mb-4 flex shrink-0 items-start justify-between gap-4">
-            <div>
+          <div className="mb-4 flex shrink-0 items-center gap-4">
+            <div className="w-[260px] shrink-0">
               <p className="font-mono text-[10px] uppercase tracking-[0.35em] text-amber-300">{t('New Earth Assignments', 'Designações da Nova Terra')}</p>
               <h3 className="font-orbitron text-xl font-black uppercase tracking-tight text-white">{t('Mission Board', 'Painel de Missões')}</h3>
             </div>
-            <div className="rounded-xl border border-amber-300/25 bg-amber-300/10 px-3 py-2 text-right">
+            <div className="relative h-[58px] min-w-0 flex-1 overflow-hidden rounded-lg border border-cyan-300/25 bg-black/70 p-2 shadow-[inset_0_0_18px_rgba(34,211,238,0.13),0_0_16px_rgba(34,211,238,0.09)]">
+              <div aria-hidden="true" className="pointer-events-none absolute inset-0 opacity-30 [background-image:linear-gradient(rgba(34,211,238,0.13)_1px,transparent_1px),linear-gradient(90deg,rgba(34,211,238,0.10)_1px,transparent_1px)] [background-size:18px_18px]" />
+              <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-cyan-200/80 to-transparent" />
+              <div className="relative z-10 h-full">
+                <div className="h-full overflow-hidden rounded-md border border-cyan-200/20 bg-black shadow-[inset_0_0_14px_rgba(0,0,0,0.9)]">
+                  <div
+                    className={`relative h-full overflow-hidden rounded-full bg-gradient-to-r from-cyan-300 via-sky-100 to-emerald-300 shadow-[0_0_18px_rgba(34,211,238,0.65),inset_0_0_10px_rgba(255,255,255,0.35)] transition-[width] ${missionCycleBonusIsDraining ? 'duration-[2000ms] ease-in' : 'duration-700 ease-out'}`}
+                    style={{ width: `${missionCycleProgressDisplay}%` }}
+                  >
+                    <div aria-hidden="true" className="absolute inset-0 bg-[linear-gradient(110deg,transparent_0%,rgba(255,255,255,0.85)_45%,transparent_75%)] opacity-75 animate-pulse" />
+                    <div aria-hidden="true" className="absolute inset-y-0 left-0 w-full bg-[repeating-linear-gradient(90deg,rgba(255,255,255,0.0)_0px,rgba(255,255,255,0.0)_14px,rgba(255,255,255,0.35)_15px,rgba(255,255,255,0.0)_18px)] opacity-55" />
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="w-[72px] shrink-0 rounded-xl border border-amber-300/25 bg-amber-300/10 px-2 py-2 text-right">
               <p className="font-mono text-[9px] uppercase tracking-widest text-amber-200/80">{t('Ready', 'Prontas')}</p>
               <p className="font-orbitron text-lg font-black text-white">
                 {newEarthMissions.missions.filter(mission => mission.completed && !mission.claimed).length}

@@ -37,6 +37,8 @@ export type SFXType =
   | 'start_engine_2'
   | 'open_window'
   | 'close_window'
+  | 'hangar_open_door'
+  | 'hangar_close_door'
   | 'open_window_void'
   | 'close_window_void'
   | 'donation_1_void'
@@ -59,7 +61,7 @@ export type SFXType =
   | 'shoot_monster_zero' | 'shoot_monster_1' | 'shoot_monster_2' | 'shoot_monster_3' | 'shoot_monster_4' | 'shoot_monster_5' | 'shoot_monster_6' | 'shoot_monster_7' | 'shoot_monster_8' | 'shoot_monster_9'
   | 'shoot_elite_zero' | 'shoot_elite_1' | 'shoot_elite_2' | 'shoot_elite_3' | 'shoot_elite_4' | 'shoot_elite_5' | 'shoot_elite_6' | 'shoot_elite_7' | 'shoot_elite_8' | 'shoot_elite_9'
   | 'shoot_boss_zero' | 'shoot_boss_1' | 'shoot_boss_2' | 'shoot_boss_3' | 'shoot_boss_4' | 'shoot_boss_5' | 'shoot_boss_6' | 'shoot_boss_7' | 'shoot_boss_8' | 'shoot_boss_9'
-  | 'laser_up' | 'laser_cannon' | 'shield_up' | 'target_up' | 'epic_battle_ship' | 'target_up_2' | 'login_start' | 'aba_click'
+  | 'laser_up' | 'laser_cannon' | 'shield_up' | 'target_up' | 'epic_battle_ship' | 'target_up_2' | 'login_start' | 'aba_click' | 'change_air_ships' | 'tec_extract_change'
   | 'big_energy_explosion_' | 'big_energy_explosion_2'
   | 'censor_beep'
   | 'heal_ship_2'
@@ -68,6 +70,8 @@ export type SFXType =
   | 'equip_card'
   | 'unequip_card'
   | 'view_card'
+  | 'radar_skip_victory'
+  | 'radar_skip_defeat'
   | 'buy'
   | 'insert_coins'
   | 'game_over';
@@ -89,6 +93,35 @@ const SFX_PATHS: Partial<Record<string, string>> = {
   ghost_gamma_mission_start: '/audio/sfx/ghost_gamma_mission_start.ogg',
   kill_enemys_botton: '/audio/sfx/kill_enemys_botton.ogg',
   bobby_blue_theme_victory: '/audio/sfx/bobby_blue/bobby_blue_theme_victory.ogg',
+  new_earth_access_denied_1: '/audio/sfx/bobby_blue/access_denied/access_denied_1.ogg',
+  new_earth_access_denied_2: '/audio/sfx/bobby_blue/access_denied/access_denied_2.ogg',
+  new_earth_access_denied_3: '/audio/sfx/bobby_blue/access_denied/access_denied_3.ogg',
+  new_earth_access_denied_4: '/audio/sfx/bobby_blue/access_denied/access_denied_4.ogg',
+  new_earth_access_denied_5: '/audio/sfx/bobby_blue/access_denied/access_denied_5.ogg',
+  new_earth_access_denied_6: '/audio/sfx/bobby_blue/access_denied/access_denied_6.ogg',
+  new_earth_access_denied_7: '/audio/sfx/bobby_blue/access_denied/access_denied_7.ogg',
+  new_earth_access_denied_8: '/audio/sfx/bobby_blue/access_denied/access_denied_8.ogg',
+  new_earth_access_denied_9: '/audio/sfx/bobby_blue/access_denied/access_denied_9.ogg',
+  new_earth_access_denied_10: '/audio/sfx/bobby_blue/access_denied/access_denied_10.ogg',
+  new_earth_mission_complete_1: '/audio/sfx/bobby_blue/mission_complete/mission_complete_1.ogg',
+  new_earth_mission_complete_2: '/audio/sfx/bobby_blue/mission_complete/mission_complete_2.ogg',
+  new_earth_mission_complete_3: '/audio/sfx/bobby_blue/mission_complete/mission_complete_3.ogg',
+  new_earth_mission_complete_4: '/audio/sfx/bobby_blue/mission_complete/mission_complete_4.ogg',
+  new_earth_mission_complete_5: '/audio/sfx/bobby_blue/mission_complete/mission_complete_5.ogg',
+  new_earth_mission_complete_6: '/audio/sfx/bobby_blue/mission_complete/mission_complete_6.ogg',
+  new_earth_mission_complete_7: '/audio/sfx/bobby_blue/mission_complete/mission_complete_7.ogg',
+  new_earth_mission_complete_8: '/audio/sfx/bobby_blue/mission_complete/mission_complete_8.ogg',
+  new_earth_mission_complete_9: '/audio/sfx/bobby_blue/mission_complete/mission_complete_9.ogg',
+  new_earth_mission_complete_10: '/audio/sfx/bobby_blue/mission_complete/mission_complete_10.ogg',
+  new_earth_population_milestone_1000000: '/audio/sfx/bobby_blue/population milestone/one_milion.ogg',
+  new_earth_population_milestone_10000000: '/audio/sfx/bobby_blue/population milestone/ten_milion.ogg',
+  new_earth_population_milestone_50000000: '/audio/sfx/bobby_blue/population milestone/fifty_milion.ogg',
+  new_earth_population_milestone_100000000: '/audio/sfx/bobby_blue/population milestone/one_hundred_milion.ogg',
+  new_earth_population_milestone_500000000: '/audio/sfx/bobby_blue/population milestone/five_hundred_milion.ogg',
+  new_earth_population_milestone_1000000000: '/audio/sfx/bobby_blue/population milestone/billion.ogg',
+  new_earth_population_milestone_5000000000: '/audio/sfx/bobby_blue/population milestone/five_billion.ogg',
+  new_earth_population_milestone_10000000000: '/audio/sfx/bobby_blue/population milestone/ten_billion.ogg',
+  new_earth_population_milestone_20000000000: '/audio/sfx/bobby_blue/population milestone/twenty_billion.ogg',
   heal_ship: '/audio/sfx/heal_ship.ogg',
   start_research: '/audio/sfx/start.botton.ogg',
   tutorial_open: '/audio/sfx/tutorial_open.ogg',
@@ -101,6 +134,8 @@ const SFX_PATHS: Partial<Record<string, string>> = {
   start_engine_2: '/audio/sfx/start_engine_2.ogg',
   open_window: '/audio/sfx/open_window.ogg',
   close_window: '/audio/sfx/close_window.ogg',
+  hangar_open_door: '/assets/rota4/SFX_new_land/hangar_open_door.ogg',
+  hangar_close_door: '/assets/rota4/SFX_new_land/hangar_close_door.ogg',
   open_window_void: '/audio/sfx/open_window_void.ogg',
   close_window_void: '/audio/sfx/close_window_void.ogg',
   donation_1_void: '/audio/sfx/donation_1_void.ogg',
@@ -163,12 +198,16 @@ const SFX_PATHS: Partial<Record<string, string>> = {
   big_energy_explosion_2: '/audio/sfx/big_energy_explosion_2.ogg',
   login_start: '/audio/sfx/login_start.ogg',
   aba_click: '/audio/sfx/aba_click.ogg',
+  change_air_ships: '/audio/sfx/change_air_ships.ogg',
+  tec_extract_change: '/audio/sfx/tec_extract_change.ogg',
   censor_beep: '/audio/sfx/censor_beep.ogg',
   buy: '/audio/sfx/buying_iten.ogg',
   claim_card: '/audio/sfx/claim_card.ogg',
   equip_card: '/audio/sfx/equip_card.ogg',
   unequip_card: '/audio/sfx/unequip_card.ogg',
   view_card: '/audio/sfx/view_card.ogg',
+  radar_skip_victory: '/audio/sfx/radar_skip_victory.ogg',
+  radar_skip_defeat: '/audio/sfx/radar_skip_defeat.ogg',
   heal_ship_2: '/audio/sfx/heal_ship_2.ogg',
   cash_register_2: '/audio/sfx/cash_register_2.ogg',
   game_over: '/audio/sfx/game_over.ogg'
@@ -176,6 +215,7 @@ const SFX_PATHS: Partial<Record<string, string>> = {
 
 // Singleton Cache para evitar recriação de objetos e preloading redundante
 const globalAudioCache: Record<string, HTMLAudioElement> = {};
+const globalExclusiveAudioLocks: Record<string, HTMLAudioElement | undefined> = {};
 
 // Função auxiliar para pré-carregar (pode ser chamada fora do componente)
 const preloadSfx = () => {
@@ -200,6 +240,7 @@ interface SFXConfig {
   volume?: number;
   loop?: boolean;
   category?: SFXCategory;
+  exclusiveKey?: string;
 }
 
 // Mapeamento automático de categorias por prefixo ou nome
@@ -247,6 +288,11 @@ export function useSFX(_deprecatedSfxOn: boolean = true) {
     if (!path) return;
 
     try {
+      if (config.exclusiveKey) {
+        const activeAudio = globalExclusiveAudioLocks[config.exclusiveKey];
+        if (activeAudio && !activeAudio.paused && !activeAudio.ended) return;
+      }
+
       let audio = globalAudioCache[type];
       
       if (!audio) {
@@ -274,6 +320,16 @@ export function useSFX(_deprecatedSfxOn: boolean = true) {
       const finalVolume = baseVolume * categoryVolume * masterVolume;
       audio.volume = isFinite(finalVolume) ? Math.min(1, Math.max(0, finalVolume)) : 0.5;
 
+      if (config.exclusiveKey) {
+        const exclusiveKey = config.exclusiveKey;
+        globalExclusiveAudioLocks[exclusiveKey] = audio;
+        audio.onended = () => {
+          if (globalExclusiveAudioLocks[exclusiveKey] === audio) {
+            delete globalExclusiveAudioLocks[exclusiveKey];
+          }
+        };
+      }
+
       // Se o som já estiver tocando e não for loop, reinicia
       if (!audio.paused && !audio.loop) {
         audio.currentTime = 0;
@@ -284,6 +340,9 @@ export function useSFX(_deprecatedSfxOn: boolean = true) {
       const promise = audio.play();
       if (promise !== undefined) {
         promise.catch(err => {
+          if (config.exclusiveKey && globalExclusiveAudioLocks[config.exclusiveKey] === audio) {
+            delete globalExclusiveAudioLocks[config.exclusiveKey];
+          }
           // Ignore AbortError and NotAllowedError (autoplay) as they are expected in some contexts
           if (err.name === 'AbortError' || err.name === 'NotAllowedError') {
             return; 
@@ -304,6 +363,9 @@ export function useSFX(_deprecatedSfxOn: boolean = true) {
     if (audio) {
       audio.pause();
       audio.currentTime = 0;
+      Object.entries(globalExclusiveAudioLocks).forEach(([key, lockedAudio]) => {
+        if (lockedAudio === audio) delete globalExclusiveAudioLocks[key];
+      });
     }
   }, []);
 

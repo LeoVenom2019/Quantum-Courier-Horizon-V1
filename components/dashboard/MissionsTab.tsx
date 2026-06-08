@@ -62,15 +62,23 @@ const MissionsTab = memo(() => {
 
   return (
     <div className="space-y-3 lg:space-y-3 flex flex-col h-full min-h-0 overflow-hidden">
-      <div className={`glass-panel ${isInterstellar ? 'neon-border-orange' : 'neon-border-cyan'} p-3 lg:py-4 lg:px-8 rounded-xl flex flex-row justify-between items-center gap-4 shrink-0`}>
-        <div className="flex-1">
+      <div className={`glass-panel ${isInterstellar ? 'neon-border-orange' : 'neon-border-cyan'} p-3 lg:py-4 lg:px-8 rounded-xl flex flex-row justify-between items-center gap-4 shrink-0 overflow-hidden relative`}>
+        <div 
+          className="absolute inset-0 z-0 opacity-60 mix-blend-overlay pointer-events-none"
+          style={{
+            backgroundImage: `url('/assets/melhorias/${isInterstellar ? 'bg_rota2_missoes_header.webp' : 'bg_rota1_missoes_header.webp'}')`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center'
+          }}
+        />
+        <div className="flex-1 relative z-10">
           <h2 className={`text-lg lg:text-2xl font-orbitron font-bold ${isInterstellar ? 'text-orange-400' : 'text-cyan-400'} uppercase tracking-tight`}>{t('missions')}</h2>
           <p className="text-base lg:text-[14px] text-slate-500 font-mono uppercase tracking-[0.2em]">
             {readyToClaimCount > 0 ? `${readyToClaimCount} ${t('readyToUnlock' as any)}` : t('gameStatsByRoute')}
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 relative z-10">
           <button
             onClick={() => {
               setShowSkillMap(true);

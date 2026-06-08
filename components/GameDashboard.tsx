@@ -148,6 +148,7 @@ import VoidMap from './dashboard/VoidMap';
 import MissionsTab from './dashboard/MissionsTab';
 import { ROUTE_THEMES, ARCADE_THEMES, getRandomTrackForRoute } from '@/lib/music-data';
 import { getRecommendedAssetGroupsForRoute, preloadAssetGroupPassive, preloadAssetGroupsPassive } from '@/lib/asset-preloader';
+import { ACTIVE_DELIVERY_BACKGROUNDS, SCIFI_TEXTURE_BACKGROUND } from '@/lib/ui-backgrounds';
 import RoutesTab from './dashboard/RoutesTab';
 import AutoTab from './dashboard/AutoTab';
 import HistoryTab from './dashboard/HistoryTab';
@@ -1486,6 +1487,20 @@ const DashboardContent = memo(({
     return Object.values(groups).sort((a, b) => b.totalCount - a.totalCount);
   }, [activeDeliveries]);
 
+  const manualDeliveryCount = useMemo(() => (
+    activeDeliveries.filter(d => !d.id.startsWith('auto-') && d.tier === routeTier).length
+  ), [activeDeliveries, routeTier]);
+
+  const hasActiveAutoDeliveries = useMemo(() => (
+    Object.entries(autoTravelActive).some(([routeId, isActive]) => {
+      if (!isActive) return false;
+      const route = ROUTES_MAP.get(routeId);
+      return route?.tier === routeTier;
+    })
+  ), [autoTravelActive, routeTier]);
+
+  const shouldShowCoffeeMessage = manualDeliveryCount === 0 && hasActiveAutoDeliveries;
+
 
 
 
@@ -1912,9 +1927,11 @@ const DashboardContent = memo(({
   }, [voidCompactedResources, dispatch]);
 
   const setUnlockedExtractionPoints = useCallback((val: string[] | ((prev: string[]) => string[])) => {
-    const nextVal = typeof val === 'function' ? val(unlockedExtractionPoints) : val;
+    const current = unlockedExtractionPointsRef.current;
+    const nextVal = typeof val === 'function' ? val(current) : val;
+    unlockedExtractionPointsRef.current = nextVal;
     dispatch({ type: 'SET_UNLOCKED_EXTRACTION_POINTS', payload: { pointIds: nextVal } });
-  }, [unlockedExtractionPoints, dispatch]);
+  }, [dispatch]);
 
 
   // Robot Event States
@@ -3306,13 +3323,14 @@ const DashboardContent = memo(({
   // Extraction Points Logic
   const extractionTimersRef = useRef<{ [id: string]: number }>({});
   useEffect(() => {
-    if (routeTier !== 'Interstellar' || unlockedExtractionPoints.length === 0) return;
-
     const interval = setInterval(() => {
+      if (routeTierRef.current !== 'Interstellar') return;
+
       const now = Date.now();
       const newProgress: { [id: string]: number } = {};
       let hasChanged = false;
-      const uniquePoints = Array.from(new Set(unlockedExtractionPoints));
+      const uniquePoints = Array.from(new Set(unlockedExtractionPointsRef.current));
+      if (uniquePoints.length === 0) return;
 
       const next = { ...extractionPacksRef.current };
       let localHasChanged = false;
@@ -3360,6 +3378,7 @@ const DashboardContent = memo(({
 
       if (localHasChanged) {
         extractionPacksRef.current = next;
+        dispatch({ type: 'SET_EXTRACTION_DATA', payload: { packs: next } });
       }
 
       // Update progress outside of the packs setter to avoid side-effect issues
@@ -3367,6 +3386,7 @@ const DashboardContent = memo(({
     }, 100);
 
     const throttleInterval = setInterval(() => {
+      if (routeTierRef.current !== 'Interstellar') return;
       dispatch({ type: 'SET_EXTRACTION_PROGRESS', payload: { progress: extractionCycleProgressRef.current } });
       dispatch({ type: 'SET_EXTRACTION_DATA', payload: { packs: extractionPacksRef.current } });
     }, 500);
@@ -3375,7 +3395,7 @@ const DashboardContent = memo(({
       clearInterval(interval);
       clearInterval(throttleInterval);
     };
-  }, [unlockedExtractionPoints, routeTier]);
+  }, [dispatch]);
 
   // Automatic Sales Logic (Robôs de Entrega)
   useEffect(() => {
@@ -3397,8 +3417,10 @@ const DashboardContent = memo(({
 
         const currentPacks = next[id] || 0;
 
-        // Sell if auto-sell is active and 100 or more packs accumulated
-        if (extractionAutoSellRef.current[id] && currentPacks >= 100) {
+        const isAutoSellEnabled = !!extractionAutoSellUnlockedRef.current[id] && !!extractionAutoSellRef.current[id];
+
+        // Sell if auto-sell is unlocked, active and 100 or more packs accumulated
+        if (isAutoSellEnabled && currentPacks >= 100) {
           let saleValue = point.valuePerPack * currentPacks * getEconomicMultipliers().profit;
 
           // Apply Level 40 reward: 5x mining value
@@ -3438,7 +3460,6 @@ const DashboardContent = memo(({
         dispatch({ type: 'UPDATE_HISTORY', payload: { tier: 'Interstellar', field: 'qcTotalAcquired', amount: totalQcGained } });
         dispatch({ type: 'UPDATE_HISTORY', payload: { tier: 'Interstellar', field: 'autoExtractionPacksSold', amount: totalPacksSold } });
 
-        playSfx('success');
       }
     }, 500); // Check every 500ms for more responsive automatic sales
 
@@ -4911,9 +4932,34 @@ const DashboardContent = memo(({
     // Check ship availability
     const requiredLevel = route.requiredShipLevel;
     const totalOwned = ownedShipsRef.current[`${route.tier}-${requiredLevel}`] || 0;
+    const routeUsesManualHangarLimit = route.tier === 'Solar' || route.tier === 'Interstellar';
+    const activeManualDeliveriesInTier = activeDeliveriesRef.current.filter(d => d.tier === route.tier);
+    const activeManualByShipLevel = activeManualDeliveriesInTier.reduce((acc, delivery) => {
+      acc[delivery.shipLevel] = (acc[delivery.shipLevel] || 0) + 1;
+      return acc;
+    }, {} as Record<number, number>);
+    const activeManualShipLevels = Object.keys(activeManualByShipLevel).length;
+    const activeManualForShipLevel = activeManualByShipLevel[requiredLevel] || 0;
+
+    if (routeUsesManualHangarLimit) {
+      if (activeManualDeliveriesInTier.length >= 25) {
+        addLog(language === 'pt' ? 'Limite de 25 entregas manuais ativas atingido.' : 'Limit of 25 active manual deliveries reached.', 'error');
+        return false;
+      }
+
+      if (activeManualForShipLevel >= 5) {
+        addLog(language === 'pt' ? 'Limite de 5 entregas manuais para esta nave atingido.' : 'Limit of 5 manual deliveries for this ship reached.', 'error');
+        return false;
+      }
+
+      if (activeManualForShipLevel === 0 && activeManualShipLevels >= 5) {
+        addLog(language === 'pt' ? 'Limite de 5 tipos de nave entregando ao mesmo tempo atingido.' : 'Limit of 5 ship types delivering at the same time reached.', 'error');
+        return false;
+      }
+    }
 
     // Count ships in use by manual deliveries
-    let currentlyInUse = activeDeliveriesRef.current.filter(d => d.shipLevel === requiredLevel && d.tier === route.tier && d.status === 'delivering').length;
+    let currentlyInUse = activeManualForShipLevel;
 
     // Count ships in use by auto-travel
     Object.keys(autoTravelActiveRef.current).forEach(routeId => {
@@ -5119,6 +5165,17 @@ const DashboardContent = memo(({
       let deliveriesStateChanged = false;
 
       let updatedDeliveries = [...prev];
+
+      if (autoSkipRandomBattlesRef.current) {
+        const activeCombatDeliveryIds = new Set(
+          [activeBattleRef.current?.deliveryId, underAttackBattleRef.current?.deliveryId].filter(Boolean)
+        );
+        const cleanedDeliveries = updatedDeliveries.filter(d => d.status !== 'combat' || activeCombatDeliveryIds.has(d.id));
+        if (cleanedDeliveries.length !== updatedDeliveries.length) {
+          updatedDeliveries = cleanedDeliveries;
+          deliveriesStateChanged = true;
+        }
+      }
 
       const shipsInUse: { [level: number]: number } = {};
       updatedDeliveries.forEach(d => {
@@ -5337,11 +5394,24 @@ const DashboardContent = memo(({
                 const victory = autoSkipBattle(battle, skipCost);
                 playSfx(victory ? 'success' : 'error');
 
+                if (isAuto) {
+                  if (!victory) {
+                    setAutoTravelActive(prev => ({ ...prev, [routeId]: false }));
+                    setAutoTravelProgress(prev => ({ ...prev, [routeId]: 0 }));
+                  }
+                } else {
+                  const shipIndex = nextManual.findIndex(d => d.id === targetId);
+                  if (shipIndex !== -1) {
+                    nextManual.splice(shipIndex, 1);
+                    deliveriesStateChanged = true;
+                  }
+                }
+
                 // Add log for the skip
                 if (victory) {
-                  addLog(languageRef.current === 'pt' ? `Batalha pulada com sucesso! (-${skipCost} Éteríon)` : `Battle skipped successfully! (-${skipCost} Aetherion)`, 'success');
+                  addLog(languageRef.current === 'pt' ? `Batalha pulada com sucesso! (-${skipCost} Etérion)` : `Battle skipped successfully! (-${skipCost} Aetherion)`, 'success');
                 } else {
-                  addLog(languageRef.current === 'pt' ? `Batalha pulada: Derrota! (-${skipCost} Éteríon)` : `Battle skipped: Defeat! (-${skipCost} Aetherion)`, 'error');
+                  addLog(languageRef.current === 'pt' ? `Batalha pulada: Derrota! (-${skipCost} Etérion)` : `Battle skipped: Defeat! (-${skipCost} Aetherion)`, 'error');
                 }
               } else {
                 if (routeTierRef.current === 'Solar' || routeTierRef.current === 'Interstellar') {
@@ -5357,6 +5427,7 @@ const DashboardContent = memo(({
         }
       }
       if (deliveriesStateChanged) {
+        activeDeliveriesRef.current = nextManual;
         setActiveDeliveries(nextManual);
       }
 
@@ -7719,7 +7790,9 @@ const DashboardContent = memo(({
                 >
                   <div className={`w-3 h-3 rounded-full ${battleNotification.type === 'success' ? 'bg-emerald-400 animate-pulse' : 'bg-red-400'}`} />
                   <div className="flex flex-col">
-                    <span className="text-base opacity-60 uppercase tracking-widest">{battleNotification.type === 'success' ? 'Auto-Combat Victory' : 'Auto-Combat Defeat'}</span>
+                    <span className="text-base opacity-60 uppercase tracking-widest">
+                      {battleNotification.title || (battleNotification.type === 'success' ? 'Auto-Combat Victory' : 'Auto-Combat Defeat')}
+                    </span>
                     {battleNotification.message}
                   </div>
                 </motion.div>
@@ -7869,29 +7942,99 @@ const DashboardContent = memo(({
                   />
                 ) : (
                   /* Active Deliveries */
-                  <div className={`glass-panel ${isInterstellar ? 'neon-border-orange' : 'neon-border-cyan'} rounded-xl flex-1 flex flex-col overflow-hidden`}>
-                    <div className="p-4 border-b border-white/5 flex justify-between items-center bg-white/5">
+                  <div
+                    className={`glass-panel ${isInterstellar ? 'neon-border-orange' : 'neon-border-cyan'} rounded-xl flex-1 flex flex-col overflow-hidden relative isolate bg-cover bg-center bg-no-repeat`}
+                    style={{ backgroundImage: `url('${isInterstellar ? ACTIVE_DELIVERY_BACKGROUNDS.route2 : ACTIVE_DELIVERY_BACKGROUNDS.route1}')` }}
+                  >
+                    <div className="absolute inset-0 bg-slate-950/55 pointer-events-none" />
+                    <div className="absolute inset-0 bg-gradient-to-b from-slate-950/55 via-slate-950/20 to-slate-950/70 pointer-events-none" />
+                    {(routeTier === 'Solar' || routeTier === 'Interstellar') && (
+                      <div className="active-delivery-starfield" aria-hidden="true">
+                        {[
+                          ['11%', '23%', '5px', '4.2s', '0s', 'rgba(34, 211, 238, 0.95)'],
+                          ['26%', '76%', '5px', '5.1s', '-1.2s', 'rgba(250, 204, 21, 0.82)'],
+                          ['43%', '31%', '4px', '4.6s', '-2.1s', 'rgba(255, 255, 255, 0.98)'],
+                          ['63%', '58%', '5px', '5.7s', '-0.7s', 'rgba(125, 211, 252, 0.88)'],
+                          ['79%', '25%', '5px', '6.2s', '-3.4s', 'rgba(244, 114, 182, 0.76)'],
+                          ['88%', '73%', '4px', '4.9s', '-2.8s', 'rgba(255, 255, 255, 0.96)'],
+                        ].map(([left, top, size, duration, delay, glow], index) => (
+                          <span
+                            key={`fixed-${index}`}
+                            className="active-delivery-star"
+                            style={{
+                              '--delivery-star-left': left,
+                              '--delivery-star-top': top,
+                              '--delivery-star-size': size,
+                              '--delivery-star-duration': duration,
+                              '--delivery-star-delay': delay,
+                              '--delivery-star-glow': glow,
+                            } as React.CSSProperties}
+                          />
+                        ))}
+                        {[
+                          ['-8%', '28%', '72vw', '12vh', '4px', '7.8s', '0s', 'rgba(34, 211, 238, 0.98)'],
+                          ['82%', '-8%', '-58vw', '78vh', '4px', '9.2s', '-2.4s', 'rgba(255, 255, 255, 0.95)'],
+                          ['108%', '68%', '-78vw', '-18vh', '4px', '8.4s', '-4.8s', 'rgba(250, 204, 21, 0.88)'],
+                          ['22%', '108%', '42vw', '-86vh', '4px', '10.5s', '-6.1s', 'rgba(125, 211, 252, 0.95)'],
+                        ].map(([left, top, travelX, travelY, size, duration, delay, glow], index) => (
+                          <span
+                            key={`satellite-${index}`}
+                            className="active-delivery-satellite"
+                            style={{
+                              '--delivery-satellite-left': left,
+                              '--delivery-satellite-top': top,
+                              '--delivery-satellite-x': travelX,
+                              '--delivery-satellite-y': travelY,
+                              '--delivery-satellite-size': size,
+                              '--delivery-satellite-duration': duration,
+                              '--delivery-satellite-delay': delay,
+                              '--delivery-satellite-glow': glow,
+                            } as React.CSSProperties}
+                          />
+                        ))}
+                      </div>
+                    )}
+                    <div className="relative z-10 p-4 border-b border-white/5 flex justify-between items-center bg-white/5">
                       <h2 className={`text-[14px] font-orbitron font-bold tracking-widest ${themeText} uppercase flex items-center gap-2`}>
                         <Navigation className="w-4 h-4" /> {t('activeDeliveries')}
                       </h2>
                       <span className={`text-base font-mono ${isInterstellar ? 'text-orange-500/40' : 'text-cyan-500/40'}`}>
-                        {groupedDeliveries.length} LOC / {activeDeliveries.filter(d => !d.id.startsWith('auto-')).length}/25 HANGARS
+                        {groupedDeliveries.length} LOC / {manualDeliveryCount}/25 HANGARS
                       </span>
                     </div>
 
-                    <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
+                    <div className="relative z-10 flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
                       {groupedDeliveries.length === 0 ? (
-                        <div className="h-full flex flex-col items-center justify-center text-center opacity-40">
-                          <div className="w-12 h-12 rounded-full border border-dashed border-cyan-500/30 flex items-center justify-center mb-4">
-                            <Database className="w-6 h-6" />
+                        shouldShowCoffeeMessage ? (
+                          <div className="h-full flex flex-col items-center justify-center text-center">
+                            <div className="w-12 h-12 rounded-xl bg-cyan-500/10 flex items-center justify-center mb-4 border border-cyan-500/20 animate-float">
+                              <Coffee className="w-6 h-6 text-cyan-400" />
+                            </div>
+                            <AnimatePresence mode="wait">
+                              <motion.p
+                                key={coffeePhraseIndex}
+                                initial={{ opacity: 0, y: 5 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: -5 }}
+                                className="max-w-md text-base font-orbitron text-cyan-300/80 leading-relaxed italic"
+                              >
+                                {translateData(translations[language].coffeeMessage[coffeePhraseIndex])}
+                              </motion.p>
+                            </AnimatePresence>
                           </div>
-                          <p className="text-[14px] font-orbitron uppercase tracking-widest">{t('noShips')}</p>
-                        </div>
+                        ) : (
+                          <div className="h-full flex flex-col items-center justify-center text-center opacity-40">
+                            <div className="w-12 h-12 rounded-full border border-dashed border-cyan-500/30 flex items-center justify-center mb-4">
+                              <Database className="w-6 h-6" />
+                            </div>
+                            <p className="text-[14px] font-orbitron uppercase tracking-widest">{t('noShips')}</p>
+                          </div>
+                        )
                       ) : (
                         <div className="flex flex-col gap-4">
                           <div className="grid grid-cols-1 gap-3 content-start">
                             {/* Coffee Message when fully automated */}
-                            {activeDeliveries.length === 0 && Object.values(autoTravelActive).some(v => v) && (
+                            {shouldShowCoffeeMessage && (
                               <motion.div
                                 initial={{ opacity: 0, y: 10 }}
                                 animate={{ opacity: 1, y: 0 }}
@@ -8206,11 +8349,11 @@ const DashboardContent = memo(({
                     exit={{ opacity: 0, scale: 0.95 }}
                     className="relative flex items-center justify-center w-full h-full min-h-[500px] rounded-3xl overflow-hidden"
                   >
-                    <img src="/assets/common/nebula_bg.png" alt="" className="absolute inset-0 h-full w-full object-cover opacity-80" />
+                    <img src="/assets/common/nebula_bg.webp" alt="" className="absolute inset-0 h-full w-full object-cover opacity-80" />
                     <div className="absolute inset-0 bg-black/40" />
 
                     <div className={`relative max-w-md w-full glass-panel ${isInterstellar ? 'neon-border-orange' : 'neon-border-cyan'} rounded-2xl p-8 space-y-8 text-center overflow-hidden shadow-2xl`}>
-                      <img src="/assets/common/scifi_texture_bg.png" alt="" className="absolute inset-0 h-full w-full object-cover opacity-30" />
+                      <img src="/assets/common/scifi_texture_bg.webp" alt="" className="absolute inset-0 h-full w-full object-cover opacity-30" />
                       <div className="absolute inset-0 bg-black/60" />
 
                       <div className="relative z-10 flex flex-col items-center gap-4">
@@ -9903,14 +10046,23 @@ const DashboardContent = memo(({
               }}
             >
               <motion.div
-                className={`glass-panel p-8 rounded-3xl border ${selectedReward.color === 'emerald' ? 'border-emerald-500/40 shadow-[0_0_30px_rgba(16,185,129,0.2)]' : 'border-purple-500/40 shadow-[0_0_30px_rgba(168,85,247,0.2)]'} max-w-md w-full text-center space-y-6 relative overflow-hidden`}
+                className={`glass-panel p-8 rounded-3xl border ${selectedReward.color === 'emerald' ? 'border-emerald-500/40 shadow-[0_0_30px_rgba(16,185,129,0.2)]' : 'border-purple-500/40 shadow-[0_0_30px_rgba(168,85,247,0.2)]'} max-w-md w-full text-center relative overflow-hidden flex flex-col gap-6`}
                 onClick={(e) => e.stopPropagation()}
               >
-                {/* Background Glow */}
-                <div className={`absolute -top-24 -left-24 w-48 h-48 ${selectedReward.color === 'emerald' ? 'bg-emerald-500/10' : 'bg-purple-500/10'} blur-[80px] rounded-full`} />
-                <div className={`absolute -bottom-24 -right-24 w-48 h-48 ${selectedReward.color === 'emerald' ? 'bg-emerald-500/10' : 'bg-purple-500/10'} blur-[80px] rounded-full`} />
+                <img
+                  src={SCIFI_TEXTURE_BACKGROUND}
+                  alt=""
+                  aria-hidden="true"
+                  className="pointer-events-none absolute inset-0 h-full w-full object-cover object-center opacity-75 brightness-125 saturate-125"
+                />
+                <div className="pointer-events-none absolute inset-0 bg-slate-950/55" />
+                <div className={`pointer-events-none absolute inset-0 ${selectedReward.color === 'emerald' ? 'bg-emerald-500/10' : 'bg-purple-500/10'}`} />
 
-                <div className={`w-20 h-20 rounded-2xl ${selectedReward.color === 'emerald' ? 'bg-emerald-500/20 border-emerald-500/40' : 'bg-purple-500/20 border-purple-500/40'} flex items-center justify-center mx-auto`}>
+                {/* Background Glow */}
+                <div className={`pointer-events-none absolute -top-24 -left-24 w-48 h-48 ${selectedReward.color === 'emerald' ? 'bg-emerald-500/10' : 'bg-purple-500/10'} blur-[80px] rounded-full`} />
+                <div className={`pointer-events-none absolute -bottom-24 -right-24 w-48 h-48 ${selectedReward.color === 'emerald' ? 'bg-emerald-500/10' : 'bg-purple-500/10'} blur-[80px] rounded-full`} />
+
+                <div className={`relative z-10 w-20 h-20 rounded-2xl ${selectedReward.color === 'emerald' ? 'bg-emerald-500/20 border-emerald-500/40' : 'bg-purple-500/20 border-purple-500/40'} flex items-center justify-center mx-auto`}>
                   <Star className={`w-10 h-10 ${selectedReward.color === 'emerald' ? 'text-emerald-400' : 'text-purple-400'}`} />
                 </div>
 
@@ -9931,35 +10083,37 @@ const DashboardContent = memo(({
                       <div className="text-base text-slate-500 uppercase font-bold tracking-widest">
                         {language === 'pt' ? 'Status da Melhoria' : 'Upgrade Status'}
                       </div>
-                      <button
+                      <PremiumCanvasButton
                         onClick={(e) => {
                           e.stopPropagation();
                           if (selectedReward.level === 30) toggleRetribution();
                           if (selectedReward.level === 50) toggleFatigue();
                         }}
-                        className={`px-6 py-2 rounded-full border transition-all flex items-center gap-2 ${(selectedReward.level === 30 ? isRetributionActive : isFatigueActive)
-                            ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-400"
-                            : "bg-white/5 border-white/10 text-slate-500"
-                          }`}
+                        tone={(selectedReward.level === 30 ? isRetributionActive : isFatigueActive) ? 'green' : 'steel'}
+                        className={`h-10 px-6 text-[12px] font-black uppercase tracking-[0.18em] ${
+                          (selectedReward.level === 30 ? isRetributionActive : isFatigueActive) ? 'text-emerald-100' : 'text-slate-300'
+                        }`}
+                        contentClassName="gap-2"
                       >
                         <div className={`w-2 h-2 rounded-full ${(selectedReward.level === 30 ? isRetributionActive : isFatigueActive) ? "bg-emerald-400 animate-pulse" : "bg-slate-600"}`} />
                         {(selectedReward.level === 30 ? isRetributionActive : isFatigueActive)
                           ? (language === 'pt' ? 'ATIVADO' : 'ACTIVE')
                           : (language === 'pt' ? 'DESATIVADO' : 'DISABLED')}
-                      </button>
+                      </PremiumCanvasButton>
                     </div>
                   )}
                 </div>
 
-                <button
+                <PremiumCanvasButton
                   onClick={() => {
                     setSelectedReward(null);
                     playSfx('close_window');
                   }}
-                  className={`w-full py-4 rounded-xl font-orbitron font-black text-[14px] tracking-[0.4em] transition-all active:scale-95 uppercase border ${selectedReward.color === 'emerald' ? 'bg-emerald-600 hover:bg-emerald-500 border-emerald-400 shadow-[0_0_20px_rgba(16,185,129,0.3)]' : 'bg-purple-600 hover:bg-purple-500 border-purple-400 shadow-[0_0_20px_rgba(168,85,247,0.3)]'} text-white`}
+                  tone={selectedReward.color === 'emerald' ? 'green' : 'purple'}
+                  className="relative z-10 h-14 w-full text-[14px] font-black uppercase tracking-[0.4em] text-white"
                 >
                   {language === 'pt' ? 'FECHAR' : 'CLOSE'}
-                </button>
+                </PremiumCanvasButton>
               </motion.div>
             </motion.div>
           )}
@@ -10009,7 +10163,27 @@ const DashboardContent = memo(({
                     onClick={() => {
                       const skipCost = routeTier === 'Interstellar' ? 40 : 10;
                       if (aetherion >= skipCost) {
-                        autoSkipBattle(foundBattle, skipCost);
+                        const victory = autoSkipBattle(foundBattle, skipCost);
+                        const notificationTitle = victory
+                          ? (language === 'pt' ? 'Radar Skip Vitória' : 'Radar Skip Victory')
+                          : (language === 'pt' ? 'Radar Skip Derrota' : 'Radar Skip Defeat');
+                        const notificationMessage = victory
+                          ? (language === 'pt'
+                            ? `Batalha de radar pulada com sucesso. -${skipCost} AE.`
+                            : `Radar battle skipped successfully. -${skipCost} AE.`)
+                          : (language === 'pt'
+                            ? `Batalha de radar pulada: derrota. -${skipCost} AE.`
+                            : `Radar battle skipped: defeat. -${skipCost} AE.`);
+
+                        setBattleNotification({
+                          title: notificationTitle,
+                          message: notificationMessage,
+                          type: victory ? 'success' : 'error',
+                          tier: routeTier
+                        });
+                        playSfx(victory ? 'radar_skip_victory' : 'radar_skip_defeat');
+                        addLog(notificationMessage, victory ? 'success' : 'error');
+                        setTimeout(() => setBattleNotification(null), 2500);
                         setFoundBattle(null);
                       }
                     }}

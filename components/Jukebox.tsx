@@ -8,6 +8,7 @@ interface JukeboxProps {
   onClose: () => void;
   language: 'pt' | 'en';
   playlist: Track[];
+  libraryPlaylist?: Track[];
   currentTrackIndex: number;
   isPlaying: boolean;
   volume: number;
@@ -17,6 +18,7 @@ interface JukeboxProps {
   setIsLoop: (v: boolean) => void;
   setIsShuffle: (v: boolean) => void;
   setTrack: (index: number) => void;
+  setLibraryTrack?: (index: number) => void;
   togglePlay: () => void;
   playNext: () => void;
   playPrev: () => void;
@@ -97,6 +99,7 @@ export function Jukebox({
   onClose,
   language,
   playlist,
+  libraryPlaylist,
   currentTrackIndex,
   isPlaying,
   volume: _volume,
@@ -106,6 +109,7 @@ export function Jukebox({
   setIsLoop,
   setIsShuffle,
   setTrack,
+  setLibraryTrack,
   togglePlay,
   playNext,
   playPrev,
@@ -113,6 +117,8 @@ export function Jukebox({
   currentTrack
 }: JukeboxProps) {
   const tl = (en: string, pt: string) => language === 'pt' ? pt : en;
+  const displayPlaylist = libraryPlaylist && libraryPlaylist.length > 0 ? libraryPlaylist : playlist;
+  const activeDisplayIndex = Math.max(0, displayPlaylist.findIndex((track) => track.url === currentTrack?.url));
   const toggleShuffleMode = () => {
     const nextShuffle = !isShuffle;
     setIsShuffle(nextShuffle);
@@ -204,7 +210,7 @@ export function Jukebox({
                             </p>
                             <div className="flex items-center justify-center gap-3">
                               <span className="text-[9px] font-mono text-cyan-400 bg-cyan-400/10 px-2 py-0.5 rounded border border-cyan-400/20">
-                                TRK {String(currentTrackIndex + 1).padStart(2, '0')}
+                                TRK {String(activeDisplayIndex + 1).padStart(2, '0')}
                               </span>
                               <div className="flex items-center gap-1.5">
                                 <div className={`w-1.5 h-1.5 rounded-full ${isPlaying ? 'bg-green-500 animate-pulse' : 'bg-slate-600'}`} />
@@ -269,22 +275,24 @@ export function Jukebox({
                       <span className="text-[10px] font-orbitron font-bold text-slate-400 uppercase tracking-widest">
                         {tl('TRANSMISSION QUEUE', 'FILA DE TRANSMISSÃO')}
                       </span>
-                      <span className="text-[9px] font-mono text-cyan-500/40">{playlist.length} TRACKS</span>
+                      <span className="text-[9px] font-mono text-cyan-500/40">{displayPlaylist.length} TRACKS</span>
                     </div>
                     
                     <div className="flex-1 overflow-y-auto custom-scrollbar p-2 space-y-1">
-                      {playlist.map((track, index) => (
+                      {displayPlaylist.map((track, index) => {
+                        const isCurrentTrack = track.url === currentTrack?.url;
+                        return (
                         <button
                           key={`${track.id}-${index}`}
-                          onClick={() => setTrack(index)}
+                          onClick={() => (setLibraryTrack ? setLibraryTrack(index) : setTrack(index))}
                           className={`w-full flex items-center gap-3 p-3 rounded-lg transition-all group ${
-                            currentTrackIndex === index 
+                            isCurrentTrack 
                             ? 'bg-cyan-500/10 border border-cyan-500/30' 
                             : 'hover:bg-white/5 border border-transparent'
                           }`}
                         >
-                          <div className={`w-8 h-8 rounded bg-slate-800/50 flex items-center justify-center font-mono text-[10px] ${currentTrackIndex === index ? 'text-cyan-400' : 'text-slate-600'}`}>
-                            {currentTrackIndex === index && isPlaying ? (
+                          <div className={`w-8 h-8 rounded bg-slate-800/50 flex items-center justify-center font-mono text-[10px] ${isCurrentTrack ? 'text-cyan-400' : 'text-slate-600'}`}>
+                            {isCurrentTrack && isPlaying ? (
                               <Activity className="w-4 h-4 animate-pulse" />
                             ) : (
                               String(index + 1).padStart(2, '0')
@@ -292,7 +300,7 @@ export function Jukebox({
                           </div>
                           
                           <div className="flex-1 text-left overflow-hidden">
-                            <p className={`text-xs font-orbitron truncate ${currentTrackIndex === index ? 'text-white font-bold' : 'text-slate-400 group-hover:text-slate-200'}`}>
+                            <p className={`text-xs font-orbitron truncate ${isCurrentTrack ? 'text-white font-bold' : 'text-slate-400 group-hover:text-slate-200'}`}>
                               {track.title}
                             </p>
                             <p className="text-[8px] font-mono text-slate-600 uppercase tracking-tighter truncate">
@@ -300,11 +308,12 @@ export function Jukebox({
                             </p>
                           </div>
 
-                          {currentTrackIndex === index && (
+                          {isCurrentTrack && (
                             <div className="w-1.5 h-1.5 rounded-full bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,1)]" />
                           )}
                         </button>
-                      ))}
+                      );
+                    })}
                     </div>
                   </div>
                 </div>

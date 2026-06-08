@@ -216,6 +216,15 @@ export function useJukebox(onPlayStateChange?: (isPlaying: boolean) => void) {
     }
   }, []);
 
+  const setLibraryTrack = useCallback((index: number) => {
+    if (index >= 0 && index < fullPlaylist.length) {
+      setPlaylist(fullPlaylist);
+      setCurrentTrackIndex(index);
+      setIsPlaying(true);
+      setDesiredIsPlaying(true);
+    }
+  }, [fullPlaylist]);
+
   const stop = useCallback((options: { rememberPreference?: boolean } = {}) => {
     setIsPlaying(false);
     if (options.rememberPreference !== false) {
@@ -271,6 +280,7 @@ export function useJukebox(onPlayStateChange?: (isPlaying: boolean) => void) {
 
   return useMemo(() => ({
     playlist,
+    libraryPlaylist: fullPlaylist,
     currentTrackIndex,
     isPlaying,
     desiredIsPlaying,
@@ -283,6 +293,7 @@ export function useJukebox(onPlayStateChange?: (isPlaying: boolean) => void) {
     setPlaylist,
     setCurrentTrackIndex,
     setTrack,
+    setLibraryTrack,
     setIsPlaying: (next: boolean) => {
       setIsPlaying(next);
       setDesiredIsPlaying(next);
@@ -296,6 +307,7 @@ export function useJukebox(onPlayStateChange?: (isPlaying: boolean) => void) {
     currentTrack: playlist[currentTrackIndex]
   }), [
     playlist, 
+    fullPlaylist,
     currentTrackIndex, 
     isPlaying, 
     desiredIsPlaying,
@@ -307,6 +319,7 @@ export function useJukebox(onPlayStateChange?: (isPlaying: boolean) => void) {
     togglePlay, 
     playNext, 
     playPrev, 
-    setTrack
+    setTrack,
+    setLibraryTrack
   ]);
 }

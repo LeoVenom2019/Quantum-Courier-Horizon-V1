@@ -4,6 +4,7 @@ import React, { memo } from 'react';
 import { motion } from 'motion/react';
 import { Flame, Coins, Zap } from 'lucide-react';
 import { ROUTES, SHIPS } from '@/lib/game-data';
+import { AETHERION_CHAMBER_BACKGROUND, INTERSTELLAR_AUTO_BACKGROUNDS, SOLAR_AUTO_BACKGROUNDS } from '@/lib/ui-backgrounds';
 import { useDashboard } from './DashboardProvider';
 import { PremiumCanvasButton } from '../ui/PremiumCanvasButton';
 
@@ -30,6 +31,9 @@ const AutoTab = memo(() => {
 
   const isInterstellar = routeTier === 'Interstellar';
   const isSpeedMode = false;
+  const aetherionFillRatio = Math.min(1, Math.max(0, aetherion / 10000));
+  const chamberBackgroundOpacity = aetherionFillRatio;
+  const chamberBackgroundBrightness = 0.85 + aetherionFillRatio * 0.55;
 
   const getAutoTravelColor = (slots: number) => {
     if (slots >= 10) return 'text-purple-400';
@@ -45,12 +49,29 @@ const AutoTab = memo(() => {
       exit={{ opacity: 0, y: -10 }}
       className="flex flex-col h-full min-h-0 gap-3 overflow-hidden"
     >
-      {/* CCE - Câmara de Contenção de Éteríon */}
+      {/* CCE - Câmara de Contenção de Etérion */}
       <div 
         onClick={synthesizeAetherion}
         className={`glass-panel ${isInterstellar ? 'neon-border-orange' : 'neon-border-cyan'} p-4 rounded-xl overflow-hidden relative group shrink-0 cursor-pointer hover:bg-white/5 transition-all`}
       >
-        <div className="flex justify-between items-center mb-3">
+        <div className="absolute inset-0 pointer-events-none select-none overflow-hidden z-0">
+          <img
+            src={AETHERION_CHAMBER_BACKGROUND}
+            alt=""
+            aria-hidden="true"
+            className="absolute inset-0 w-full h-full object-cover transition-[filter,opacity] duration-[1800ms] ease-in-out"
+            style={{
+              opacity: chamberBackgroundOpacity,
+              filter: `brightness(${chamberBackgroundBrightness}) saturate(${1 + aetherionFillRatio * 0.45})`,
+            }}
+          />
+          <div
+            className={`absolute inset-0 transition-opacity duration-[1800ms] ease-in-out ${isInterstellar ? 'bg-orange-400/10' : 'bg-cyan-400/10'}`}
+            style={{ opacity: aetherionFillRatio * 0.35 }}
+          />
+        </div>
+
+        <div className="relative z-10 flex justify-between items-center mb-3">
           <div className="flex items-center gap-3">
             <div className={`p-2 rounded-lg ${isInterstellar ? 'bg-orange-500/10 text-orange-400' : 'bg-cyan-500/10 text-cyan-400'}`}>
               <Flame className="w-5 h-5" />
@@ -68,7 +89,7 @@ const AutoTab = memo(() => {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-[1fr_200px] gap-4 items-center">
+        <div className="relative z-10 grid grid-cols-1 md:grid-cols-[1fr_200px] gap-4 items-center">
           <div className="space-y-1.5">
             <div className="h-2.5 bg-white/5 rounded-full border border-white/10 p-0.5 relative overflow-hidden">
               <motion.div 
@@ -98,10 +119,25 @@ const AutoTab = memo(() => {
         const progress = autoTravelProgress[route.id] || 0;
         const locationTech = techLevels[route.id] || { engine: 0, ai: 0, value: 0, rare: 0 };
         const ship = SHIPS.find((s: any) => s.level === route.requiredShipLevel && s.tier === route.tier);
+        const backgroundImage = route.tier === 'Solar'
+          ? SOLAR_AUTO_BACKGROUNDS[route.requiredShipLevel]
+          : route.tier === 'Interstellar'
+            ? INTERSTELLAR_AUTO_BACKGROUNDS[route.requiredShipLevel]
+            : undefined;
         
         return (
-          <div key={route.id} className={`glass-panel ${isInterstellar ? 'neon-border-orange' : 'neon-border-cyan'} rounded-lg p-3 flex flex-col gap-3 hover:bg-white/5 transition-colors h-full min-h-[160px] justify-between`}>
-            <div className="space-y-3">
+          <div
+            key={route.id}
+            className={`glass-panel ${isInterstellar ? 'neon-border-orange' : 'neon-border-cyan'} rounded-lg p-3 flex flex-col gap-3 bg-cover bg-center bg-no-repeat hover:bg-white/5 transition-colors h-full min-h-[160px] justify-between relative overflow-hidden`}
+            style={backgroundImage ? { backgroundImage: `url('${backgroundImage}')` } : undefined}
+          >
+            {backgroundImage && (
+              <>
+                <div className="absolute inset-0 bg-slate-950/45 pointer-events-none" />
+                <div className="absolute inset-0 bg-gradient-to-b from-slate-950/45 via-transparent to-slate-950/70 pointer-events-none" />
+              </>
+            )}
+            <div className="relative z-10 space-y-3">
               <div className="flex justify-between items-start">
                 <div className="min-w-0">
                   <h3 className={`font-orbitron text-base font-bold ${ship?.color || 'text-white'} truncate leading-tight uppercase tracking-wider`}>{ship?.name || translateData(route.name)}</h3>
@@ -152,7 +188,7 @@ const AutoTab = memo(() => {
             </div>
 
             {slots > 0 && (
-              <div className="pt-2 border-t border-white/5 flex flex-col gap-2 mt-auto">
+              <div className="relative z-10 pt-2 border-t border-white/5 flex flex-col gap-2 mt-auto">
                 <div className="flex justify-between items-center">
                   <div className="flex flex-col gap-1">
                     <PremiumCanvasButton
@@ -198,5 +234,7 @@ const AutoTab = memo(() => {
     </motion.div>
   );
 });
+
+AutoTab.displayName = 'AutoTab';
 
 export default AutoTab;

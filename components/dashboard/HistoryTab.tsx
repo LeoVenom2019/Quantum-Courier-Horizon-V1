@@ -262,8 +262,16 @@ const HistoryTab = memo(function HistoryTab() {
         </>
       ) : (
         <>
-          <div className={`glass-panel ${isInterstellar ? 'neon-border-orange' : isVoid ? 'neon-border-purple' : 'neon-border-cyan'} p-3 px-5 rounded-2xl flex justify-between items-center shadow-lg border-2`}>
-            <div className="flex items-center gap-4">
+          <div className={`glass-panel ${isInterstellar ? 'neon-border-orange' : isVoid ? 'neon-border-purple' : 'neon-border-cyan'} p-3 px-5 rounded-2xl flex justify-between items-center shadow-lg border-2 relative overflow-hidden`}>
+            <div 
+              className="absolute inset-0 z-0 opacity-65 mix-blend-overlay pointer-events-none"
+              style={{
+                backgroundImage: `url(${isInterstellar ? '/assets/texturas/historic/cap2/bg_header.webp' : '/assets/texturas/historic/cap1/bg_header.webp'})`,
+                backgroundSize: 'cover',
+                backgroundPosition: 'center'
+              }}
+            />
+            <div className="flex items-center gap-4 relative z-10">
               <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isInterstellar ? 'bg-orange-500/20 text-orange-400' : isVoid ? 'bg-purple-500/20 text-purple-400' : 'bg-cyan-500/20 text-cyan-400'} border border-white/10`}>
                 <Activity size={20} />
               </div>
@@ -273,7 +281,7 @@ const HistoryTab = memo(function HistoryTab() {
               </div>
             </div>
             
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 relative z-10">
               {!isEarth && (
                 <button 
                   onClick={() => {
@@ -336,16 +344,24 @@ const HistoryTab = memo(function HistoryTab() {
                     {/* Decorative Background Elements */}
                     <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-white/5 to-transparent rounded-bl-full pointer-events-none" />
 
-                    <div className="flex justify-between items-center bg-black/40 p-3 rounded-2xl border border-white/5 shadow-inner">
+                    <div className="flex justify-between items-center bg-black/40 p-3 rounded-2xl border border-white/5 shadow-inner relative overflow-hidden">
+                      <div 
+                        className="absolute inset-0 z-0 opacity-65 mix-blend-overlay pointer-events-none"
+                        style={{
+                          backgroundImage: `url(${tier === 'Interstellar' ? '/assets/texturas/historic/cap2/bg_repo.webp' : '/assets/texturas/historic/cap1/bg_repo.webp'})`,
+                          backgroundSize: 'cover',
+                          backgroundPosition: 'center'
+                        }}
+                      />
                       <button 
                         onClick={() => setHistoryPage(prev => Math.max(0, prev - 1))}
                         disabled={historyPage === 0}
-                        className={`p-2 rounded-xl transition-all ${historyPage === 0 ? 'text-slate-800 cursor-not-allowed' : 'text-white hover:bg-white/10'}`}
+                        className={`p-2 rounded-xl transition-all relative z-10 ${historyPage === 0 ? 'text-slate-800 cursor-not-allowed' : 'text-white hover:bg-white/10'}`}
                       >
                         <ChevronLeft size={24} />
                       </button>
                       
-                      <div className="flex flex-col items-center">
+                      <div className="flex flex-col items-center relative z-10">
                         <span className="text-[10px] font-mono text-slate-500 uppercase tracking-[0.4em]">DATA REPOSITORY</span>
                         <h3 className={`font-orbitron text-lg font-black ${tierColor} uppercase tracking-[0.3em] drop-shadow-[0_0_10px_rgba(0,0,0,0.5)]`}>
                           {tierLabel}
@@ -355,7 +371,7 @@ const HistoryTab = memo(function HistoryTab() {
                       <button 
                         onClick={() => setHistoryPage(prev => Math.min(availableTiers.length - 1, prev + 1))}
                         disabled={historyPage >= availableTiers.length - 1}
-                        className={`p-2 rounded-xl transition-all ${historyPage >= availableTiers.length - 1 ? 'text-slate-800 cursor-not-allowed' : 'text-white hover:bg-white/10'}`}
+                        className={`p-2 rounded-xl transition-all relative z-10 ${historyPage >= availableTiers.length - 1 ? 'text-slate-800 cursor-not-allowed' : 'text-white hover:bg-white/10'}`}
                       >
                         <ChevronRight size={24} />
                       </button>
@@ -420,9 +436,17 @@ const HistoryTab = memo(function HistoryTab() {
                               {t('totalDeliveriesBattlesMining')}
                             </h4>
                             <div className="space-y-2 bg-black/40 p-4 rounded-[1.5rem] border-2 border-white/5 flex-1 shadow-inner relative overflow-hidden group min-h-0">
-                              <div className="absolute top-0 left-0 w-1 h-full bg-emerald-500/20 group-hover:bg-emerald-500/40 transition-colors" />
+                              <div 
+                                className="absolute inset-0 z-0 opacity-65 mix-blend-overlay pointer-events-none"
+                                style={{
+                                  backgroundImage: `url(${tier === 'Interstellar' ? '/assets/texturas/historic/cap2/bg_left.webp' : '/assets/texturas/historic/cap1/bg_left.webp'})`,
+                                  backgroundSize: 'cover',
+                                  backgroundPosition: 'center'
+                                }}
+                              />
+                              <div className="absolute top-0 left-0 w-1 h-full bg-emerald-500/20 group-hover:bg-emerald-500/40 transition-colors z-10" />
                               
-                              <div className="grid grid-cols-2 gap-4">
+                              <div className="grid grid-cols-2 gap-4 relative z-10">
                                 <div className="flex flex-col bg-white/5 p-3 rounded-xl border border-white/5">
                                   <span className="text-slate-400 uppercase font-mono text-[10px] font-bold truncate">{t('randomBattlesFound')}</span>
                                   <span className="font-orbitron font-black text-xl text-white">{formatValue(stats.randomBattlesFound || 0)}</span>
@@ -455,7 +479,7 @@ const HistoryTab = memo(function HistoryTab() {
                                 </div>
                               </div>
                               
-                              <div className="mt-auto pt-3 border-t border-white/10 flex justify-between items-center">
+                              <div className="mt-auto pt-3 border-t border-white/10 flex justify-between items-center relative z-10">
                                 <span className="text-slate-300 uppercase font-orbitron text-[10px] font-bold truncate">{t('missionsCompleted')}</span>
                                 <div className="flex items-center gap-3">
                                   <div className="w-12 h-1 bg-white/5 rounded-full overflow-hidden">
@@ -476,10 +500,18 @@ const HistoryTab = memo(function HistoryTab() {
                               </div>
                               {t('totalQCAcquired')}
                             </h4>
-                            <div className="space-y-2 bg-black/40 p-4 rounded-[1.5rem] border-2 border-white/5 flex-1 shadow-inner relative group min-h-0">
-                              <div className="absolute top-0 left-0 w-1.5 h-full bg-cyan-500/20 group-hover:bg-cyan-500/40 transition-colors" />
+                            <div className="space-y-2 bg-black/40 p-4 rounded-[1.5rem] border-2 border-white/5 flex-1 shadow-inner relative group min-h-0 overflow-hidden">
+                              <div 
+                                className="absolute inset-0 z-0 opacity-65 mix-blend-overlay pointer-events-none"
+                                style={{
+                                  backgroundImage: `url(${tier === 'Interstellar' ? '/assets/texturas/historic/cap2/bg_right1.webp' : '/assets/texturas/historic/cap1/bg_right1.webp'})`,
+                                  backgroundSize: 'cover',
+                                  backgroundPosition: 'center'
+                                }}
+                              />
+                              <div className="absolute top-0 left-0 w-1.5 h-full bg-cyan-500/20 group-hover:bg-cyan-500/40 transition-colors z-10" />
                               
-                              <div className="flex flex-col gap-1">
+                              <div className="flex flex-col gap-1 relative z-10">
                                 <div className="flex justify-between items-center text-sm">
                                   <span className="text-slate-400 uppercase font-mono text-[10px] font-bold">{t('fromDeliveries')}</span>
                                   <span className="font-mono text-emerald-400 font-black text-lg">+{formatValue(stats.qcFromDeliveries || 0)}</span>
@@ -502,7 +534,7 @@ const HistoryTab = memo(function HistoryTab() {
                                 </div>
                               </div>
                               
-                              <div className="mt-auto pt-3 border-t-2 border-white/10 flex flex-col gap-1">
+                              <div className="mt-auto pt-3 border-t-2 border-white/10 flex flex-col gap-1 relative z-10">
                                 <span className="text-[9px] font-mono text-slate-500 uppercase tracking-[0.4em] text-center font-bold">NET ACQUISITION</span>
                                 <div className="flex justify-between items-center bg-white/5 p-3 rounded-xl border border-white/10">
                                   <span className="text-xs font-black text-white uppercase font-orbitron">{t('totalQCAcquired')}</span>
@@ -520,6 +552,14 @@ const HistoryTab = memo(function HistoryTab() {
                               {t('totalQCSpent')}
                             </h4>
                             <div className="bg-pink-500/5 p-4 rounded-[1.5rem] border-2 border-pink-500/30 shadow-[0_0_30px_rgba(236,72,153,0.05)] flex flex-col gap-2 relative group overflow-hidden">
+                              <div 
+                                className="absolute inset-0 z-0 opacity-65 mix-blend-overlay pointer-events-none"
+                                style={{
+                                  backgroundImage: `url(${tier === 'Interstellar' ? '/assets/texturas/historic/cap2/bg_right2.webp' : '/assets/texturas/historic/cap1/bg_right2.webp'})`,
+                                  backgroundSize: 'cover',
+                                  backgroundPosition: 'center'
+                                }}
+                              />
                               <div className="flex justify-between items-center relative z-10">
                                 <div className="flex flex-col">
                                   <span className="text-[10px] text-slate-400 uppercase font-mono font-bold">{t('fromAllSources')}</span>

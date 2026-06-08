@@ -5,6 +5,7 @@ import { motion } from 'motion/react';
 import { Zap, ChevronUp, RefreshCw, ArrowRight, Settings, Activity, Coins } from 'lucide-react';
 import { ROUTES, SHIPS, UPGRADES } from '@/lib/game-data';
 import { ROUTES_MAP, DOUBLE_ROUTE_COSTS, DOOM_P_COSTS } from '@/lib/game-constants';
+import { AETHERION_CHAMBER_BACKGROUND } from '@/lib/ui-backgrounds';
 import { useDashboard } from './DashboardProvider';
 import { PremiumCanvasButton } from '../ui/PremiumCanvasButton';
 
@@ -47,9 +48,13 @@ const UpgradesTab = memo(function UpgradesTab() {
     doubleRouteLevel,
     doomPLevel
   } = progression;
-  const { qc, miningWaste, solarEnergy, aetherionTubes } = economy;
+  const { qc, miningWaste, solarEnergy, aetherion, aetherionTubes } = economy;
 
   const [selectedUpgradeLocation, setSelectedUpgradeLocation] = React.useState<string | null>(null);
+  const [rhseLiquidPulse, setRhseLiquidPulse] = React.useState(0);
+  const previousAetherionRef = React.useRef(aetherion);
+  const previousAetherionTubesRef = React.useRef(aetherionTubes);
+  const manualSynthesisPulseRef = React.useRef(false);
 
   const isInterstellar = routeTier === 'Interstellar';
   const themeAccent = isInterstellar ? 'text-orange-400' : 'text-cyan-400';
@@ -71,6 +76,34 @@ const UpgradesTab = memo(function UpgradesTab() {
     return 'neon-border-cyan';
   };
 
+  const triggerRhseLiquidMotion = React.useCallback(() => {
+    setRhseLiquidPulse((pulse) => pulse + 1);
+  }, []);
+
+  const handleSynthesizeAetherion = React.useCallback(() => {
+    if (aetherionTubes > 0 && aetherion < 10000) {
+      manualSynthesisPulseRef.current = true;
+      triggerRhseLiquidMotion();
+    }
+    synthesizeAetherion();
+  }, [aetherion, aetherionTubes, synthesizeAetherion, triggerRhseLiquidMotion]);
+
+  React.useEffect(() => {
+    const consumedTube = aetherionTubes < previousAetherionTubesRef.current;
+    const gainedAetherion = aetherion > previousAetherionRef.current;
+
+    if (consumedTube && gainedAetherion) {
+      if (manualSynthesisPulseRef.current) {
+        manualSynthesisPulseRef.current = false;
+      } else {
+        triggerRhseLiquidMotion();
+      }
+    }
+
+    previousAetherionRef.current = aetherion;
+    previousAetherionTubesRef.current = aetherionTubes;
+  }, [aetherion, aetherionTubes, triggerRhseLiquidMotion]);
+
   return (
     <motion.div 
       key="upgrades"
@@ -81,9 +114,25 @@ const UpgradesTab = memo(function UpgradesTab() {
     >
       {!selectedUpgradeLocation ? (
         <div className="flex-1 flex flex-col min-h-0 space-y-3">
-          {/* RHSE Header (Always Open) */}
-          {true && (
-            <div className={`w-full glass-panel ${isInterstellar ? 'neon-border-orange' : 'neon-border-cyan'} rounded-xl p-3 bg-white/5 relative overflow-hidden shrink-0`}>
+          {/* RHSE (Always Open) */}
+          <div
+            className={`w-full glass-panel ${isInterstellar ? 'neon-border-orange' : 'neon-border-cyan'} rounded-xl bg-white/5 relative overflow-hidden shrink-0`}
+          >
+            <div
+              key={`rhse-liquid-${rhseLiquidPulse}`}
+              aria-hidden="true"
+              className={`absolute inset-0 scale-[1.04] bg-cover bg-center bg-no-repeat opacity-55 ${rhseLiquidPulse > 0 ? 'animate-aetherion-liquid-flow' : ''}`}
+              style={{ backgroundImage: `url('${AETHERION_CHAMBER_BACKGROUND}')` }}
+            />
+            {rhseLiquidPulse > 0 && (
+              <div
+                key={`rhse-liquid-sheen-${rhseLiquidPulse}`}
+                className={`absolute inset-0 ${isInterstellar ? 'bg-orange-300/15' : 'bg-cyan-300/15'} animate-aetherion-liquid-sheen pointer-events-none`}
+              />
+            )}
+            <div className="absolute inset-0 bg-slate-950/45 pointer-events-none" />
+            <div className="absolute inset-0 bg-gradient-to-b from-slate-950/45 via-slate-950/25 to-slate-950/70 pointer-events-none" />
+            <div className="relative z-10 p-3">
               <div className="flex justify-between items-center">
                 <div className="flex items-center gap-3">
                   <div className={`w-10 h-10 rounded-xl flex items-center justify-center border ${isInterstellar ? 'bg-orange-500/20 border-orange-500/40 text-orange-400' : 'bg-cyan-500/20 border-cyan-500/40 text-cyan-400'}`}>
@@ -100,10 +149,8 @@ const UpgradesTab = memo(function UpgradesTab() {
                 </div>
               </div>
             </div>
-          )}
 
-          {/* RHSE Content (Always Open) */}
-          <div className={`glass-panel ${isInterstellar ? 'neon-border-orange' : 'neon-border-cyan'} rounded-xl p-3 bg-white/5 space-y-4 shrink-0 mt-1`}>
+            <div className="relative z-10 p-3 pt-4 space-y-4">
             {isInterstellar && (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
                 {/* Extraction Technology Upgrade */}
@@ -244,7 +291,7 @@ const UpgradesTab = memo(function UpgradesTab() {
 
             <div className="flex flex-col md:flex-row items-center justify-between gap-4 pt-1 border-t border-white/5 mt-1">
               <div className="flex items-center gap-4">
-                <div className="flex flex-col cursor-pointer group/tubes" onClick={synthesizeAetherion}>
+                <div className="flex flex-col cursor-pointer group/tubes" onClick={handleSynthesizeAetherion}>
                   <span className="text-[15px] font-orbitron text-slate-500 uppercase tracking-widest group-hover/tubes:text-slate-400 transition-colors">{t('aetherionTubes')}</span>
                   <div className="flex gap-1 mt-1">
                     {Array.from({ length: 10 }).map((_, i) => {
@@ -272,7 +319,7 @@ const UpgradesTab = memo(function UpgradesTab() {
               </div>
 
               <PremiumCanvasButton
-                onClick={synthesizeAetherion}
+                onClick={handleSynthesizeAetherion}
                 tone={aetherionTubes > 0 ? (isInterstellar ? 'orange' : 'cyan') : 'steel'}
                 className="h-11 min-w-[218px] px-5 text-[15px] font-bold uppercase tracking-widest"
                 contentClassName={`gap-2 ${aetherionTubes > 0 ? (isInterstellar ? 'text-orange-100' : 'text-cyan-100') : 'text-slate-500'}`}
@@ -280,6 +327,7 @@ const UpgradesTab = memo(function UpgradesTab() {
                 <RefreshCw className={`w-3 h-3 ${aetherionTubes > 0 ? 'animate-spin-slow' : ''}`} />
                 {language === 'pt' ? 'SINTETIZAR ÉTERION' : 'SYNTHESIZE AETHERION'}
               </PremiumCanvasButton>
+            </div>
             </div>
           </div>
 
@@ -296,7 +344,7 @@ const UpgradesTab = memo(function UpgradesTab() {
                 key={route.id}
                 onClick={() => {
                   setSelectedUpgradeLocation(route.id);
-                  playSfx('open_window');
+                  playSfx('hangar_open_door');
                 }}
                 tone={isMaxed ? 'green' : (isInterstellar ? 'orange' : 'cyan')}
                 className={`p-4 text-left h-full min-h-[112px] ${isMaxed ? 'opacity-90' : 'opacity-100'}`}
@@ -330,7 +378,7 @@ const UpgradesTab = memo(function UpgradesTab() {
           <PremiumCanvasButton
             onClick={() => {
               setSelectedUpgradeLocation(null);
-              playSfx('close_window');
+              playSfx('hangar_close_door');
             }}
             tone={isInterstellar ? 'orange' : 'cyan'}
             className="h-10 w-fit min-w-[112px] px-4 text-lg font-bold uppercase tracking-widest shrink-0"
@@ -343,8 +391,16 @@ const UpgradesTab = memo(function UpgradesTab() {
             {/* ROW 1: Evolution Progress (Left 50%) + Title (Right 50%) */}
             <div className="col-span-2">
               <div className={`h-full glass-panel rounded-3xl border-2 ${themeBorder} bg-white/5 p-6 flex flex-col justify-center overflow-hidden relative`}>
-                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-cyan-500/40 to-transparent" />
-                <div className="flex justify-between items-center gap-8">
+                <div 
+                  className="absolute inset-0 z-0 opacity-60 mix-blend-overlay pointer-events-none"
+                  style={{
+                    backgroundImage: `url('/assets/melhorias/${isInterstellar ? 'bg_rota2_upgrade.webp' : 'bg_rota1_upgrade.webp'}')`,
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center'
+                  }}
+                />
+                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-cyan-500/40 to-transparent z-10" />
+                <div className="flex justify-between items-center gap-8 relative z-10">
                   <div className="flex flex-col gap-1">
                     <h3 className="text-[10px] font-orbitron font-bold text-white/40 uppercase tracking-[0.4em] flex items-center gap-2">
                       <Activity className="w-3 h-3" /> Ship Evolution Status
@@ -381,7 +437,15 @@ const UpgradesTab = memo(function UpgradesTab() {
 
             <div className="col-span-2">
               <div className={`h-full glass-panel ${isInterstellar ? 'neon-border-orange' : 'neon-border-cyan'} rounded-3xl p-6 bg-white/5 border-2 flex items-center justify-start px-10 relative overflow-hidden`}>
-                <div className="flex items-center gap-8">
+                <div 
+                  className="absolute inset-0 z-0 opacity-60 mix-blend-overlay pointer-events-none"
+                  style={{
+                    backgroundImage: `url('/assets/melhorias/${isInterstellar ? 'bg_rota2_title.webp' : 'bg_rota1_title.webp'}')`,
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center'
+                  }}
+                />
+                <div className="flex items-center gap-8 relative z-10">
                   <h2 className={`text-xl font-orbitron font-bold ${SHIPS.find(s => s.level === (ROUTES_MAP.get(selectedUpgradeLocation!)?.requiredShipLevel || 1) && s.tier === (ROUTES_MAP.get(selectedUpgradeLocation!)?.tier || routeTier))?.color || (isInterstellar ? 'text-orange-400' : 'text-cyan-400')} uppercase tracking-widest flex items-center gap-4`}>
                     <Settings className="w-8 h-8 animate-spin-slow" /> {SHIPS.find(s => s.level === (ROUTES_MAP.get(selectedUpgradeLocation!)?.requiredShipLevel || 1) && s.tier === (ROUTES_MAP.get(selectedUpgradeLocation!)?.tier || routeTier))?.name} {t('upgrades')}
                   </h2>
@@ -434,7 +498,7 @@ const UpgradesTab = memo(function UpgradesTab() {
             </div>
 
             {/* UPGRADE CARDS (4 units) */}
-            {UPGRADES.map(upgrade => {
+            {UPGRADES.map((upgrade, index) => {
               const locationTech = techLevels[selectedUpgradeLocation!] || { engine: 0, ai: 0, value: 0, rare: 0 };
               const level = locationTech[upgrade.id.toLowerCase()] || 0;
               const currentTier = upgrade.tiers.find(t => t.level === level) || { name: 'Base', bonus: 'Nenhum' };
@@ -448,9 +512,20 @@ const UpgradesTab = memo(function UpgradesTab() {
               const maxLvl = upgrade.tiers[upgrade.tiers.length - 1].level;
               const progressPercent = Math.min((level / maxLvl) * 100, 100);
 
+              const bgName = ['motor', 'ia', 'mercadoria', 'missao'][index % 4];
+
               return (
-                <div key={upgrade.id} className={`glass-panel ${isInterstellar ? 'neon-border-orange' : 'neon-border-cyan'} rounded-3xl p-4 flex flex-col hover:bg-white/5 transition-all border-2 group h-full min-h-[240px] relative`}>
-                  <div className="grid grid-cols-[1fr_auto] items-start gap-3 mb-3 shrink-0">
+                <div key={upgrade.id} className={`glass-panel ${isInterstellar ? 'neon-border-orange' : 'neon-border-cyan'} rounded-3xl p-4 flex flex-col hover:bg-white/5 transition-all border-2 group h-full min-h-[240px] relative overflow-hidden`}>
+                  <div 
+                    className="absolute inset-0 z-0 opacity-60 mix-blend-overlay pointer-events-none group-hover:opacity-80 transition-opacity"
+                    style={{
+                      backgroundImage: `url('/assets/melhorias/${isInterstellar ? 'bg_rota2_' : 'bg_rota1_'}${bgName}.webp')`,
+                      backgroundSize: 'cover',
+                      backgroundPosition: 'center'
+                    }}
+                  />
+                  <div className="relative z-10 flex flex-col h-full">
+                    <div className="grid grid-cols-[1fr_auto] items-start gap-3 mb-3 shrink-0">
                     <h3 className="font-orbitron text-[15px] xl:text-base font-bold text-white leading-tight uppercase tracking-wide group-hover:text-cyan-400 transition-colors">
                       {translateData(upgrade.name)}
                     </h3>
@@ -497,12 +572,13 @@ const UpgradesTab = memo(function UpgradesTab() {
                     </PremiumCanvasButton>
                   </div>
                 </div>
-              );
-            })}
-          </div>
+              </div>
+            );
+          })}
         </div>
-      )}
-    </motion.div>
+      </div>
+    )}
+  </motion.div>
   );
 });
 

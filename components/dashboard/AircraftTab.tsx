@@ -8,6 +8,17 @@ import { SHIPS } from '@/lib/game-data';
 import { useDashboard } from './DashboardProvider';
 import { PremiumCanvasButton } from '../ui/PremiumCanvasButton';
 
+const aircraftCardBackgrounds = {
+  Solar: {
+    square: '/images/bg_route1_square.webp',
+    rect: '/images/bg_route1_rect.webp',
+  },
+  Interstellar: {
+    square: '/images/bg_route2_square.webp',
+    rect: '/images/bg_route2_rect.webp',
+  },
+} as const;
+
 const AircraftTab = memo(({ renderBattleLevelTab }: { renderBattleLevelTab: () => React.ReactNode }) => {
   const { 
     t, 
@@ -35,6 +46,8 @@ const AircraftTab = memo(({ renderBattleLevelTab }: { renderBattleLevelTab: () =
   const themeBg = isInterstellar ? 'bg-orange-500/5' : 'bg-cyan-500/5';
   const themeAccent = isInterstellar ? 'from-orange-600 to-orange-400' : 'from-cyan-600 to-cyan-400';
   const themeGlow = isInterstellar ? 'shadow-[0_0_20px_rgba(249,115,22,0.2)]' : 'shadow-[0_0_20px_rgba(6,182,212,0.2)]';
+  const routeBackgrounds = aircraftCardBackgrounds[routeTier as keyof typeof aircraftCardBackgrounds] ?? aircraftCardBackgrounds.Solar;
+  const shouldUseAirShipsSfx = routeTier === 'Solar' || routeTier === 'Interstellar';
 
   const currentShips = SHIPS.filter(s => s.tier === routeTier);
 
@@ -60,8 +73,9 @@ const AircraftTab = memo(({ renderBattleLevelTab }: { renderBattleLevelTab: () =
         <div className="flex bg-black/40 p-1 rounded-xl border border-white/10">
           <PremiumCanvasButton
             onClick={() => {
+              if (aircraftSubTab === 'fleet') return;
               setAircraftSubTab('fleet');
-              playSfx('laser_up');
+              playSfx(shouldUseAirShipsSfx ? 'change_air_ships' : 'laser_up');
             }}
             tone={aircraftSubTab === 'fleet' ? (isInterstellar ? 'orange' : 'cyan') : 'steel'}
             className={`h-10 min-w-[132px] px-3 text-[14px] font-bold lg:px-4 ${
@@ -72,8 +86,9 @@ const AircraftTab = memo(({ renderBattleLevelTab }: { renderBattleLevelTab: () =
           </PremiumCanvasButton>
           <PremiumCanvasButton
             onClick={() => {
+              if (aircraftSubTab === 'battle') return;
               setAircraftSubTab('battle');
-              playSfx('laser_up');
+              playSfx(shouldUseAirShipsSfx ? 'change_air_ships' : 'laser_up');
             }}
             tone={aircraftSubTab === 'battle' ? 'purple' : 'steel'}
             className={`h-10 min-w-[142px] px-3 text-[14px] font-bold lg:px-4 ${
@@ -93,7 +108,11 @@ const AircraftTab = memo(({ renderBattleLevelTab }: { renderBattleLevelTab: () =
               return (
                 <PremiumCanvasButton
                   key={ship.level}
-                  onClick={() => isUnlocked && setShipPageIndex(ship.level - 1)}
+                  onClick={() => {
+                    if (!isUnlocked || shipPageIndex === ship.level - 1) return;
+                    setShipPageIndex(ship.level - 1);
+                    if (shouldUseAirShipsSfx) playSfx('change_air_ships');
+                  }}
                   disabled={!isUnlocked}
                   tone={shipPageIndex === ship.level - 1 ? (isInterstellar ? 'orange' : 'cyan') : 'steel'}
                   className={`min-h-[72px] min-w-[120px] flex-1 px-2 py-3 font-bold ${
@@ -125,12 +144,16 @@ const AircraftTab = memo(({ renderBattleLevelTab }: { renderBattleLevelTab: () =
             >
               {currentShips[shipPageIndex] && (
                 <>
-                  <div className={`p-6 rounded-2xl border ${themeBorder} ${themeBg} relative overflow-hidden group flex flex-col justify-between h-full`}>
+                  <div
+                    className={`p-6 rounded-2xl border ${themeBorder} ${themeBg} relative overflow-hidden group flex flex-col justify-between h-full bg-cover bg-center bg-no-repeat`}
+                    style={{ backgroundImage: `url('${routeBackgrounds.square}')` }}
+                  >
+                    <div className="absolute inset-0 bg-slate-950/45 pointer-events-none" />
                     <div className={`absolute top-0 right-0 w-32 h-32 bg-gradient-to-br ${isInterstellar ? 'from-orange-500' : 'from-cyan-500'} opacity-10 blur-3xl group-hover:opacity-20 transition-opacity`} />
                     
-                    <div className="space-y-6">
+                    <div className="relative z-10 space-y-6">
                       <div className="flex justify-between items-start">
-                        <div>
+                        <div className="rounded-xl border border-white/10 bg-slate-950/60 p-3 shadow-[0_16px_40px_rgba(0,0,0,0.35)] backdrop-blur-sm">
                           <h3 className={`text-3xl lg:text-4xl font-bold ${currentShips[shipPageIndex].color} mb-2`}>
                             {translateData(currentShips[shipPageIndex].name)}
                           </h3>
@@ -138,7 +161,7 @@ const AircraftTab = memo(({ renderBattleLevelTab }: { renderBattleLevelTab: () =
                             <span className="px-3 py-1 rounded-full bg-slate-800 text-slate-300 text-[14px] font-bold border border-slate-700">
                               {t('level')} {currentShips[shipPageIndex].level}
                             </span>
-                            <span className="text-slate-400 text-[14px] flex items-center gap-1.5">
+                            <span className="text-slate-300 text-[14px] flex items-center gap-1.5">
                               <Cpu className="w-3.5 h-3.5" />
                               {translateData(currentShips[shipPageIndex].technology)}
                             </span>
@@ -149,19 +172,19 @@ const AircraftTab = memo(({ renderBattleLevelTab }: { renderBattleLevelTab: () =
                         </div>
                       </div>
 
-                      <p className="text-slate-300 text-lg lg:text-[14px] leading-relaxed italic opacity-80 max-w-[95%]">
+                      <p className="max-w-[95%] rounded-xl border border-white/10 bg-slate-950/55 p-3 text-lg leading-relaxed text-slate-200 shadow-[0_14px_35px_rgba(0,0,0,0.32)] backdrop-blur-sm lg:text-[14px]">
                         &quot;{translateData(currentShips[shipPageIndex].description)}&quot;
                       </p>
                     </div>
 
-                    <div className="mt-auto space-y-6 pb-2">
+                    <div className="relative z-10 mt-auto space-y-6 pb-2">
                       <div className="grid grid-cols-3 gap-4">
-                        <div className="p-4 rounded-xl bg-slate-900/50 border border-slate-800/50 group/stat">
-                          <div className="text-base lg:text-[14px] text-slate-500 uppercase font-bold mb-1 tracking-widest">{t('speed')}</div>
+                        <div className="p-4 rounded-xl bg-slate-950/70 border border-slate-700/60 shadow-[0_12px_30px_rgba(0,0,0,0.3)] backdrop-blur-sm group/stat">
+                          <div className="text-base lg:text-[14px] text-slate-400 uppercase font-bold mb-1 tracking-widest">{t('speed')}</div>
                           <div className={`text-xl font-bold font-orbitron ${themeText}`}>{currentShips[shipPageIndex].maxSpeed} <span className="text-base opacity-60 font-mono">km/s</span></div>
                         </div>
-                        <div className="p-4 rounded-xl bg-slate-900/50 border border-slate-800/50 group/stat">
-                          <div className="text-base lg:text-[14px] text-slate-500 uppercase font-bold mb-1 tracking-widest">{t('range')}</div>
+                        <div className="p-4 rounded-xl bg-slate-950/70 border border-slate-700/60 shadow-[0_12px_30px_rgba(0,0,0,0.3)] backdrop-blur-sm group/stat">
+                          <div className="text-base lg:text-[14px] text-slate-400 uppercase font-bold mb-1 tracking-widest">{t('range')}</div>
                           <div className={`text-lg lg:text-xl font-bold font-orbitron ${themeText} whitespace-nowrap flex items-baseline gap-1`}>
                             <span>
                               {(() => {
@@ -175,8 +198,8 @@ const AircraftTab = memo(({ renderBattleLevelTab }: { renderBattleLevelTab: () =
                             <span className="text-base opacity-60 font-mono uppercase">{isInterstellar ? 'LY' : 'Km'}</span>
                           </div>
                         </div>
-                        <div className="p-4 rounded-xl bg-slate-900/50 border border-slate-800/50 group/stat">
-                          <div className="text-base lg:text-[14px] text-slate-500 uppercase font-bold mb-1 tracking-widest">{t('owned')}</div>
+                        <div className="p-4 rounded-xl bg-slate-950/70 border border-slate-700/60 shadow-[0_12px_30px_rgba(0,0,0,0.3)] backdrop-blur-sm group/stat">
+                          <div className="text-base lg:text-[14px] text-slate-400 uppercase font-bold mb-1 tracking-widest">{t('owned')}</div>
                           <div className={`text-xl font-bold font-orbitron ${themeText}`}>{ownedShips[`${routeTier}-${currentShips[shipPageIndex].level}`] || 0} <span className="text-base opacity-60">/ 5</span></div>
                         </div>
                       </div>
@@ -221,18 +244,22 @@ const AircraftTab = memo(({ renderBattleLevelTab }: { renderBattleLevelTab: () =
                   </div>
 
                   <div className="flex flex-col gap-4 h-full">
-                    <div className="p-4 rounded-xl bg-slate-900/50 border border-slate-800 shrink-0">
-                      <h4 className="text-base font-bold text-slate-300 mb-4 flex items-center gap-2">
+                    <div
+                      className="relative overflow-hidden p-4 rounded-xl bg-slate-900/50 border border-slate-800 shrink-0 bg-cover bg-center bg-no-repeat"
+                      style={{ backgroundImage: `url('${routeBackgrounds.rect}')` }}
+                    >
+                      <div className="absolute inset-0 bg-slate-950/45 pointer-events-none" />
+                      <h4 className="relative z-10 mb-4 flex w-fit items-center gap-2 rounded-lg border border-white/10 bg-slate-950/65 px-3 py-2 text-base font-bold text-slate-200 shadow-[0_10px_28px_rgba(0,0,0,0.32)] backdrop-blur-sm">
                         <Info className="w-4 h-4 text-cyan-400" />
                         {t('status')}
                       </h4>
-                      <div className="space-y-3">
-                        <div className="flex justify-between items-center p-2 rounded-lg bg-slate-800/30">
-                          <span className="text-[14px] text-slate-400">{language === 'pt' ? 'Capacidade de Frota' : 'Fleet Capacity'}</span>
+                      <div className="relative z-10 space-y-3">
+                        <div className="flex justify-between items-center p-2 rounded-lg border border-white/10 bg-slate-950/65 shadow-[0_8px_24px_rgba(0,0,0,0.28)] backdrop-blur-sm">
+                          <span className="text-[14px] text-slate-300">{language === 'pt' ? 'Capacidade de Frota' : 'Fleet Capacity'}</span>
                           <span className="text-[14px] font-bold text-slate-200">{ownedShips[`${routeTier}-${currentShips[shipPageIndex].level}`] || 0} / 5</span>
                         </div>
-                        <div className="flex justify-between items-center p-2 rounded-lg bg-slate-800/30">
-                          <span className="text-[14px] text-slate-400">{language === 'pt' ? 'Tecnologia Requerida' : 'Required Technology'}</span>
+                        <div className="flex justify-between items-center p-2 rounded-lg border border-white/10 bg-slate-950/65 shadow-[0_8px_24px_rgba(0,0,0,0.28)] backdrop-blur-sm">
+                          <span className="text-[14px] text-slate-300">{language === 'pt' ? 'Tecnologia Requerida' : 'Required Technology'}</span>
                           <span className={`text-[14px] font-bold ${(unlockedTechLevels[routeTier] || 0) >= currentShips[shipPageIndex].level ? 'text-emerald-400' : 'text-red-400'}`}>
                             Lvl {currentShips[shipPageIndex].level}
                           </span>
@@ -277,5 +304,7 @@ const AircraftTab = memo(({ renderBattleLevelTab }: { renderBattleLevelTab: () =
     </motion.div>
   );
 });
+
+AircraftTab.displayName = 'AircraftTab';
 
 export default AircraftTab;

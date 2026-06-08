@@ -97,8 +97,21 @@ const RoutesTab = memo(() => {
 
           const requiredLevel = route.requiredShipLevel;
           const totalOwned = ownedShips[`${routeTier}-${requiredLevel}`] || 0;
+          const routeUsesManualHangarLimit = route.tier === 'Solar' || route.tier === 'Interstellar';
+          const activeManualDeliveriesInTier = activeDeliveries.filter(d => d.tier === routeTier);
+          const activeManualByShipLevel = activeManualDeliveriesInTier.reduce((acc, delivery) => {
+            acc[delivery.shipLevel] = (acc[delivery.shipLevel] || 0) + 1;
+            return acc;
+          }, {} as Record<number, number>);
+          const activeManualShipLevels = Object.keys(activeManualByShipLevel).length;
+          const activeManualForShipLevel = activeManualByShipLevel[requiredLevel] || 0;
+          const manualHangarLimitReached = routeUsesManualHangarLimit && (
+            activeManualDeliveriesInTier.length >= 25 ||
+            activeManualForShipLevel >= 5 ||
+            (activeManualForShipLevel === 0 && activeManualShipLevels >= 5)
+          );
           
-          let currentlyInUse = activeDeliveries.filter(d => d.shipLevel === requiredLevel && d.tier === routeTier).length;
+          let currentlyInUse = activeManualForShipLevel;
           
           Object.keys(autoTravelActive).forEach(routeId => {
             if (autoTravelActive[routeId]) {
@@ -109,7 +122,7 @@ const RoutesTab = memo(() => {
             }
           });
 
-          const shipAvailable = currentlyInUse < totalOwned;
+          const shipAvailable = currentlyInUse < totalOwned && !manualHangarLimitReached;
 
           const routeBgMap: Record<string, string> = {
             'terra': '/assets/texturas/bg_route1_terra.webp',
@@ -257,6 +270,11 @@ const RoutesTab = memo(() => {
                   <div className="flex items-center gap-2">
                     <Rocket className="w-4 h-4 opacity-50" />
                     <span className="text-slate-500 opacity-80">{language === 'pt' ? 'REQUER NAVE' : 'SHIP REQUIRED'}</span>
+                  </div>
+                ) : manualHangarLimitReached ? (
+                  <div className="flex items-center gap-2">
+                    <Rocket className="w-4 h-4 opacity-50" />
+                    <span className="text-pink-500 opacity-80">{language === 'pt' ? 'HANGAR CHEIO' : 'HANGAR FULL'}</span>
                   </div>
                 ) : !shipAvailable ? (
                   <div className="flex items-center gap-2">

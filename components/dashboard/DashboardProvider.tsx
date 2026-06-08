@@ -242,8 +242,8 @@ interface DashboardContextType {
   donateQCToPOI: (poiId: string, amount: number) => void;
   
   // Battle Notification
-  battleNotification: { message: string, type: 'success' | 'error', tier: string } | null;
-  setBattleNotification: React.Dispatch<React.SetStateAction<{ message: string, type: 'success' | 'error', tier: string } | null>>;
+  battleNotification: { message: string, type: 'success' | 'error', tier: string, title?: string } | null;
+  setBattleNotification: React.Dispatch<React.SetStateAction<{ message: string, type: 'success' | 'error', tier: string, title?: string } | null>>;
   
   isScanning: boolean;
   scanProgress: number;
@@ -444,7 +444,7 @@ export const DashboardProvider = ({
   const voidAutoShipmentUnlocked = mining.voidAutoShipmentUnlocked;
   const voidAutoShipmentActive = mining.voidAutoShipmentActive;
 
-  const [battleNotification, setBattleNotification] = React.useState<{ message: string, type: 'success' | 'error', tier: string } | null>(null);
+  const [battleNotification, setBattleNotification] = React.useState<{ message: string, type: 'success' | 'error', tier: string, title?: string } | null>(null);
 
   const [floatingRewards, setFloatingRewards] = React.useState<any[]>([]);
   
@@ -600,7 +600,7 @@ export const DashboardProvider = ({
     if (economy.aetherion < aetherionRequired && route.id !== 'speed_run') {
       playSfx('error');
       const msg = language === 'pt' 
-        ? `Necessário ${aetherionRequired} Éterion para este slot (Possui: ${Math.floor(economy.aetherion)})` 
+        ? `Necessário ${aetherionRequired} Etérion para este slot (Possui: ${Math.floor(economy.aetherion)})` 
         : `Need ${aetherionRequired} Aetherion for this slot (Have: ${Math.floor(economy.aetherion)})`;
       addLog(msg, 'error');
       return;
@@ -638,8 +638,33 @@ export const DashboardProvider = ({
     
     const requiredLevel = route.requiredShipLevel;
     const totalOwned = progression.ownedShips[`${route.tier}-${requiredLevel}`] || 0;
+    const routeUsesManualHangarLimit = route.tier === 'Solar' || route.tier === 'Interstellar';
+    const activeManualDeliveriesInTier = activeDeliveries.filter(d => d.tier === route.tier);
+    const activeManualByShipLevel = activeManualDeliveriesInTier.reduce((acc, delivery) => {
+      acc[delivery.shipLevel] = (acc[delivery.shipLevel] || 0) + 1;
+      return acc;
+    }, {} as Record<number, number>);
+    const activeManualShipLevels = Object.keys(activeManualByShipLevel).length;
+    const activeManualForShipLevel = activeManualByShipLevel[requiredLevel] || 0;
+
+    if (routeUsesManualHangarLimit) {
+      if (activeManualDeliveriesInTier.length >= 25) {
+        addLog(language === 'pt' ? 'Limite de 25 entregas manuais ativas atingido.' : 'Limit of 25 active manual deliveries reached.', 'error');
+        return;
+      }
+
+      if (activeManualForShipLevel >= 5) {
+        addLog(language === 'pt' ? 'Limite de 5 entregas manuais para esta nave atingido.' : 'Limit of 5 manual deliveries for this ship reached.', 'error');
+        return;
+      }
+
+      if (activeManualForShipLevel === 0 && activeManualShipLevels >= 5) {
+        addLog(language === 'pt' ? 'Limite de 5 tipos de nave entregando ao mesmo tempo atingido.' : 'Limit of 5 ship types delivering at the same time reached.', 'error');
+        return;
+      }
+    }
     
-    let currentlyInUse = activeDeliveries.filter(d => d.shipLevel === requiredLevel && d.tier === route.tier && d.status === 'delivering').length;
+    let currentlyInUse = activeManualForShipLevel;
     
     Object.keys(autoTravelActive).forEach(routeId => {
       if (autoTravelActive[routeId]) {
@@ -688,7 +713,7 @@ export const DashboardProvider = ({
       }
     ]);
     addLog(`Ship launched to ${route.name}`, 'info');
-  }, [economy.qc, progression, activeDeliveries, autoTravelActive, dispatch, updateHistoryStats, playSfx, addLog, missions.completedInitialMissions, completeInitialMission]);
+  }, [economy.qc, progression, activeDeliveries, autoTravelActive, dispatch, updateHistoryStats, playSfx, addLog, language, missions.completedInitialMissions, completeInitialMission]);
 
 
   const toggleAutoTravel = useCallback((routeId: string) => {
@@ -1015,8 +1040,7 @@ export const DashboardProvider = ({
     const point = EXTRACTION_POINTS_MAP.get(pointId);
     if (!point) return;
 
-    const multipliers = getEconomicMultipliers();
-    const boostCost = Math.floor(point.cost * multipliers.cost * 0.75);
+    const boostCost = Math.floor(point.cost * 0.75);
 
     if (economy.qc < boostCost) {
       playSfx('error');
@@ -1030,7 +1054,7 @@ export const DashboardProvider = ({
     
     playSfx('zap');
     addLog(t('researchBoosted'), 'success');
-  }, [mining.researchingExtractionPoint, economy.qc, progression.routeTier, dispatch, playSfx, addLog, t, getEconomicMultipliers, updateHistoryStats]);
+  }, [mining.researchingExtractionPoint, economy.qc, progression.routeTier, dispatch, playSfx, addLog, t, updateHistoryStats]);
 
   const boostResearch = useCallback(() => {
     if (!progression.researchingTech) return;
@@ -1193,8 +1217,7 @@ export const DashboardProvider = ({
       const point = EXTRACTION_POINTS.find(p => p.id === id);
       if (!point) return;
 
-      const multipliers = getEconomicMultipliers();
-      const cost = Math.floor(point.cost * multipliers.cost);
+      const cost = point.cost;
 
       if (economy.qc < cost) {
         playSfx('error');
@@ -1206,7 +1229,7 @@ export const DashboardProvider = ({
       playSfx('buy');
       addLog(`${t('researchStarted')} ${translateData(point.name)}!`, 'success');
     });
-  }, [economy.qc, dispatch, playSfx, addLog, t, getEconomicMultipliers, translateData]);
+  }, [economy.qc, dispatch, playSfx, addLog, t, translateData]);
 
   const isRoute2Unlocked = useCallback(() => {
     return (progression.unlockedTechLevels['Solar'] || 0) >= 9;
@@ -2027,7 +2050,7 @@ export const DashboardProvider = ({
 
     if (economy.aetherion >= 10000) {
       playSfx('target_up_2');
-      addLog(language === 'pt' ? 'Câmara de Éteríon em capacidade máxima!' : 'Aetherion Chamber at maximum capacity!', 'warning');
+      addLog(language === 'pt' ? 'Câmara de Etérion em capacidade máxima!' : 'Aetherion Chamber at maximum capacity!', 'warning');
       return;
     }
 

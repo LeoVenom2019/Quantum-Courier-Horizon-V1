@@ -106,7 +106,7 @@ const BattleLevelTab = memo(({
   }
   const isCooldownActive = Date.now() - lastScanTime < currentCooldown;
   const scanCooldownRemaining = Math.max(0, Math.ceil((currentCooldown - (Date.now() - lastScanTime)) / 1000));
-  
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -115,15 +115,28 @@ const BattleLevelTab = memo(({
     >
       <div className="flex-1 grid grid-cols-1 xl:grid-cols-2 grid-rows-[auto,1fr] gap-3 items-stretch">
         <div className="flex flex-col space-y-4 h-full">
+          {/* Card: Radar de Busca de Setor */}
           <div className={`glass-panel p-3 rounded-2xl border ${themeBorder} ${themeBg} relative overflow-hidden flex flex-col items-center justify-center min-h-[180px]`}>
-            <div className="absolute top-3 left-4 flex items-center gap-2">
+            {/* Sci-Fi Radar Texture & Background */}
+            <div className="absolute inset-0 pointer-events-none select-none overflow-hidden z-0">
+              {/* WebP Texture */}
+              <img
+                src="/assets/texturas/bg_battle_radar.webp"
+                alt=""
+                aria-hidden="true"
+                className="absolute inset-0 w-full h-full object-cover opacity-60"
+                style={{ borderRadius: '1rem' }}
+              />
+            </div>
+
+            <div className="absolute top-3 left-4 flex items-center gap-2 z-10">
               <Radar className={`w-4 h-4 ${!isCooldownActive ? 'text-cyan-400' : 'text-slate-500'}`} />
               <h4 className="text-[14px] font-bold text-white uppercase tracking-widest">
                 {language === 'pt' ? 'Radar de Busca de Setor' : 'Sector Radar'}
               </h4>
             </div>
             
-            <div className="absolute top-3 right-4 flex items-center gap-3">
+            <div className="absolute top-3 right-4 flex items-center gap-3 z-10">
               <div className="text-base font-black text-cyan-400 uppercase tracking-wider">
                 {language === 'pt' ? 'CHANCE:' : 'CHANCE:'} {50 + (radarLevel * 5)}%
               </div>
@@ -135,7 +148,7 @@ const BattleLevelTab = memo(({
               )}
             </div>
 
-            <div className="relative w-24 h-24 mb-4 mt-6">
+            <div className="relative w-24 h-24 mb-4 mt-6 z-10">
               <div className={`absolute inset-0 rounded-full border-2 transition-colors duration-500 ${!isCooldownActive ? 'border-cyan-500/30 shadow-[0_0_20px_rgba(6,182,212,0.3)]' : 'border-white/5'}`} />
               {isScanning && !scanResult && (
                 <motion.div 
@@ -184,7 +197,7 @@ const BattleLevelTab = memo(({
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4 w-full px-4">
+            <div className="grid grid-cols-2 gap-4 w-full px-4 z-10">
               <PremiumCanvasButton
                 onClick={findBattle}
                 disabled={battleLevel < 1 || isScanning || isCooldownActive}
@@ -219,8 +232,21 @@ const BattleLevelTab = memo(({
             </div>
           </div>
 
+          {/* Card: Doom Protocol */}
           <div className={`glass-panel p-3 rounded-2xl border ${themeBorder} ${themeBg} relative overflow-hidden space-y-3 flex-1 flex flex-col`}>
-            <div className="flex items-center justify-between">
+            {/* Sci-Fi Doom Protocol Texture & Background */}
+            <div className="absolute inset-0 pointer-events-none select-none overflow-hidden z-0">
+              {/* WebP Texture */}
+              <img
+                src="/assets/texturas/bg_doom_protocol.webp"
+                alt=""
+                aria-hidden="true"
+                className="absolute inset-0 w-full h-full object-cover opacity-60"
+                style={{ borderRadius: '1rem' }}
+              />
+            </div>
+
+            <div className="flex items-center justify-between relative z-10">
               <div className="flex items-center gap-3">
                 <motion.button
                   onClick={() => setShowDoomProtocolInfo(true)}
@@ -264,12 +290,24 @@ const BattleLevelTab = memo(({
                   : t('max')}
               </PremiumCanvasButton>
             </div>
-
           </div>
 
+          {/* Card: Pular Batalhas (Skip Battles) - Optional but standard */}
           {privatePoliceLevel > 0 && (
             <div className={`glass-panel p-3 rounded-2xl border ${themeBorder} ${themeBg} relative overflow-hidden flex flex-col justify-center items-center`}>
-              <div className="flex items-center justify-between w-full">
+              {/* Sci-Fi Skip Battles Texture & Background */}
+              <div className="absolute inset-0 pointer-events-none select-none overflow-hidden z-0">
+                {/* WebP Texture */}
+                <img
+                  src="/images/bg_route2_rect.webp"
+                  alt=""
+                  aria-hidden="true"
+                  className="absolute inset-0 w-full h-full object-cover opacity-60"
+                  style={{ borderRadius: '1rem' }}
+                />
+              </div>
+
+              <div className="flex items-center justify-between w-full relative z-10">
                 <div className="flex items-center gap-3">
                   <div className={`w-10 h-10 rounded-xl bg-orange-500/20 border border-orange-500/40 flex items-center justify-center`}>
                     <FastForward className="w-5 h-5 text-orange-400" />
@@ -303,8 +341,21 @@ const BattleLevelTab = memo(({
         </div>
 
         <div className="flex flex-col space-y-4 h-full">
+          {/* Card: Nível de Batalha */}
           <div className={`glass-panel p-3 rounded-2xl border ${themeBorder} ${themeBg} relative overflow-hidden group`}>
-            <div className="flex items-center justify-between gap-4">
+            {/* Sci-Fi Battle Level Texture & Background */}
+            <div className="absolute inset-0 pointer-events-none select-none overflow-hidden z-0">
+              {/* WebP Texture */}
+              <img
+                src="/assets/texturas/bg_battle_level.webp"
+                alt=""
+                aria-hidden="true"
+                className="absolute inset-0 w-full h-full object-cover opacity-60"
+                style={{ borderRadius: '1rem' }}
+              />
+            </div>
+
+            <div className="flex items-center justify-between gap-4 relative z-10">
               <div className="flex items-center gap-4">
                 <div className={`w-12 h-12 rounded-2xl bg-purple-500/20 border border-purple-500/40 flex items-center justify-center ${themeGlow}`}>
                   <Trophy className="w-6 h-6 text-purple-400" />
@@ -346,19 +397,32 @@ const BattleLevelTab = memo(({
             </div>
           </div>
 
+          {/* Card: Recompensa de Nível */}
           <div className={`glass-panel p-3 rounded-2xl border ${themeBorder} ${themeBg} relative overflow-hidden flex-1 flex flex-col`}>
-            <h4 className="text-[14px] font-bold text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+            {/* Sci-Fi Rewards Texture & Background */}
+            <div className="absolute inset-0 pointer-events-none select-none overflow-hidden z-0">
+              {/* WebP Texture */}
+              <img
+                src="/assets/texturas/bg_level_rewards.webp"
+                alt=""
+                aria-hidden="true"
+                className="absolute inset-0 w-full h-full object-cover opacity-60"
+                style={{ borderRadius: '1rem' }}
+              />
+            </div>
+
+            <h4 className="text-[14px] font-bold text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2 relative z-10">
               <Star className="w-4 h-4 text-yellow-400" />
               {language === 'pt' ? 'Recompensas de Nível' : 'Level Rewards'}
             </h4>
             
-            <div className="grid grid-cols-3 gap-3 flex-1">
+            <div className="grid grid-cols-3 gap-3 flex-1 relative z-10">
               {(routeTier === 'Solar' ? [
                 { level: 1, title: language === 'pt' ? 'Busca' : 'Search', description: language === 'pt' ? 'Você desbloqueou o modo radar, vá buscar batalhas, receber recursos e QC em caso de vitória, mas cuidado, podem vir naves poderosas, esteja preparado!' : 'You unlocked radar mode, go search for battles, receive resources and QC in case of victory, but be careful, powerful ships may come, be prepared!', color: 'emerald' },
                 { level: 5, title: language === 'pt' ? '-50% Rad' : '-50% Rad', description: language === 'pt' ? 'Parabéns, agora você pode procurar batalha de 30 em 30 segundos. -50% de tempo do radar!' : 'Congratulations, now you can search for battles every 30 seconds. -50% radar time!', color: 'emerald' },
                 { level: 10, title: language === 'pt' ? '100% QC' : '100% QC', description: language === 'pt' ? 'Parabéns, você irá receber 100% a mais de QC como recompensa das batalhas vencidas! +100% de QC!' : 'Congratulations, you will receive 100% more QC as a reward for won battles! +100% QC!', color: 'emerald' },
                 { level: 15, title: language === 'pt' ? '+10% Boss' : '+10% Boss', description: language === 'pt' ? 'Parabéns, agora você poderá encontrar batalhas de chefe mais facilmente! +10% de chance de encontrar Boss!' : 'Congratulations, now you can find boss battles more easily! +10% chance to find Boss!', color: 'emerald' },
-                 { level: 20, title: language === 'pt' ? '+50% Dmg' : '+50% Dmg', description: language === 'pt' ? 'Parabéns, você ganhou um aumento de 50% total de dano! +50% de dano!' : 'Congratulations, you gained a 50% total damage increase in all skills! +50% damage!', color: 'emerald' },
+                { level: 20, title: language === 'pt' ? '+50% Dmg' : '+50% Dmg', description: language === 'pt' ? 'Parabéns, você ganhou um aumento de 50% total de dano! +50% de dano!' : 'Congratulations, you gained a 50% total damage increase in all skills! +50% damage!', color: 'emerald' },
                 { level: 25, title: language === 'pt' ? 'Skyring' : 'Skyring', description: language === 'pt' ? 'Parabéns, você ganhou a nave "Skyring". Ela tem 25% a mais de dano, 25% a mais de vida e todas as recargas de habilidades são de 1 segundo!' : 'Congratulations, you gained the "Skyring" ship. It has 25% more damage, 25% more life and all skill cooldowns are 1 second!', color: 'emerald' }
               ] : [
                 { level: 30, title: language === 'pt' ? 'Retribuição' : 'Retribution', description: language === 'pt' ? 'Parabéns! Suas habilidades de combate agora garantem 25% a mais de QC em todas as batalhas.' : 'Congratulations! Your combat skills now grant 25% more QC in all battles.', color: 'purple', toggleable: true },
@@ -400,25 +464,38 @@ const BattleLevelTab = memo(({
           </div>
         </div>
 
+        {/* Card: Status da Nave & Status de Combate */}
         <div className="xl:col-span-2 space-y-3 flex flex-col">
           <div className={`glass-panel p-3 rounded-2xl border ${themeBorder} ${themeBg} relative overflow-hidden flex-1 flex flex-col`}>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Sci-Fi Ship & Combat Status Texture & Background */}
+            <div className="absolute inset-0 pointer-events-none select-none overflow-hidden z-0">
+              {/* WebP Texture */}
+              <img
+                src="/assets/texturas/bg_ship_combat_status.webp"
+                alt=""
+                aria-hidden="true"
+                className="absolute inset-0 w-full h-full object-cover opacity-60"
+                style={{ borderRadius: '1rem' }}
+              />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 relative z-10">
               <div className="space-y-3 flex flex-col h-full">
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center px-3 py-1.5 rounded-xl bg-gradient-to-b from-white/15 to-white/5 border border-white/20 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2)] backdrop-blur-md relative overflow-hidden group/title">
+                  <div className="flex items-center px-3 py-1.5 rounded-xl bg-gradient-to-b from-slate-800/95 to-slate-950/90 border border-white/25 shadow-[inset_0_1px_1px_rgba(255,255,255,0.16),0_10px_24px_rgba(0,0,0,0.38)] backdrop-blur-md relative overflow-hidden group/title">
                     <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover/title:translate-x-full transition-transform duration-1000" />
                     <h4 className="text-base font-bold text-white uppercase tracking-widest flex items-center gap-2 relative z-10">
                       <TrendingUp className="w-4 h-4 text-emerald-400" />
                       {language === 'pt' ? 'Status da Nave' : 'Ship Status'}
                     </h4>
                   </div>
-                  <div className={`px-2 py-0.5 rounded-lg text-[15px] font-bold ${shipLevel >= (routeTier === 'Solar' ? 10 : 20) ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40' : 'bg-white/10 text-white border border-white/20'}`}>
+                  <div className={`px-2 py-0.5 rounded-lg text-[15px] font-bold shadow-[0_8px_20px_rgba(0,0,0,0.3)] backdrop-blur-md ${shipLevel >= (routeTier === 'Solar' ? 10 : 20) ? 'bg-emerald-950/85 text-emerald-300 border border-emerald-500/50' : 'bg-slate-950/85 text-white border border-white/25'}`}>
                     {shipLevel >= (routeTier === 'Solar' ? 10 : 20) ? 'MAX LEVEL' : `LEVEL ${shipLevel}`}
                   </div>
                 </div>
                 
                 <div className="space-y-3 flex-1 flex flex-col">
-                  <div className="relative">
+                  <div className="relative rounded-xl border border-white/10 bg-slate-950/75 p-2 shadow-[0_10px_28px_rgba(0,0,0,0.35)] backdrop-blur-sm">
                     <div className="flex mb-1 items-center justify-between">
                       <span className="text-[15px] font-bold uppercase text-emerald-400">
                         {language === 'pt' ? 'Progresso de XP' : 'XP Progress'}
@@ -439,14 +516,14 @@ const BattleLevelTab = memo(({
                   </div>
 
                   <div className="mt-auto grid grid-cols-2 gap-3">
-                    <div className="bg-white/5 border border-white/10 rounded-xl p-2 flex flex-col items-center justify-center h-12">
-                      <div className="text-[15px] font-bold text-slate-500 uppercase mb-0.5">{language === 'pt' ? 'Bônus QC' : 'QC Bonus'}</div>
+                    <div className="bg-slate-950/75 border border-white/15 rounded-xl p-2 flex flex-col items-center justify-center h-12 shadow-[0_10px_26px_rgba(0,0,0,0.32)] backdrop-blur-sm">
+                      <div className="text-[15px] font-bold text-slate-300 uppercase mb-0.5">{language === 'pt' ? 'Bônus QC' : 'QC Bonus'}</div>
                       <div className="text-base font-black text-emerald-400 leading-none">
                         +{shipLevel <= 10 ? shipLevel * 10 : 100 + (shipLevel - 10) * 20}%
                       </div>
                     </div>
-                    <div className="bg-white/5 border border-white/10 rounded-xl p-2 flex flex-col items-center justify-center h-12">
-                      <div className="text-[15px] font-bold text-slate-500 uppercase mb-0.5">{language === 'pt' ? 'Bônus Etérion' : 'Aetherion Bonus'}</div>
+                    <div className="bg-slate-950/75 border border-white/15 rounded-xl p-2 flex flex-col items-center justify-center h-12 shadow-[0_10px_26px_rgba(0,0,0,0.32)] backdrop-blur-sm">
+                      <div className="text-[15px] font-bold text-slate-300 uppercase mb-0.5">{language === 'pt' ? 'Bônus Etérion' : 'Aetherion Bonus'}</div>
                       <div className="text-base font-black text-orange-400 leading-none">
                         +{shipLevel <= 10 ? shipLevel * 5 : 50 + (shipLevel - 10) * 10}%
                       </div>
@@ -456,7 +533,7 @@ const BattleLevelTab = memo(({
               </div>
 
               <div className="space-y-3 flex flex-col h-full">
-                <div className="flex items-center px-4 py-1.5 rounded-xl bg-gradient-to-b from-white/15 to-white/5 border border-white/20 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2)] backdrop-blur-md self-start relative overflow-hidden group/title">
+                <div className="flex items-center px-4 py-1.5 rounded-xl bg-gradient-to-b from-slate-800/95 to-slate-950/90 border border-white/25 shadow-[inset_0_1px_1px_rgba(255,255,255,0.16),0_10px_24px_rgba(0,0,0,0.38)] backdrop-blur-md self-start relative overflow-hidden group/title">
                   <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover/title:translate-x-full transition-transform duration-1000" />
                   <h4 className="text-base font-bold text-white uppercase tracking-widest flex items-center gap-2 relative z-10">
                     <Sword className="w-4 h-4 text-red-400" />
@@ -467,7 +544,7 @@ const BattleLevelTab = memo(({
                 <div className="flex-1 flex flex-col space-y-3">
                   {isInterstellar ? (
                     <>
-                      <div className="mt-auto flex items-center justify-between p-3 rounded-xl bg-orange-500/10 border border-orange-500/20">
+                      <div className="mt-auto flex items-center justify-between p-3 rounded-xl bg-slate-950/75 border border-orange-500/30 shadow-[0_10px_28px_rgba(0,0,0,0.34)] backdrop-blur-sm">
                         <div className="flex items-center gap-3">
                           <motion.button
                             onClick={() => {
@@ -510,8 +587,8 @@ const BattleLevelTab = memo(({
                       </div>
 
                       <div className="grid grid-cols-2 gap-3">
-                        <div className="bg-white/5 border border-white/10 rounded-xl p-2 flex flex-col items-center justify-center h-12">
-                          <div className="flex items-center gap-1.5 text-slate-500 text-[15px] font-bold uppercase mb-0.5">
+                        <div className="bg-slate-950/75 border border-white/15 rounded-xl p-2 flex flex-col items-center justify-center h-12 shadow-[0_10px_26px_rgba(0,0,0,0.32)] backdrop-blur-sm">
+                          <div className="flex items-center gap-1.5 text-slate-300 text-[15px] font-bold uppercase mb-0.5">
                             <Shield className="w-3 h-3 text-blue-400" />
                             {language === 'pt' ? 'Vida' : 'HP'}
                           </div>
@@ -519,8 +596,8 @@ const BattleLevelTab = memo(({
                             {Math.floor((100 + (battleLevel * 150)) * (battleLevel >= 25 ? 1.25 : 1))}
                           </div>
                         </div>
-                        <div className="bg-white/5 border border-white/10 rounded-xl p-2 flex flex-col items-center justify-center h-12">
-                          <div className="flex items-center gap-1.5 text-slate-500 text-[15px] font-bold uppercase mb-0.5">
+                        <div className="bg-slate-950/75 border border-white/15 rounded-xl p-2 flex flex-col items-center justify-center h-12 shadow-[0_10px_26px_rgba(0,0,0,0.32)] backdrop-blur-sm">
+                          <div className="flex items-center gap-1.5 text-slate-300 text-[15px] font-bold uppercase mb-0.5">
                             <Sword className="w-3 h-3 text-red-400" />
                             {language === 'pt' ? 'Dano' : 'ATK'}
                           </div>
@@ -532,8 +609,8 @@ const BattleLevelTab = memo(({
                     </>
                   ) : (
                     <div className="mt-auto grid grid-cols-2 gap-3">
-                      <div className="bg-white/5 border border-white/10 rounded-xl p-2 flex flex-col items-center justify-center h-12">
-                        <div className="flex items-center gap-1.5 text-slate-500 text-[15px] font-bold uppercase mb-0.5">
+                      <div className="bg-slate-950/75 border border-white/15 rounded-xl p-2 flex flex-col items-center justify-center h-12 shadow-[0_10px_26px_rgba(0,0,0,0.32)] backdrop-blur-sm">
+                        <div className="flex items-center gap-1.5 text-slate-300 text-[15px] font-bold uppercase mb-0.5">
                           <Shield className="w-3 h-3 text-blue-400" />
                           {language === 'pt' ? 'Vida' : 'HP'}
                         </div>
@@ -541,8 +618,8 @@ const BattleLevelTab = memo(({
                           {Math.floor((100 + (battleLevel * 150)) * (battleLevel >= 25 ? 1.25 : 1))}
                         </div>
                       </div>
-                      <div className="bg-white/5 border border-white/10 rounded-xl p-2 flex flex-col items-center justify-center h-12">
-                        <div className="flex items-center gap-1.5 text-slate-500 text-[15px] font-bold uppercase mb-0.5">
+                      <div className="bg-slate-950/75 border border-white/15 rounded-xl p-2 flex flex-col items-center justify-center h-12 shadow-[0_10px_26px_rgba(0,0,0,0.32)] backdrop-blur-sm">
+                        <div className="flex items-center gap-1.5 text-slate-300 text-[15px] font-bold uppercase mb-0.5">
                           <Sword className="w-3 h-3 text-red-400" />
                           {language === 'pt' ? 'Dano' : 'ATK'}
                         </div>
@@ -562,5 +639,6 @@ const BattleLevelTab = memo(({
   );
 });
 
-export default BattleLevelTab;
+BattleLevelTab.displayName = 'BattleLevelTab';
 
+export default BattleLevelTab;

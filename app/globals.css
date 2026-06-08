@@ -83,6 +83,58 @@
   animation: pickaxe-glow 2s ease-in-out infinite;
 }
 
+@keyframes aetherion-liquid-flow {
+  0% {
+    transform: translate3d(0, 0, 0) scale(1.04);
+    filter: brightness(0.95) saturate(1.05);
+  }
+  24% {
+    transform: translate3d(-0.45%, 0.65%, 0) scale(1.055) skewX(-0.35deg);
+    filter: brightness(1.2) saturate(1.3);
+  }
+  52% {
+    transform: translate3d(0.55%, -0.35%, 0) scale(1.06) skewX(0.35deg);
+    filter: brightness(1.32) saturate(1.42);
+  }
+  78% {
+    transform: translate3d(-0.25%, 0.25%, 0) scale(1.05);
+    filter: brightness(1.1) saturate(1.2);
+  }
+  100% {
+    transform: translate3d(0, 0, 0) scale(1.04);
+    filter: brightness(0.95) saturate(1.05);
+  }
+}
+
+@keyframes aetherion-liquid-sheen {
+  0% {
+    opacity: 0;
+    transform: translateX(-115%) skewX(-18deg);
+  }
+  18% {
+    opacity: 0.45;
+  }
+  58% {
+    opacity: 0.22;
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(135%) skewX(-18deg);
+  }
+}
+
+.animate-aetherion-liquid-flow {
+  animation: aetherion-liquid-flow 2.85s ease-in-out;
+  transform-origin: center;
+  will-change: transform, filter;
+}
+
+.animate-aetherion-liquid-sheen {
+  animation: aetherion-liquid-sheen 2.6s ease-out;
+  mix-blend-mode: screen;
+  will-change: transform, opacity;
+}
+
 @layer base {
   body {
     @apply bg-[#050510] text-slate-200 antialiased;
@@ -324,6 +376,68 @@
     transform: translate3d(var(--delivery-star-x, 96px), var(--delivery-star-y, -72px), 0);
     opacity: 0;
   }
+}
+
+@keyframes activeDeliverySatellitePass {
+  0% {
+    transform: translate3d(0, 0, 0);
+    opacity: 0;
+  }
+  8% {
+    opacity: 0.9;
+  }
+  72% {
+    opacity: 0.75;
+  }
+  100% {
+    transform: translate3d(var(--delivery-satellite-x, 120vw), var(--delivery-satellite-y, 0), 0);
+    opacity: 0;
+  }
+}
+
+.active-delivery-starfield {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 20;
+}
+
+.active-delivery-star {
+  position: absolute;
+  left: var(--delivery-star-left, 50%);
+  top: var(--delivery-star-top, 50%);
+  width: var(--delivery-star-size, 4px);
+  height: var(--delivery-star-size, 4px);
+  border-radius: 9999px;
+  background: var(--delivery-star-core, rgba(255, 255, 255, 0.95));
+  box-shadow:
+    0 0 8px rgba(255, 255, 255, 1),
+    0 0 18px var(--delivery-star-glow, rgba(34, 211, 238, 0.9)),
+    0 0 34px var(--delivery-star-glow, rgba(34, 211, 238, 0.68));
+  animation: deliveryStarPulse var(--delivery-star-duration, 4.8s) ease-in-out infinite;
+  animation-delay: var(--delivery-star-delay, 0s);
+  will-change: opacity, transform;
+}
+
+.active-delivery-satellite {
+  position: absolute;
+  left: var(--delivery-satellite-left, -8%);
+  top: var(--delivery-satellite-top, 50%);
+  width: var(--delivery-satellite-size, 4px);
+  height: var(--delivery-satellite-size, 4px);
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow:
+    0 0 7px rgba(255, 255, 255, 1),
+    0 0 18px var(--delivery-satellite-glow, rgba(34, 211, 238, 0.88)),
+    0 0 30px var(--delivery-satellite-glow, rgba(34, 211, 238, 0.52));
+  animation-name: activeDeliverySatellitePass;
+  animation-duration: var(--delivery-satellite-duration, 7s);
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  animation-delay: var(--delivery-satellite-delay, 0s);
+  will-change: transform, opacity;
 }
 
 .star-animation {

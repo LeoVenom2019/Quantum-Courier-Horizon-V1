@@ -5,6 +5,7 @@ import { motion } from 'motion/react';
 import { Cpu, Lock, Check, Zap, Rocket, Search, ChevronRight, ChevronLeft, TrendingUp, Coins } from 'lucide-react';
 import { TECHNOLOGIES, SHIPS, EXTRACTION_POINTS } from '@/lib/game-data';
 import { EXTRACTION_PRODUCTION_COSTS } from '@/lib/game-constants';
+import { INTERSTELLAR_EXTRACTION_POINT_BACKGROUNDS, INTERSTELLAR_TECHNOLOGY_BACKGROUNDS, SOLAR_TECHNOLOGY_BACKGROUNDS } from '@/lib/ui-backgrounds';
 import { useDashboard } from './DashboardProvider';
 import { PremiumCanvasButton } from '../ui/PremiumCanvasButton';
 
@@ -87,7 +88,12 @@ const TechnologyTab = memo(() => {
         {isInterstellar && (
           <div className="flex bg-black/40 p-1 rounded-xl border border-white/10">
             <PremiumCanvasButton
-              onClick={() => setTechSubTab('ships')}
+              onClick={() => {
+                if (techSubTab !== 'ships') {
+                  playSfx('tec_extract_change');
+                  setTechSubTab('ships');
+                }
+              }}
               tone={techSubTab === 'ships' ? 'indigo' : 'steel'}
               className="h-9 px-4 text-[14px] font-bold"
               contentClassName={techSubTab === 'ships' ? 'text-white' : 'text-white/50'}
@@ -96,7 +102,10 @@ const TechnologyTab = memo(() => {
             </PremiumCanvasButton>
             <PremiumCanvasButton
               onClick={() => {
-                if (allTechUnlocked) setTechSubTab('extraction');
+                if (allTechUnlocked && techSubTab !== 'extraction') {
+                  playSfx('tec_extract_change');
+                  setTechSubTab('extraction');
+                }
               }}
               disabled={!allTechUnlocked}
               tone={techSubTab === 'extraction' ? 'orange' : 'steel'}
@@ -126,10 +135,25 @@ const TechnologyTab = memo(() => {
               const picaretaCost = EXTRACTION_PRODUCTION_COSTS[prodLevel + 1] * Math.pow(1.1, absIndex);
               const compCost = Math.floor(100000000 * Math.pow(1.2, compLevel));
               const autoSellCost = 5000000000;
+              const extractionResearchCost = point.cost;
+              const extractionBoostCost = Math.floor(point.cost * 0.75);
+              const extractionBackgroundImage = point.tier === 'Interstellar'
+                ? INTERSTELLAR_EXTRACTION_POINT_BACKGROUNDS[point.id]
+                : undefined;
 
               return (
-                <div key={point.id} className={`glass-panel p-4 rounded-2xl border transition-all duration-500 flex flex-col h-full relative overflow-hidden ${isResearched ? 'neon-border-orange bg-orange-500/5' : 'border-white/10 bg-orange-900/5'}`}>
-                  <div className="flex justify-between items-start mb-4">
+                <div
+                  key={point.id}
+                  className={`glass-panel p-4 rounded-2xl border transition-all duration-500 flex flex-col h-full relative overflow-hidden bg-cover bg-center bg-no-repeat ${isResearched ? 'neon-border-orange bg-orange-500/5' : 'border-white/10 bg-orange-900/5'}`}
+                  style={extractionBackgroundImage ? { backgroundImage: `url('${extractionBackgroundImage}')` } : undefined}
+                >
+                  {extractionBackgroundImage && (
+                    <>
+                      <div className="absolute inset-0 bg-slate-950/50 pointer-events-none" />
+                      <div className="absolute inset-0 bg-gradient-to-b from-slate-950/45 via-slate-950/20 to-slate-950/80 pointer-events-none" />
+                    </>
+                  )}
+                  <div className="relative z-10 flex justify-between items-start mb-4">
                     <div className="flex items-center gap-2">
                       <div className="p-2 bg-orange-500/10 rounded-lg text-orange-400">
                         <Search className="w-5 h-5" />
@@ -146,7 +170,7 @@ const TechnologyTab = memo(() => {
                   </div>
 
                   {/* Production Status */}
-                  <div className="space-y-1 mb-4">
+                  <div className="relative z-10 space-y-1 mb-4">
                     <div className="flex justify-between items-end">
                       <span className="text-[10px] text-slate-500 uppercase font-bold tracking-widest">{t('collection')}: {Math.floor((progressPercent / 100) * point.productionPerCycle)}/{point.productionPerCycle}</span>
                       <span className="text-[12px] font-orbitron font-bold text-orange-400">{Math.floor(progressPercent)}%</span>
@@ -160,7 +184,7 @@ const TechnologyTab = memo(() => {
                   </div>
 
                   {isResearched ? (
-                    <div className="space-y-4">
+                    <div className="relative z-10 space-y-4">
                       {/* Stats Grid */}
                       <div className="grid grid-cols-2 gap-2">
                         <div className="bg-black/20 p-2 rounded-xl border border-white/5 flex flex-col items-center">
@@ -224,21 +248,22 @@ const TechnologyTab = memo(() => {
                       </div>
                     </div>
                   ) : (
-                    <div className="space-y-3">
+                    <div className="relative z-10 space-y-3">
                       <PremiumCanvasButton
                         onClick={() => researchPoint(point.id)}
-                        disabled={qc < point.cost || (!!researchingExtractionPoint && researchingExtractionPoint.id !== point.id)}
-                        tone={(!!researchingExtractionPoint && researchingExtractionPoint.id === point.id) ? 'amber' : qc >= point.cost ? 'orange' : 'steel'}
+                        disabled={qc < extractionResearchCost || (!!researchingExtractionPoint && researchingExtractionPoint.id !== point.id)}
+                        tone={(!!researchingExtractionPoint && researchingExtractionPoint.id === point.id) ? 'amber' : qc >= extractionResearchCost ? 'orange' : 'steel'}
                         className="w-full h-12 text-[14px] font-bold uppercase"
                         contentClassName={`gap-2 ${
                           (!!researchingExtractionPoint && researchingExtractionPoint.id === point.id) ? 'text-yellow-200' :
-                          qc >= point.cost ? 'text-orange-100' : 'text-slate-500'
+                          qc >= extractionResearchCost ? 'text-orange-100' : 'text-slate-500'
                         }`}
                       >
                         {(researchingExtractionPoint && researchingExtractionPoint.id === point.id) ? t('researching') : (
                           <>
                             <Search className="w-4 h-4" />
-                            {t('researchPoint')}
+                            <span>{t('researchPoint')}</span>
+                            <span className="font-mono text-[11px] opacity-80">{formatValue(extractionResearchCost)} QC</span>
                           </>
                         )}
                       </PremiumCanvasButton>
@@ -261,7 +286,7 @@ const TechnologyTab = memo(() => {
                             >
                               <Zap className="w-3 h-3 animate-pulse" />
                               <span className="text-[10px] font-bold font-mono">
-                                {formatValue(Math.floor(point.cost * (getEconomicMultipliers().cost) * 0.75))} QC
+                                {formatValue(extractionBoostCost)} QC
                               </span>
                             </PremiumCanvasButton>
                           </div>
@@ -274,17 +299,36 @@ const TechnologyTab = memo(() => {
             })}
             <div className="flex items-center justify-center">
               <PremiumCanvasButton
-                onClick={() => setExtractionPageIndex(extractionPageIndex === 0 ? 1 : 0)}
+                onClick={() => {
+                  playSfx('tec_extract_change');
+                  setExtractionPageIndex(extractionPageIndex === 0 ? 1 : 0);
+                }}
                 tone="orange"
-                className="min-h-[132px] max-w-[230px] p-6"
-                contentClassName="flex-col gap-2 text-orange-300"
+                className="min-h-[132px] max-w-[230px] p-0"
+                contentClassName="relative h-full w-full items-center justify-center text-orange-300 overflow-hidden"
+                aria-label={extractionPageIndex === 0 ? 'Ver outros pontos' : 'Voltar pontos'}
               >
-                <div className="relative">
-                  {extractionPageIndex === 0 ? <ChevronRight className="w-10 h-10 text-orange-400" /> : <ChevronLeft className="w-10 h-10 text-orange-400" />}
+                <div className="absolute inset-x-8 top-5 h-px bg-gradient-to-r from-transparent via-orange-200/70 to-transparent" />
+                <div className="absolute inset-x-10 bottom-5 h-px bg-gradient-to-r from-transparent via-yellow-300/45 to-transparent" />
+                <div className="absolute left-8 top-1/2 h-12 w-px -translate-y-1/2 bg-gradient-to-b from-transparent via-orange-400/45 to-transparent" />
+                <div className="absolute right-8 top-1/2 h-12 w-px -translate-y-1/2 bg-gradient-to-b from-transparent via-orange-400/45 to-transparent" />
+                <div className="relative flex h-[76px] w-[76px] items-center justify-center">
+                  <div className="absolute inset-0 rotate-45 rounded-[14px] border border-orange-300/45 bg-orange-500/10 shadow-[0_0_24px_rgba(249,115,22,0.45)]" />
+                  <div className="absolute inset-2 rotate-45 rounded-[10px] border border-yellow-200/35 bg-black/30" />
+                  <div className="absolute inset-[-10px] rounded-full bg-orange-500/15 blur-xl" />
+                  <div className="absolute h-[2px] w-16 bg-gradient-to-r from-transparent via-orange-200/80 to-transparent" />
+                  {extractionPageIndex === 0 ? (
+                    <>
+                      <ChevronRight className="relative z-10 h-14 w-14 text-yellow-200 drop-shadow-[0_0_10px_rgba(251,191,36,0.95)]" strokeWidth={2.7} />
+                      <ChevronRight className="absolute z-0 h-16 w-16 translate-x-2 text-orange-500/35 blur-[1px]" strokeWidth={2.7} />
+                    </>
+                  ) : (
+                    <>
+                      <ChevronLeft className="relative z-10 h-14 w-14 text-yellow-200 drop-shadow-[0_0_10px_rgba(251,191,36,0.95)]" strokeWidth={2.7} />
+                      <ChevronLeft className="absolute z-0 h-16 w-16 -translate-x-2 text-orange-500/35 blur-[1px]" strokeWidth={2.7} />
+                    </>
+                  )}
                 </div>
-                <span className="text-base font-orbitron font-bold text-orange-400 uppercase tracking-widest">
-                  {extractionPageIndex === 0 ? (language === 'pt' ? 'Ver outros 4 pontos' : 'View other 4 points') : (language === 'pt' ? 'Voltar para os 5 pontos' : 'Back to 5 points')}
-                </span>
               </PremiumCanvasButton>
             </div>
           </div>
@@ -301,13 +345,25 @@ const TechnologyTab = memo(() => {
             
             const shipForTech = SHIPS.find(s => s.tier === routeTier && s.level === tech.unlocksShipLevel);
             const shipColorClass = shipForTech?.color || 'text-cyan-400';
+            const backgroundImage = tech.tier === 'Solar'
+              ? SOLAR_TECHNOLOGY_BACKGROUNDS[tech.level]
+              : tech.tier === 'Interstellar'
+                ? INTERSTELLAR_TECHNOLOGY_BACKGROUNDS[tech.level]
+                : undefined;
 
             return (
               <div
                 key={tech.id}
-                className={`glass-panel ${getShipNeonBorder(shipColorClass)} rounded-xl p-3 flex flex-col h-full relative overflow-hidden transition-all duration-300 ${!isUnlocked && !isNext ? 'opacity-30' : 'opacity-100'}`}
+                className={`glass-panel ${getShipNeonBorder(shipColorClass)} rounded-xl p-3 flex flex-col h-full relative overflow-hidden bg-cover bg-center bg-no-repeat transition-all duration-300 ${!isUnlocked && !isNext ? 'opacity-30' : 'opacity-100'}`}
+                style={backgroundImage ? { backgroundImage: `url('${backgroundImage}')` } : undefined}
               >
-                <div className="flex justify-between items-start mb-2">
+                {backgroundImage && (
+                  <>
+                    <div className="absolute inset-0 bg-slate-950/45 pointer-events-none" />
+                    <div className="absolute inset-0 bg-gradient-to-b from-slate-950/45 via-transparent to-slate-950/70 pointer-events-none" />
+                  </>
+                )}
+                <div className="relative z-10 flex justify-between items-start mb-2">
                   <div className="flex-1 overflow-hidden">
                     <h3 className={`font-orbitron text-[14px] font-bold ${isUnlocked ? shipColorClass : 'text-slate-200'} uppercase tracking-tight`}>
                       {translateData(tech.name)}
@@ -339,7 +395,7 @@ const TechnologyTab = memo(() => {
                   )}
                 </div>
 
-                <div className="mt-auto space-y-2">
+                <div className="relative z-10 mt-auto space-y-2">
                   <div className="flex items-center gap-2 text-[15px] font-bold text-slate-400 uppercase tracking-tighter">
                     <Rocket className={`w-3 h-3 ${isUnlocked ? shipColorClass : 'text-slate-600'}`} />
                     <span>{t('unlocksShip')} {tech.unlocksShipLevel}</span>
@@ -378,5 +434,7 @@ const TechnologyTab = memo(() => {
     </motion.div>
   );
 });
+
+TechnologyTab.displayName = 'TechnologyTab';
 
 export default TechnologyTab;

@@ -1,6 +1,7 @@
 import { CARD_BACKGROUND_BY_RARITY } from './colony-cards';
 import { MINI_GAMES_CONFIG } from './mini-games-config';
 import { ARCADE_THEMES, ROUTE_THEMES } from './music-data';
+import { AETHERION_CHAMBER_BACKGROUND, ACTIVE_DELIVERY_BACKGROUNDS, MISSION_HEADER_BACKGROUNDS, ROUTE1_UI_BACKGROUNDS, ROUTE2_UI_BACKGROUNDS, SCIFI_TEXTURE_BACKGROUND } from './ui-backgrounds';
 
 export type AssetKind = 'image' | 'audio' | 'video';
 export type AssetRouteGroup = 'route1' | 'route2' | 'route3' | 'route4';
@@ -44,15 +45,53 @@ const routeHeaderImages = {
   route4: '/assets/rota4/layout_header_cap_4/background_header_rota_4.webp',
 } as const;
 
-const activeDeliveryBackgrounds = {
-  route1: '/assets/texturas/deliver_bg_cap1.webp',
-  route2: '/assets/texturas/deliver_bg_cap2.webp',
-} as const;
+const route1UpgradeBackgrounds = [
+  '/assets/melhorias/bg_rota1_upgrade.webp',
+  '/assets/melhorias/bg_rota1_title.webp',
+  '/assets/melhorias/bg_rota1_missoes_header.webp',
+  '/assets/melhorias/bg_rota1_motor.webp',
+  '/assets/melhorias/bg_rota1_missao.webp',
+  '/assets/melhorias/bg_rota1_mercadoria.webp',
+  '/assets/melhorias/bg_rota1_ia.webp',
+];
 
-const missionHeaderBackgrounds = {
-  route1: '/assets/texturas/cap1_mission_bg.webp',
-  route2: '/assets/texturas/cap2_mission_bg.webp',
-} as const;
+const route1MineralVideos = [
+  '/videos/minerals/cap1/1_common_ferrite.webm',
+  '/videos/minerals/cap1/2_energized_quartz.webm',
+  '/videos/minerals/cap1/3_space_nickel.webm',
+  '/videos/minerals/cap1/4_ionized_cobalt.webm',
+  '/videos/minerals/cap1/5_refined_titanium.webm',
+  '/videos/minerals/cap1/6_plasma_crystal.webm',
+  '/videos/minerals/cap1/7_condensed_aether.webm',
+  '/videos/minerals/cap1/8_exotic_matter.webm',
+  '/videos/minerals/cap1/9_quantum_core.webm',
+];
+
+const route1HistoricBackgrounds = [
+  '/assets/texturas/historic/cap1/bg_header.webp',
+  '/assets/texturas/historic/cap1/bg_left.webp',
+  '/assets/texturas/historic/cap1/bg_repo.webp',
+  '/assets/texturas/historic/cap1/bg_right1.webp',
+  '/assets/texturas/historic/cap1/bg_right2.webp',
+];
+
+const route2UpgradeBackgrounds = [
+  '/assets/melhorias/bg_rota2_upgrade.webp',
+  '/assets/melhorias/bg_rota2_title.webp',
+  '/assets/melhorias/bg_rota2_missoes_header.webp',
+  '/assets/melhorias/bg_rota2_motor.webp',
+  '/assets/melhorias/bg_rota2_missao.webp',
+  '/assets/melhorias/bg_rota2_mercadoria.webp',
+  '/assets/melhorias/bg_rota2_ia.webp',
+];
+
+const route2HistoricBackgrounds = [
+  '/assets/texturas/historic/cap2/bg_header.webp',
+  '/assets/texturas/historic/cap2/bg_left.webp',
+  '/assets/texturas/historic/cap2/bg_repo.webp',
+  '/assets/texturas/historic/cap2/bg_right1.webp',
+  '/assets/texturas/historic/cap2/bg_right2.webp',
+];
 
 const route4ColonyImages = [
   'genesis/1genesis_colony.webp',
@@ -115,6 +154,39 @@ const route4ColonyAudio = [
   '/assets/rota4/SFX_new_land/hangar_open_door.ogg',
   '/assets/rota4/SFX_new_land/hangar_close_door.ogg',
   '/assets/rota4/SFX_new_land/warning_gaming.ogg',
+];
+
+const route4BobbyAccessDeniedAudio = Array.from({ length: 10 }, (_, index) => (
+  `/audio/sfx/bobby_blue/access_denied/access_denied_${index + 1}.ogg`
+));
+
+const route4BobbyMissionCompleteAudio = Array.from({ length: 10 }, (_, index) => (
+  `/audio/sfx/bobby_blue/mission_complete/mission_complete_${index + 1}.ogg`
+));
+
+const route4BobbyWarningAudio = Array.from({ length: 9 }, (_, index) => (
+  `/audio/sfx/bobby_blue/warnings/warning_${index + 1}.ogg`
+));
+
+const route4BobbyPopulationMilestoneAudio = [
+  '/audio/sfx/bobby_blue/population milestone/one_milion.ogg',
+  '/audio/sfx/bobby_blue/population milestone/ten_milion.ogg',
+  '/audio/sfx/bobby_blue/population milestone/fifty_milion.ogg',
+  '/audio/sfx/bobby_blue/population milestone/one_hundred_milion.ogg',
+  '/audio/sfx/bobby_blue/population milestone/five_hundred_milion.ogg',
+  '/audio/sfx/bobby_blue/population milestone/billion.ogg',
+  '/audio/sfx/bobby_blue/population milestone/five_billion.ogg',
+  '/audio/sfx/bobby_blue/population milestone/ten_billion.ogg',
+  '/audio/sfx/bobby_blue/population milestone/twenty_billion.ogg',
+];
+
+const route4BobbyMuralAudio = [
+  ...Array.from({ length: 34 }, (_, index) => (
+    `/audio/sfx/bobby_blue/mural open/open_mural_${index + 1}.ogg`
+  )),
+  ...Array.from({ length: 24 }, (_, index) => (
+    `/audio/sfx/bobby_blue/mural close/close_mural_${index + 1}.ogg`
+  )),
 ];
 
 const route4BattleBase = '/assets/rota4/battles';
@@ -424,10 +496,16 @@ export const ASSET_GROUPS: Record<AssetGroupId, AssetPreloadEntry[]> = {
       '/audio/bgm_landing.ogg',
       '/audio/sfx/open_window.ogg',
       '/audio/sfx/close_window.ogg',
+      '/assets/rota4/SFX_new_land/hangar_open_door.ogg',
+      '/assets/rota4/SFX_new_land/hangar_close_door.ogg',
       '/audio/sfx/view_card.ogg',
       '/audio/sfx/claim_card.ogg',
       '/audio/sfx/equip_card.ogg',
       '/audio/sfx/unequip_card.ogg',
+      '/audio/sfx/change_air_ships.ogg',
+      '/audio/sfx/tec_extract_change.ogg',
+      '/audio/sfx/radar_skip_victory.ogg',
+      '/audio/sfx/radar_skip_defeat.ogg',
     ], 'audio'),
     ...asEntries([
       '/images/bobby_blue/bobby_blue_summer.webp',
@@ -439,6 +517,7 @@ export const ASSET_GROUPS: Record<AssetGroupId, AssetPreloadEntry[]> = {
       '/images/ui/options_background.webp',
       '/images/ui/sounds_ef_background.webp',
       '/images/ui/jukebox_background.webp',
+      SCIFI_TEXTURE_BACKGROUND,
     ], 'image'),
     ...asEntries([
       '/videos/bobby_blue/bobby_blue_game_intro_glitch.webm',
@@ -461,11 +540,12 @@ export const ASSET_GROUPS: Record<AssetGroupId, AssetPreloadEntry[]> = {
     ...asEntries(fliperSfx, 'audio'),
   ],
   route1: [
-    ...asEntries([routeHeaderImages.route1, activeDeliveryBackgrounds.route1, missionHeaderBackgrounds.route1], 'image'),
+    ...asEntries([routeHeaderImages.route1, ACTIVE_DELIVERY_BACKGROUNDS.route1, MISSION_HEADER_BACKGROUNDS.route1, AETHERION_CHAMBER_BACKGROUND, ...ROUTE1_UI_BACKGROUNDS, ...route1UpgradeBackgrounds, ...route1HistoricBackgrounds], 'image'),
+    ...asEntries(route1MineralVideos, 'video'),
     ...asEntries(routeThemeAudio('Solar'), 'audio'),
   ],
   route2: [
-    ...asEntries([routeHeaderImages.route2, activeDeliveryBackgrounds.route2, missionHeaderBackgrounds.route2], 'image'),
+    ...asEntries([routeHeaderImages.route2, ACTIVE_DELIVERY_BACKGROUNDS.route2, MISSION_HEADER_BACKGROUNDS.route2, AETHERION_CHAMBER_BACKGROUND, ...ROUTE2_UI_BACKGROUNDS, ...route2UpgradeBackgrounds, ...route2HistoricBackgrounds], 'image'),
     ...asEntries(routeThemeAudio('Interstellar'), 'audio'),
   ],
   route3: [
@@ -479,7 +559,7 @@ export const ASSET_GROUPS: Record<AssetGroupId, AssetPreloadEntry[]> = {
   route4: [
     ...asEntries([routeHeaderImages.route4, '/images/bobby_blue/bobby_blue_new_land.webp', '/assets/rota4/new_land_map.webp', ...route4TextureImages], 'image'),
     ...asEntries(['/assets/rota4/videos/quantum_courier_credits.webm'], 'video'),
-    ...asEntries([...routeThemeAudio('Earth'), '/audio/themes/infinite_horizon_short_version.ogg'], 'audio'),
+    ...asEntries([...routeThemeAudio('Earth'), '/audio/themes/infinite_horizon_short_version.ogg', ...route4BobbyAccessDeniedAudio, ...route4BobbyMissionCompleteAudio, ...route4BobbyWarningAudio, ...route4BobbyPopulationMilestoneAudio, ...route4BobbyMuralAudio], 'audio'),
   ],
   'route4-colonies': [
     ...asEntries([...route4ColonyImages, ...route4LayoutImages], 'image'),

@@ -148,15 +148,15 @@ export const ORES: Ore[] = [
   { id: 'nucleo', name: 'Núcleo Quântico', rarity: 1, baseValue: 1000000, requiredShipLevel: 9, packSize: 50, robotBaseCost: 100000000, autoSellCost: 50000000, tier: 'Solar' },
   
   // ROTA 2: Interstellar
-  { id: 'ferro-estelar', name: 'Ferro Estelar', rarity: 1, baseValue: 1000000, requiredShipLevel: 1, packSize: 50, robotBaseCost: 100000000, autoSellCost: 500000000, tier: 'Interstellar' },
-  { id: 'cristal-fotonico', name: 'Cristal Fotônico', rarity: 1, baseValue: 2000000, requiredShipLevel: 2, packSize: 50, robotBaseCost: 300000000, autoSellCost: 1500000000, tier: 'Interstellar' },
-  { id: 'liga-iridio', name: 'Liga de Irídio', rarity: 1, baseValue: 5000000, requiredShipLevel: 3, packSize: 50, robotBaseCost: 1000000000, autoSellCost: 5000000000, tier: 'Interstellar' },
-  { id: 'plasma-solido', name: 'Plasma Sólido', rarity: 1, baseValue: 15000000, requiredShipLevel: 4, packSize: 50, robotBaseCost: 5000000000, autoSellCost: 25000000000, tier: 'Interstellar' },
-  { id: 'nucleo-radiante', name: 'Núcleo Radiante', rarity: 1, baseValue: 50000000, requiredShipLevel: 5, packSize: 50, robotBaseCost: 25000000000, autoSellCost: 125000000000, tier: 'Interstellar' },
-  { id: 'fragmento-anomalia', name: 'Fragmento de Anomalia', rarity: 1, baseValue: 150000000, requiredShipLevel: 6, packSize: 50, robotBaseCost: 100000000000, autoSellCost: 500000000000, tier: 'Interstellar' },
-  { id: 'essencia-nebular', name: 'Essência Nebular', rarity: 1, baseValue: 500000000, requiredShipLevel: 7, packSize: 50, robotBaseCost: 500000000000, autoSellCost: 2500000000000, tier: 'Interstellar' },
-  { id: 'materia-instavel', name: 'Matéria Instável', rarity: 1, baseValue: 1500000000, requiredShipLevel: 8, packSize: 50, robotBaseCost: 2500000000000, autoSellCost: 12500000000000, tier: 'Interstellar' },
-  { id: 'singularidade-condensada', name: 'Singularidade Condensada', rarity: 1, baseValue: 5000000000, requiredShipLevel: 9, packSize: 50, robotBaseCost: 10000000000000, autoSellCost: 50000000000000, tier: 'Interstellar' },
+  { id: 'ferro-estelar', name: 'Ferro Estelar', rarity: 1, baseValue: 3000000, requiredShipLevel: 1, packSize: 50, robotBaseCost: 100000000, autoSellCost: 500000000, tier: 'Interstellar' },
+  { id: 'cristal-fotonico', name: 'Cristal Fotônico', rarity: 1, baseValue: 6000000, requiredShipLevel: 2, packSize: 50, robotBaseCost: 300000000, autoSellCost: 1500000000, tier: 'Interstellar' },
+  { id: 'liga-iridio', name: 'Liga de Irídio', rarity: 1, baseValue: 15000000, requiredShipLevel: 3, packSize: 50, robotBaseCost: 1000000000, autoSellCost: 5000000000, tier: 'Interstellar' },
+  { id: 'plasma-solido', name: 'Plasma Sólido', rarity: 1, baseValue: 45000000, requiredShipLevel: 4, packSize: 50, robotBaseCost: 5000000000, autoSellCost: 25000000000, tier: 'Interstellar' },
+  { id: 'nucleo-radiante', name: 'Núcleo Radiante', rarity: 1, baseValue: 150000000, requiredShipLevel: 5, packSize: 50, robotBaseCost: 25000000000, autoSellCost: 125000000000, tier: 'Interstellar' },
+  { id: 'fragmento-anomalia', name: 'Fragmento de Anomalia', rarity: 1, baseValue: 450000000, requiredShipLevel: 6, packSize: 50, robotBaseCost: 100000000000, autoSellCost: 500000000000, tier: 'Interstellar' },
+  { id: 'essencia-nebular', name: 'Essência Nebular', rarity: 1, baseValue: 1500000000, requiredShipLevel: 7, packSize: 50, robotBaseCost: 500000000000, autoSellCost: 2500000000000, tier: 'Interstellar' },
+  { id: 'materia-instavel', name: 'Matéria Instável', rarity: 1, baseValue: 4500000000, requiredShipLevel: 8, packSize: 50, robotBaseCost: 2500000000000, autoSellCost: 12500000000000, tier: 'Interstellar' },
+  { id: 'singularidade-condensada', name: 'Singularidade Condensada', rarity: 1, baseValue: 15000000000, requiredShipLevel: 9, packSize: 50, robotBaseCost: 10000000000000, autoSellCost: 50000000000000, tier: 'Interstellar' },
 ];
 
 export const ROBOT_UPGRADES: MiningRobotUpgrade[] = [
@@ -316,7 +316,7 @@ export const TECHNOLOGIES: Technology[] = [
   {
     id: 'inter-6',
     level: 6,
-    name: 'Propuls propulsion de Horizonte de Eventos',
+    name: 'Propulsão de Horizonte de Eventos',
     description: 'Uso de singularidades para deslocamento. Desbloqueia Nave 6',
     unlocksShipLevel: 6,
     cost: 100000000,
@@ -468,7 +468,7 @@ export const EXTRACTION_POINTS: ExtractionPoint[] = [
     cycleTime: 5000,
     cost: 500000000, // 500 Mi
     researchTime: 600000, // 10 minutes
-    valuePerPack: 25000000, // 25 Mi
+    valuePerPack: 10000000, // 10 Mi
     tier: 'Interstellar',
   },
   {
@@ -479,7 +479,7 @@ export const EXTRACTION_POINTS: ExtractionPoint[] = [
     cycleTime: 5000,
     cost: 2500000000, // 2.5 Bi
     researchTime: 900000, // 15 minutes
-    valuePerPack: 100000000, // 100 Mi
+    valuePerPack: 40000000, // 40 Mi
     tier: 'Interstellar',
   },
   {
@@ -490,7 +490,7 @@ export const EXTRACTION_POINTS: ExtractionPoint[] = [
     cycleTime: 5000,
     cost: 10000000000, // 10 Bi
     researchTime: 1200000, // 20 minutes
-    valuePerPack: 500000000, // 500 Mi
+    valuePerPack: 180000000, // 180 Mi
     tier: 'Interstellar',
   },
   {
@@ -501,7 +501,7 @@ export const EXTRACTION_POINTS: ExtractionPoint[] = [
     cycleTime: 5000,
     cost: 50000000000, // 50 Bi
     researchTime: 1500000, // 25 minutes
-    valuePerPack: 2500000000, // 2.5 Bi
+    valuePerPack: 900000000, // 900 Mi
     tier: 'Interstellar',
   },
   {
@@ -512,7 +512,7 @@ export const EXTRACTION_POINTS: ExtractionPoint[] = [
     cycleTime: 5000,
     cost: 200000000000, // 200 Bi
     researchTime: 1800000, // 30 minutes
-    valuePerPack: 10000000000, // 10 Bi
+    valuePerPack: 3500000000, // 3.5 Bi
     tier: 'Interstellar',
   },
   {
@@ -521,9 +521,9 @@ export const EXTRACTION_POINTS: ExtractionPoint[] = [
     resourceName: 'Platina Bruta',
     productionPerCycle: 10,
     cycleTime: 5000,
-    cost: 400000000, // 400 Mi
+    cost: 1000000000000, // 1 Tri
     researchTime: 2400000, // 40 minutes
-    valuePerPack: 175000, // 175k (Decreased by 99% again for balance)
+    valuePerPack: 18000000000, // 18 Bi
     tier: 'Interstellar',
   },
   {
@@ -532,9 +532,9 @@ export const EXTRACTION_POINTS: ExtractionPoint[] = [
     resourceName: 'Diamante',
     productionPerCycle: 10,
     cycleTime: 5000,
-    cost: 500000000, // 500 Mi
+    cost: 5000000000000, // 5 Tri
     researchTime: 3000000, // 50 minutes
-    valuePerPack: 200000, // 200k (Decreased by 99% again for balance)
+    valuePerPack: 90000000000, // 90 Bi
     tier: 'Interstellar',
   },
   {
@@ -543,9 +543,9 @@ export const EXTRACTION_POINTS: ExtractionPoint[] = [
     resourceName: 'Ródio',
     productionPerCycle: 10,
     cycleTime: 5000,
-    cost: 600000000, // 600 Mi
+    cost: 25000000000000, // 25 Tri
     researchTime: 3600000, // 60 minutes
-    valuePerPack: 225000, // 225k (Decreased by 99% again for balance)
+    valuePerPack: 450000000000, // 450 Bi
     tier: 'Interstellar',
   },
   {
@@ -554,9 +554,9 @@ export const EXTRACTION_POINTS: ExtractionPoint[] = [
     resourceName: 'Irídio',
     productionPerCycle: 10,
     cycleTime: 5000,
-    cost: 750000000, // 750 Mi
+    cost: 100000000000000, // 100 Tri
     researchTime: 4500000, // 75 minutes
-    valuePerPack: 250000, // 250k (Decreased by 99% again for balance)
+    valuePerPack: 1800000000000, // 1.8 Tri
     tier: 'Interstellar',
   },
 ];

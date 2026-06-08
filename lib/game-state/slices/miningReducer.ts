@@ -200,6 +200,10 @@ export function miningReducer(state: MiningState = initialMiningState, action: G
           ...state.extractionAutoSellUnlocked,
           [pointId]: true,
         },
+        extractionAutoSell: {
+          ...state.extractionAutoSell,
+          [pointId]: false,
+        },
       };
     }
 
