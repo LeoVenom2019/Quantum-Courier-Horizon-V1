@@ -8248,7 +8248,7 @@ const DashboardContent = memo(({
                   ))}
                 </motion.div>
               )}
-              <AnimatePresence mode="wait">
+              <AnimatePresence mode="sync" initial={false}>
                 {activeTab === 'mini_games' && isEarth && isArcadeUnlocked && (
                   <motion.div
                     key="mini_games"
@@ -8299,11 +8299,29 @@ const DashboardContent = memo(({
                 )}
 
                 {(activeTab === 'routes' || activeTab === 'routes2') && !isVoid && !isEarth && (
-                  <RoutesTab key="routes_tab" />
+                  <motion.div
+                    key={`routes-${activeTab}-${routeTier}`}
+                    initial={{ opacity: 0, x: 16 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -16 }}
+                    transition={{ duration: 0.18 }}
+                    className="h-full min-h-0 flex flex-col"
+                  >
+                    <RoutesTab />
+                  </motion.div>
                 )}
 
                 {activeTab === 'missions' && !isVoid && !isEarth && (
-                  <MissionsTab key="missions_tab" />
+                  <motion.div
+                    key={`missions-${routeTier}`}
+                    initial={{ opacity: 0, x: 16 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -16 }}
+                    transition={{ duration: 0.18 }}
+                    className="h-full min-h-0 flex flex-col"
+                  >
+                    <MissionsTab />
+                  </motion.div>
                 )}
 
                 {activeTab === 'auto' && !isVoid && !isEarth && (
