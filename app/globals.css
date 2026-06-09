@@ -451,7 +451,7 @@
   overflow: hidden;
   pointer-events: none;
   mix-blend-mode: screen;
-  opacity: 0.48;
+  opacity: 0.78;
 }
 
 .route-header-particles::before,
@@ -466,73 +466,73 @@
 
 .route-header-particles-solar::before {
   background-image:
-    radial-gradient(circle, rgba(34, 211, 238, 0.48) 0 0.7px, transparent 1.5px),
-    radial-gradient(circle, rgba(250, 204, 21, 0.34) 0 0.65px, transparent 1.4px);
-  background-size: 132px 79px, 231px 139px;
+    radial-gradient(circle, rgba(34, 211, 238, 0.72) 0 0.95px, transparent 1.9px),
+    radial-gradient(circle, rgba(250, 204, 21, 0.52) 0 0.85px, transparent 1.8px);
+  background-size: 96px 57px, 173px 101px;
   filter: blur(0.15px);
   animation: route-header-dust-a 18s ease-in-out infinite;
 }
 
 .route-header-particles-solar::after {
   background-image:
-    radial-gradient(circle, rgba(74, 222, 128, 0.28) 0 0.75px, transparent 1.6px),
-    radial-gradient(circle, rgba(96, 165, 250, 0.3) 0 0.65px, transparent 1.5px);
-  background-size: 191px 113px, 307px 167px;
+    radial-gradient(circle, rgba(74, 222, 128, 0.44) 0 0.95px, transparent 1.9px),
+    radial-gradient(circle, rgba(96, 165, 250, 0.44) 0 0.85px, transparent 1.8px);
+  background-size: 151px 87px, 247px 139px;
   filter: blur(0.35px);
   animation: route-header-dust-b 24s ease-in-out infinite;
 }
 
 .route-header-particles-heat::before {
   background-image:
-    radial-gradient(circle, rgba(251, 146, 60, 0.46) 0 0.75px, transparent 1.6px),
-    radial-gradient(circle, rgba(250, 204, 21, 0.32) 0 0.65px, transparent 1.5px);
-  background-size: 128px 73px, 247px 137px;
+    radial-gradient(circle, rgba(251, 146, 60, 0.74) 0 1px, transparent 2px),
+    radial-gradient(circle, rgba(250, 204, 21, 0.52) 0 0.85px, transparent 1.8px);
+  background-size: 91px 53px, 181px 103px;
   filter: blur(0.15px);
   animation: route-header-dust-a 19s ease-in-out infinite;
 }
 
 .route-header-particles-heat::after {
   background-image:
-    radial-gradient(circle, rgba(253, 186, 116, 0.24) 0 1px, transparent 2.8px),
-    radial-gradient(circle, rgba(220, 38, 38, 0.2) 0 0.85px, transparent 2.4px);
-  background-size: 293px 151px, 421px 211px;
-  filter: blur(0.55px);
+    radial-gradient(circle, rgba(253, 186, 116, 0.38) 0 1.25px, transparent 3px),
+    radial-gradient(circle, rgba(220, 38, 38, 0.32) 0 1px, transparent 2.6px);
+  background-size: 239px 127px, 337px 173px;
+  filter: blur(0.45px);
   animation: route-header-dust-b 26s ease-in-out infinite;
 }
 
 .route-header-particles-void::before {
   background-image:
-    radial-gradient(circle, rgba(192, 132, 252, 0.34) 0 1px, transparent 2.8px),
-    radial-gradient(circle, rgba(34, 211, 238, 0.22) 0 0.8px, transparent 2.2px);
-  background-size: 181px 101px, 337px 179px;
-  filter: blur(0.45px);
+    radial-gradient(circle, rgba(192, 132, 252, 0.56) 0 1.15px, transparent 3px),
+    radial-gradient(circle, rgba(34, 211, 238, 0.38) 0 0.95px, transparent 2.4px);
+  background-size: 137px 79px, 259px 143px;
+  filter: blur(0.3px);
   animation: route-header-dust-a 24s ease-in-out infinite;
 }
 
 .route-header-particles-void::after {
   background-image:
-    radial-gradient(circle, rgba(168, 85, 247, 0.18) 0 1.3px, transparent 4px),
-    radial-gradient(circle, rgba(56, 189, 248, 0.14) 0 1px, transparent 3.4px);
-  background-size: 389px 191px, 557px 267px;
-  filter: blur(0.9px);
+    radial-gradient(circle, rgba(168, 85, 247, 0.3) 0 1.5px, transparent 4.2px),
+    radial-gradient(circle, rgba(56, 189, 248, 0.24) 0 1.2px, transparent 3.6px);
+  background-size: 307px 157px, 449px 223px;
+  filter: blur(0.75px);
   animation: route-header-dust-b 30s ease-in-out infinite;
 }
 
 .route-header-particles-earth::before {
   background-image:
-    radial-gradient(circle, rgba(45, 212, 191, 0.42) 0 0.75px, transparent 1.6px),
-    radial-gradient(circle, rgba(132, 204, 22, 0.34) 0 0.65px, transparent 1.5px);
-  background-size: 151px 89px, 277px 151px;
+    radial-gradient(circle, rgba(45, 212, 191, 0.68) 0 0.95px, transparent 1.9px),
+    radial-gradient(circle, rgba(132, 204, 22, 0.52) 0 0.85px, transparent 1.8px);
+  background-size: 109px 67px, 211px 119px;
   filter: blur(0.2px);
   animation: route-header-dust-a 20s ease-in-out infinite;
 }
 
 .route-header-particles-earth::after {
   background-image:
-    radial-gradient(circle, rgba(250, 204, 21, 0.28) 0 0.8px, transparent 1.9px),
-    radial-gradient(circle, rgba(96, 165, 250, 0.28) 0 0.7px, transparent 1.8px);
-  background-size: 223px 121px, 379px 199px;
-  filter: blur(0.4px);
+    radial-gradient(circle, rgba(250, 204, 21, 0.42) 0 1px, transparent 2px),
+    radial-gradient(circle, rgba(96, 165, 250, 0.42) 0 0.9px, transparent 1.9px);
+  background-size: 179px 97px, 293px 157px;
+  filter: blur(0.35px);
   animation: route-header-dust-b 26s ease-in-out infinite;
 }
 
