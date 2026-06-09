@@ -785,6 +785,7 @@ const VoidBattleArena = memo(function VoidBattleArena({
       s.playerShotDuckedUntil = now + 4500;
       playSfx('big_energy_explosion_2', { volume: 1.0, category: 'player' });
     } else if (type === 'special') {
+      if (playerShipStats.rarity !== 'mythic') return;
       if (s.fireballs.length > 0) return; // Bloqueia se HB estiver em curso
       s.abilities.special.lastUsed = now;
       s.laserState = 'charge';
@@ -812,7 +813,7 @@ const VoidBattleArena = memo(function VoidBattleArena({
       s.playerShotDuckedUntil = now + 6500;
       playSfx('big_energy_explosion_', { volume: 1.0, category: 'player' });
     }
-  }, [onUpdateResources, addLog, t, playSfx, routeTier]);
+  }, [onUpdateResources, addLog, t, playSfx, routeTier, playerShipStats.rarity]);
 
   const triggerAttack = useCallback((targetX: number, targetY: number) => {
     const s = gameRef.current;
