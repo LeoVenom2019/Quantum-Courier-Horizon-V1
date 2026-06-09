@@ -451,7 +451,7 @@
   overflow: hidden;
   pointer-events: none;
   mix-blend-mode: screen;
-  opacity: 0.82;
+  opacity: 0.48;
 }
 
 .route-header-particles::before,
@@ -461,109 +461,101 @@
   inset: -22%;
   background-repeat: repeat;
   transform: translate3d(0, 0, 0);
-  will-change: transform;
+  will-change: transform, opacity;
 }
 
 .route-header-particles-solar::before {
   background-image:
-    radial-gradient(circle, rgba(34, 211, 238, 0.9) 0 1px, transparent 1.9px),
-    radial-gradient(circle, rgba(244, 114, 182, 0.7) 0 1px, transparent 1.8px),
-    radial-gradient(circle, rgba(250, 204, 21, 0.75) 0 1px, transparent 1.7px);
-  background-size: 54px 31px, 87px 49px, 121px 67px;
-  animation: route-header-drift-a 7s ease-in-out infinite;
+    radial-gradient(circle, rgba(34, 211, 238, 0.48) 0 0.7px, transparent 1.5px),
+    radial-gradient(circle, rgba(250, 204, 21, 0.34) 0 0.65px, transparent 1.4px);
+  background-size: 132px 79px, 231px 139px;
+  filter: blur(0.15px);
+  animation: route-header-dust-a 18s ease-in-out infinite;
 }
 
 .route-header-particles-solar::after {
   background-image:
-    radial-gradient(circle, rgba(74, 222, 128, 0.75) 0 1px, transparent 1.8px),
-    radial-gradient(circle, rgba(96, 165, 250, 0.65) 0 1px, transparent 1.9px);
-  background-size: 73px 43px, 137px 71px;
-  animation: route-header-drift-b 9s ease-in-out infinite;
+    radial-gradient(circle, rgba(74, 222, 128, 0.28) 0 0.75px, transparent 1.6px),
+    radial-gradient(circle, rgba(96, 165, 250, 0.3) 0 0.65px, transparent 1.5px);
+  background-size: 191px 113px, 307px 167px;
+  filter: blur(0.35px);
+  animation: route-header-dust-b 24s ease-in-out infinite;
 }
 
 .route-header-particles-heat::before {
   background-image:
-    radial-gradient(circle, rgba(251, 146, 60, 0.9) 0 1.2px, transparent 2px),
-    radial-gradient(circle, rgba(239, 68, 68, 0.72) 0 1px, transparent 1.8px),
-    radial-gradient(circle, rgba(250, 204, 21, 0.7) 0 1px, transparent 1.8px);
-  background-size: 48px 29px, 83px 47px, 118px 63px;
-  animation: route-header-heat-a 5.5s ease-in-out infinite;
+    radial-gradient(circle, rgba(251, 146, 60, 0.46) 0 0.75px, transparent 1.6px),
+    radial-gradient(circle, rgba(250, 204, 21, 0.32) 0 0.65px, transparent 1.5px);
+  background-size: 128px 73px, 247px 137px;
+  filter: blur(0.15px);
+  animation: route-header-dust-a 19s ease-in-out infinite;
 }
 
 .route-header-particles-heat::after {
   background-image:
-    radial-gradient(circle, rgba(253, 186, 116, 0.48) 0 2px, transparent 4px),
-    radial-gradient(circle, rgba(220, 38, 38, 0.42) 0 1.4px, transparent 3px);
-  background-size: 131px 68px, 173px 84px;
-  filter: blur(0.3px);
-  animation: route-header-heat-b 6.5s ease-in-out infinite;
+    radial-gradient(circle, rgba(253, 186, 116, 0.24) 0 1px, transparent 2.8px),
+    radial-gradient(circle, rgba(220, 38, 38, 0.2) 0 0.85px, transparent 2.4px);
+  background-size: 293px 151px, 421px 211px;
+  filter: blur(0.55px);
+  animation: route-header-dust-b 26s ease-in-out infinite;
 }
 
 .route-header-particles-void::before {
   background-image:
-    radial-gradient(circle, rgba(192, 132, 252, 0.48) 0 2px, transparent 5px),
-    radial-gradient(circle, rgba(217, 70, 239, 0.36) 0 1.8px, transparent 4.5px),
-    radial-gradient(circle, rgba(34, 211, 238, 0.32) 0 1.4px, transparent 4px);
-  background-size: 96px 53px, 141px 77px, 181px 95px;
-  filter: blur(0.4px);
-  animation: route-header-void-a 10s ease-in-out infinite;
+    radial-gradient(circle, rgba(192, 132, 252, 0.34) 0 1px, transparent 2.8px),
+    radial-gradient(circle, rgba(34, 211, 238, 0.22) 0 0.8px, transparent 2.2px);
+  background-size: 181px 101px, 337px 179px;
+  filter: blur(0.45px);
+  animation: route-header-dust-a 24s ease-in-out infinite;
 }
 
 .route-header-particles-void::after {
   background-image:
-    radial-gradient(circle, rgba(168, 85, 247, 0.28) 0 3px, transparent 8px),
-    radial-gradient(circle, rgba(56, 189, 248, 0.18) 0 2px, transparent 7px);
-  background-size: 211px 104px, 283px 132px;
-  filter: blur(1px);
-  animation: route-header-void-b 12s ease-in-out infinite;
+    radial-gradient(circle, rgba(168, 85, 247, 0.18) 0 1.3px, transparent 4px),
+    radial-gradient(circle, rgba(56, 189, 248, 0.14) 0 1px, transparent 3.4px);
+  background-size: 389px 191px, 557px 267px;
+  filter: blur(0.9px);
+  animation: route-header-dust-b 30s ease-in-out infinite;
 }
 
 .route-header-particles-earth::before {
   background-image:
-    radial-gradient(circle, rgba(45, 212, 191, 0.85) 0 1px, transparent 1.8px),
-    radial-gradient(circle, rgba(132, 204, 22, 0.78) 0 1px, transparent 1.8px),
-    radial-gradient(circle, rgba(244, 114, 182, 0.7) 0 1px, transparent 1.7px);
-  background-size: 92px 53px, 157px 83px, 241px 123px;
-  animation: route-header-drift-a 6.5s ease-in-out infinite;
+    radial-gradient(circle, rgba(45, 212, 191, 0.42) 0 0.75px, transparent 1.6px),
+    radial-gradient(circle, rgba(132, 204, 22, 0.34) 0 0.65px, transparent 1.5px);
+  background-size: 151px 89px, 277px 151px;
+  filter: blur(0.2px);
+  animation: route-header-dust-a 20s ease-in-out infinite;
 }
 
 .route-header-particles-earth::after {
   background-image:
-    radial-gradient(circle, rgba(250, 204, 21, 0.72) 0 1px, transparent 1.8px),
-    radial-gradient(circle, rgba(96, 165, 250, 0.72) 0 1px, transparent 1.8px),
-    radial-gradient(circle, rgba(196, 181, 253, 0.62) 0 1px, transparent 1.8px);
-  background-size: 139px 77px, 211px 117px, 307px 163px;
-  animation: route-header-drift-b 8.5s ease-in-out infinite;
+    radial-gradient(circle, rgba(250, 204, 21, 0.28) 0 0.8px, transparent 1.9px),
+    radial-gradient(circle, rgba(96, 165, 250, 0.28) 0 0.7px, transparent 1.8px);
+  background-size: 223px 121px, 379px 199px;
+  filter: blur(0.4px);
+  animation: route-header-dust-b 26s ease-in-out infinite;
 }
 
-@keyframes route-header-drift-a {
-  0%, 100% { transform: translate3d(-8px, 0, 0); }
-  50% { transform: translate3d(10px, -4px, 0); }
+@keyframes route-header-dust-a {
+  0%, 100% {
+    transform: translate3d(-3px, 1px, 0);
+    opacity: 0.6;
+  }
+  50% {
+    transform: translate3d(4px, -2px, 0);
+    opacity: 0.9;
+  }
 }
 
-@keyframes route-header-drift-b {
-  0%, 100% { transform: translate3d(8px, 3px, 0); }
-  50% { transform: translate3d(-10px, 6px, 0); }
-}
-
-@keyframes route-header-heat-a {
-  0%, 100% { transform: translate3d(-6px, 5px, 0) scale(1); }
-  50% { transform: translate3d(12px, -6px, 0) scale(1.01); }
-}
-
-@keyframes route-header-heat-b {
-  0%, 100% { transform: translate3d(6px, 8px, 0) scale(1.01); }
-  50% { transform: translate3d(-8px, -7px, 0) scale(1); }
-}
-
-@keyframes route-header-void-a {
-  0%, 100% { transform: translate3d(-12px, 2px, 0); }
-  50% { transform: translate3d(14px, -6px, 0); }
-}
-
-@keyframes route-header-void-b {
-  0%, 100% { transform: translate3d(10px, 6px, 0) scale(1); }
-  50% { transform: translate3d(-12px, -8px, 0) scale(1.02); }
+@keyframes route-header-dust-b {
+  0%, 100% {
+    transform: translate3d(3px, -1px, 0);
+    opacity: 0.45;
+  }
+  50% {
+    transform: translate3d(-4px, 2px, 0);
+    opacity: 0.75;
+  }
 }
 
 .colony-completion-card {
