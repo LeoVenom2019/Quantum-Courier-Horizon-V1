@@ -378,12 +378,18 @@ const VoidBattleArena = memo(function VoidBattleArena({
   const [dimensions, setDimensions] = useState({ width: 800, height: 500 });
   const isBossEncounter = initialEnemies.some(enemy => enemy.type === 'Boss')
     || (enemyQueue || []).some(enemy => enemy.type === 'Boss');
-  const canStartMeteorEvent = !disableMeteorEvent
-    && !isBossEncounter
-    && initialEnemies.length === 1
-    && (enemyQueue || []).length === 0;
   const bossIntro = routeTier === 'Void' && isBossEncounter ? BOSS_INTROS[locationId] : undefined;
   const [showBossIntro, setShowBossIntro] = useState(Boolean(bossIntro));
+  const [meteorEventEnabled] = useState(() => (
+    routeTier === 'Void'
+      && !disableMeteorEvent
+      && !isBossEncounter
+      && initialEnemies.length > 0
+      && Math.random() < 0.3
+  ));
+  const battleEnemies = meteorEventEnabled ? [initialEnemies[0]] : initialEnemies;
+  const battleEnemyQueue = meteorEventEnabled ? [] : (enemyQueue || []);
+  const battleIsGroupBattle = meteorEventEnabled ? false : isGroupBattle;
   const meteoriteQcValue = Math.max(0, Math.floor(meteoriteRewardValue || 0));
   const meteorQcValue = meteoriteQcValue * 3;
 
@@ -403,14 +409,14 @@ const VoidBattleArena = memo(function VoidBattleArena({
 
   // Game state in a ref for zero-latency updates
   const gameRef = useRef<VoidBattleState>({
-    enemies: initialEnemies.map(e => ({ ...e, isExploding: false })),
+    enemies: battleEnemies.map(e => ({ ...e, isExploding: false })),
     playerX: 10,
     playerY: 50,
     projectiles: [],
     particles: [],
     lastEnemyMove: Date.now(),
     lastEnemyAttack: Date.now(),
-    isGroupBattle,
+    isGroupBattle: battleIsGroupBattle,
     playerImage: routeTier === 'Void'
       ? (playerShipStats.rarity === 'mythic' ? '/assets/rota3/void/mitic_eclipse/mitic_eclipse_neutral.webp' : '/images/ships/battle/player-battle.webp')
       : (activeShipImage || '/images/battle/standard_ship.webp'),
@@ -428,7 +434,7 @@ const VoidBattleArena = memo(function VoidBattleArena({
     keysPressed: new Set<string>(),
     damageNumbers: [],
     locationId,
-    enemyQueue: [...(enemyQueue || [])],
+    enemyQueue: [...battleEnemyQueue],
     zoomTarget: { x: 50, y: 50 },
     isSlowMo: false,
     meteors: [],
@@ -453,7 +459,7 @@ const VoidBattleArena = memo(function VoidBattleArena({
     laserResidualBurnLife: 0,
     laserLastDamageTick: 0,
     playerShotDuckedUntil: 0,
-    meteorEvent: canStartMeteorEvent && Math.random() < 0.3 ? {
+    meteorEvent: meteorEventEnabled ? {
       active: true,
       startTime: Date.now() + 500, // Começa quase imediatamente
       lastSpawn: 0,
@@ -501,11 +507,11 @@ const VoidBattleArena = memo(function VoidBattleArena({
   const [hud, setHud] = useState<VoidBattleHudState>({
     playerHp: playerShipStats.hp,
     playerShield: playerShipStats.shield,
-    enemyHp: initialEnemies[0].hp,
-    enemyShield: initialEnemies[0].shield,
-    enemyType: initialEnemies[0].type,
-    enemyName: initialEnemies[0].name || initialEnemies[0].type,
-    enemiesAlive: initialEnemies.length,
+    enemyHp: battleEnemies[0].hp,
+    enemyShield: battleEnemies[0].shield,
+    enemyType: battleEnemies[0].type,
+    enemyName: battleEnemies[0].name || battleEnemies[0].type,
+    enemiesAlive: battleEnemies.length,
     dodgeCooldown: 0,
     shieldCooldown: 0,
     burstCooldown: 0,
@@ -526,7 +532,7 @@ const VoidBattleArena = memo(function VoidBattleArena({
     routeTier,
     activeShipImage: activeShipImage || '',
     playerRarity: playerShipStats.rarity || 'common',
-    enemies: [...initialEnemies, ...(enemyQueue || [])].map(enemy => ({
+    enemies: [...battleEnemies, ...battleEnemyQueue].map(enemy => ({
       id: enemy.id,
       type: enemy.type,
       image: enemy.image,
@@ -592,7 +598,7 @@ const VoidBattleArena = memo(function VoidBattleArena({
       { id: 'meteor2', src: isVoid ? '/images/battle/void/meteor2.webp' : '/images/battle/solar/meteor2.webp' }
     ];
 
-    const allPotentialEnemies = [...initialEnemies, ...(enemyQueue || [])];
+    const allPotentialEnemies = [...battleEnemies, ...battleEnemyQueue];
     allPotentialEnemies.forEach(e => {
       if (routeTier === 'Void') {
         let baseName = e.assetBaseName || 'boss';
@@ -2979,7 +2985,7 @@ const VoidBattleArena = memo(function VoidBattleArena({
         playerMaxShield={gameRef.current.playerMaxShield}
         displayEnemy={displayEnemy}
         t={t}
-        isGroupBattle={isGroupBattle}
+        isGroupBattle={battleIsGroupBattle}
         routeTier={routeTier}
       />
 
