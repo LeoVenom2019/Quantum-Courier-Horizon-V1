@@ -731,6 +731,7 @@ const VoidBattleArena = memo(function VoidBattleArena({
       s.playerShield = Math.min(s.playerMaxShield, s.playerShield + (s.playerMaxShield * 0.4));
       playSfx('level_up');
     } else if (type === 'burst') {
+      if (playerShipStats.rarity !== 'mythic') return;
       if (s.laserState !== 'idle') return; // Bloqueia se o laser estiver ativo
       if (voidResourcesRef.current.tech < 500) { addLog(t('notEnoughEnergy'), 'error'); return; }
       onUpdateResources({ ...voidResourcesRef.current, tech: voidResourcesRef.current.tech - 500 });
