@@ -8248,7 +8248,7 @@ const DashboardContent = memo(({
                   ))}
                 </motion.div>
               )}
-              <AnimatePresence mode="sync" initial={false}>
+              <React.Fragment key={`main-tab-content-${activeTab}-${routeTier}`}>
                 {activeTab === 'mini_games' && isEarth && isArcadeUnlocked && (
                   <motion.div
                     key="mini_games"
@@ -8299,29 +8299,11 @@ const DashboardContent = memo(({
                 )}
 
                 {(activeTab === 'routes' || activeTab === 'routes2') && !isVoid && !isEarth && (
-                  <motion.div
-                    key={`routes-${activeTab}-${routeTier}`}
-                    initial={{ opacity: 0, x: 16 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: -16 }}
-                    transition={{ duration: 0.18 }}
-                    className="h-full min-h-0 flex flex-col"
-                  >
-                    <RoutesTab />
-                  </motion.div>
+                  <RoutesTab key={`routes-${activeTab}-${routeTier}`} />
                 )}
 
                 {activeTab === 'missions' && !isVoid && !isEarth && (
-                  <motion.div
-                    key={`missions-${routeTier}`}
-                    initial={{ opacity: 0, x: 16 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: -16 }}
-                    transition={{ duration: 0.18 }}
-                    className="h-full min-h-0 flex flex-col"
-                  >
-                    <MissionsTab />
-                  </motion.div>
+                  <MissionsTab key={`missions-${routeTier}`} />
                 )}
 
                 {activeTab === 'auto' && !isVoid && !isEarth && (
@@ -8719,7 +8701,7 @@ const DashboardContent = memo(({
                   <HistoryTab />
                 )}
 
-              </AnimatePresence>
+              </React.Fragment>
 
               {/* Void Map */}
               {isVoid && activeTab === 'void_map' && (
