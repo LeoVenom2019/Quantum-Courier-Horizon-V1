@@ -20,6 +20,18 @@ const SOLAR_MINERAL_VIDEOS: Record<string, string> = {
   nucleo: '/videos/minerals/cap1/9_quantum_core.webm',
 };
 
+const INTERSTELLAR_MINERAL_VIDEOS: Record<string, string> = {
+  'ferro-estelar': '/videos/minerals/cap2/1_stellar_iron.webm',
+  'cristal-fotonico': '/videos/minerals/cap2/2_photonic_crystal.webm',
+  'liga-iridio': '/videos/minerals/cap2/3_iridium_alloy.webm',
+  'plasma-solido': '/videos/minerals/cap2/4_solid_plasma.webm',
+  'nucleo-radiante': '/videos/minerals/cap2/5_radiant_core.webm',
+  'fragmento-anomalia': '/videos/minerals/cap2/6_anomaly_fragment.webm',
+  'essencia-nebular': '/videos/minerals/cap2/7_nebular_essence.webm',
+  'materia-instavel': '/videos/minerals/cap2/8_unstable_matter.webm',
+  'singularidade-condensada': '/videos/minerals/cap2/9_condensed_singularity.webm',
+};
+
 const MiningTab = memo(() => {
   const {
     t,
@@ -171,7 +183,9 @@ const MiningTab = memo(() => {
     const remainingToPack = Math.max(0, ore.packSize - packProgress);
     const secondsToNextPack = productionPerSecond > 0 ? Math.ceil(remainingToPack / productionPerSecond) : null;
     const canSell = isInterstellar ? packs >= 100 : packs > 0;
-    const mineralVideoSrc = isInterstellar ? `/videos/mining/${ore.id}.webm` : SOLAR_MINERAL_VIDEOS[ore.id] || `/videos/mining/${ore.id}.webm`;
+    const mineralVideoSrc = isInterstellar
+      ? INTERSTELLAR_MINERAL_VIDEOS[ore.id] || `/videos/mining/${ore.id}.webm`
+      : SOLAR_MINERAL_VIDEOS[ore.id] || `/videos/mining/${ore.id}.webm`;
 
     if (!isUnlocked) {
       return (

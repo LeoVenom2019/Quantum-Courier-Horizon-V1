@@ -67,6 +67,18 @@ const route1MineralVideos = [
   '/videos/minerals/cap1/9_quantum_core.webm',
 ];
 
+const route2MineralVideos = [
+  '/videos/minerals/cap2/1_stellar_iron.webm',
+  '/videos/minerals/cap2/2_photonic_crystal.webm',
+  '/videos/minerals/cap2/3_iridium_alloy.webm',
+  '/videos/minerals/cap2/4_solid_plasma.webm',
+  '/videos/minerals/cap2/5_radiant_core.webm',
+  '/videos/minerals/cap2/6_anomaly_fragment.webm',
+  '/videos/minerals/cap2/7_nebular_essence.webm',
+  '/videos/minerals/cap2/8_unstable_matter.webm',
+  '/videos/minerals/cap2/9_condensed_singularity.webm',
+];
+
 const route1HistoricBackgrounds = [
   '/assets/texturas/historic/cap1/bg_header.webp',
   '/assets/texturas/historic/cap1/bg_left.webp',
@@ -546,6 +558,7 @@ export const ASSET_GROUPS: Record<AssetGroupId, AssetPreloadEntry[]> = {
   ],
   route2: [
     ...asEntries([routeHeaderImages.route2, ACTIVE_DELIVERY_BACKGROUNDS.route2, MISSION_HEADER_BACKGROUNDS.route2, AETHERION_CHAMBER_BACKGROUND, ...ROUTE2_UI_BACKGROUNDS, ...route2UpgradeBackgrounds, ...route2HistoricBackgrounds], 'image'),
+    ...asEntries(route2MineralVideos, 'video'),
     ...asEntries(routeThemeAudio('Interstellar'), 'audio'),
   ],
   route3: [
