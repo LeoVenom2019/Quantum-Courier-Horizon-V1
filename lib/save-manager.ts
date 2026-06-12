@@ -1,5 +1,45 @@
 export const CURRENT_SAVE_VERSION = "1.2.2";
 
+const VALID_ROUTE_TIERS = new Set(['Solar', 'Interstellar', 'Void', 'Earth']);
+
+const hasArrayItems = (value: unknown) => Array.isArray(value) && value.length > 0;
+
+const hasRoute4SaveSignals = (data: any): boolean => {
+  if (!data || typeof data !== 'object') return false;
+
+  const colonySystem = data.colony_system || {};
+  const colonyStorage = colonySystem.storage || {};
+  const earthReconstruction = data.earth_reconstruction || {};
+
+  return (
+    Number(data.earthPopulation || earthReconstruction.earthPopulation || 0) > 0 ||
+    Number(data.gameTimeSeconds || data.global?.gameTimeSeconds || 0) > 0 && (
+      hasArrayItems(data.colonies) ||
+      hasArrayItems(earthReconstruction.colonies) ||
+      hasArrayItems(colonySystem.colonies) ||
+      hasArrayItems(colonyStorage.colonies_data)
+    ) ||
+    hasArrayItems(data.colonies) ||
+    hasArrayItems(earthReconstruction.colonies) ||
+    hasArrayItems(colonySystem.colonies) ||
+    hasArrayItems(colonyStorage.colonies_data) ||
+    Boolean(colonySystem.newEarthMissions || colonyStorage.new_earth_missions) ||
+    Boolean(colonySystem.newEarthSubmarines || colonyStorage.new_earth_submarines)
+  );
+};
+
+const normalizeSavedRouteTier = (routeTier: unknown, data: any): 'Solar' | 'Interstellar' | 'Void' | 'Earth' => {
+  const tier = typeof routeTier === 'string' && VALID_ROUTE_TIERS.has(routeTier)
+    ? routeTier as 'Solar' | 'Interstellar' | 'Void' | 'Earth'
+    : 'Solar';
+
+  if (tier === 'Solar' && hasRoute4SaveSignals(data)) {
+    return 'Earth';
+  }
+
+  return tier;
+};
+
 export const COLONY_SAVE_STORAGE_KEYS = [
   'colonies_data',
   'colony_cards_data',
@@ -293,7 +333,7 @@ export const SaveManager = {
       global: {
         qc: flatData.qc || 0,
         playerName: flatData.playerName || '',
-        routeTier: flatData.routeTier || 'Solar',
+        routeTier: normalizeSavedRouteTier(flatData.routeTier, flatData),
         route4Unlocked: flatData.route4Unlocked || false,
         gameTimeSeconds: flatData.gameTimeSeconds || 0,
         totalDeliveries: flatData.totalDeliveries || 0,
@@ -434,7 +474,7 @@ export const SaveManager = {
           totalExtractionProfit: rawData.totalExtractionProfit || 0
         },
         progression: {
-          routeTier: rawData.routeTier || 'Solar',
+          routeTier: normalizeSavedRouteTier(rawData.routeTier, rawData),
           unlockedRouteIds: rawData.unlockedRouteIds || ['solar-1', 'solar-2'],
           ownedShips: rawData.ownedShips || { 'solar-1': 1 },
           techLevels: rawData.techLevels || {},
@@ -559,7 +599,7 @@ export const SaveManager = {
         totalExtractionProfit: ex.totalExtractionProfit || 0
       },
       progression: {
-        routeTier: g.routeTier || 'Solar',
+        routeTier: normalizeSavedRouteTier(g.routeTier, rawData),
         unlockedRouteIds: r.unlockedRouteIds || ['solar-1'],
         ownedShips: (() => {
           const ships = s.ownedShips || {};
