@@ -15,6 +15,7 @@ const SUPPLEMENTAL_LEGACY_KEYS: Partial<Record<ColonySaveStorageKey, string>> = 
   colony_search_upgrade_levels: 'searchUpgradeLevels',
   colony_active_search: 'activeSearches',
   colony_search_threat_bonus: 'searchThreatBonus',
+  route4_search_battle_cycle: 'route4SearchBattleCycle',
   horizon_ship_xp: 'horizonShipXp',
   route4_defense_battle_level: 'defenseBattleLevel',
   battle_cards_loadout: 'battleLoadout',
@@ -45,6 +46,22 @@ const mergeSupplementalSaveValue = (key: ColonySaveStorageKey, localValue: any, 
 
   if (key === 'route4_qc_reset_done') {
     return Boolean(localValue) || Boolean(mainValue);
+  }
+
+  if (key === 'route4_search_battle_cycle') {
+    const localCycle = Math.max(0, Math.floor(Number(localValue?.cycle) || 0));
+    const mainCycle = Math.max(0, Math.floor(Number(mainValue?.cycle) || 0));
+    if (mainCycle > localCycle) return mainValue;
+    if (localCycle > mainCycle) return localValue;
+    const nextBattleIndex = Math.max(
+      0,
+      Math.floor(Number(localValue?.nextBattleIndex) || 0),
+      Math.floor(Number(mainValue?.nextBattleIndex) || 0)
+    );
+    return {
+      cycle: localCycle,
+      nextBattleIndex: Math.min(5, nextBattleIndex),
+    };
   }
 
   if (key === 'colony_card_levels') {

@@ -1,4 +1,4 @@
-import { CARD_BACKGROUND_BY_RARITY } from './colony-cards';
+import { CARD_BACKGROUND_BY_RARITY, CARD_MODAL_BACKGROUND_BY_RARITY } from './colony-cards';
 import { MINI_GAMES_CONFIG } from './mini-games-config';
 import { ARCADE_THEMES, ROUTE_THEMES } from './music-data';
 import { AETHERION_CHAMBER_BACKGROUND, ACTIVE_DELIVERY_BACKGROUNDS, MISSION_HEADER_BACKGROUNDS, ROUTE1_UI_BACKGROUNDS, ROUTE2_UI_BACKGROUNDS, SCIFI_TEXTURE_BACKGROUND } from './ui-backgrounds';
@@ -150,6 +150,14 @@ const route4LayoutImages = [
   '/assets/rota4/layout_cap4/searc_land_background.webp',
   '/assets/rota4/layout_cap4/search_sea_background.webp',
   '/assets/rota4/layout_cap4/hangar_horizon.webp',
+  '/assets/rota4/layout_cap4/mural_background.webp',
+  '/assets/rota4/layout_cap4/historico_card.webp',
+  '/assets/rota4/layout_cap4/historico_card_raro.webp',
+  '/assets/rota4/layout_cap4/historico_card_epico.webp',
+  '/assets/rota4/layout_cap4/historico_card_lendario.webp',
+  '/assets/rota4/layout_cap4/historico_card_rgb.webp',
+  '/assets/rota4/layout_cap4/ano_atual.webp',
+  '/assets/rota4/layout_cap4/populacao_atual.webp',
   '/assets/texturas/textura_ficsi_2400x240.webp',
 ];
 
@@ -166,6 +174,7 @@ const route4ColonyAudio = [
   '/assets/rota4/SFX_new_land/hangar_open_door.ogg',
   '/assets/rota4/SFX_new_land/hangar_close_door.ogg',
   '/assets/rota4/SFX_new_land/warning_gaming.ogg',
+  '/assets/rota4/SFX_new_land/bonus_qc_final.ogg',
 ];
 
 const route4BobbyAccessDeniedAudio = Array.from({ length: 10 }, (_, index) => (
@@ -179,6 +188,17 @@ const route4BobbyMissionCompleteAudio = Array.from({ length: 10 }, (_, index) =>
 const route4BobbyWarningAudio = Array.from({ length: 9 }, (_, index) => (
   `/audio/sfx/bobby_blue/warnings/warning_${index + 1}.ogg`
 ));
+
+const route4BobbyLockedArcadeCardAudio = [
+  '/audio/sfx/bobby_blue/cards lockeds/cards lockeds1.ogg',
+  '/audio/sfx/bobby_blue/cards lockeds/cards lockeds2.ogg',
+];
+
+const route4BobbyLockedTvAudio = [
+  '/audio/sfx/bobby_blue/video tv/video_tv1.ogg',
+  '/audio/sfx/bobby_blue/video tv/video_tv2.ogg',
+  '/audio/sfx/bobby_blue/video tv/video_tv3.ogg',
+];
 
 const route4BobbyPopulationMilestoneAudio = [
   '/audio/sfx/bobby_blue/population milestone/one_milion.ogg',
@@ -430,6 +450,7 @@ const route3VoidBattleImages = [
   '/images/battle/void/meteorite2.webp',
   '/images/battle/void/meteor1.webp',
   '/images/battle/void/meteor2.webp',
+  '/assets/rota3/void/bg_void_invasion.webp',
   '/assets/rota3/void/mitic_eclipse/mitic_eclipse_neutral.webp',
   '/assets/rota3/void/mitic_eclipse/mitic_eclipse_up.webp',
   '/assets/rota3/void/mitic_eclipse/mitic_eclipse_down.webp',
@@ -538,6 +559,7 @@ export const ASSET_GROUPS: Record<AssetGroupId, AssetPreloadEntry[]> = {
   ],
   'card-frames': asEntries([
     ...Object.values(CARD_BACKGROUND_BY_RARITY),
+    ...Object.values(CARD_MODAL_BACKGROUND_BY_RARITY),
     '/assets/rota4/cards/joker_ico.webp',
   ], 'image'),
   arcades: [
@@ -549,7 +571,7 @@ export const ASSET_GROUPS: Record<AssetGroupId, AssetPreloadEntry[]> = {
     ...asEntries(neoCatcherBackgrounds, 'image'),
     ...asEntries(rupturaEstelarEnemies, 'image'),
     ...asEntries(arcadeThemeAudio, 'audio'),
-    ...asEntries(fliperSfx, 'audio'),
+    ...asEntries([...fliperSfx, ...route4BobbyLockedArcadeCardAudio], 'audio'),
   ],
   route1: [
     ...asEntries([routeHeaderImages.route1, ACTIVE_DELIVERY_BACKGROUNDS.route1, MISSION_HEADER_BACKGROUNDS.route1, AETHERION_CHAMBER_BACKGROUND, ...ROUTE1_UI_BACKGROUNDS, ...route1UpgradeBackgrounds, ...route1HistoricBackgrounds], 'image'),
@@ -572,7 +594,7 @@ export const ASSET_GROUPS: Record<AssetGroupId, AssetPreloadEntry[]> = {
   route4: [
     ...asEntries([routeHeaderImages.route4, '/images/bobby_blue/bobby_blue_new_land.webp', '/assets/rota4/new_land_map.webp', ...route4TextureImages], 'image'),
     ...asEntries(['/assets/rota4/videos/quantum_courier_credits.webm'], 'video'),
-    ...asEntries([...routeThemeAudio('Earth'), '/audio/themes/infinite_horizon_short_version.ogg', ...route4BobbyAccessDeniedAudio, ...route4BobbyMissionCompleteAudio, ...route4BobbyWarningAudio, ...route4BobbyPopulationMilestoneAudio, ...route4BobbyMuralAudio], 'audio'),
+    ...asEntries([...routeThemeAudio('Earth'), '/audio/themes/infinite_horizon_short_version.ogg', ...route4BobbyAccessDeniedAudio, ...route4BobbyMissionCompleteAudio, ...route4BobbyWarningAudio, ...route4BobbyLockedTvAudio, ...route4BobbyPopulationMilestoneAudio, ...route4BobbyMuralAudio], 'audio'),
   ],
   'route4-colonies': [
     ...asEntries([...route4ColonyImages, ...route4LayoutImages], 'image'),

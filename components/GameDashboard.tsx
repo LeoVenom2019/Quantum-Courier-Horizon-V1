@@ -112,6 +112,7 @@ import { SpaceAmbience } from './SpaceAmbience';
 import { MINI_GAMES_CONFIG } from '@/lib/mini-games-config';
 import { MiniGames } from './MiniGames';
 import { ColonySystem, Colony, cleanColoniesData } from './ColonySystem';
+import NewEarthUnderwaterBattle from './NewEarthUnderwaterBattle';
 import {
   ARCADE_CARD_REWARD_CHANCE,
   ARCADE_CARD_REWARD_RULES,
@@ -137,6 +138,19 @@ import {
   normalizeNewEarthMissionState,
   recordNewEarthMissionEvent,
 } from '@/lib/new-earth-missions';
+import {
+  NEW_EARTH_SUBMARINES_STORAGE_KEY,
+  MAX_NEW_EARTH_SUBMARINE_UPGRADE_LEVEL,
+  NEW_EARTH_SUBMARINE_IMAGE_PATHS,
+  NEW_EARTH_SUBMARINE_UPGRADES,
+  createDefaultNewEarthSubmarineState,
+  getNewEarthSubmarineUpgradeCost,
+  getNewEarthSubmarineStats,
+  normalizeNewEarthSubmarineState,
+  type NewEarthSubmarineColonyId,
+  type NewEarthSubmarineUpgradeId,
+  type NewEarthSubmarineState,
+} from '@/lib/new-earth-submarines';
 import { LoreScreen, RobotVisual } from './LoreSystem';
 import Lottie from 'lottie-react';
 import EconomicGoals from './dashboard/EconomicGoals';
@@ -226,11 +240,18 @@ const NEW_EARTH_COLONY_MARKERS = [
 
 const NEW_EARTH_DANGER_MARKERS = [
   { id: 'zona-glacial', label: 'ZONA GLACIAL', left: '45.3%', top: '10.5%' },
-  { id: 'oceano-abissal', label: 'OCEANO ABISSAL', left: '13.8%', top: '42.1%' },
+  { id: 'oceano-abissal', label: 'OCEANO ABISSAL', left: '13.8%', top: '42.1%', submarineColonyId: 'colony-4' },
   { id: 'ruinas-europeias', label: 'RUÍNAS EUROPÉIAS', left: '51.3%', top: '38.0%' },
-  { id: 'cemiterio-navios', label: 'CEMITÉRIO DE NAVIOS', left: '45.3%', top: '69.3%' },
+  { id: 'cemiterio-navios', label: 'CEMITÉRIO DE NAVIOS', left: '45.3%', top: '69.3%', submarineColonyId: 'colony-2' },
   { id: 'continente-esquecido', label: 'CONTINENTE ESQUECIDO', left: '80.5%', top: '77.0%' },
 ] as const;
+
+type NewEarthUnderwaterSiteId = Extract<typeof NEW_EARTH_DANGER_MARKERS[number]['id'], 'oceano-abissal' | 'cemiterio-navios'>;
+
+const NEW_EARTH_SUBMARINE_NAMES: Record<NewEarthSubmarineColonyId, string> = {
+  'colony-4': 'NEPTUNE',
+  'colony-2': 'POSEIDON',
+};
 
 const NEW_EARTH_SECTOR_ORDER: ColonySectorId[] = ['culture', 'economy', 'health', 'happiness', 'security', 'technology'];
 
@@ -719,7 +740,8 @@ const DashboardContent = memo(({
     seenTutorials, completeTutorial,
     showRoute2Goals, setShowRoute2Goals,
     floatingRewards, setFloatingRewards,
-    autoSkipRandomBattles, toggleAutoSkipRandomBattles
+    autoSkipRandomBattles, toggleAutoSkipRandomBattles,
+    totalProjectTerra: dashboardTotalProjectTerra
   } = useDashboard();
   const [isLoaded, setIsLoaded] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(false);
@@ -768,6 +790,11 @@ const DashboardContent = memo(({
   const [selectedNewEarthColonyId, setSelectedNewEarthColonyId] = useState<string | null>(null);
   const [selectedNewEarthCardIndex, setSelectedNewEarthCardIndex] = useState<number | null>(null);
   const [newEarthMapFeedback, setNewEarthMapFeedback] = useState<string | null>(null);
+  const [newEarthSubmarines, setNewEarthSubmarines] = useState<NewEarthSubmarineState>(() => createDefaultNewEarthSubmarineState());
+  const [activeUnderwaterBattle, setActiveUnderwaterBattle] = useState<{
+    siteId: NewEarthUnderwaterSiteId;
+    colonyId: NewEarthSubmarineColonyId;
+  } | null>(null);
 
   const isInterstellar = useMemo(() => routeTier === 'Interstellar', [routeTier]);
   const isVoid = useMemo(() => routeTier === 'Void', [routeTier]);
@@ -780,6 +807,27 @@ const DashboardContent = memo(({
   useEffect(() => {
     preloadAssetGroupsPassive(getRecommendedAssetGroupsForRoute(routeTier));
   }, [routeTier]);
+
+  useEffect(() => {
+    let mounted = true;
+    GameStorage.load(NEW_EARTH_SUBMARINES_STORAGE_KEY)
+      .then(saved => {
+        if (!mounted) return;
+        const normalized = normalizeNewEarthSubmarineState(saved);
+        setNewEarthSubmarines(normalized);
+        if (!saved || typeof saved !== 'object') {
+          GameStorage.save(normalized, NEW_EARTH_SUBMARINES_STORAGE_KEY).catch(error => {
+            console.warn('Unable to initialize New Earth submarine save data', error);
+          });
+        }
+      })
+      .catch(error => {
+        console.warn('Unable to load New Earth submarine save data', error);
+      });
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (activeTab === 'mini_games') {
@@ -1171,6 +1219,11 @@ const DashboardContent = memo(({
   }, [gameTimeSeconds]);
 
   const setRouteTier = useCallback((tier: 'Solar' | 'Interstellar' | 'Void' | 'Earth') => {
+    if (tier === 'Earth' && routeTierRef.current !== 'Earth') {
+      qcRef.current = 0;
+      lastFlushedQcRef.current = 0;
+      dispatch({ type: 'SET_QC', payload: { amount: 0 } });
+    }
     dispatch({ type: 'ADVANCE_ROUTE_TIER', payload: { tier } });
   }, [dispatch]);
 
@@ -1372,9 +1425,31 @@ const DashboardContent = memo(({
     [selectedNewEarthColony?.id]
   );
 
+  const selectedNewEarthSubmarineColonyId = (
+    selectedNewEarthColony?.id === 'colony-2' || selectedNewEarthColony?.id === 'colony-4'
+      ? selectedNewEarthColony.id
+      : null
+  ) as NewEarthSubmarineColonyId | null;
+
+  const selectedNewEarthSubmarineLevels = selectedNewEarthSubmarineColonyId
+    ? newEarthSubmarines[selectedNewEarthSubmarineColonyId]
+    : null;
+
+  const selectedNewEarthSubmarineStats = selectedNewEarthSubmarineLevels
+    ? getNewEarthSubmarineStats(selectedNewEarthSubmarineLevels)
+    : null;
+
   const selectedNewEarthCard = selectedNewEarthCardIndex !== null
     ? selectedNewEarthColonyCards[selectedNewEarthCardIndex]
     : undefined;
+
+  const playRandomNewEarthAccessDenied = useCallback(() => {
+    const index = Math.floor(Math.random() * 10) + 1;
+    playSfx(`new_earth_access_denied_${index}`, {
+      exclusiveKey: 'new-earth-access-denied',
+      category: 'ui',
+    });
+  }, [playSfx]);
 
   const handleNewEarthColonyMarkerClick = useCallback((colonyId: string) => {
     const colony = colonies.find((item: Colony) => item.id === colonyId);
@@ -1384,7 +1459,7 @@ const DashboardContent = memo(({
           ? 'Visita bloqueada: conclua todas as construções desta colônia.'
           : 'Visit blocked: complete every construction in this colony.'
       );
-      playSfx('warning_gaming');
+      playRandomNewEarthAccessDenied();
       return;
     }
 
@@ -1392,7 +1467,7 @@ const DashboardContent = memo(({
     setSelectedNewEarthCardIndex(null);
     setNewEarthMapFeedback(null);
     playSfx('aba_click');
-  }, [colonies, language, playSfx]);
+  }, [colonies, language, playRandomNewEarthAccessDenied, playSfx]);
 
   const navigateNewEarthCard = useCallback((direction: -1 | 1) => {
     setSelectedNewEarthCardIndex(current => {
@@ -1402,6 +1477,40 @@ const DashboardContent = memo(({
     });
     playSfx('view_card');
   }, [playSfx, selectedNewEarthColonyCards.length]);
+
+  const upgradeNewEarthSubmarine = useCallback((colonyId: NewEarthSubmarineColonyId, upgradeId: NewEarthSubmarineUpgradeId) => {
+    const currentLevel = newEarthSubmarines[colonyId][upgradeId] || 0;
+    if (currentLevel >= MAX_NEW_EARTH_SUBMARINE_UPGRADE_LEVEL) {
+      playSfx('error');
+      return;
+    }
+
+    const cost = getNewEarthSubmarineUpgradeCost(currentLevel);
+    if (qcRef.current < cost) {
+      setNewEarthMapFeedback(
+        language === 'pt'
+          ? `QC insuficiente para melhorar o submarino. Necessário ${cost.toLocaleString()} QC.`
+          : `Not enough QC to upgrade the submarine. Need ${cost.toLocaleString()} QC.`
+      );
+      playSfx('error');
+      return;
+    }
+
+    const nextState = normalizeNewEarthSubmarineState({
+      ...newEarthSubmarines,
+      [colonyId]: {
+        ...newEarthSubmarines[colonyId],
+        [upgradeId]: currentLevel + 1,
+      },
+    });
+    setNewEarthSubmarines(nextState);
+    dispatch({ type: 'SPEND_QC', payload: { amount: cost } });
+    GameStorage.save(nextState, NEW_EARTH_SUBMARINES_STORAGE_KEY).catch(error => {
+      console.warn('Unable to save New Earth submarine upgrade', error);
+    });
+    setNewEarthMapFeedback(null);
+    playSfx('level_up');
+  }, [dispatch, language, newEarthSubmarines, playSfx]);
 
 
   const setQc = useCallback((val: number | ((prev: number) => number)) => {
@@ -1760,6 +1869,8 @@ const DashboardContent = memo(({
     dispatch({ type: 'UPDATE_EARTH_STATE', payload: { qualityOfLife: nextVal } });
   }, [dispatch]);
 
+  const removedEarthEventIds = React.useMemo(() => new Set(['route4-population-5000000']), []);
+
   const setEarthEvents = useCallback((val: any[] | ((prev: any[]) => any[])) => {
     const rawVal = typeof val === 'function' ? val(earthEventsRef.current) : val;
     
@@ -1774,6 +1885,7 @@ const DashboardContent = memo(({
       new Map(
         rawVal
           .filter((item: any) => item && typeof item === 'object' && item.id && typeof item.id === 'string')
+          .filter((item: any) => !removedEarthEventIds.has(item.id))
           .map((item: any) => [item.id, item])
       ).values()
     );
@@ -1804,7 +1916,12 @@ const DashboardContent = memo(({
 
     earthEventsRef.current = nextVal;
     dispatch({ type: 'UPDATE_EARTH_STATE', payload: { events: nextVal } });
-  }, [dispatch]);
+  }, [dispatch, removedEarthEventIds]);
+
+  useEffect(() => {
+    if (!isLoaded) return;
+    setEarthEvents(prev => prev);
+  }, [isLoaded, setEarthEvents]);
 
   const setActiveBattle = useCallback((val: Battle | null | ((prev: Battle | null) => Battle | null)) => {
     const nextVal = typeof val === 'function' ? val(activeBattle) : val;
@@ -1964,8 +2081,21 @@ const DashboardContent = memo(({
       500000000,
       1000000000,
       5000000000,
-      10000000000
+      10000000000,
+      20000000000
     ];
+
+    const populationMilestoneSfx: Record<number, string> = {
+      1000000: 'new_earth_population_milestone_1000000',
+      10000000: 'new_earth_population_milestone_10000000',
+      50000000: 'new_earth_population_milestone_50000000',
+      100000000: 'new_earth_population_milestone_100000000',
+      500000000: 'new_earth_population_milestone_500000000',
+      1000000000: 'new_earth_population_milestone_1000000000',
+      5000000000: 'new_earth_population_milestone_5000000000',
+      10000000000: 'new_earth_population_milestone_10000000000',
+      20000000000: 'new_earth_population_milestone_20000000000',
+    };
 
     const getMilestoneLabel = (milestone: number) => {
       if (milestone === 1000000) {
@@ -1991,6 +2121,9 @@ const DashboardContent = memo(({
       }
       if (milestone === 10000000000) {
         return language === 'pt' ? '10 Bilhões de Habitantes' : '10 Billion Inhabitants';
+      }
+      if (milestone === 20000000000) {
+        return language === 'pt' ? '20 Bilhões de Habitantes' : '20 Billion Inhabitants';
       }
       return language === 'pt'
         ? `Humanidade alcançou ${milestone.toLocaleString()} habitantes`
@@ -2038,6 +2171,11 @@ const DashboardContent = memo(({
           ? 'A plenitude da vida! 10 Bilhões de habitantes na Nova Terra, um novo amanhecer para o amanhã.'
           : 'The fullness of life! 10 Billion inhabitants on New Earth, a new dawn for tomorrow.';
       }
+      if (milestone === 20000000000) {
+        return language === 'pt'
+          ? '20 Bilhões de habitantes! A Nova Terra se torna um berço colossal para a humanidade renascida.'
+          : '20 Billion inhabitants! New Earth becomes a colossal cradle for reborn humanity.';
+      }
       return language === 'pt'
         ? `A humanidade alcançou ${milestone.toLocaleString()} habitantes na Nova Terra.`
         : `Humanity reached ${milestone.toLocaleString()} inhabitants on New Earth.`;
@@ -2065,9 +2203,16 @@ const DashboardContent = memo(({
             : `Population milestone: ${name}. ${description}`,
           'population'
         );
+        const sfxKey = populationMilestoneSfx[milestone];
+        if (sfxKey) {
+          playSfx(sfxKey, {
+            category: 'ui',
+            exclusiveKey: 'new-earth-population-milestone',
+          });
+        }
       }
     });
-  }, [addLog, colonies, gameTime.months, gameTime.years, isLoaded, language, routeTier, setEarthEvents, totalHumanPopulation]);
+  }, [addLog, colonies, gameTime.months, gameTime.years, isLoaded, language, playSfx, routeTier, setEarthEvents, totalHumanPopulation]);
 
   // Persistent refs for Earth simulation
   const generateEarthEvent = useCallback(() => {
@@ -2735,12 +2880,6 @@ const DashboardContent = memo(({
     return Math.min(100, (progressValue / (poi.resourceRequired || 100000)) * 100);
   }, [combatState.voidPOIsInspiration, combatState.voidPOIQCDonations]);
 
-  const totalProjectTerra = useMemo(() => {
-    const poiSum = VOID_POIS.reduce((acc, poi) => acc + getPOIProgress(poi.id), 0);
-    const locationContribution = poiSum / 8; // Max 50%
-    return Math.min(100, locationContribution + combatState.terraPassiveProgress + combatState.terraDirectProgress);
-  }, [getPOIProgress, combatState.terraPassiveProgress, combatState.terraDirectProgress]);
-
   // Passive Contribution Loop
   useEffect(() => {
     if (routeTier !== 'Void') return;
@@ -2773,15 +2912,15 @@ const DashboardContent = memo(({
 
   // Invasion Trigger
   useEffect(() => {
-    if (routeTier === 'Void' && totalProjectTerra >= 100 && !voidWarAlertActive && !hasTriggeredVoidWarRef.current) {
+    if (routeTier === 'Void' && dashboardTotalProjectTerra >= 100 && !voidWarAlertActive && !hasTriggeredVoidWarRef.current) {
       hasTriggeredVoidWarRef.current = true;
       setVoidWarAlertActive(true);
       setVoidWarRobotSpeaking(true);
       setLoreLineIndex(0);
       addLog(language === 'pt' ? 'ALERTA: Invasão detectada! O Projeto Terra está sob ataque!' : 'ALERT: Invasion detected! Project Terra is under attack!', 'error');
-      playSfx('alarm_loop');
+      playSfx('songs_of_war', { loop: true, volume: 0.75, category: 'ambient', exclusiveKey: 'void-war-invasion-alarm' });
     }
-  }, [totalProjectTerra, voidWarAlertActive, routeTier, language, addLog, playSfx]);
+  }, [dashboardTotalProjectTerra, voidWarAlertActive, routeTier, language, addLog, playSfx]);
 
 
 
@@ -2871,6 +3010,95 @@ const DashboardContent = memo(({
       console.warn('Unable to update New Earth arcade action mission progress', error);
     }
   }, []);
+
+  const recordSubmarineMissionProgress = useCallback(async (
+    event: { type: 'submarine-victory'; siteId: string; colonyId: string } | { type: 'submarine-treasure'; amount?: number }
+  ) => {
+    try {
+      const saved = await GameStorage.load(NEW_EARTH_MISSIONS_STORAGE_KEY);
+      const normalized = normalizeNewEarthMissionState(saved, { canUseSubmarines: true });
+      const result = recordNewEarthMissionEvent(normalized, event);
+      if (!result.changed) return;
+      await GameStorage.save(result.state, NEW_EARTH_MISSIONS_STORAGE_KEY);
+      window.dispatchEvent(new CustomEvent('qch:new-earth-missions-updated', { detail: result.state }));
+    } catch (error) {
+      console.warn('Unable to update New Earth submarine mission progress', error);
+    }
+  }, []);
+
+  const handleNewEarthDangerMarkerClick = useCallback((marker: typeof NEW_EARTH_DANGER_MARKERS[number]) => {
+    if (!('submarineColonyId' in marker)) {
+      setNewEarthMapFeedback(language === 'pt' ? 'Zona hostil. Operação ainda indisponível.' : 'Hostile zone. Operation unavailable.');
+      playRandomNewEarthAccessDenied();
+      return;
+    }
+
+    const colony = colonies.find((item: Colony) => item.id === marker.submarineColonyId);
+    if (!colony || !isNewEarthColonyUnlocked(colony)) {
+      setNewEarthMapFeedback(
+        language === 'pt'
+          ? `Exploração submarina bloqueada: conclua todas as construções de ${marker.submarineColonyId === 'colony-4' ? 'Gaia' : 'Eden'}.`
+          : `Submarine exploration blocked: complete every construction in ${marker.submarineColonyId === 'colony-4' ? 'Gaia' : 'Eden'}.`
+      );
+      playRandomNewEarthAccessDenied();
+      return;
+    }
+
+    setSelectedNewEarthColonyId(null);
+    setSelectedNewEarthCardIndex(null);
+    setNewEarthMapFeedback(null);
+    setActiveUnderwaterBattle({
+      siteId: marker.id as NewEarthUnderwaterSiteId,
+      colonyId: marker.submarineColonyId as NewEarthSubmarineColonyId,
+    });
+    playSfx('aba_click');
+  }, [colonies, language, playRandomNewEarthAccessDenied, playSfx]);
+
+  const handleUnderwaterTreasureLoot = useCallback((payload: any) => {
+    recordSubmarineMissionProgress({ type: 'submarine-treasure', amount: 1 });
+    if (!payload || typeof payload !== 'object') return;
+
+    if (payload.type === 'qc' && Number(payload.amount) > 0) {
+      const amount = Math.max(0, Math.floor(Number(payload.amount)));
+      dispatch({ type: 'EARN_QC', payload: { amount, source: 'battle' } });
+      return;
+    }
+
+    const supplyKeyByRewardType: Record<string, string> = {
+      biomassa: 'biomass',
+      materiais: 'materials',
+      techParts: 'tech',
+      defCores: 'defense',
+      food: 'food',
+      meds: 'meds',
+    };
+    const supplyKey = supplyKeyByRewardType[String(payload.type || '')];
+    const amount = Math.max(0, Math.floor(Number(payload.amount) || 0));
+    if (!supplyKey || amount <= 0) return;
+
+    const supplyAwardEvent = new CustomEvent('qch:colony-supplies-awarded', {
+      detail: { [supplyKey]: amount },
+      cancelable: true,
+    });
+    const handledByColonySystem = !window.dispatchEvent(supplyAwardEvent);
+    if (!handledByColonySystem) {
+      GameStorage.load('colony_supplies_data')
+        .then(saved => {
+          const current = saved && typeof saved === 'object' ? saved : {};
+          return GameStorage.save({
+            ...current,
+            [supplyKey]: Math.max(0, Math.floor(Number((current as Record<string, number>)[supplyKey] || 0) + amount)),
+          }, 'colony_supplies_data');
+        })
+        .catch(error => console.warn('Failed to persist underwater treasure reward', error));
+    }
+  }, [dispatch, recordSubmarineMissionProgress]);
+
+  const activeUnderwaterBattleColony = useMemo(() => (
+    activeUnderwaterBattle
+      ? colonies.find((colony: Colony) => colony.id === activeUnderwaterBattle.colonyId) || null
+      : null
+  ), [activeUnderwaterBattle, colonies]);
 
   useEffect(() => {
     // Load arcade scores from localStorage initially
@@ -4090,16 +4318,16 @@ const DashboardContent = memo(({
 
   // Auto-Shipment stops once Project Terra is complete.
   useEffect(() => {
-    if (voidAutoShipmentActive && routeTier === 'Void' && totalProjectTerra >= 100) {
+    if (voidAutoShipmentActive && routeTier === 'Void' && dashboardTotalProjectTerra >= 100) {
       dispatch({ type: 'SET_MINING_DATA', payload: { voidAutoShipmentActive: false } });
       voidAutoShipmentActiveRef.current = false;
       addLog(language === 'pt' ? 'Projeto Terra atingiu 100%. Drones de Auto Envio desligados.' : 'Project Terra reached 100%. Auto-Shipment Drones disabled.', 'success');
     }
-  }, [voidAutoShipmentActive, routeTier, totalProjectTerra, dispatch, addLog, language]);
+  }, [voidAutoShipmentActive, routeTier, dashboardTotalProjectTerra, dispatch, addLog, language]);
 
   // Auto-Shipment Logic
   useEffect(() => {
-    if (!voidAutoShipmentActive || routeTier !== 'Void' || totalProjectTerra >= 100) return;
+    if (!voidAutoShipmentActive || routeTier !== 'Void' || dashboardTotalProjectTerra >= 100) return;
 
     const interval = setInterval(() => {
       const resources = ['energy', 'minerals', 'food', 'meds', 'tech'] as const;
@@ -4120,7 +4348,7 @@ const DashboardContent = memo(({
     }, 2000);
 
     return () => clearInterval(interval);
-  }, [voidAutoShipmentActive, routeTier, totalProjectTerra, compactVoidResource, sendCompactedToEarth]);
+  }, [voidAutoShipmentActive, routeTier, dashboardTotalProjectTerra, compactVoidResource, sendCompactedToEarth]);
 
   const claimMission = useCallback((missionId: string, event?: React.MouseEvent, isAuto: boolean = false) => {
     const mission = missionsRef.current.find(m => m.id === missionId);
@@ -6583,10 +6811,17 @@ const DashboardContent = memo(({
     return () => clearInterval(interval);
   }, [routeTier, voidPOIsInspiration, voidPOIQCDonations]);
 
+  const getVoidDonationSfx = (mode: '1x' | '10x' | 'max') => {
+    if (mode === 'max') return 'donation_3_void';
+    if (mode === '10x') return 'donation_2_void';
+    return 'donation_1_void';
+  };
+
   const donateQCToPOI = (poiId: string) => {
     const cost = 10000;
     const currentDonations = voidPOIQCDonations[poiId] || 0;
     const maxDonations = 10;
+    const mode = voidDonationModes[poiId] || '1x';
 
     if (currentDonations >= maxDonations) {
       addLog(t('maxDonationReached'), 'warning');
@@ -6604,7 +6839,7 @@ const DashboardContent = memo(({
       [poiId]: currentDonations + 1
     }));
 
-    playSfx('level_up');
+    playSfx(getVoidDonationSfx(mode));
     addLog(`${t('qcDonationSuccess')} ${VOID_POIS.find(p => p.id === poiId)?.name}.`, 'success');
   };
 
@@ -6677,10 +6912,10 @@ const DashboardContent = memo(({
 
       if (totalAfter >= 100 && totalBefore < 100) {
         addLog(`${poi.name} ${t('poiInspired')}`, 'success');
-        playSfx('success');
+        playSfx(getVoidDonationSfx(mode));
       } else {
         addLog(`${t('donationSuccess')} ${resourceName} (+${increment.toFixed(1)}%)`, 'success');
-        playSfx('click');
+        playSfx(getVoidDonationSfx(mode));
       }
 
       return { ...prev, [poiId]: nextPOIStats };
@@ -7594,6 +7829,41 @@ const DashboardContent = memo(({
           </motion.div>
         ))}
       </AnimatePresence>
+
+      {activeUnderwaterBattle && activeUnderwaterBattleColony && (
+        <NewEarthUnderwaterBattle
+          language={language as 'en' | 'pt'}
+          siteId={activeUnderwaterBattle.siteId}
+          colonyId={activeUnderwaterBattle.colonyId}
+          colonyName={activeUnderwaterBattleColony.name}
+          musicOn={musicOn}
+          submarineStats={getNewEarthSubmarineStats(newEarthSubmarines[activeUnderwaterBattle.colonyId])}
+          defenseBattleLevel={Math.max(1, battleLevel || 1)}
+          onClose={() => setActiveUnderwaterBattle(null)}
+          onVictory={() => {
+            recordSubmarineMissionProgress({
+              type: 'submarine-victory',
+              siteId: activeUnderwaterBattle.siteId,
+              colonyId: activeUnderwaterBattle.colonyId,
+            });
+            addLog(
+              language === 'pt'
+                ? `Vitória submarina em ${activeUnderwaterBattle.siteId === 'oceano-abissal' ? 'Oceano Abissal' : 'Cemitério de Navios'}.`
+                : `Submarine victory at ${activeUnderwaterBattle.siteId === 'oceano-abissal' ? 'Abyssal Ocean' : 'Ship Graveyard'}.`,
+              'success'
+            );
+          }}
+          onDefeat={() => {
+            addLog(
+              language === 'pt'
+                ? 'Submarino retornou severamente danificado.'
+                : 'Submarine returned severely damaged.',
+              'error'
+            );
+          }}
+          onTreasureLoot={handleUnderwaterTreasureLoot}
+        />
+      )}
 
       <SpaceAmbience isPlaying={musicOn} volume={0.2} />
 
@@ -8517,11 +8787,8 @@ const DashboardContent = memo(({
                           <button
                             type="button"
                             key={marker.id}
-                            onClick={() => {
-                              setNewEarthMapFeedback(language === 'pt' ? 'Zona hostil. Operação ainda indisponível.' : 'Hostile zone. Operation unavailable.');
-                              playSfx('warning_gaming');
-                            }}
-                            className="absolute cursor-not-allowed text-left transition hover:scale-105"
+                            onClick={() => handleNewEarthDangerMarkerClick(marker)}
+                            className={`absolute text-left transition hover:scale-105 ${'submarineColonyId' in marker ? 'cursor-pointer' : 'cursor-not-allowed'}`}
                             style={{ left: marker.left, top: marker.top }}
                           >
                             <span
@@ -8615,57 +8882,145 @@ const DashboardContent = memo(({
                                     </div>
                                   </div>
 
-                                  <div className="flex min-h-0 flex-[0.92] flex-col items-center justify-center rounded-2xl border border-emerald-300/18 bg-black/32 p-4 text-center">
-                                    <h3 className="font-orbitron text-5xl font-black uppercase leading-none text-white">{selectedNewEarthColony.name}</h3>
-                                    <p className="mt-7 font-mono text-sm font-black uppercase tracking-[0.34em] text-emerald-100/76">{language === 'pt' ? 'População' : 'Population'}</p>
-                                    <p className="mt-3 font-orbitron text-5xl font-black leading-none text-white">{selectedNewEarthColony.population.toLocaleString()}</p>
+                                  <div className="flex min-h-0 flex-[0.92] flex-col overflow-hidden rounded-2xl border border-emerald-300/18 bg-black/32 p-4 text-center">
+                                    <div className="flex min-h-0 flex-1 flex-col items-center justify-center">
+                                      <h3 className="font-orbitron text-5xl font-black uppercase leading-none text-white">{selectedNewEarthColony.name}</h3>
+                                      <p className="mt-7 font-mono text-sm font-black uppercase tracking-[0.34em] text-emerald-100/76">{language === 'pt' ? 'População' : 'Population'}</p>
+                                      <p className="mt-3 font-orbitron text-5xl font-black leading-none text-white">{selectedNewEarthColony.population.toLocaleString()}</p>
+                                    </div>
                                   </div>
                                 </div>
 
                                 <div className="min-h-0 overflow-hidden rounded-2xl border border-red-300/18 bg-black/36 p-4">
-                                  <div className="flex items-center justify-between gap-4">
-                                    <div>
-                                      <p className="font-mono text-[10px] uppercase tracking-[0.34em] text-red-100/70">
-                                        {language === 'pt' ? 'Comando estratégico' : 'Strategic command'}
-                                      </p>
-                                      <h3 className="mt-1 font-orbitron text-2xl font-black uppercase text-white">
-                                        {language === 'pt' ? 'Planos de Guerra' : 'War Plans'}
-                                      </h3>
-                                    </div>
-                                    <span className="rounded-full border border-amber-300/25 bg-amber-300/10 px-3 py-1 font-mono text-[9px] uppercase tracking-[0.22em] text-amber-100">
-                                      {language === 'pt' ? 'Batalha em breve' : 'Battle soon'}
-                                    </span>
-                                  </div>
-
-                                  <div className="mt-3 grid h-[calc(100%-5rem)] grid-rows-5 gap-2">
-                                    {selectedNewEarthWarMissions.map(plan => (
-                                      <div key={plan.id} className="flex min-h-0 flex-col justify-center rounded-xl border border-white/10 bg-slate-950/72 px-3.5 py-2">
-                                        <div className="flex items-start justify-between gap-3">
-                                          <div>
-                                            <h4 className="font-orbitron text-xs font-black uppercase leading-tight text-white">{plan.title[language]}</h4>
-                                            <p className="mt-1 font-mono text-[8px] uppercase tracking-[0.22em] text-slate-400">{plan.meta[language]}</p>
+                                  {selectedNewEarthSubmarineColonyId && selectedNewEarthSubmarineLevels && selectedNewEarthSubmarineStats ? (
+                                    <div className="relative flex h-full min-h-0 flex-col overflow-hidden rounded-xl border border-cyan-300/14 bg-slate-950/72 p-3">
+                                      <img
+                                        src="/assets/rota4/missions/bg_submarine.webp"
+                                        alt=""
+                                        aria-hidden="true"
+                                        className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-20"
+                                      />
+                                      <div className="pointer-events-none absolute inset-0 bg-black/64" />
+                                      <div className="relative z-10 grid min-h-0 flex-1 grid-cols-[minmax(220px,0.78fr)_minmax(320px,1.22fr)] gap-3 overflow-hidden rounded-xl border border-cyan-200/12 bg-black/42 p-3">
+                                        <div className="relative flex min-h-0 items-center justify-center overflow-hidden rounded-xl border border-cyan-300/18 bg-cyan-950/18">
+                                          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_55%,rgba(34,211,238,0.34),transparent_58%)]" />
+                                          <img
+                                            src={NEW_EARTH_SUBMARINE_IMAGE_PATHS[selectedNewEarthSubmarineColonyId] || ''}
+                                            alt=""
+                                            aria-hidden="true"
+                                            className="relative z-10 h-full max-h-[205px] w-full object-contain px-3 py-3 drop-shadow-[0_0_22px_rgba(34,211,238,0.34)]"
+                                          />
+                                        </div>
+                                        <div className="grid min-h-0 grid-rows-[70px_1fr] gap-2">
+                                          <div className="flex items-center rounded-xl border border-cyan-200/16 bg-black/58 px-4">
+                                            <p className="font-orbitron text-4xl font-black uppercase leading-none text-white">
+                                              {NEW_EARTH_SUBMARINE_NAMES[selectedNewEarthSubmarineColonyId]}
+                                            </p>
                                           </div>
-                                          <div className="flex shrink-0 items-center gap-2">
-                                            <span className="rounded-full border border-cyan-300/20 bg-cyan-300/10 px-2.5 py-1 font-mono text-[9px] font-black uppercase tracking-[0.18em] text-cyan-100">
-                                              {plan.progress}
-                                            </span>
-                                            <PremiumCanvasButton
-                                              type="button"
-                                              disabled
-                                              tone="steel"
-                                              className="rounded-full px-3 py-1"
-                                              contentClassName="font-mono text-[9px] font-black uppercase tracking-[0.18em] text-white/35"
-                                            >
-                                              {language === 'pt' ? 'Resgatar' : 'Claim'}
-                                            </PremiumCanvasButton>
+                                          <div className="grid min-h-0 grid-cols-2 gap-2">
+                                            {[
+                                              { label: language === 'pt' ? 'Profundidade' : 'Depth', value: `${selectedNewEarthSubmarineStats.maxDepth.toLocaleString()}m` },
+                                              { label: language === 'pt' ? 'Tesouros' : 'Treasures', value: selectedNewEarthSubmarineStats.treasurePotential },
+                                              { label: language === 'pt' ? 'Casco' : 'Hull', value: `+${selectedNewEarthSubmarineStats.hullResistance}%` },
+                                              { label: language === 'pt' ? 'Dano' : 'Damage', value: `+${selectedNewEarthSubmarineStats.missileDamageBonus}%` },
+                                              { label: language === 'pt' ? 'Míssil' : 'Missile', value: `+${selectedNewEarthSubmarineStats.missileSpeedBonus}%` },
+                                              { label: language === 'pt' ? 'Velocidade' : 'Speed', value: `+${selectedNewEarthSubmarineStats.speedBonus}%` },
+                                            ].map(attribute => (
+                                              <div key={attribute.label} className="flex min-h-0 min-w-0 flex-col justify-center rounded-xl border border-cyan-200/16 bg-black/58 px-3 py-2">
+                                                <p className="truncate font-mono text-[8px] uppercase tracking-[0.16em] text-cyan-100/58">{attribute.label}</p>
+                                                <p className="mt-1 truncate font-orbitron text-xl font-black leading-none text-white">{attribute.value}</p>
+                                              </div>
+                                            ))}
                                           </div>
                                         </div>
-                                        <p className="mt-2 rounded-lg border border-emerald-300/15 bg-emerald-300/10 px-3 py-1 font-mono text-[9px] uppercase tracking-[0.18em] text-emerald-100">
-                                          {plan.reward}
-                                        </p>
                                       </div>
-                                    ))}
-                                  </div>
+
+                                      <div className="relative z-10 mt-3 grid h-[142px] shrink-0 grid-cols-3 grid-rows-2 gap-2">
+                                        {NEW_EARTH_SUBMARINE_UPGRADES.map(upgrade => {
+                                          const level = selectedNewEarthSubmarineLevels[upgrade.id] || 0;
+                                          const isMax = level >= MAX_NEW_EARTH_SUBMARINE_UPGRADE_LEVEL;
+                                          const cost = getNewEarthSubmarineUpgradeCost(level);
+                                          return (
+                                            <PremiumCanvasButton
+                                              key={upgrade.id}
+                                              type="button"
+                                              onClick={() => upgradeNewEarthSubmarine(selectedNewEarthSubmarineColonyId, upgrade.id)}
+                                              disabled={isMax}
+                                              tone={isMax ? 'steel' : 'cyan'}
+                                              className="min-h-0 rounded-xl"
+                                              contentClassName={`flex h-full flex-col items-stretch justify-center px-2.5 py-2 text-left ${isMax ? 'text-zinc-500' : 'text-cyan-50'}`}
+                                            >
+                                              <div className="flex items-start justify-between gap-2">
+                                                <span className="min-w-0 truncate font-mono text-[8px] font-black uppercase tracking-[0.12em]">
+                                                  {upgrade.label[language as 'pt' | 'en']}
+                                                </span>
+                                                <span className="shrink-0 rounded-full border border-white/10 bg-black/42 px-1.5 py-0.5 font-mono text-[7px] font-black uppercase tracking-[0.08em]">
+                                                  {isMax ? 'MAX' : `${formatValue(cost)} QC`}
+                                                </span>
+                                              </div>
+                                              <div className="mt-1.5 flex items-center gap-2">
+                                                <span className="shrink-0 font-orbitron text-[11px] font-black uppercase leading-none">
+                                                  LVL {level}/{MAX_NEW_EARTH_SUBMARINE_UPGRADE_LEVEL}
+                                                </span>
+                                                <div className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full border border-cyan-100/10 bg-black/50">
+                                                  <div
+                                                    className={`h-full rounded-full ${isMax ? 'bg-zinc-500' : 'bg-cyan-300'}`}
+                                                    style={{ width: `${(level / MAX_NEW_EARTH_SUBMARINE_UPGRADE_LEVEL) * 100}%` }}
+                                                  />
+                                                </div>
+                                              </div>
+                                            </PremiumCanvasButton>
+                                          );
+                                        })}
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <>
+                                      <div className="flex items-center justify-between gap-4">
+                                        <div>
+                                          <p className="font-mono text-[10px] uppercase tracking-[0.34em] text-red-100/70">
+                                            {language === 'pt' ? 'Comando estratégico' : 'Strategic command'}
+                                          </p>
+                                          <h3 className="mt-1 font-orbitron text-2xl font-black uppercase text-white">
+                                            {language === 'pt' ? 'Planos de Guerra' : 'War Plans'}
+                                          </h3>
+                                        </div>
+                                        <span className="rounded-full border border-amber-300/25 bg-amber-300/10 px-3 py-1 font-mono text-[9px] uppercase tracking-[0.22em] text-amber-100">
+                                          {language === 'pt' ? 'Batalha em breve' : 'Battle soon'}
+                                        </span>
+                                      </div>
+
+                                      <div className="mt-3 grid h-[calc(100%-5rem)] grid-rows-5 gap-2">
+                                        {selectedNewEarthWarMissions.map(plan => (
+                                          <div key={plan.id} className="flex min-h-0 flex-col justify-center rounded-xl border border-white/10 bg-slate-950/72 px-3.5 py-2">
+                                            <div className="flex items-start justify-between gap-3">
+                                              <div>
+                                                <h4 className="font-orbitron text-xs font-black uppercase leading-tight text-white">{plan.title[language]}</h4>
+                                                <p className="mt-1 font-mono text-[8px] uppercase tracking-[0.22em] text-slate-400">{plan.meta[language]}</p>
+                                              </div>
+                                              <div className="flex shrink-0 items-center gap-2">
+                                                <span className="rounded-full border border-cyan-300/20 bg-cyan-300/10 px-2.5 py-1 font-mono text-[9px] font-black uppercase tracking-[0.18em] text-cyan-100">
+                                                  {plan.progress}
+                                                </span>
+                                                <PremiumCanvasButton
+                                                  type="button"
+                                                  disabled
+                                                  tone="steel"
+                                                  className="rounded-full px-3 py-1"
+                                                  contentClassName="font-mono text-[9px] font-black uppercase tracking-[0.18em] text-white/35"
+                                                >
+                                                  {language === 'pt' ? 'Resgatar' : 'Claim'}
+                                                </PremiumCanvasButton>
+                                              </div>
+                                            </div>
+                                            <p className="mt-2 rounded-lg border border-emerald-300/15 bg-emerald-300/10 px-3 py-1 font-mono text-[9px] uppercase tracking-[0.18em] text-emerald-100">
+                                              {plan.reward}
+                                            </p>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </>
+                                  )}
                                 </div>
                               </div>
                             </div>
@@ -10335,6 +10690,7 @@ const DashboardContent = memo(({
                 playSfx('click');
               }}
               onComplete={() => {
+                stopSfx('songs_of_war');
                 setVoidWarRobotSpeaking(false);
                 setIsShaking(true);
                 setIsFlashingRed(true);
@@ -10355,6 +10711,7 @@ const DashboardContent = memo(({
               theme="purple"
               completeText={language === 'pt' ? 'DEFENDER TERRA' : 'DEFEND EARTH'}
               imageSrc="/images/bobby_blue/bobby_blue_fear.webp"
+              bgImage="/assets/rota3/void/bg_void_invasion.webp"
             />
           )}
         </AnimatePresence>

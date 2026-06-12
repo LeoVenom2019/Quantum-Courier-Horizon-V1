@@ -165,6 +165,21 @@ export const CARD_BACKGROUND_BY_RARITY: Record<ColonyCardRarity, string> = {
 
 export const getCardBackgroundImage = (rarity: ColonyCardRarity) => CARD_BACKGROUND_BY_RARITY[rarity];
 
+export const CARD_MODAL_BACKGROUND_BY_RARITY: Record<ColonyCardRarity, string> = {
+  common: '/assets/rota4/cards/modal_comum.webp',
+  rare: '/assets/rota4/cards/modal_rara.webp',
+  epic: '/assets/rota4/cards/modal_epica.webp',
+  legendary: '/assets/rota4/cards/modal_lendaria.webp',
+  mythic: '/assets/rota4/cards/modal_mitica.webp',
+  wildcard: '/assets/rota4/cards/modal_rgb.webp',
+};
+
+export const getCardModalBackgroundImage = (rarity: ColonyCardRarity, cardClass: ColonyCardClass = 'political') => (
+  cardClass === 'wildcard' || rarity === 'wildcard'
+    ? CARD_MODAL_BACKGROUND_BY_RARITY.wildcard
+    : CARD_MODAL_BACKGROUND_BY_RARITY[rarity]
+);
+
 export const ELEMENTAL_BATTLE_STATS: Record<ElementalDamageType, BattleCardStat> = {
   ice: 'iceDamagePercent',
   electric: 'electricDamagePercent',
@@ -391,7 +406,7 @@ export const BATTLE_CARD_DROP_CHANCE: Record<ColonyCardRarity, number> = {
   wildcard: 0,
 };
 
-export const ARCADE_CARD_REWARD_CHANCE = 35;
+export const ARCADE_CARD_REWARD_CHANCE = 42;
 
 export type ArcadeCardRewardRule = {
   gameId: string;
@@ -483,16 +498,20 @@ export const rollAnyMissingColonyCardReward = (
   if (pool.length === 0) return null;
 
   const missingPoliticalMythics = pool.filter(card => isPoliticalCard(card) && card.rarity === 'mythic');
-  if (missingPoliticalMythics.length > 0 && random() < 0.35) {
+  if (missingPoliticalMythics.length > 0 && random() < 0.42) {
     return missingPoliticalMythics[Math.floor(random() * missingPoliticalMythics.length)];
   }
 
   const getRewardWeight = (card: ColonyCard) => {
-    if (isPoliticalCard(card) && card.rarity === 'mythic') return 24;
-    if (card.rarity === 'legendary') return 8;
-    if (card.rarity === 'epic') return 10;
-    if (card.rarity === 'rare') return 12;
-    return 14;
+    const baseWeight = (() => {
+      if (isPoliticalCard(card) && card.rarity === 'mythic') return 24;
+      if (card.rarity === 'legendary') return 8;
+      if (card.rarity === 'epic') return 10;
+      if (card.rarity === 'rare') return 12;
+      return 14;
+    })();
+    if (isPoliticalCard(card) || isWildcardCard(card)) return baseWeight * 1.2;
+    return baseWeight;
   };
   const totalWeight = pool.reduce((sum, card) => sum + getRewardWeight(card), 0);
   let roll = random() * totalWeight;

@@ -1,4 +1,4 @@
-import { ColonySectorId } from './colony-cards';
+import { ColonySectorId, MAX_COLONY_CARD_LEVEL } from './colony-cards';
 
 export type NewEarthMissionEvent =
   | { type: 'arcade-score'; gameId: string; score: number; previousRecord: number }
@@ -57,7 +57,7 @@ export type NewEarthMissionState = {
 
 export const NEW_EARTH_MISSIONS_STORAGE_KEY = 'new_earth_missions';
 export const NEW_EARTH_MISSION_RENEW_COOLDOWN_MS = 0;
-export const NEW_EARTH_MISSION_QC_REWARD_MULTIPLIER = 2.5;
+export const NEW_EARTH_MISSION_QC_REWARD_MULTIPLIER = 5;
 
 const scaleNewEarthMissionQcReward = (amount: number) => Math.round(amount * NEW_EARTH_MISSION_QC_REWARD_MULTIPLIER);
 
@@ -450,7 +450,9 @@ const NEW_EARTH_FULL_MISSION_CATALOG: NewEarthMission[] = [
 ];
 
 const createCardUpgradeMissions = (context: NewEarthMissionGenerationContext = {}): NewEarthMission[] => (
-  (context.upgradeableCards || []).map(card => {
+  (context.upgradeableCards || [])
+    .filter(card => Math.max(1, Math.floor(Number(card.level) || 1)) < MAX_COLONY_CARD_LEVEL)
+    .map(card => {
     const currentLevel = Math.max(1, Math.floor(Number(card.level) || 1));
     const targetLevel = currentLevel + 1;
     return makeMission({
@@ -476,7 +478,7 @@ const createCardUpgradeMissions = (context: NewEarthMissionGenerationContext = {
       cardId: card.id,
       cardTargetLevel: targetLevel,
     });
-  })
+    })
 );
 
 const getMissionCatalog = (context?: NewEarthMissionGenerationContext) => [
@@ -509,9 +511,12 @@ const isMissionEligible = (mission: NewEarthMission, context: NewEarthMissionGen
   }
   if (mission.eventType === 'card-upgrade') {
     if (!mission.cardId || !mission.cardTargetLevel) return false;
+    if (!Array.isArray(context.upgradeableCards)) return true;
     const targetLevel = mission.cardTargetLevel;
     return (context.upgradeableCards || []).some(card => (
-      card.id === mission.cardId && Math.max(1, Math.floor(Number(card.level) || 1)) < targetLevel
+      card.id === mission.cardId
+      && Math.max(1, Math.floor(Number(card.level) || 1)) < MAX_COLONY_CARD_LEVEL
+      && Math.max(1, Math.floor(Number(card.level) || 1)) < targetLevel
     ));
   }
   if (mission.eventType === 'submarine-victory' || mission.eventType === 'submarine-treasure') return Boolean(context.canUseSubmarines);
@@ -602,7 +607,12 @@ export const normalizeNewEarthMissionState = (saved: any, context?: NewEarthMiss
     const savedMission: any = savedById.get(defaultMission.id);
     const progress = Math.max(0, Math.floor(Number(savedMission?.progress) || 0));
     const claimed = Boolean(savedMission?.claimed);
-    const completed = Boolean(savedMission?.completed) || progress >= defaultMission.target;
+    const cardUpgradeCurrentLevel = defaultMission.eventType === 'card-upgrade' && defaultMission.cardId
+      ? (context?.upgradeableCards || []).find(card => card.id === defaultMission.cardId)?.level
+      : undefined;
+    const completedByCardLevel = defaultMission.eventType === 'card-upgrade'
+      && Number(cardUpgradeCurrentLevel || 0) >= Number(defaultMission.cardTargetLevel || 0);
+    const completed = Boolean(savedMission?.completed) || completedByCardLevel || progress >= defaultMission.target;
 
     return {
       ...defaultMission,

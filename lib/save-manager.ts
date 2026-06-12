@@ -7,6 +7,7 @@ export const COLONY_SAVE_STORAGE_KEYS = [
   'colony_search_upgrade_levels',
   'colony_active_search',
   'colony_search_threat_bonus',
+  'route4_search_battle_cycle',
   'horizon_ship_xp',
   'route4_defense_battle_level',
   'battle_cards_loadout',
@@ -31,6 +32,7 @@ export interface ColonySystemSaveData {
   searchUpgradeLevels: Record<'land' | 'sea', number>;
   activeSearches: Record<string, any>;
   searchThreatBonus: Record<'land' | 'sea', number>;
+  searchBattleCycle: any;
   horizonShipXp: number;
   horizonShipLevel: number;
   defenseBattleLevel: number;
@@ -89,6 +91,7 @@ const createColonySystemSave = (flatData: any): ColonySystemSaveData => {
   const searchUpgradeLevels = getFlatOrStorageValue(flatData, 'colonySearchUpgradeLevels', 'colony_search_upgrade_levels', { land: 0, sea: 0 });
   const activeSearches = getFlatOrStorageValue(flatData, 'colonyActiveSearches', 'colony_active_search', {});
   const searchThreatBonus = getFlatOrStorageValue(flatData, 'colonySearchThreatBonus', 'colony_search_threat_bonus', { land: 0, sea: 0 });
+  const searchBattleCycle = getFlatOrStorageValue(flatData, 'route4SearchBattleCycle', 'route4_search_battle_cycle', { nextBattleIndex: 0, cycle: 0 });
   const horizonShipXp = Number(getFlatOrStorageValue(flatData, 'horizonShipXp', 'horizon_ship_xp', 0)) || 0;
   const defenseBattleLevel = Number(getFlatOrStorageValue(flatData, 'route4DefenseBattleLevel', 'route4_defense_battle_level', 1)) || 1;
   const battleLoadout = getFlatOrStorageValue(flatData, 'battleCardsLoadout', 'battle_cards_loadout', {});
@@ -117,6 +120,7 @@ const createColonySystemSave = (flatData: any): ColonySystemSaveData => {
       land: Math.max(0, Number(searchThreatBonus?.land) || 0),
       sea: Math.max(0, Number(searchThreatBonus?.sea) || 0),
     },
+    searchBattleCycle: searchBattleCycle && typeof searchBattleCycle === 'object' ? searchBattleCycle : { nextBattleIndex: 0, cycle: 0 },
     horizonShipXp: Math.max(0, horizonShipXp),
     horizonShipLevel: getHorizonLevelFromXp(horizonShipXp),
     defenseBattleLevel: Math.max(1, Math.floor(defenseBattleLevel)),
@@ -135,6 +139,7 @@ const createColonySystemSave = (flatData: any): ColonySystemSaveData => {
       colony_search_upgrade_levels: searchUpgradeLevels && typeof searchUpgradeLevels === 'object' ? searchUpgradeLevels : { land: 0, sea: 0 },
       colony_active_search: activeSearches && typeof activeSearches === 'object' ? activeSearches : {},
       colony_search_threat_bonus: searchThreatBonus && typeof searchThreatBonus === 'object' ? searchThreatBonus : { land: 0, sea: 0 },
+      route4_search_battle_cycle: searchBattleCycle && typeof searchBattleCycle === 'object' ? searchBattleCycle : { nextBattleIndex: 0, cycle: 0 },
       horizon_ship_xp: Math.max(0, horizonShipXp),
       route4_defense_battle_level: Math.max(1, Math.floor(defenseBattleLevel)),
       battle_cards_loadout: battleLoadout && typeof battleLoadout === 'object' ? battleLoadout : {},

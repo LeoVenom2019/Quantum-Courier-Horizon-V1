@@ -160,6 +160,8 @@ export interface VoidBattleState {
   laserLastDamageTick: number;
   playerShotDuckedUntil: number;
   fireballs: any[];
+  hellfireQueue: any[];
+  hellfireNextLaunchAt: number;
   trailParts: any[];
   burnZones: any[];
   playerDotEffects: any[];
@@ -473,6 +475,8 @@ const VoidBattleArena = memo(function VoidBattleArena({
       extraEnemiesSpawned: 0
     },
     fireballs: [],
+    hellfireQueue: [],
+    hellfireNextLaunchAt: 0,
     trailParts: [],
     burnZones: [],
     playerDotEffects: [],
@@ -732,19 +736,24 @@ const VoidBattleArena = memo(function VoidBattleArena({
       playSfx('level_up');
     } else if (type === 'burst') {
       if (playerShipStats.rarity !== 'mythic') return;
+      if (s.fireballs.length > 0 || s.hellfireQueue.length > 0) return;
       if (s.laserState !== 'idle') return; // Bloqueia se o laser estiver ativo
       if (voidResourcesRef.current.tech < 500) { addLog(t('notEnoughEnergy'), 'error'); return; }
       onUpdateResources({ ...voidResourcesRef.current, tech: voidResourcesRef.current.tech - 500 });
       s.abilities.burst.lastUsed = now;
 
-      const count = 5;
-      const cWidth = canvasRef.current?.width || 800;
-      const cHeight = canvasRef.current?.height || 500;
-      const baseOX = (s.playerX / 100) * cWidth + 40;
-      const baseOY = (s.playerY / 100) * cHeight;
       const dirs = ['up', 'forward', 'down'];
+      s.fireballs = [];
+      s.hellfireQueue = Array.from({ length: 5 }, (_, index) => ({
+        id: `hb-${now}-${index}`,
+        dir: dirs[index % dirs.length],
+        arcSeed: Math.random(),
+        size: 22 + Math.random() * 12,
+      }));
+      s.hellfireNextLaunchAt = now;
 
-      for(let i = 0; i < count; i++) {
+      /*
+      for(let i = 0; i < 0; i++) {
           const dir = dirs[Math.floor(Math.random() * dirs.length)];
           let ox = baseOX, oy = baseOY;
           if (dir === 'up') { ox -= 10; oy -= 28; }
@@ -783,11 +792,12 @@ const VoidBattleArena = memo(function VoidBattleArena({
               readyAt: now + (i * 120) // Mesma base clock do loop
           });
       }
-      s.playerShotDuckedUntil = now + 4500;
+      */
+      s.playerShotDuckedUntil = now + 8500;
       playSfx('big_energy_explosion_2', { volume: 1.0, category: 'player' });
     } else if (type === 'special') {
       if (playerShipStats.rarity !== 'mythic') return;
-      if (s.fireballs.length > 0) return; // Bloqueia se HB estiver em curso
+      if (s.fireballs.length > 0 || s.hellfireQueue.length > 0) return; // Bloqueia se HB estiver em curso
       s.abilities.special.lastUsed = now;
       s.laserState = 'charge';
       s.laserStateStart = now;
@@ -2408,6 +2418,38 @@ const VoidBattleArena = memo(function VoidBattleArena({
       });
 
       // ── HELLFIRE BARRAGE: Fireballs ──
+      if (s.fireballs.length === 0 && s.hellfireQueue.length > 0 && now >= s.hellfireNextLaunchAt) {
+        const nextHellfire = s.hellfireQueue.shift();
+        const dir = nextHellfire.dir || 'forward';
+        let ox = (s.playerX / 100) * cWidth + 40;
+        let oy = (s.playerY / 100) * cHeight;
+        if (dir === 'up') { ox -= 10; oy -= 28; }
+        else if (dir === 'forward') { ox += 10; }
+        else { ox -= 10; oy += 28; }
+
+        const target = findNearestLivingEnemy(s, ox, oy, cWidth, cHeight);
+        const tx = target ? (target.x / 100) * cWidth : cWidth + 200;
+        const ty = target ? (target.y / 100) * cHeight : oy + (Math.random() - 0.5) * 200;
+        const dist = Math.hypot(tx - ox, ty - oy);
+        const travelFrames = Math.max(35, Math.min(65, dist / 12));
+        const speed = 1 / travelFrames;
+
+        s.fireballs.push({
+          id: nextHellfire.id,
+          ox, oy, tx, ty,
+          targetId: target?.id,
+          x: ox, y: oy,
+          t: 0,
+          speed,
+          arcBend: (dir === 'up' ? -1 : dir === 'down' ? 1 : 0) * (40 + (nextHellfire.arcSeed || 0) * 50) + (Math.random() - 0.5) * 30,
+          size: nextHellfire.size || 26,
+          life: 1,
+          done: false,
+          readyAt: now,
+        });
+        s.hellfireNextLaunchAt = now + 180;
+      }
+
       if (s.fireballs.length > 0) {
         ctx.save();
         ctx.globalCompositeOperation = 'lighter';
@@ -2437,7 +2479,9 @@ const VoidBattleArena = memo(function VoidBattleArena({
           const hitDistance = target ? Math.hypot((target.x / 100) * cWidth - fb.x, (target.y / 100) * cHeight - fb.y) : Infinity;
           if (fb.t >= 1 || hitDistance < Math.max(34, fb.size * 1.25)) {
             // Impacto individual: cada bola recalcula o alvo vivo e explode onde ele está agora.
-            spawnHBImpact(target ? (target.x / 100) * cWidth : fb.tx, target ? (target.y / 100) * cHeight : fb.ty);
+            if (target) {
+              spawnHBImpact((target.x / 100) * cWidth, (target.y / 100) * cHeight);
+            }
             return false;
           }
 

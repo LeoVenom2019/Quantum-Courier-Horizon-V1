@@ -13,6 +13,7 @@ interface ArcadeCardProps {
   temaVisual: 'sci-fi' | 'war' | 'puzzle' | 'nebula';
   status: string;
   onPlay: () => void;
+  onLockedClick?: () => void;
   onInfo: () => void;
   screenshot?: string;
   cabinetImage?: string;
@@ -34,6 +35,7 @@ const ArcadeCard: React.FC<ArcadeCardProps> = ({
   temaVisual,
   status,
   onPlay,
+  onLockedClick,
   onInfo,
   screenshot,
   cabinetImage,
@@ -160,12 +162,20 @@ const ArcadeCard: React.FC<ArcadeCardProps> = ({
         </PremiumCanvasButton>
 
         {!isAvailable && (
-          <div className="absolute inset-0 z-50 flex flex-col items-center justify-center rounded-[1.25rem] bg-black/65 px-5 text-center backdrop-blur-[2px]">
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              onLockedClick?.();
+            }}
+            className="absolute inset-0 z-50 flex cursor-pointer flex-col items-center justify-center rounded-[1.25rem] bg-black/65 px-5 text-center backdrop-blur-[2px] transition hover:bg-black/58"
+            aria-label={language === 'pt' ? 'Fliperama bloqueado' : 'Locked arcade'}
+          >
             <LockKeyhole className="mb-3 h-10 w-10 text-white/45" />
             <p className="font-orbitron text-[11px] font-black uppercase tracking-[0.28em] text-white/80">
               {language === 'pt' ? 'Carta necessária' : 'Card required'}
             </p>
-          </div>
+          </button>
         )}
 
         <div className="absolute inset-x-8 bottom-3 h-6 rounded-full opacity-45 blur-xl" style={{ background: corPrimaria }} />

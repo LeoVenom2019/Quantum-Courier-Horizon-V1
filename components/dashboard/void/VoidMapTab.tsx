@@ -34,6 +34,12 @@ const getVoidPOIContributionValue = (poi: any, poiProgress: Record<string, numbe
   return resourceValue;
 };
 
+const getVoidDonationSfx = (amount: number | 'max') => {
+  if (amount === 'max') return 'donation_3_void';
+  if (amount === 10) return 'donation_2_void';
+  return 'donation_1_void';
+};
+
 const VoidMapTab = memo(function VoidMapTab() {
   const {
     combat,
@@ -97,8 +103,7 @@ const VoidMapTab = memo(function VoidMapTab() {
       if (acceptedAmount <= 0) return;
     }
     
-    const donationSfx = amount === 'max' ? 'donation_3_void' : amount === 10 ? 'donation_2_void' : 'donation_1_void';
-    playSfx(donationSfx);
+    playSfx(getVoidDonationSfx(amount));
     setDonationModal(null);
   };
 

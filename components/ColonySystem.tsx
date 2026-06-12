@@ -54,6 +54,7 @@ import {
   getCardBackgroundImage,
   getCardClass,
   getCardLevel,
+  getCardModalBackgroundImage,
   getHorizonLevelFromXp,
   getCardStyle,
   getPoliticalEffects,
@@ -65,10 +66,8 @@ import {
   isBattleCard,
   isPoliticalCard,
   normalizeOwnedColonyCardIds,
-  rollBattleCardReward,
   rollAnyMissingColonyCardReward,
   TRINITY_REACTOR_CARD_ID,
-  MAX_COLONY_CARD_LEVEL,
 } from '@/lib/colony-cards';
 import {
   NEW_EARTH_MISSIONS_STORAGE_KEY,
@@ -92,17 +91,41 @@ type ActiveColonySearches = Record<string, ActiveColonySearch>;
 type SearchThreatBonus = Record<ColonyExpeditionId, number>;
 type SearchUpgradeLevels = Record<ColonyExpeditionId, number>;
 type BattleLoadout = Partial<Record<BattleCardSlot, string>>;
-type DefenseSpecialId = 'apocalypse-laser' | 'hellfire-barrage' | 'special-slot-3' | 'special-slot-4';
+type DefenseSpecialId = 'apocalypse-laser' | 'hellfire-barrage' | 'thor-oath' | 'special-slot-4';
+type SearchBattleCycleState = {
+  nextBattleIndex: number;
+  cycle: number;
+};
+type ActiveSearchBattle = {
+  battleIndex: number;
+  searchId: ColonyExpeditionId;
+  slotIndex: number;
+  title: string;
+};
 
 const BATTLE_CARD_CODEX_PAGE_SIZE = 6;
 const MAX_SEARCH_UPGRADE_LEVEL = 5;
 const MAX_PARALLEL_SEARCHES_PER_TYPE = 3;
+const SEARCH_BATTLE_TOTAL = 6;
+const SEARCH_BATTLE_QC_REWARDS = [250000, 320000, 390000, 470000, 540000, 600000];
+const SEARCH_BATTLE_FINAL_QC_REWARD = 5000000;
+const SEARCH_BATTLE_CARD_CHANCE = 0.3;
+const SEARCH_BATTLE_SENTIMENT_SECTORS: ColonySectorId[] = ['happiness', 'health', 'economy', 'security', 'technology', 'culture'];
+const DEFAULT_SEARCH_BATTLE_CYCLE: SearchBattleCycleState = { nextBattleIndex: 0, cycle: 0 };
 const SEARCH_THREAT_TRIGGER_MIN_PROGRESS = 0.2;
 const SEARCH_THREAT_TRIGGER_MAX_PROGRESS = 0.9;
 const SEARCH_UPGRADE_RESOURCE_BONUS = 15;
 const SEARCH_UPGRADE_THREAT_BONUS = 5;
 const DEFAULT_SEARCH_UPGRADE_LEVELS: SearchUpgradeLevels = { land: 0, sea: 0 };
 const getSearchSlotKey = (id: ColonyExpeditionId, slotIndex: number) => `${id}-${slotIndex}`;
+const getSearchBattleIndex = (id: ColonyExpeditionId, slotIndex: number) => (
+  id === 'land' ? slotIndex : MAX_PARALLEL_SEARCHES_PER_TYPE + slotIndex
+);
+const normalizeSearchBattleCycle = (saved: any): SearchBattleCycleState => {
+  const nextBattleIndex = Math.max(0, Math.min(SEARCH_BATTLE_TOTAL - 1, Math.floor(Number(saved?.nextBattleIndex) || 0)));
+  const cycle = Math.max(0, Math.floor(Number(saved?.cycle) || 0));
+  return { nextBattleIndex, cycle };
+};
 const SEARCH_SLOT_STYLES = [
   'border-cyan-300/35 bg-cyan-300/10 text-cyan-100 hover:border-cyan-200/70 hover:bg-cyan-300 hover:text-black',
   'border-emerald-300/35 bg-emerald-300/10 text-emerald-100 hover:border-emerald-200/70 hover:bg-emerald-300 hover:text-black',
@@ -234,6 +257,7 @@ const ROUTE4_HANGAR_OPEN_SFX = `${ROUTE4_SEARCH_SFX_BASE}/hangar_open_door.ogg`;
 const ROUTE4_HANGAR_CLOSE_SFX = `${ROUTE4_SEARCH_SFX_BASE}/hangar_close_door.ogg`;
 const ROUTE4_QUEST_REWARD_SFX = `${ROUTE4_SEARCH_SFX_BASE}/quest_reward.ogg`;
 const ROUTE4_QUESTS_RENEW_SFX = `${ROUTE4_SEARCH_SFX_BASE}/quests_renew.ogg`;
+const ROUTE4_FINAL_MISSION_QC_BONUS_SFX = `${ROUTE4_SEARCH_SFX_BASE}/bonus_qc_final.ogg`;
 const ROUTE4_SPECIAL_EQUIP_SFX = `${ROUTE4_SEARCH_SFX_BASE}/equip_special.ogg`;
 const ROUTE4_SPECIAL_UNEQUIP_SFX = `${ROUTE4_SEARCH_SFX_BASE}/unequip_special.ogg`;
 const ROUTE4_CANT_EQUIP_SFX = `${ROUTE4_SEARCH_SFX_BASE}/cant_equip.ogg`;
@@ -246,6 +270,7 @@ const route4BattleSfxCache = new Map<string, HTMLAudioElement>();
 type NewEarthMissionCycleBonusAnimation = {
   cycle: number;
   bonus: number;
+  displayBonus: number;
   draining: boolean;
   revealed: boolean;
 } | null;
@@ -490,13 +515,13 @@ const DEFENSE_SPECIALS: DefenseSpecial[] = [
     implemented: true,
   },
   {
-    id: 'special-slot-3',
-    name: { en: 'Special Slot 3', pt: 'Especial 3' },
+    id: 'thor-oath',
+    name: { en: 'Thor Oath', pt: 'Juramento de Thor' },
     description: {
-      en: 'Reserved slot for a future aerial defense special.',
-      pt: 'Slot reservado para um futuro especial de defesa aérea.',
+      en: 'Route 4 special: a divine storm with tornados, lightning strikes, and a final thunderbolt.',
+      pt: 'Especial da Rota 4: tempestade divina com tornados, raios e um trovão final.',
     },
-    implemented: false,
+    implemented: true,
   },
   {
     id: 'special-slot-4',
@@ -1031,6 +1056,8 @@ const CardDetailOverlay = ({
   if (!selected) return null;
 
   const { card, action } = selected;
+  const cardClass = getCardClass(card);
+  const modalBackgroundImage = getCardModalBackgroundImage(card.rarity, cardClass);
   const arcade = card.unlocksArcadeId
     ? MINI_GAMES_CONFIG.find(game => game.id === card.unlocksArcadeId)
     : null;
@@ -1046,9 +1073,11 @@ const CardDetailOverlay = ({
         initial={{ opacity: 0, scale: 0.9, y: 18 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.94, y: 10 }}
-        className={`relative w-full max-w-5xl overflow-hidden rounded-[2rem] border border-white/15 bg-zinc-950 shadow-[0_0_80px_rgba(34,211,238,0.12)] ${getCardStyle(card.rarity, getCardClass(card))}`}
+        className={`relative w-full max-w-5xl overflow-hidden rounded-[2rem] border border-white/15 bg-zinc-950 shadow-[0_0_80px_rgba(34,211,238,0.12)] ${getCardStyle(card.rarity, cardClass)}`}
       >
-        <div className="absolute inset-0 opacity-40 bg-[radial-gradient(circle_at_20%_0%,rgba(255,255,255,0.2),transparent_34%),radial-gradient(circle_at_80%_20%,rgba(45,212,191,0.18),transparent_30%)]" />
+        <img src={modalBackgroundImage} alt="" aria-hidden="true" className="pointer-events-none absolute inset-0 z-0 h-full w-full object-cover opacity-90" />
+        <div className="pointer-events-none absolute inset-0 z-0 bg-black/16" />
+        <div className="pointer-events-none absolute inset-0 z-0 opacity-35 bg-[radial-gradient(circle_at_20%_0%,rgba(255,255,255,0.2),transparent_34%),radial-gradient(circle_at_80%_20%,rgba(45,212,191,0.18),transparent_30%)]" />
         <PremiumCanvasButton
           onClick={onClose}
           tone="steel"
@@ -1093,10 +1122,10 @@ const CardDetailOverlay = ({
 
           <div className="flex flex-col justify-between gap-5">
             <div>
-              <p className="text-[10px] text-cyan-200 font-mono uppercase tracking-[0.42em]">
+              <p className="font-mono text-[10px] font-bold uppercase tracking-[0.42em] text-cyan-100 drop-shadow-[0_0_10px_rgba(103,232,249,0.55)]">
                 {language === 'pt' ? 'Dossiê do Conselho' : 'Council Dossier'}
               </p>
-              <h3 className="mt-2 text-3xl font-orbitron font-black text-white uppercase tracking-tight">
+              <h3 className="mt-2 font-orbitron text-3xl font-black uppercase tracking-tight text-white drop-shadow-[0_0_14px_rgba(255,255,255,0.25)]">
                 {card.name[language]}
               </h3>
               <div className="mt-3 flex flex-wrap gap-2">
@@ -1108,15 +1137,15 @@ const CardDetailOverlay = ({
                 </span>
               </div>
 
-              <p className="mt-5 text-sm leading-relaxed text-zinc-200">
+              <p className="mt-5 text-sm font-semibold leading-relaxed text-zinc-50 drop-shadow-[0_1px_6px_rgba(0,0,0,0.85)]">
                 {card.role[language]}
               </p>
-              <p className="mt-3 text-sm leading-relaxed text-zinc-400">
+              <p className="mt-3 text-sm leading-relaxed text-zinc-200 drop-shadow-[0_1px_6px_rgba(0,0,0,0.85)]">
                 {card.lore[language]}
               </p>
 
-              <div className="mt-5 rounded-2xl border border-white/10 bg-black/35 p-4">
-                <p className="text-[10px] font-mono uppercase tracking-[0.3em] text-zinc-500">
+              <div className="mt-5 rounded-2xl border border-white/15 bg-black/55 p-4 shadow-[inset_0_0_24px_rgba(0,0,0,0.45)]">
+                <p className="font-mono text-[10px] font-bold uppercase tracking-[0.3em] text-cyan-100/85">
                   {language === 'pt' ? 'Impacto direto' : 'Direct impact'}
                 </p>
                 {isBattleCard(card) ? (
@@ -1232,6 +1261,9 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
   const [isSearchThreatBonusLoaded, setIsSearchThreatBonusLoaded] = useState(false);
   const [searchUpgradeLevels, setSearchUpgradeLevels] = useState<SearchUpgradeLevels>(DEFAULT_SEARCH_UPGRADE_LEVELS);
   const [isSearchUpgradeLevelsLoaded, setIsSearchUpgradeLevelsLoaded] = useState(false);
+  const [searchBattleCycle, setSearchBattleCycle] = useState<SearchBattleCycleState>(DEFAULT_SEARCH_BATTLE_CYCLE);
+  const [isSearchBattleCycleLoaded, setIsSearchBattleCycleLoaded] = useState(false);
+  const [activeSearchBattle, setActiveSearchBattle] = useState<ActiveSearchBattle | null>(null);
   const [legendaryBattleCardPity, setLegendaryBattleCardPity] = useState(0);
   const [isBattlePityLoaded, setIsBattlePityLoaded] = useState(false);
   const [cardLevels, setCardLevels] = useState<ColonyCardLevels>({});
@@ -1265,6 +1297,7 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
   const defenseAlertsPausedAtRef = useRef<number | null>(null);
   const lastBuildingLevelsRef = useRef<Record<string, Record<string, number>>>({});
   const newEarthMissionCycleBonusTimeoutRef = useRef<number | null>(null);
+  const newEarthMissionCycleBonusDrainIntervalRef = useRef<number | null>(null);
   const scheduledNewEarthMissionCycleBonusRef = useRef<number | null>(null);
   const paidNewEarthMissionCycleBonusRef = useRef<number | null>(null);
 
@@ -1282,8 +1315,7 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
         id: card.id,
         name: card.name,
         level: getCardLevel(card.id, cardLevels),
-      }))
-      .filter(card => card.level < MAX_COLONY_CARD_LEVEL);
+      }));
     const submarineColoniesReady = colonies.some(colony => (
       (colony.id === 'colony-2' || colony.id === 'colony-4') &&
       isColonyReadyForPopulation(colony.constructions)
@@ -1315,11 +1347,13 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
   ), [newEarthMissions.missions]);
 
   const newEarthMissionCycleBonusValue = useMemo(() => (
-    newEarthMissions.missions.reduce((total, mission) => total + (Number(mission.reward.qc) || 0), 0)
+    newEarthMissions.missions.reduce((total, mission) => (
+      mission.completed ? total + (Number(mission.reward.qc) || 0) : total
+    ), 0)
   ), [newEarthMissions.missions]);
 
-  const isNewEarthMissionCycleComplete = newEarthMissions.missions.length >= 4
-    && newEarthMissions.missions.every(mission => mission.completed);
+  const isNewEarthMissionCycleFullyClaimed = newEarthMissions.missions.length >= 4
+    && newEarthMissions.missions.every(mission => mission.claimed);
 
   const newEarthMissionContextRef = useRef(newEarthMissionContext);
   const onEarnQCRef = useRef(onEarnQC);
@@ -1356,10 +1390,10 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
   }, []);
 
   useEffect(() => {
-    if (showDefenseHangar || activeDefenseThreat) {
+    if (showDefenseHangar || activeDefenseThreat || activeSearchBattle) {
       preloadAssetGroupPassive('route4-battle');
     }
-  }, [showDefenseHangar, activeDefenseThreat]);
+  }, [showDefenseHangar, activeDefenseThreat, activeSearchBattle]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => setIsLoaded(true), 0);
@@ -1474,6 +1508,16 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
         });
       }
       setIsSearchUpgradeLevelsLoaded(true);
+    });
+    return () => { mounted = false; };
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+    GameStorage.load('route4_search_battle_cycle').then(saved => {
+      if (!mounted) return;
+      setSearchBattleCycle(normalizeSearchBattleCycle(saved));
+      setIsSearchBattleCycleLoaded(true);
     });
     return () => { mounted = false; };
   }, []);
@@ -1625,6 +1669,11 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
   }, [searchUpgradeLevels, isLoaded, isSearchUpgradeLevelsLoaded]);
 
   useEffect(() => {
+    if (!isLoaded || !isSearchBattleCycleLoaded) return;
+    GameStorage.save(searchBattleCycle, 'route4_search_battle_cycle');
+  }, [searchBattleCycle, isLoaded, isSearchBattleCycleLoaded]);
+
+  useEffect(() => {
     if (!isLoaded || !isBattlePityLoaded) return;
     GameStorage.save(legendaryBattleCardPity, 'battle_card_legendary_pity');
   }, [legendaryBattleCardPity, isLoaded, isBattlePityLoaded]);
@@ -1668,12 +1717,15 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
     if (newEarthMissionCycleBonusTimeoutRef.current) {
       window.clearTimeout(newEarthMissionCycleBonusTimeoutRef.current);
     }
+    if (newEarthMissionCycleBonusDrainIntervalRef.current) {
+      window.clearInterval(newEarthMissionCycleBonusDrainIntervalRef.current);
+    }
     scheduledNewEarthMissionCycleBonusRef.current = null;
   }, []);
 
   useEffect(() => {
     if (!isLoaded || !isNewEarthMissionsLoaded) return;
-    if (!isNewEarthMissionCycleComplete || newEarthMissions.cycleRewardClaimed) return;
+    if (!isNewEarthMissionCycleFullyClaimed || newEarthMissions.cycleRewardClaimed) return;
 
     const bonus = newEarthMissionCycleBonusValue;
     const cycle = newEarthMissions.cycle;
@@ -1688,7 +1740,26 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
     }
 
     scheduledNewEarthMissionCycleBonusRef.current = cycle;
-    setNewEarthMissionCycleBonusAnimation({ cycle, bonus, draining: true, revealed: false });
+    playRoute4UiSfx(ROUTE4_FINAL_MISSION_QC_BONUS_SFX, 0.82);
+    setNewEarthMissionCycleBonusAnimation({ cycle, bonus, displayBonus: bonus, draining: true, revealed: false });
+
+    const startedAt = Date.now();
+    if (newEarthMissionCycleBonusDrainIntervalRef.current) {
+      window.clearInterval(newEarthMissionCycleBonusDrainIntervalRef.current);
+    }
+    newEarthMissionCycleBonusDrainIntervalRef.current = window.setInterval(() => {
+      const progress = Math.min(1, (Date.now() - startedAt) / 2000);
+      const displayBonus = Math.max(0, Math.round(bonus * (1 - progress)));
+      setNewEarthMissionCycleBonusAnimation(current => (
+        current?.cycle === cycle && current.draining
+          ? { ...current, displayBonus }
+          : current
+      ));
+      if (progress >= 1 && newEarthMissionCycleBonusDrainIntervalRef.current) {
+        window.clearInterval(newEarthMissionCycleBonusDrainIntervalRef.current);
+        newEarthMissionCycleBonusDrainIntervalRef.current = null;
+      }
+    }, 50);
 
     newEarthMissionCycleBonusTimeoutRef.current = window.setTimeout(() => {
       if (paidNewEarthMissionCycleBonusRef.current === cycle) {
@@ -1705,10 +1776,14 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
         const isSameCompletedCycle = prev.cycle === cycle
           && !prev.cycleRewardClaimed
           && prev.missions.length >= 4
-          && prev.missions.every(mission => mission.completed);
+          && prev.missions.every(mission => mission.claimed);
         return isSameCompletedCycle ? markNewEarthMissionCycleRewardClaimed(prev) : prev;
       });
-      setNewEarthMissionCycleBonusAnimation({ cycle, bonus, draining: false, revealed: true });
+      if (newEarthMissionCycleBonusDrainIntervalRef.current) {
+        window.clearInterval(newEarthMissionCycleBonusDrainIntervalRef.current);
+        newEarthMissionCycleBonusDrainIntervalRef.current = null;
+      }
+      setNewEarthMissionCycleBonusAnimation({ cycle, bonus, displayBonus: 0, draining: false, revealed: true });
       setCardFeedback(
         tRef.current('New Earth mission board bonus credited.', 'Bônus final do painel de missões creditado.')
       );
@@ -1718,7 +1793,7 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
   }, [
     isLoaded,
     isNewEarthMissionsLoaded,
-    isNewEarthMissionCycleComplete,
+    isNewEarthMissionCycleFullyClaimed,
     newEarthMissions.cycle,
     newEarthMissions.cycleRewardClaimed,
     newEarthMissionCycleBonusValue,
@@ -1726,6 +1801,7 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
 
   useEffect(() => {
     if (!isLoaded || !isNewEarthMissionsLoaded) return;
+    if (isNewEarthMissionCycleFullyClaimed && !newEarthMissions.cycleRewardClaimed) return;
     setNewEarthMissions(prev => {
       const next = refreshNewEarthMissionBoard(
         normalizeNewEarthMissionState(prev, newEarthMissionContext),
@@ -1736,12 +1812,16 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
       }
       return JSON.stringify(next) === JSON.stringify(prev) ? prev : next;
     });
-  }, [isLoaded, isNewEarthMissionsLoaded, newEarthMissionContext]);
+  }, [isLoaded, isNewEarthMissionsLoaded, isNewEarthMissionCycleFullyClaimed, newEarthMissions.cycleRewardClaimed, newEarthMissionContext]);
 
   useEffect(() => {
     if (!isLoaded || !isNewEarthMissionsLoaded) return;
     const timer = window.setInterval(() => {
       setNewEarthMissions(prev => {
+        const waitingForCycleBonus = prev.missions.length >= 4
+          && prev.missions.every(mission => mission.claimed)
+          && !prev.cycleRewardClaimed;
+        if (waitingForCycleBonus) return prev;
         const next = refreshNewEarthMissionBoard(prev, newEarthMissionContext);
         if (next.cycle !== prev.cycle && prev.cycle > 0) {
           playRoute4UiSfx(ROUTE4_QUESTS_RENEW_SFX);
@@ -2127,6 +2207,10 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
   const activeColony = useMemo(() => 
     colonies.find(c => c.id === effectiveActiveColonyId) || null
   , [colonies, effectiveActiveColonyId]);
+
+  const allColoniesFullyBuilt = useMemo(() => (
+    colonies.length > 0 && colonies.every(colony => isColonyReadyForPopulation(colony.constructions))
+  ), [colonies]);
 
   const ownedCards = useMemo(() =>
     ownedCardIds
@@ -2647,7 +2731,9 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
     const completesCycle = newEarthMissions.missions.length > 0
       && newEarthMissions.missions.every(item => item.claimed || item.id === missionId);
     const claimed = markNewEarthMissionClaimed(newEarthMissions, missionId);
-    const claimedMissionState = refreshNewEarthMissionBoard(claimed, newEarthMissionContext);
+    const claimedMissionState = completesCycle
+      ? claimed
+      : refreshNewEarthMissionBoard(claimed, newEarthMissionContext);
 
     setNewEarthMissions(claimedMissionState);
     GameStorage.save(claimedMissionState, NEW_EARTH_MISSIONS_STORAGE_KEY);
@@ -2705,14 +2791,14 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
     }
 
     setCardFeedback(completesCycle
-      ? t('Mission board renewed.', 'Painel de missões renovado.')
+      ? t('Final mission bonus releasing.', 'Bonificação final das missões liberando.')
       : t('Mission reward claimed', 'Recompensa da missão resgatada')
     );
   }, [newEarthMissions, newEarthMissionContext, onEarnQC, effectiveActiveColonyId, setColonies, ownedCardIds, playSfx, t]);
 
   const resolveDefenseVictory = useCallback((summary?: BattleResultSummary) => {
     if (!activeDefenseThreat) return;
-    const reward = rollBattleCardReward(ownedCardIds, Math.random, legendaryBattleCardPity);
+    const reward = rollAnyMissingColonyCardReward(ownedCardIds);
     const kills = summary?.kills || 18;
     const battleXp = summary?.xp || (kills * 45 + 450);
     const battleQc = summary?.qc || (kills * 4200 + 35000);
@@ -2766,7 +2852,11 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
       const nextOwned = normalizeOwnedColonyCardIds([...ownedCardIds, reward.id]);
       setOwnedCardIds(nextOwned);
       GameStorage.save(nextOwned, 'colony_cards_data');
-      setLegendaryBattleCardPity(reward.rarity === 'legendary' ? 0 : legendaryBattleCardPity + LEGENDARY_BATTLE_CARD_PITY_STEP);
+      setLegendaryBattleCardPity(prev => (
+        isBattleCard(reward) && reward.rarity !== 'legendary'
+          ? prev + LEGENDARY_BATTLE_CARD_PITY_STEP
+          : prev
+      ));
       setCardEvent(reward);
       playSfx?.('claim_card');
       setCardFeedback(t(
@@ -2781,7 +2871,7 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
       `Threat neutralized: +${battleXp} XP and +${formatValue(battleQc)} QC`,
       `Ameaça neutralizada: +${battleXp} XP e +${formatValue(battleQc)} QC`
     ));
-  }, [activeDefenseThreat, ownedCardIds, playSfx, legendaryBattleCardPity, onEarnQC, formatValue, recordNewEarthMissionProgress]);
+  }, [activeDefenseThreat, ownedCardIds, playSfx, onEarnQC, formatValue, recordNewEarthMissionProgress]);
 
   const resolveDefenseDefeat = useCallback(() => {
     const retryUntil = Date.now() + DEFENSE_THREAT_RESPONSE_SECONDS * 1000;
@@ -2793,6 +2883,119 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
     setActiveDefenseThreat(null);
     setCardFeedback(language === 'pt' ? 'Defesa falhou. A ameaça permanece pendente.' : 'Defense failed. Threat remains pending.');
   }, [activeDefenseThreat, language]);
+
+  const resolveSearchBattleVictory = useCallback((summary?: BattleResultSummary) => {
+    if (!activeSearchBattle) return;
+
+    const battleIndex = activeSearchBattle.battleIndex;
+    const battleNumber = battleIndex + 1;
+    const kills = summary?.kills || 20;
+    const battleXp = summary?.xp || (kills * 45 + 550 + battleIndex * 80);
+    const battleQc = SEARCH_BATTLE_QC_REWARDS[battleIndex] || SEARCH_BATTLE_QC_REWARDS[0];
+    const targetColonyId = effectiveActiveColonyId || colonies[0]?.id || null;
+    const targetColony = colonies.find(colony => colony.id === targetColonyId) || null;
+    const availableSentimentSectors = SEARCH_BATTLE_SENTIMENT_SECTORS.filter(sector => (
+      Number(targetColony?.sectors?.[sector] ?? DEFAULT_COLONY_SECTORS[sector]) < 100
+    ));
+    const sentimentPool = availableSentimentSectors.length > 0 ? availableSentimentSectors : SEARCH_BATTLE_SENTIMENT_SECTORS;
+    const sentimentSector = sentimentPool[Math.floor(Math.random() * sentimentPool.length)] || 'happiness';
+    const sentimentValue = 3 + Math.floor(Math.random() * 5);
+    let nextOwned = normalizeOwnedColonyCardIds(ownedCardIds);
+    const awardedCards: ColonyCard[] = [];
+
+    const previousHorizonXp = horizonXpRef.current;
+    const nextHorizonXp = previousHorizonXp + battleXp;
+    const previousHorizonLevel = getHorizonLevelFromXp(previousHorizonXp).level;
+    const nextHorizonLevel = getHorizonLevelFromXp(nextHorizonXp).level;
+    horizonXpRef.current = nextHorizonXp;
+    setHorizonXp(nextHorizonXp);
+    if (nextHorizonLevel > previousHorizonLevel && !summary?.levelUpSfxHandled) {
+      playRoute4BattleSfx(HORIZON_LEVEL_UP_SFX, 0.78);
+    }
+
+    if (targetColonyId) {
+      setColonies(prev => prev.map(colony => (
+        colony.id === targetColonyId
+          ? {
+              ...colony,
+              sectors: {
+                ...(colony.sectors || {}),
+                [sentimentSector]: Math.min(
+                  100,
+                  Math.max(0, Number(colony.sectors?.[sentimentSector] ?? DEFAULT_COLONY_SECTORS[sentimentSector]) + sentimentValue)
+                ),
+              },
+            }
+          : colony
+      )));
+    }
+
+    onEarnQC?.(battleQc, 'battle');
+    if (Math.random() < SEARCH_BATTLE_CARD_CHANCE) {
+      const card = rollAnyMissingColonyCardReward(nextOwned);
+      if (card) {
+        nextOwned = normalizeOwnedColonyCardIds([...nextOwned, card.id]);
+        awardedCards.push(card);
+      }
+    }
+
+    const completesCycle = battleIndex >= SEARCH_BATTLE_TOTAL - 1;
+    if (completesCycle) {
+      onEarnQC?.(SEARCH_BATTLE_FINAL_QC_REWARD, 'battle');
+      const guaranteedCard = rollAnyMissingColonyCardReward(nextOwned);
+      if (guaranteedCard) {
+        nextOwned = normalizeOwnedColonyCardIds([...nextOwned, guaranteedCard.id]);
+        awardedCards.push(guaranteedCard);
+      }
+    }
+
+    if (awardedCards.length > 0) {
+      setOwnedCardIds(nextOwned);
+      GameStorage.save(nextOwned, 'colony_cards_data');
+      setCardEvent(awardedCards[awardedCards.length - 1]);
+      playSfx?.('claim_card');
+    }
+
+    setDefenseBattleLevel(prev => Math.max(1, Math.floor(prev)) + 1);
+    setSearchBattleCycle(prev => (
+      completesCycle
+        ? { nextBattleIndex: 0, cycle: prev.cycle + 1 }
+        : { ...prev, nextBattleIndex: Math.min(SEARCH_BATTLE_TOTAL - 1, battleIndex + 1) }
+    ));
+    setActiveSearchBattle(null);
+    recordNewEarthMissionProgress({ type: 'defense-victory' });
+    recordNewEarthMissionProgress({ type: 'defense-kills', amount: kills });
+    recordNewEarthMissionProgress({ type: 'defense-bosses', amount: Math.max(1, Math.floor(Number(summary?.bossesDefeated) || 1)) });
+
+    const sentimentLabel = SECTOR_CONFIG[sentimentSector].label[language];
+    const cardText = awardedCards.length > 0
+      ? t(' and card acquired', ' e carta adquirida')
+      : '';
+    const finalText = completesCycle
+      ? t(` Final bonus: +${formatValue(SEARCH_BATTLE_FINAL_QC_REWARD)} QC.`, ` Bônus final: +${formatValue(SEARCH_BATTLE_FINAL_QC_REWARD)} QC.`)
+      : '';
+    setCardFeedback(t(
+      `Battle ${battleNumber} won: +${formatValue(battleQc)} QC, +${sentimentValue} ${sentimentLabel}${cardText}.${finalText}`,
+      `Batalha ${battleNumber} vencida: +${formatValue(battleQc)} QC, +${sentimentValue} ${sentimentLabel}${cardText}.${finalText}`
+    ));
+  }, [
+    activeSearchBattle,
+    colonies,
+    effectiveActiveColonyId,
+    formatValue,
+    language,
+    onEarnQC,
+    ownedCardIds,
+    playSfx,
+    recordNewEarthMissionProgress,
+    setColonies,
+    t,
+  ]);
+
+  const resolveSearchBattleDefeat = useCallback(() => {
+    setActiveSearchBattle(null);
+    setCardFeedback(t('Battle failed. The same battle remains available.', 'Batalha falhou. A mesma batalha continua disponível.'));
+  }, [t]);
 
   const handleRunSearch = useCallback((option: ColonySearchOption, slotIndex: number) => {
     const searchKey = getSearchSlotKey(option.id, slotIndex);
@@ -2823,6 +3026,33 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
     setSearchRemainingSeconds(prev => ({ ...prev, [searchKey]: option.durationSeconds }));
     setCardFeedback(t('Search team deployed', 'Equipe de busca enviada'));
   }, [activeSearches, t]);
+
+  const handleSearchSlotAction = useCallback((option: ColonySearchOption, slotIndex: number) => {
+    if (!allColoniesFullyBuilt) {
+      handleRunSearch(option, slotIndex);
+      return;
+    }
+
+    const battleIndex = getSearchBattleIndex(option.id, slotIndex);
+    if (activeSearchBattle) {
+      setCardFeedback(t('Finish the active battle first', 'Finalize a batalha ativa primeiro'));
+      return;
+    }
+    if (battleIndex !== searchBattleCycle.nextBattleIndex) {
+      setCardFeedback(t('Win the previous battle to unlock this one', 'Vença a batalha anterior para liberar esta'));
+      return;
+    }
+
+    playRoute4SearchSfx(option.id, slotIndex);
+    setLastSearchReport(null);
+    setActiveSearchBattle({
+      battleIndex,
+      searchId: option.id,
+      slotIndex,
+      title: t(`Battle ${battleIndex + 1}`, `Batalha ${battleIndex + 1}`),
+    });
+    setCardFeedback(t(`Battle ${battleIndex + 1} started`, `Batalha ${battleIndex + 1} iniciada`));
+  }, [activeSearchBattle, allColoniesFullyBuilt, handleRunSearch, searchBattleCycle.nextBattleIndex, t]);
 
   const upgradeSearch = useCallback((id: ColonyExpeditionId) => {
     const currentLevel = searchUpgradeLevels[id] || 0;
@@ -2983,6 +3213,9 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
     && newEarthMissionCycleBonusAnimation.cycle === newEarthMissions.cycle
   );
   const missionCycleProgressDisplay = missionCycleBonusIsDraining ? 0 : missionCycleBaseProgress;
+  const missionCycleBonusDisplayValue = missionCycleBonusIsDraining
+    ? Math.max(0, Math.floor(newEarthMissionCycleBonusAnimation?.displayBonus || 0))
+    : newEarthMissionCycleBonusValue;
 
   return (
     <div className="flex flex-col h-full space-y-3 overflow-hidden">
@@ -3012,7 +3245,7 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
       </AnimatePresence>
 
       <AnimatePresence>
-        {activeDefenseThreat && (
+        {activeDefenseThreat && !activeSearchBattle && (
           <NewEarthDefenseBattle
             language={language}
             shipStats={battleShipStats}
@@ -3026,6 +3259,25 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
             onVictory={resolveDefenseVictory}
             onDefeat={resolveDefenseDefeat}
             onClose={() => setActiveDefenseThreat(null)}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {activeSearchBattle && (
+          <NewEarthDefenseBattle
+            language={language}
+            shipStats={battleShipStats}
+            horizonLevel={horizonProgress.level}
+            defenseBattleLevel={defenseBattleLevel}
+            horizonXp={horizonProgress.currentXp}
+            horizonNextXp={horizonProgress.nextXp}
+            specials={selectedSpecialIds}
+            trinityShotEnabled={trinityShotEnabled}
+            threatTitle={activeSearchBattle.title}
+            onVictory={resolveSearchBattleVictory}
+            onDefeat={resolveSearchBattleDefeat}
+            onClose={() => setActiveSearchBattle(null)}
           />
         )}
       </AnimatePresence>
@@ -3419,6 +3671,11 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
                     <div aria-hidden="true" className="absolute inset-0 bg-[linear-gradient(110deg,transparent_0%,rgba(255,255,255,0.85)_45%,transparent_75%)] opacity-75 animate-pulse" />
                     <div aria-hidden="true" className="absolute inset-y-0 left-0 w-full bg-[repeating-linear-gradient(90deg,rgba(255,255,255,0.0)_0px,rgba(255,255,255,0.0)_14px,rgba(255,255,255,0.35)_15px,rgba(255,255,255,0.0)_18px)] opacity-55" />
                   </div>
+                  <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center px-4 text-center">
+                    <span className="rounded-full border border-cyan-100/25 bg-black/55 px-4 py-1 font-orbitron text-[11px] font-black uppercase tracking-[0.18em] text-cyan-50 shadow-[0_0_14px_rgba(34,211,238,0.28)]">
+                      {t('Extra bonus', 'Bonificação extra')} {formatValue(missionCycleBonusDisplayValue)} QC
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -3790,9 +4047,11 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
             {searchOptions.map(option => {
               const searchSlots = Array.from({ length: MAX_PARALLEL_SEARCHES_PER_TYPE }, (_, slotIndex) => {
                 const searchKey = getSearchSlotKey(option.id, slotIndex);
+                const battleIndex = getSearchBattleIndex(option.id, slotIndex);
                 return {
                   slotIndex,
                   searchKey,
+                  battleIndex,
                   activeSearch: activeSearches[searchKey],
                   style: SEARCH_SLOT_STYLES[slotIndex],
                 };
@@ -3829,7 +4088,9 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
                           key={`${option.id}-duration-${slot.slotIndex}`}
                           className={`rounded-lg border px-1.5 py-1 text-center font-orbitron text-[11px] font-black ${slot.style}`}
                         >
-                          {formatSearchTime(slot.activeSearch ? searchRemainingSeconds[slot.searchKey] || 0 : option.durationSeconds)}
+                          {allColoniesFullyBuilt
+                            ? t('Battle', 'Batalha')
+                            : formatSearchTime(slot.activeSearch ? searchRemainingSeconds[slot.searchKey] || 0 : option.durationSeconds)}
                         </span>
                       ))}
                     </div>
@@ -3893,13 +4154,19 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
                     <PremiumCanvasButton
                       key={`${option.id}-start-${slot.slotIndex}`}
                       type="button"
-                      onClick={() => handleRunSearch(option, slot.slotIndex)}
-                      disabled={Boolean(slot.activeSearch)}
+                      onClick={() => handleSearchSlotAction(option, slot.slotIndex)}
+                      disabled={allColoniesFullyBuilt
+                        ? Boolean(activeSearchBattle) || slot.battleIndex !== searchBattleCycle.nextBattleIndex
+                        : Boolean(slot.activeSearch)}
                       tone={option.id === 'sea' ? 'cyan' : 'green'}
                       className="h-12 rounded-2xl"
                       contentClassName="px-2 text-[11px] font-black uppercase tracking-[0.14em] text-white"
                     >
-                      {slot.activeSearch ? formatSearchTime(searchRemainingSeconds[slot.searchKey] || 0) : `Start ${slot.slotIndex + 1}`}
+                      {allColoniesFullyBuilt
+                        ? (slot.battleIndex < searchBattleCycle.nextBattleIndex
+                            ? t('Won', 'Vencida')
+                            : t(`Battle ${slot.battleIndex + 1}`, `Batalha ${slot.battleIndex + 1}`))
+                        : (slot.activeSearch ? formatSearchTime(searchRemainingSeconds[slot.searchKey] || 0) : `Start ${slot.slotIndex + 1}`)}
                     </PremiumCanvasButton>
                   ))}
                 </div>

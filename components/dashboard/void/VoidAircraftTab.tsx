@@ -52,6 +52,7 @@ const VoidAircraftTab = memo(() => {
       <AnimatePresence>
         {showVoidAircraftTutorial && (
           <motion.div 
+            key="tutorial-overlay"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -98,6 +99,7 @@ const VoidAircraftTab = memo(() => {
             </motion.div>
           </motion.div>
         )}
+      </AnimatePresence>
         
         <div className="min-h-0 flex-1 overflow-hidden pr-2">
           <div className="grid h-full min-h-0 grid-cols-1 gap-4 xl:grid-cols-3 xl:auto-rows-fr">
@@ -460,7 +462,6 @@ const VoidAircraftTab = memo(() => {
             })}
           </div>
         </div>
-      </AnimatePresence>
     </div>
   );
 });

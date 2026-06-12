@@ -48,6 +48,25 @@ const EVENT_IMPORTANCE_STYLES: Record<string, { title: string; card: string; des
   },
 };
 
+const HISTORIC_CARD_BACKGROUND_BY_IMPORTANCE: Record<string, string> = {
+  important: '/assets/rota4/layout_cap4/historico_card.webp',
+  relevant: '/assets/rota4/layout_cap4/historico_card_raro.webp',
+  major: '/assets/rota4/layout_cap4/historico_card_epico.webp',
+  epic: '/assets/rota4/layout_cap4/historico_card_epico.webp',
+  population: '/assets/rota4/layout_cap4/historico_card_lendario.webp',
+  mythic: '/assets/rota4/layout_cap4/historico_card_lendario.webp',
+  arcade: '/assets/rota4/layout_cap4/historico_card_rgb.webp',
+};
+
+const getHistoricCardBackground = (importance?: string) => (
+  HISTORIC_CARD_BACKGROUND_BY_IMPORTANCE[importance || 'important']
+  || HISTORIC_CARD_BACKGROUND_BY_IMPORTANCE.important
+);
+
+const getHistoricCardBackgroundImage = (importance?: string) => (
+  `linear-gradient(90deg,rgba(3,7,18,0.70),rgba(3,7,18,0.46)), url('${getHistoricCardBackground(importance)}')`
+);
+
 const cleanEventText = (value: unknown) => String(value || '')
   .replace(/ÃƒÂ¡|Ã¡/g, 'á')
   .replace(/ÃƒÂ |Ã /g, 'à')
@@ -248,21 +267,29 @@ const EarthSidebar: React.FC<EarthSidebarProps> = ({
       <div className="flex-1 overflow-y-auto p-4 space-y-6 custom-scrollbar bg-black/20">
         {/* Main Info Grid */}
         <div className="grid grid-cols-2 gap-4">
-          <div className="p-3 rounded-xl bg-white/5 border border-white/5 flex flex-col gap-1">
-            <span className="text-[14px] font-orbitron text-white/40 uppercase tracking-widest flex items-center gap-1.5">
+          <div
+            className="relative overflow-hidden rounded-xl border border-emerald-300/20 bg-cover bg-center p-3 flex flex-col items-center justify-center gap-1 text-center shadow-[0_0_18px_rgba(16,185,129,0.12)]"
+            style={{ backgroundImage: "linear-gradient(90deg,rgba(4,8,18,0.72),rgba(4,8,18,0.48)), url('/assets/rota4/layout_cap4/ano_atual.webp')" }}
+          >
+            <div className="absolute inset-2 rounded-lg bg-black/30 shadow-[inset_0_0_18px_rgba(0,0,0,0.45)]" />
+            <span className="relative z-10 text-[14px] font-orbitron text-emerald-50/70 uppercase tracking-widest flex items-center justify-center gap-1.5">
               <Clock className="w-2.5 h-2.5 text-emerald-400" />
               {language === 'pt' ? 'Ano Atual' : 'Current Year'}
             </span>
-            <span className="text-base font-mono font-black text-white tracking-widest">
+            <span className="relative z-10 text-base font-mono font-black text-white tracking-widest drop-shadow-[0_0_8px_rgba(0,0,0,0.95)]">
               {gameTime.years}
             </span>
           </div>
-          <div className="p-3 rounded-xl bg-white/5 border border-white/5 flex flex-col gap-1">
-            <span className="text-[14px] font-orbitron text-white/40 uppercase tracking-widest flex items-center gap-1.5">
+          <div
+            className="relative overflow-hidden rounded-xl border border-cyan-300/20 bg-cover bg-center p-3 flex flex-col items-center justify-center gap-1 text-center shadow-[0_0_18px_rgba(34,211,238,0.12)]"
+            style={{ backgroundImage: "linear-gradient(90deg,rgba(4,8,18,0.72),rgba(4,8,18,0.48)), url('/assets/rota4/layout_cap4/populacao_atual.webp')" }}
+          >
+            <div className="absolute inset-2 rounded-lg bg-black/30 shadow-[inset_0_0_18px_rgba(0,0,0,0.45)]" />
+            <span className="relative z-10 text-[14px] font-orbitron text-cyan-50/70 uppercase tracking-widest flex items-center justify-center gap-1.5">
               <Users className="w-2.5 h-2.5 text-cyan-400" />
               {language === 'pt' ? 'População Total' : 'Total Population'}
             </span>
-            <span className="text-base font-mono font-black text-white tracking-widest">
+            <span className="relative z-10 text-base font-mono font-black text-white tracking-widest drop-shadow-[0_0_8px_rgba(0,0,0,0.95)]">
               {formatValue(Math.floor(totalHumanPopulation))}
             </span>
           </div>
@@ -311,7 +338,8 @@ const EarthSidebar: React.FC<EarthSidebarProps> = ({
                     initial={{ opacity: 0, x: -10 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: idx * 0.1 }}
-                    className={`p-3 rounded-xl transition-all group ${style.card}`}
+                    className={`bg-cover bg-center p-3 rounded-xl transition-all group ${style.card}`}
+                    style={{ backgroundImage: getHistoricCardBackgroundImage(importance) }}
                   >
                     <div className="flex justify-between items-start mb-1">
                       <span className={`text-base font-bold uppercase tracking-tight transition-colors ${style.title}`}>
@@ -323,7 +351,7 @@ const EarthSidebar: React.FC<EarthSidebarProps> = ({
                             {language === 'pt' ? style.badgePt : style.badgeEn}
                           </span>
                         ) : null}
-                        <span className="text-[14px] font-mono text-white/20">
+                        <span className="text-[14px] font-mono font-black text-white drop-shadow-[0_0_8px_rgba(0,0,0,0.95)]">
                           {language === 'pt' ? 'ANO' : 'YEAR'} {event.year || 0}
                         </span>
                       </div>
@@ -399,19 +427,18 @@ const EarthSidebar: React.FC<EarthSidebarProps> = ({
               </div>
 
               <div
-                className="flex flex-1 flex-col gap-4 overflow-hidden p-5 bg-cover bg-center"
-                style={{ backgroundImage: "linear-gradient(to bottom, rgba(3, 7, 18, 0.75), rgba(3, 7, 18, 0.9)), url('/assets/rota4/layout_cap4/mural_background.webp')" }}
+                className="flex flex-1 flex-col gap-3 overflow-hidden p-4 bg-cover bg-center"
+                style={{ backgroundImage: "linear-gradient(to bottom, rgba(3, 7, 18, 0.38), rgba(3, 7, 18, 0.58)), url('/assets/rota4/layout_cap4/mural_background.webp')" }}
               >
                 {permanentHistoryEvents.length === 0 ? (
                   <div
-                    className="flex h-full items-center justify-center rounded-xl border border-dashed border-white/10 p-8 text-center font-mono text-[13px] uppercase tracking-[0.18em] text-white/45"
-                    style={{ backgroundColor: '#080e1a' }}
+                    className="flex h-full items-center justify-center rounded-xl border border-dashed border-white/10 bg-[#080e1a]/68 p-8 text-center font-mono text-[13px] uppercase tracking-[0.18em] text-white/55 shadow-[inset_0_0_40px_rgba(0,0,0,0.34)] backdrop-blur-[1px]"
                   >
                     {language === 'pt' ? 'Nenhum marco raro registrado ainda.' : 'No rare milestone registered yet.'}
                   </div>
                 ) : (
                   <>
-                    <div className="grid flex-1 auto-rows-max grid-cols-1 gap-3 overflow-y-auto custom-scrollbar pr-1">
+                    <div className="grid flex-1 auto-rows-fr grid-cols-1 gap-2 overflow-hidden">
                       {permanentHistoryPageEvents.map((event, idx) => {
                         const importance = event.importance || (event.isFixed ? 'major' : 'important');
                         const style = EVENT_IMPORTANCE_STYLES[importance] || EVENT_IMPORTANCE_STYLES.important;
@@ -421,24 +448,25 @@ const EarthSidebar: React.FC<EarthSidebarProps> = ({
                             initial={{ opacity: 0, y: 8 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ delay: Math.min(idx * 0.04, 0.3) }}
-                            className="min-h-0 rounded-xl border border-white/14 bg-black/50 backdrop-blur-md p-4 shadow-[0_0_18px_rgba(0,0,0,0.28)]"
+                            className="min-h-0 overflow-hidden rounded-xl border border-white/14 bg-cover bg-center p-3 shadow-[0_0_18px_rgba(0,0,0,0.28)]"
+                            style={{ backgroundImage: getHistoricCardBackgroundImage(importance) }}
                           >
-                            <div className="mb-2 flex items-start justify-between gap-4">
+                            <div className="mb-1.5 flex items-start justify-between gap-3">
                               <div>
-                                <p className={`font-orbitron text-lg font-black uppercase tracking-wide ${style.title}`}>
+                                <p className={`line-clamp-1 font-orbitron text-[17px] font-black uppercase leading-tight tracking-wide ${style.title}`}>
                                   {cleanEventText(event.name || 'Unknown Event')}
                                 </p>
-                                <p className="mt-1 font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-white/35">
+                                <p className="mt-1 font-mono text-[9px] font-black uppercase tracking-[0.2em] text-white drop-shadow-[0_0_8px_rgba(0,0,0,0.95)]">
                                   {formatEventDate(event)}
                                 </p>
                               </div>
                               {(language === 'pt' ? style.badgePt : style.badgeEn) ? (
-                                <span className="rounded-full border border-current/30 px-2 py-1 font-mono text-[9px] font-black uppercase tracking-[0.16em] text-current opacity-80">
+                                <span className="shrink-0 rounded-full border border-current/30 px-2 py-0.5 font-mono text-[8px] font-black uppercase tracking-[0.14em] text-current opacity-80">
                                   {language === 'pt' ? style.badgePt : style.badgeEn}
                                 </span>
                               ) : null}
                             </div>
-                            <p className={`line-clamp-2 text-[15px] leading-relaxed ${style.description}`}>
+                            <p className={`line-clamp-2 text-[14px] leading-snug ${style.description}`}>
                               {cleanEventText(event.description || 'No description available')}
                             </p>
                           </motion.div>

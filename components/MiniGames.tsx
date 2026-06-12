@@ -29,6 +29,11 @@ const ARCADE_BACKGROUND_SRC = '/assets/games/arcade_background.webp';
 const WILDCARD_ICON_SRC = '/assets/rota4/cards/joker_ico.webp';
 const WILDCARD_CARD_BACKGROUND_SRC = '/assets/rota4/cards/6_background_j.webp';
 const arcadeUiSoundCache = new Map<string, HTMLAudioElement>();
+const LOCKED_ARCADE_CARD_SFX = [
+  '/audio/sfx/bobby_blue/cards lockeds/cards lockeds1.ogg',
+  '/audio/sfx/bobby_blue/cards lockeds/cards lockeds2.ogg',
+];
+let lockedArcadeCardSfxPlaying = false;
 
 const ARCADE_GLOW_THEMES: Record<string, { primary: string; secondary: string; halo: string; visual: 'sci-fi' | 'war' | 'puzzle' | 'nebula' }> = {
   'salto-espacial': {
@@ -80,6 +85,32 @@ const playArcadeUiSound = (src: string) => {
   const instance = audio.cloneNode(true) as HTMLAudioElement;
   instance.volume = 0.7;
   instance.play().catch(() => {});
+};
+
+const playRandomLockedArcadeCardSfx = () => {
+  if (typeof Audio === 'undefined' || lockedArcadeCardSfxPlaying) return;
+  const src = LOCKED_ARCADE_CARD_SFX[Math.floor(Math.random() * LOCKED_ARCADE_CARD_SFX.length)];
+  if (!src) return;
+
+  let audio = arcadeUiSoundCache.get(src);
+  if (!audio) {
+    audio = new Audio(src);
+    audio.preload = 'auto';
+    arcadeUiSoundCache.set(src, audio);
+  }
+
+  lockedArcadeCardSfxPlaying = true;
+  audio.currentTime = 0;
+  audio.volume = 0.82;
+  audio.onended = () => {
+    lockedArcadeCardSfxPlaying = false;
+  };
+  audio.onerror = () => {
+    lockedArcadeCardSfxPlaying = false;
+  };
+  audio.play().catch(() => {
+    lockedArcadeCardSfxPlaying = false;
+  });
 };
 
 export const MiniGames: React.FC<MiniGamesProps> = ({ onGameSelect, language, arcadeScores = {} }) => {
@@ -438,7 +469,14 @@ export const MiniGames: React.FC<MiniGamesProps> = ({ onGameSelect, language, ar
                       corSecundaria={theme.secondary}
                       temaVisual={theme.visual}
                       status={isUnlockedByCard ? (language === 'pt' ? 'DISPONÍVEL' : 'AVAILABLE') : (language === 'pt' ? 'CARTA BLOQUEADA' : 'CARD LOCKED')}
-                      onPlay={() => isUnlockedByCard && onGameSelect(game.id)}
+                      onPlay={() => {
+                        if (!isUnlockedByCard) {
+                          playRandomLockedArcadeCardSfx();
+                          return;
+                        }
+                        onGameSelect(game.id);
+                      }}
+                      onLockedClick={playRandomLockedArcadeCardSfx}
                       onInfo={() => handleInfoOpen(game)}
                       screenshot={game.image}
                       cabinetImage={game.cabinetImage}
@@ -793,7 +831,10 @@ export const MiniGames: React.FC<MiniGamesProps> = ({ onGameSelect, language, ar
 
               <PremiumCanvasButton
                 onClick={() => {
-                  if (!unlockedArcadeIds.has(selectedGameInfo.id)) return;
+                  if (!unlockedArcadeIds.has(selectedGameInfo.id)) {
+                    playRandomLockedArcadeCardSfx();
+                    return;
+                  }
                   onGameSelect(selectedGameInfo.id);
                   setSelectedGameInfo(null);
                 }}

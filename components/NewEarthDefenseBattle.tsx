@@ -5,14 +5,17 @@ import { X } from 'lucide-react';
 import { BattleShipComputedStats, getHorizonXpForNextLevel, MAX_HORIZON_LEVEL } from '@/lib/colony-cards';
 import { PremiumCanvasButton } from './ui/PremiumCanvasButton';
 
-type DefenseSpecialId = 'apocalypse-laser' | 'hellfire-barrage' | 'special-slot-3' | 'special-slot-4';
+type DefenseSpecialId = 'apocalypse-laser' | 'hellfire-barrage' | 'thor-oath' | 'special-slot-4';
 type EnemyKind = 'common-ship' | 'elite-ship' | 'boss-ship' | 'monster-1' | 'monster-2';
 type LaserState = 'idle' | 'charge' | 'firing' | 'collapse';
+type ThorPhase = 'idle' | 'prelude' | 'small' | 'big' | 'ending' | 'collapse';
 type HellfireSequence = {
   active: boolean;
   remaining: number;
   waitingForImpact: boolean;
 };
+
+const REGULAR_ENEMIES_BEFORE_FINAL_BOSS = 20;
 
 interface NewEarthDefenseBattleProps {
   language: 'en' | 'pt';
@@ -140,6 +143,66 @@ type Shockwave = {
   width?: number;
 };
 
+type ThorPoint = { x: number; y: number };
+
+type ThorBolt = {
+  paths: ThorPoint[][];
+  life: number;
+  maxLife: number;
+  width: number;
+  color: string;
+};
+
+type ThorTornado = {
+  x: number;
+  y: number;
+  radius: number;
+  height: number;
+  spin: number;
+  kind: 'small' | 'big';
+  alive: boolean;
+  birthScale: number;
+  seed: number;
+  lastDir?: number;
+  vx?: number;
+  vy?: number;
+};
+
+type ThorCloud = {
+  x: number; y: number; w: number; h: number; spd: number; alpha: number; swirl: number; layer: number;
+};
+type ThorRainDrop = {
+  x: number; y: number; len: number; spd: number; alpha: number;
+};
+type ThorDebris = {
+  x: number; y: number; vx: number; vy: number; sz: number; rot: number; vr: number; life: number; decay: number; color: string; target?: ThorTornado;
+};
+type ThorSpark = {
+  x: number; y: number; vx: number; vy: number; life: number; decay: number; color: string;
+};
+type ThorEnergyArc = {
+  x: number; y: number; ex: number; ey: number; life: number; decay: number; color: string;
+};
+type ThorParticle = {
+  x: number; y: number; vx: number; vy: number; life: number; decay?: number; color: string; type?: string;
+  sz?: number;
+  size?: number;
+  maxLife?: number;
+  drag?: number;
+  growth?: number;
+  rotation?: number;
+  spin?: number;
+};
+
+type ThorRing = {
+  x: number;
+  y: number;
+  radius: number;
+  life: number;
+  angle: number;
+  color: string;
+};
+
 type EnemyBlueprint = {
   kind: EnemyKind;
   image: string;
@@ -208,7 +271,7 @@ const MONSTER_2_FRAMES = [
 const SPECIAL_LABEL: Record<DefenseSpecialId, Record<'en' | 'pt', string>> = {
   'apocalypse-laser': { en: 'Horizon Laser', pt: 'Horizon Laser' },
   'hellfire-barrage': { en: 'Horizon Barrage', pt: 'Horizon Barrage' },
-  'special-slot-3': { en: 'Special 3', pt: 'Especial 3' },
+  'thor-oath': { en: 'Thor Oath', pt: 'Juramento de Thor' },
   'special-slot-4': { en: 'Special 4', pt: 'Especial 4' },
 };
 
@@ -320,22 +383,6 @@ const buildEnemyBlueprint = (kills: number, forceMonsterBoss: boolean): EnemyBlu
         };
   }
 
-  if (kills >= 12 && roll > 0.93) {
-    return {
-      kind: 'boss-ship',
-      image: `${ASSET_BASE}/enemys/air_ships/enemy_boss_rt4.webp`,
-      shootSound: `${ASSET_BASE}/enemys/air_ships/shoot_enemy_boss_rt4.ogg`,
-      hp: 980 + kills * 18,
-      damage: 68,
-      speed: 0.48,
-      radius: 42,
-      width: 122,
-      height: 82,
-      xp: 150,
-      qc: 18000,
-    };
-  }
-
   if (roll > 0.82) {
     return {
       kind: 'elite-ship',
@@ -396,6 +443,8 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
     lastShot: 0,
     lastSpawn: 0,
     kills: 0,
+    regularEnemiesSpawned: 0,
+    regularEnemiesDefeated: 0,
     earnedXp: 0,
     earnedQc: 0,
     nextId: 1,
@@ -427,6 +476,31 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
     trinityParticles: [] as LaserEmber[],
     trinityShockwaves: [] as Shockwave[],
     trinityShake: 0,
+    thorPhase: 'idle' as ThorPhase,
+    thorPhaseStart: 0,
+    thorStart: 0,
+    thorLastUpdate: 0,
+    thorNextBolt: 0,
+    thorNextFarBolt: 0,
+    thorTickSmall: 0,
+    thorTickBig: 0,
+    thorColumn: 0,
+    thorDarkness: 0,
+    thorFinalDone: false,
+    thorSmallTornados: [] as ThorTornado[],
+    thorBigTornado: null as ThorTornado | null,
+    thorBolts: [] as ThorBolt[],
+    thorFarBolts: [] as ThorBolt[],
+    thorParticles: [] as ThorParticle[],
+    thorDebris: [] as ThorDebris[],
+    thorSparks: [] as ThorSpark[],
+    thorEnergyArcs: [] as ThorEnergyArc[],
+    thorClouds: [] as ThorCloud[],
+    thorRainDrops: [] as ThorRainDrop[],
+    thorShockwaves: [] as Shockwave[],
+    thorRings: [] as ThorRing[],
+    thorFlashAlpha: 0,
+    thorShake: 0,
   });
   const currentDefenseBattleLevel = Math.max(1, Math.floor(defenseBattleLevel || 1));
   const [hud, setHud] = useState({
@@ -471,6 +545,8 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
     state.projectiles = [];
     state.floats = [];
     state.kills = 0;
+    state.regularEnemiesSpawned = 0;
+    state.regularEnemiesDefeated = 0;
     state.earnedXp = 0;
     state.earnedQc = 0;
     state.lastShot = 0;
@@ -502,6 +578,55 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
     state.trinityParticles = [];
     state.trinityShockwaves = [];
     state.trinityShake = 0;
+    state.thorPhase = 'idle';
+    state.thorPhaseStart = 0;
+    state.thorStart = 0;
+    state.thorLastUpdate = 0;
+    state.thorNextBolt = 0;
+    state.thorNextFarBolt = 0;
+    state.thorTickSmall = 0;
+    state.thorTickBig = 0;
+    state.thorColumn = 0;
+    state.thorDarkness = 0;
+    state.thorFinalDone = false;
+    state.thorSmallTornados = [];
+    state.thorBigTornado = null;
+    state.thorBolts = [];
+    state.thorFarBolts = [];
+    state.thorParticles = [];
+    state.thorDebris = [];
+    state.thorSparks = [];
+    state.thorEnergyArcs = [];
+    
+    state.thorClouds = [];
+    for (let i = 0; i < 42; i++) {
+      state.thorClouds.push({
+        x: Math.random() * 960,
+        y: 4 + Math.random() * 180,
+        w: 100 + Math.random() * 300,
+        h: 28 + Math.random() * 44,
+        spd: 2 + Math.random() * 9,
+        alpha: 0.04 + Math.random() * 0.1,
+        swirl: Math.random() * Math.PI * 2,
+        layer: i % 3
+      });
+    }
+    
+    state.thorRainDrops = [];
+    for (let i = 0; i < 180; i++) {
+      state.thorRainDrops.push({
+        x: Math.random() * 960,
+        y: Math.random() * 540,
+        len: 6 + Math.random() * 14,
+        spd: 8 + Math.random() * 8,
+        alpha: 0.04 + Math.random() * 0.09
+      });
+    }
+
+    state.thorShockwaves = [];
+    state.thorRings = [];
+    state.thorFlashAlpha = 0;
+    state.thorShake = 0;
     horizonProgressRef.current = { level: horizonLevel, currentXp: horizonXp, nextXp: horizonNextXp };
     levelUpSfxHandledRef.current = false;
     setHorizonHud({ level: horizonLevel, currentXp: horizonXp, nextXp: horizonNextXp });
@@ -634,6 +759,156 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
     };
 
     const rand = (min: number, max: number) => min + Math.random() * (max - min);
+    const easeInOut = (value: number) => value * value * (3 - 2 * value);
+
+    const createThorTornado = (index: number, kind: 'small' | 'big' = 'small'): ThorTornado => {
+      if (kind === 'big') {
+        return {
+          x: WIDTH * 0.72,
+          y: HEIGHT * 0.52,
+          radius: 138,
+          height: 360,
+          spin: Math.random() * Math.PI * 2,
+          kind,
+          alive: true,
+          birthScale: 0.05,
+          seed: rand(0, 10),
+          lastDir: 0,
+        };
+      }
+      return {
+        x: WIDTH * (0.58 + index * 0.13),
+        y: HEIGHT * (0.45 + Math.sin(index * 1.7) * 0.16),
+        radius: 54 + index * 8,
+        height: 220 + index * 20,
+        spin: Math.random() * Math.PI * 2,
+        kind,
+        alive: true,
+        birthScale: 0.05,
+        seed: rand(0, 10),
+        vx: rand(-40, 40),
+        vy: rand(-60, 60),
+        lastDir: 0,
+      };
+    };
+
+    const createThorBoltPaths = (x1: number, y1: number, x2: number, y2: number, depth = 0): ThorPoint[][] => {
+      const points: ThorPoint[] = [{ x: x1, y: y1 }];
+      const segments = 10 + Math.floor(Math.random() * 8);
+      for (let i = 1; i < segments; i++) {
+        const progress = i / segments;
+        const baseX = x1 + (x2 - x1) * progress;
+        const baseY = y1 + (y2 - y1) * progress;
+        const chaos = (1 - Math.abs(0.5 - progress)) * (54 - depth * 13);
+        points.push({ x: baseX + rand(-chaos * 0.5, chaos * 0.5), y: baseY + rand(-chaos * 0.5, chaos * 0.5) });
+      }
+      points.push({ x: x2, y: y2 });
+      const paths = [points];
+      if (depth < 3) {
+        for (let i = 2; i < points.length - 2; i += 2) {
+          const branchChance = depth === 0 ? 0.62 : depth === 1 ? 0.36 : 0.16;
+          if (Math.random() < branchChance) {
+            const point = points[i];
+            const side = Math.random() < 0.5 ? -1 : 1;
+            paths.push(...createThorBoltPaths(point.x, point.y, point.x + side * rand(28, 80), point.y + rand(22, 90), depth + 1));
+          }
+        }
+      }
+      return paths;
+    };
+
+    const spawnThorRing = (x: number, y: number, radius: number, color: string) => {
+      state.thorRings.push({ x, y, radius, life: 1, angle: Math.random() * Math.PI, color });
+    };
+
+    const spawnThorShockwave = (x: number, y: number, color: string, maxRadius: number) => {
+      state.thorShockwaves.push({ x, y, life: 1, maxRadius, color, decay: 0.035, width: 6 });
+    };
+
+    const spawnThorBurst = (x: number, y: number, color: string, count: number) => {
+      for (let i = 0; i < count; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = rand(1.2, 8.6);
+        state.thorParticles.push({
+          type: i % 6 === 0 ? 'debris' : 'electric',
+          x,
+          y,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed,
+          life: 0.58 + Math.random() * 0.55,
+          maxLife: 1,
+          size: rand(1.2, i % 6 === 0 ? 6.4 : 4.2),
+          color,
+          drag: i % 6 === 0 ? 0.975 : 0.94,
+          growth: i % 6 === 0 ? -0.015 : -0.02,
+          rotation: Math.random() * Math.PI * 2,
+          spin: rand(-0.2, 0.2),
+        });
+      }
+    };
+
+    const applyThorDamage = (multiplier: number, x: number, y: number, radius: number, label: string, color: string) => {
+      const now = performance.now();
+      const payload = createSpecialDamagePayload(multiplier, { electric: 44 });
+      let hitCount = 0;
+      state.enemies.forEach(enemy => {
+        if (enemy.hp <= 0) return;
+        const distance = Math.hypot(enemy.x - x, enemy.y - y);
+        if (distance > radius + enemy.radius) return;
+        const baseDamage = payload.crit ? payload.damage * shipStats.critMultiplier : payload.damage;
+        enemy.hp -= baseDamage;
+        const elementalDamage = applyElementalDamage(enemy, payload.elemental, now, hitCount < 2 || isMonsterKind(enemy.kind));
+        hitCount += 1;
+        if (hitCount <= 4 || isMonsterKind(enemy.kind)) {
+          spawnFloat(enemy.x + rand(-12, 12), enemy.y - 30, `${label} ${Math.round(baseDamage + elementalDamage)}`, color);
+        }
+        spawnThorBurst(enemy.x, enemy.y, color, enemy.hp <= 0 ? 18 : 8);
+      });
+      return hitCount;
+    };
+
+    const spawnThorBolt = (now: number, empowered = false, isFinal = false) => {
+      const aliveEnemies = state.enemies.filter(enemy => enemy.hp > 0);
+      const target = pick(aliveEnemies);
+      const endX = target ? target.x + rand(-24, 24) : rand(WIDTH * 0.58, WIDTH * 0.94);
+      const endY = target ? target.y : rand(96, HEIGHT - 86);
+      const startX = clamp(endX + rand(-180, 180), WIDTH * 0.5, WIDTH - 22);
+      state.thorBolts.push({
+        paths: createThorBoltPaths(startX, -18, endX, endY),
+        life: isFinal ? 30 : empowered ? 21 : 14,
+        maxLife: isFinal ? 30 : empowered ? 21 : 14,
+        width: isFinal ? 7.8 : empowered ? 4.8 : 3,
+        color: isFinal ? '#ffffff' : empowered ? '#fde68a' : '#93c5fd',
+      });
+      const hits = applyThorDamage(isFinal ? 6.8 : empowered ? 2.4 : 1.7, endX, endY, isFinal ? 285 : 165, isFinal ? 'SUPER' : 'RAIO', isFinal ? '#ffffff' : '#fde68a');
+      spawnThorBurst(endX, endY, isFinal ? '#ffffff' : '#fde68a', isFinal ? 68 : empowered ? 36 : 22);
+      spawnThorShockwave(endX, endY, isFinal ? 'rgba(255,255,255,0.9)' : 'rgba(253,230,138,0.82)', isFinal ? 360 : 230);
+      state.thorShake = Math.max(state.thorShake, isFinal ? 36 : empowered ? 24 : 14);
+      state.thorFlashAlpha = Math.max(state.thorFlashAlpha, isFinal ? 0.78 : empowered ? 0.52 : 0.34);
+      if (hits > 0 || isFinal) playSound(PLAYER_SOUNDS.electric, isFinal ? 0.86 : 0.68);
+      state.thorNextBolt = now + (empowered ? rand(340, 740) : rand(480, 980));
+    };
+
+    const spawnThorFarBolt = (now: number) => {
+      const x1 = rand(WIDTH * 0.42, WIDTH);
+      state.thorFarBolts.push({
+        paths: createThorBoltPaths(x1, 0, x1 + rand(-110, 110), rand(60, 200)),
+        life: 10,
+        maxLife: 10,
+        width: 1.5,
+        color: '#93c5fd',
+      });
+      state.thorFlashAlpha = Math.max(state.thorFlashAlpha, 0.07);
+      state.thorNextFarBolt = now + rand(360, 860);
+    };
+
+    const isEnemyInThorTornado = (enemy: Enemy, tornado: ThorTornado) => {
+      const dx = enemy.x - tornado.x;
+      const dy = enemy.y - tornado.y;
+      const rx = tornado.radius * (tornado.kind === 'big' ? 1.28 : 1.1);
+      const ry = tornado.height * 0.46;
+      return (dx * dx) / (rx * rx) + (dy * dy) / (ry * ry) <= 1;
+    };
 
     const spawnSmokeParticle = (x: number, y: number, vx = 0, vy = 0, size = 14, life = 70) => {
       if (state.hellfireParticles.length > 320) return;
@@ -1087,10 +1362,14 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
     };
 
     const spawnEnemy = () => {
-      if (state.kills >= 19 && state.monsterSpawned) return;
-      const forceMonsterBoss = state.kills >= 19 && !state.monsterSpawned;
+      const shouldSpawnFinalBoss = state.regularEnemiesDefeated >= REGULAR_ENEMIES_BEFORE_FINAL_BOSS && !state.monsterSpawned;
+      if (!shouldSpawnFinalBoss && state.regularEnemiesSpawned >= REGULAR_ENEMIES_BEFORE_FINAL_BOSS) return;
+      if (shouldSpawnFinalBoss && state.monsterSpawned) return;
+
+      const forceMonsterBoss = shouldSpawnFinalBoss;
       const blueprint = buildEnemyBlueprint(state.kills, forceMonsterBoss);
       if (isMonsterKind(blueprint.kind)) state.monsterSpawned = true;
+      else state.regularEnemiesSpawned += 1;
       const level = horizonLevel + 1 + Math.floor(Math.random() * 3);
       const levelScale = 1 + Math.max(0, level - 1) * 0.06;
       const bossScale = isMonsterKind(blueprint.kind) ? 1.25 : 1;
@@ -1406,6 +1685,7 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
       const cooldown = Math.max(5500, 16000 * (1 - shipStats.specialCooldownReductionPercent / 100));
       if ((state.specialCooldowns[specialId] || 0) > now) return;
       if (specialId === 'apocalypse-laser' && state.laserState !== 'idle') return;
+      if (specialId === 'thor-oath' && state.thorPhase !== 'idle') return;
       state.specialCooldowns[specialId] = now + cooldown;
 
       if (specialId === 'apocalypse-laser') {
@@ -1457,6 +1737,31 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
         state.hellfireLaunchIndex = 0;
         spawnFloat(state.player.x + 76, state.player.y - 58, 'HORIZON BARRAGE', '#ffcc66');
         launchHellfireOrb();
+      }
+
+      if (specialId === 'thor-oath') {
+        state.thorPhase = 'prelude';
+        state.thorPhaseStart = now;
+        state.thorStart = now;
+        state.thorLastUpdate = now;
+        state.thorNextBolt = now + 1180;
+        state.thorNextFarBolt = now + 120;
+        state.thorTickSmall = 0;
+        state.thorTickBig = 0;
+        state.thorColumn = 0;
+        state.thorDarkness = 0;
+        state.thorFinalDone = false;
+        state.thorSmallTornados = [];
+        state.thorBigTornado = null;
+        state.thorBolts = [];
+        state.thorFarBolts = [];
+        state.thorParticles = [];
+        state.thorShockwaves = [];
+        state.thorRings = [];
+        state.thorFlashAlpha = 0.32;
+        state.thorShake = 12;
+        spawnFloat(state.player.x + 78, state.player.y - 62, 'JURAMENTO DE THOR', '#fde68a');
+        playSound(PLAYER_SOUNDS.electric, 0.82);
       }
     };
 
@@ -1520,6 +1825,444 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
         state.backgroundParticles = [];
         state.laserShake = 0;
       }
+    };
+
+        const updateThorSpecial = (now: number, dt: number) => {
+      if (state.thorPhase === 'idle') return;
+      const age = now - state.thorPhaseStart;
+      state.thorFlashAlpha *= 0.86;
+
+      if (state.thorPhase === 'prelude') {
+        const progress = Math.min(1, age / 1200);
+        state.thorDarkness = easeInOut(progress) * 0.66;
+        state.thorColumn = clamp((age - 480) / 700, 0, 1);
+        state.thorShake = Math.max(state.thorShake, 3 + state.thorDarkness * 11);
+        if (now >= state.thorNextFarBolt) spawnThorFarBolt(now);
+        if (age >= 1200) {
+          state.thorPhase = 'small';
+          state.thorPhaseStart = now;
+          state.thorSmallTornados = [createThorTornado(0), createThorTornado(1), createThorTornado(2)];
+          state.thorNextBolt = now + 200;
+          state.thorShake = 20;
+          state.thorFlashAlpha = 0.48;
+          spawnThorRing(WIDTH * 0.71, HEIGHT * 0.5, 56, 'rgba(103,232,249,1)');
+          playSound(PLAYER_SOUNDS.electric, 0.76);
+        }
+      } else if (state.thorPhase === 'small') {
+        if (now >= state.thorNextBolt) spawnThorBolt(now, true);
+        state.thorTickSmall += dt;
+        while (state.thorTickSmall >= 650) {
+          state.thorTickSmall -= 650;
+          state.thorSmallTornados.forEach(tornado => {
+            const hit = state.enemies.some(enemy => enemy.hp > 0 && isEnemyInThorTornado(enemy, tornado));
+            if (hit) {
+              applyThorDamage(1.35, tornado.x, tornado.y, tornado.radius * 1.25, 'TORNADO', '#7dd3fc');
+              spawnThorShockwave(tornado.x, tornado.y, 'rgba(125,211,252,0.8)', 130);
+            }
+          });
+        }
+        if (age >= 4000) {
+          state.thorPhase = 'big';
+          state.thorPhaseStart = now;
+          state.thorSmallTornados.forEach(tornado => { tornado.alive = false; });
+          state.thorBigTornado = createThorTornado(0, 'big');
+          state.thorColumn = 0.58;
+          state.thorShake = 28;
+          state.thorFlashAlpha = 0.62;
+          spawnThorRing(WIDTH * 0.72, HEIGHT * 0.52, 96, 'rgba(253,230,138,1)');
+          playSound(PLAYER_SOUNDS.electric, 0.86);
+        }
+      } else if (state.thorPhase === 'big') {
+        if (now >= state.thorNextBolt) spawnThorBolt(now, true);
+        state.thorTickBig += dt;
+        while (state.thorTickBig >= 500) {
+          state.thorTickBig -= 500;
+          if (state.thorBigTornado) {
+            const hit = state.enemies.some(enemy => enemy.hp > 0 && isEnemyInThorTornado(enemy, state.thorBigTornado as ThorTornado));
+            if (hit) {
+              applyThorDamage(1.9, state.thorBigTornado.x, state.thorBigTornado.y, state.thorBigTornado.radius * 1.45, 'MEGA', '#fde68a');
+              spawnThorShockwave(state.thorBigTornado.x, state.thorBigTornado.y, 'rgba(253,230,138,0.82)', 190);
+            }
+          }
+        }
+        if (age >= 4000) {
+          state.thorPhase = 'ending';
+          state.thorPhaseStart = now;
+          if (state.thorBigTornado) state.thorBigTornado.alive = false;
+        }
+      } else if (state.thorPhase === 'ending') {
+        state.thorDarkness = Math.max(0, 0.52 * (1 - age / 1700));
+        if (!state.thorFinalDone && age > 240) {
+          state.thorFinalDone = true;
+          spawnThorBolt(now, true, true);
+        }
+        if (age >= 1800) {
+          state.thorPhase = 'idle';
+          state.thorSmallTornados = [];
+          state.thorBigTornado = null;
+          state.thorBolts = [];
+          state.thorFarBolts = [];
+          state.thorParticles = [];
+          state.thorDebris = [];
+          state.thorSparks = [];
+          state.thorEnergyArcs = [];
+          state.thorShockwaves = [];
+          state.thorRings = [];
+          state.thorDarkness = 0;
+          state.thorColumn = 0;
+          state.thorFlashAlpha = 0;
+          state.thorShake = 0;
+        }
+      }
+
+      const activeTornados = state.thorPhase === 'small'
+        ? state.thorSmallTornados.filter(t => t.alive)
+        : (state.thorBigTornado && state.thorBigTornado.alive ? [state.thorBigTornado] : []);
+
+      activeTornados.forEach((tornado, index) => {
+        tornado.spin += (tornado.kind === 'big' ? 0.0072 : 0.0092) * dt;
+        tornado.birthScale = clamp(tornado.birthScale + dt / 400, 0, 1);
+        tornado.lastDir = (tornado.lastDir || 0) + dt;
+
+        if (tornado.kind === 'small') {
+          if ((tornado.lastDir || 0) > 260 + rand(0, 240)) {
+             tornado.vx = (tornado.vx || 0) + rand(-120, 120);
+             tornado.vy = (tornado.vy || 0) + rand(-150, 150);
+             tornado.lastDir = 0;
+          }
+          tornado.vx = (tornado.vx || 0) + Math.sin(now / 205 + tornado.seed) * 4.6;
+          tornado.vy = (tornado.vy || 0) + Math.cos(now / 165 + tornado.seed) * 5.4;
+          tornado.vx *= 0.988;
+          tornado.vy *= 0.986;
+          tornado.x += tornado.vx * dt / 1000;
+          tornado.y += tornado.vy * dt / 1000;
+        } else {
+          tornado.x = WIDTH * 0.76 + Math.sin(now / 740) * 90 + Math.sin(now / 254) * 24;
+          tornado.y = HEIGHT * 0.5 + Math.sin(now / 510) * 132 + Math.cos(now / 305) * 22;
+        }
+        
+        tornado.x = clamp(tornado.x, WIDTH * 0.52 + tornado.radius * 0.25, WIDTH - 36 - tornado.radius * 0.12);
+        tornado.y = clamp(tornado.y, 72, HEIGHT - 40);
+
+        for (let i = 0; i < (tornado.kind === 'big' ? 2 : 1); i++) {
+          const side = Math.random() < 0.5 ? -1 : 1;
+          state.thorDebris.push({
+            x: tornado.x + side * rand(tornado.radius * 1.1, tornado.radius * 2.2),
+            y: tornado.y + rand(-tornado.height * 0.4, tornado.height * 0.42),
+            vx: rand(-1.2, 1.2),
+            vy: rand(-2.4, 0.6),
+            sz: rand(1.5, tornado.kind === 'big' ? 8 : 5),
+            rot: rand(0, Math.PI * 2),
+            vr: rand(-0.18, 0.18),
+            life: 1,
+            decay: rand(0.006, 0.018),
+            target: tornado,
+            color: Math.random() < 0.7 ? 'rgba(148,163,184,0.72)' : 'rgba(253,230,138,0.78)'
+          });
+        }
+
+        const pChance = tornado.kind === 'big' ? 0.97 : 0.72;
+        if (Math.random() < pChance) {
+          const n = tornado.kind === 'big' ? 5 : 2;
+          for (let i = 0; i < n; i++) {
+            const a = rand(0, Math.PI * 2);
+            const rim = tornado.radius * rand(0.4, 1.28);
+            state.thorParticles.push({
+              x: tornado.x + Math.cos(a) * rim,
+              y: tornado.y + rand(-tornado.height * 0.4, tornado.height * 0.4),
+              vx: Math.cos(a + Math.PI / 2) * rand(0.8, 3),
+              vy: rand(-3.2, -0.7),
+              sz: rand(0.8, tornado.kind === 'big' ? 5.2 : 3.2),
+              life: 0.82,
+              decay: rand(0.011, 0.028),
+              color: Math.random() < 0.55 ? 'rgba(186,230,253,0.78)' : 'rgba(253,230,138,0.78)'
+            });
+          }
+        }
+
+        if (tornado.kind === 'big' && Math.random() < 0.16) {
+          const a = rand(0, Math.PI * 2);
+          state.thorSparks.push({
+            x: tornado.x + Math.cos(a) * tornado.radius * rand(0.2, 1),
+            y: tornado.y + rand(-tornado.height * 0.4, tornado.height * 0.28),
+            vx: Math.cos(a) * rand(1, 5),
+            vy: Math.sin(a) * rand(1, 5),
+            life: 1,
+            decay: rand(0.04, 0.09),
+            color: 'rgba(253,230,138,1)'
+          });
+        }
+
+        if (Math.random() < (tornado.kind === 'big' ? 0.22 : 0.08)) {
+          const angle = rand(0, Math.PI * 2);
+          state.thorEnergyArcs.push({
+            x: tornado.x,
+            y: tornado.y,
+            ex: tornado.x + Math.cos(angle) * rand(30, 90),
+            ey: tornado.y + Math.sin(angle) * rand(20, 60),
+            life: 1,
+            decay: rand(0.06, 0.14),
+            color: tornado.kind === 'big' ? 'rgba(253,230,138,' : 'rgba(103,232,249,'
+          });
+        }
+      });
+      
+      const wind = state.thorPhase === 'prelude' ? 2.6 : state.thorPhase === 'big' ? 8.8 : 5.4;
+      for (const c of state.thorClouds) {
+        c.swirl += dt * 0.0006;
+        c.x -= (c.spd + wind * 4) * dt / 1000;
+        const cx = WIDTH * 0.72;
+        c.y += Math.sin(now / 560 + c.swirl) * 0.1 * wind;
+        c.x += (cx - c.x) * 0.0005 * wind;
+        if (c.x + c.w < -80) {
+          c.x = WIDTH + rand(0, 180);
+          c.y = 4 + rand(0, 180);
+        }
+      }
+      for (const r of state.thorRainDrops) {
+        r.y += r.spd; r.x -= r.spd * 0.18;
+        if (r.y > HEIGHT + 20) { r.y = -10; r.x = rand(0, WIDTH); }
+      }
+
+      const boltDecay = Math.max(0.55, dt / 16.67);
+      state.thorBolts.forEach(bolt => { bolt.life -= boltDecay; });
+      state.thorFarBolts.forEach(bolt => { bolt.life -= boltDecay * 0.9; });
+      state.thorBolts = state.thorBolts.filter(bolt => bolt.life > 0);
+      state.thorFarBolts = state.thorFarBolts.filter(bolt => bolt.life > 0);
+
+      for (let i = state.thorDebris.length - 1; i >= 0; i--) {
+        const d = state.thorDebris[i];
+        if (d.target && d.target.alive) {
+          const dx = d.target.x - d.x;
+          const dy = d.target.y - d.y;
+          const dist = Math.max(14, Math.hypot(dx, dy));
+          const pull = d.target.kind === 'big' ? 0.30 : 0.19;
+          d.vx += (dx / dist) * pull;
+          d.vy += (dy / dist) * pull - 0.02;
+        }
+        d.x += d.vx; d.y += d.vy; d.rot += d.vr;
+        d.vx *= 0.982; d.vy *= 0.982; d.life -= d.decay;
+        if (d.life <= 0 || d.y < -80) state.thorDebris.splice(i, 1);
+      }
+      for (let i = state.thorSparks.length - 1; i >= 0; i--) {
+        const s = state.thorSparks[i];
+        s.x += s.vx; s.y += s.vy; s.vx *= 0.93; s.vy *= 0.93; s.life -= s.decay;
+        if (s.life <= 0) state.thorSparks.splice(i, 1);
+      }
+      for (let i = state.thorEnergyArcs.length - 1; i >= 0; i--) {
+        const e = state.thorEnergyArcs[i];
+        e.life -= e.decay;
+        if (e.life <= 0) state.thorEnergyArcs.splice(i, 1);
+      }
+
+      state.thorParticles.forEach(particle => {
+        particle.x += particle.vx;
+        particle.y += particle.vy;
+        particle.vx *= 0.984;
+        particle.vy *= 0.984;
+        particle.life -= particle.decay || 0.018;
+      });
+      state.thorParticles = state.thorParticles.filter(p => p.life > 0).slice(-360);
+    };
+
+    const drawThorBoltPath = (ctx: CanvasRenderingContext2D, points: ThorPoint[]) => {
+      if (points.length < 2) return;
+      ctx.beginPath();
+      ctx.moveTo(points[0].x, points[0].y);
+      for (let i = 1; i < points.length; i++) ctx.lineTo(points[i].x, points[i].y);
+      ctx.stroke();
+    };
+
+    const drawThorLightning = (ctx: CanvasRenderingContext2D) => {
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      [...state.thorFarBolts, ...state.thorBolts].forEach(bolt => {
+        const alpha = Math.pow(clamp(bolt.life / bolt.maxLife, 0, 1), 1.45);
+        const isFar = state.thorFarBolts.includes(bolt);
+        const passes = isFar
+          ? [{ color: `rgba(147,197,253,${0.34 * alpha})`, width: 1.5 }]
+          : [
+              { color: bolt.color === '#ffffff' ? `rgba(180,220,255,${0.28 * alpha})` : bolt.color === '#fde68a' ? `rgba(253,230,138,${0.28 * alpha})` : `rgba(147,197,253,${0.28 * alpha})`, width: bolt.width + 7 },
+              { color: `rgba(255,255,255,${0.96 * alpha})`, width: bolt.width + 2.8 },
+              { color: bolt.color === '#ffffff' ? `rgba(255,255,255,${0.9 * alpha})` : bolt.color === '#fde68a' ? `rgba(253,230,138,${0.88 * alpha})` : `rgba(147,197,253,${0.84 * alpha})`, width: bolt.width },
+              { color: `rgba(103,232,249,${0.52 * alpha})`, width: 0.8 },
+            ];
+        passes.forEach(pass => {
+          ctx.strokeStyle = pass.color;
+          ctx.lineWidth = pass.width;
+          bolt.paths.forEach(path => drawThorBoltPath(ctx, path));
+        });
+      });
+      ctx.restore();
+    };
+
+    const drawThorTornado = (ctx: CanvasRenderingContext2D, tornado: ThorTornado, now: number) => {
+      const scale = easeInOut(clamp(tornado.birthScale, 0, 1));
+      ctx.save();
+      ctx.translate(tornado.x, tornado.y);
+      ctx.scale(scale, scale);
+      ctx.globalCompositeOperation = 'lighter';
+
+      const halo = ctx.createRadialGradient(0, 0, tornado.radius * 0.08, 0, 0, tornado.radius * 2.1);
+      halo.addColorStop(0, tornado.kind === 'big' ? 'rgba(253,230,138,0.22)' : 'rgba(125,211,252,0.14)');
+      halo.addColorStop(0.44, 'rgba(56,189,248,0.08)');
+      halo.addColorStop(1, 'rgba(2,6,23,0)');
+      ctx.fillStyle = halo;
+      ctx.beginPath();
+      ctx.ellipse(0, 0, tornado.radius * 2.1, tornado.height * 0.6, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      for (let i = 0; i < 28; i++) {
+        const band = i / 27;
+        const y = -tornado.height * 0.46 + band * tornado.height * 0.92;
+        const spin = tornado.spin + i * 0.42 + now / (tornado.kind === 'big' ? 210 : 160);
+        const radius = tornado.radius * (0.18 + Math.sin(band * Math.PI) * 0.95);
+        const x = Math.cos(spin) * radius;
+        const nextX = Math.cos(spin + 1.15) * radius * 0.92;
+        const nextY = y + tornado.height / 34;
+        ctx.strokeStyle = tornado.kind === 'big'
+          ? `rgba(253,230,138,${0.12 + band * 0.24})`
+          : `rgba(103,232,249,${0.12 + band * 0.2})`;
+        ctx.lineWidth = tornado.kind === 'big' ? 5.2 : 3.2;
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.quadraticCurveTo(0, y + 12, nextX, nextY);
+        ctx.stroke();
+      }
+
+      const cone = ctx.createLinearGradient(0, 0, 0, tornado.height * 0.5);
+      cone.addColorStop(0, 'rgba(2,6,23,0)');
+      cone.addColorStop(0.7, 'rgba(0,0,8,0.28)');
+      cone.addColorStop(1, 'rgba(0,0,8,0.58)');
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.fillStyle = cone;
+      ctx.beginPath();
+      ctx.moveTo(-tornado.radius * 0.15, tornado.height * 0.48);
+      ctx.quadraticCurveTo(0, tornado.height * 0.6, tornado.radius * 0.15, tornado.height * 0.48);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    };
+
+    const drawThorSpecial = (ctx: CanvasRenderingContext2D) => {
+      if (state.thorPhase === 'idle') return;
+      const now = performance.now();
+      ctx.save();
+
+      if (state.thorDarkness > 0.01) {
+        ctx.fillStyle = `rgba(0,0,0,${state.thorDarkness})`;
+        ctx.fillRect(0, 0, WIDTH, HEIGHT);
+      }
+
+      const columnIntensity = state.thorPhase === 'prelude'
+        ? state.thorColumn
+        : state.thorPhase === 'small'
+          ? Math.max(0, 1 - (now - state.thorPhaseStart) / 1300)
+          : state.thorPhase === 'big'
+            ? 0.42
+            : 0;
+      if (columnIntensity > 0.01) {
+        const x = WIDTH * 0.72;
+        ctx.globalCompositeOperation = 'screen';
+        const column = ctx.createLinearGradient(x, 0, x, HEIGHT);
+        column.addColorStop(0, `rgba(255,255,255,${0.46 * columnIntensity})`);
+        column.addColorStop(0.18, `rgba(103,232,249,${0.3 * columnIntensity})`);
+        column.addColorStop(0.68, `rgba(253,230,138,${0.18 * columnIntensity})`);
+        column.addColorStop(1, 'rgba(255,255,255,0)');
+        ctx.fillStyle = column;
+        ctx.beginPath();
+        ctx.moveTo(x - 86 * columnIntensity, 0);
+        ctx.lineTo(x + 90 * columnIntensity, 0);
+        ctx.lineTo(x + 42 * columnIntensity, HEIGHT);
+        ctx.lineTo(x - 36 * columnIntensity, HEIGHT);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = `rgba(255,255,255,${0.55 * columnIntensity})`;
+        ctx.fillRect(x - 7 * columnIntensity, 0, 14 * columnIntensity, HEIGHT);
+      }
+
+      ctx.globalCompositeOperation = 'lighter';
+      state.thorShockwaves.forEach(wave => drawShockwave(ctx, wave));
+      state.thorRings.forEach(ring => {
+        ctx.globalAlpha = Math.max(0, ring.life);
+        ctx.strokeStyle = ring.color.replace('1)', `${0.44 * ring.life})`);
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.ellipse(ring.x, ring.y, ring.radius * 1.62, ring.radius * 0.44, ring.angle, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.strokeStyle = `rgba(255,255,255,${0.22 * ring.life})`;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.ellipse(ring.x, ring.y, ring.radius * 1.22, ring.radius * 0.32, -ring.angle * 0.72, 0, Math.PI * 2);
+        ctx.stroke();
+      });
+      ctx.globalAlpha = 1;
+
+      if (state.thorPhase === 'small') state.thorSmallTornados.filter(tornado => tornado.alive).forEach(tornado => drawThorTornado(ctx, tornado, now));
+      if ((state.thorPhase === 'big' || state.thorPhase === 'ending') && state.thorBigTornado) drawThorTornado(ctx, state.thorBigTornado, now);
+
+      state.thorParticles.forEach(particle => {
+        const alpha = Math.max(0, particle.life / (particle.maxLife || 1));
+        const particleSize = particle.size ?? particle.sz ?? 2;
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        ctx.globalCompositeOperation = particle.type === 'debris' ? 'source-over' : 'lighter';
+        ctx.translate(particle.x, particle.y);
+        ctx.rotate(particle.rotation || 0);
+        ctx.fillStyle = particle.color;
+        if (particle.type === 'debris') {
+          ctx.fillRect(-particleSize / 2, -particleSize / 2, particleSize, particleSize * 0.6);
+        } else {
+          ctx.beginPath();
+          ctx.arc(0, 0, particleSize, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = 'rgba(255,255,255,0.7)';
+          ctx.beginPath();
+          ctx.arc(-particleSize * 0.2, -particleSize * 0.2, particleSize * 0.32, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.restore();
+      });
+
+      drawThorLightning(ctx);
+
+      if (state.thorFlashAlpha > 0.01) {
+        ctx.globalCompositeOperation = 'screen';
+        ctx.fillStyle = `rgba(219,234,254,${state.thorFlashAlpha})`;
+        ctx.fillRect(0, 0, WIDTH, HEIGHT);
+      }
+
+      ctx.globalCompositeOperation = 'source-over';
+      const label = state.thorPhase === 'prelude'
+        ? 'O CEU RESPONDE'
+        : state.thorPhase === 'small'
+          ? '3 TORNADOS INICIAIS'
+          : state.thorPhase === 'big'
+            ? 'MEGA TORNADO DIVINO'
+            : state.thorPhase === 'ending'
+              ? 'ULTIMO RAIO'
+              : 'JURAMENTO SELADO';
+      const elapsed = Math.min(10, (now - state.thorStart) / 1000);
+      ctx.fillStyle = 'rgba(1,3,9,0.72)';
+      ctx.strokeStyle = 'rgba(253,230,138,0.32)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.roundRect(18, 118, 330, 82, 7);
+      ctx.fill();
+      ctx.stroke();
+      ctx.font = '700 10px Orbitron, sans-serif';
+      ctx.fillStyle = '#fde68a';
+      ctx.fillText('JURAMENTO DE THOR', 34, 142);
+      ctx.font = '900 16px Orbitron, sans-serif';
+      ctx.fillStyle = '#e2e8f0';
+      ctx.fillText(label, 34, 164);
+      ctx.fillStyle = 'rgba(56,189,248,0.22)';
+      ctx.fillRect(34, 176, 278, 7);
+      ctx.fillStyle = '#67e8f9';
+      ctx.fillRect(34, 176, 278 * (elapsed / 10), 7);
+      ctx.restore();
     };
 
     const drawLaserSpecial = (ctx: CanvasRenderingContext2D) => {
@@ -1736,12 +2479,13 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
       const ctx = canvas?.getContext('2d');
       if (!ctx) return;
       ctx.save();
-      if (state.laserShake > 0.1 || state.hellfireShake > 0.1 || state.trinityShake > 0.1) {
-        const shake = Math.max(state.laserShake, state.hellfireShake, state.trinityShake);
+      if (state.laserShake > 0.1 || state.hellfireShake > 0.1 || state.trinityShake > 0.1 || state.thorShake > 0.1) {
+        const shake = Math.max(state.laserShake, state.hellfireShake, state.trinityShake, state.thorShake);
         ctx.translate((Math.random() - 0.5) * shake, (Math.random() - 0.5) * shake);
         state.laserShake *= 0.88;
         state.hellfireShake *= 0.88;
         state.trinityShake *= 0.88;
+        state.thorShake *= 0.88;
       }
 
       const background = getImage(backgroundRef.current);
@@ -1753,9 +2497,14 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
       }
 
       const laserActive = state.laserState !== 'idle';
-      ctx.fillStyle = laserActive ? 'rgba(29, 3, 39, 0.38)' : 'rgba(2, 6, 23, 0.42)';
+      const thorActive = state.thorPhase !== 'idle';
+      ctx.fillStyle = laserActive
+        ? 'rgba(29, 3, 39, 0.38)'
+        : thorActive
+          ? 'rgba(1, 3, 12, 0.36)'
+          : 'rgba(2, 6, 23, 0.42)';
       ctx.fillRect(0, 0, WIDTH, HEIGHT);
-      ctx.strokeStyle = laserActive ? 'rgba(34, 211, 238, 0.18)' : 'rgba(34, 211, 238, 0.08)';
+      ctx.strokeStyle = laserActive || thorActive ? 'rgba(34, 211, 238, 0.18)' : 'rgba(34, 211, 238, 0.08)';
       ctx.lineWidth = 1;
       const now = performance.now();
       for (let x = 0; x < WIDTH; x += 48) {
@@ -1996,6 +2745,7 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
         ctx.globalAlpha = 1;
       });
 
+      drawThorSpecial(ctx);
       drawLaserSpecial(ctx);
       ctx.restore();
     };
@@ -2024,6 +2774,8 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
     const loop = () => {
       if (state.ended) return;
       const now = performance.now();
+      const thorDt = state.thorLastUpdate > 0 ? Math.min(60, now - state.thorLastUpdate) : 16.67;
+      state.thorLastUpdate = now;
       const keys = keysRef.current;
       const p = state.player;
 
@@ -2046,6 +2798,7 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
         triggerSpecial(1);
       }
       updateLaserSpecial(now);
+      updateThorSpecial(now, thorDt);
       if (state.hellfireSequence.active && !state.hellfireSequence.waitingForImpact && state.hellfireSequence.remaining > 0) {
         launchHellfireOrb();
       }
@@ -2161,7 +2914,8 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
       state.enemies = state.enemies.filter(enemy => {
         if (enemy.hp <= 0) {
           state.kills += 1;
-          if (enemy.kind === 'boss-ship' || isMonsterKind(enemy.kind)) state.bossesDefeated += 1;
+          if (isMonsterKind(enemy.kind)) state.bossesDefeated += 1;
+          else state.regularEnemiesDefeated += 1;
           state.earnedXp += enemy.xp;
           awardHorizonXp(enemy.xp);
           state.earnedQc += enemy.qc;
@@ -2186,12 +2940,12 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
       if (p.hp <= 0) {
         state.ended = true;
         stopAllBattleSounds();
-        setHud({ hp: 0, shield: Math.max(0, p.shield), kills: state.kills, earnedXp: state.earnedXp, earnedQc: state.earnedQc, enemies: state.enemies.length, ended: true, result: 'defeat' });
+        setHud({ hp: 0, shield: Math.max(0, p.shield), kills: state.regularEnemiesDefeated, earnedXp: state.earnedXp, earnedQc: state.earnedQc, enemies: state.enemies.length, ended: true, result: 'defeat' });
         setResult('defeat');
         return;
       }
 
-      if (state.kills >= 20 && state.monsterDefeated) {
+      if (state.regularEnemiesDefeated >= REGULAR_ENEMIES_BEFORE_FINAL_BOSS && state.monsterDefeated) {
         state.ended = true;
         stopAllBattleSounds();
         const victoryRewardScale = 1 + Math.max(0, currentDefenseBattleLevel - 1) * 0.1;
@@ -2200,13 +2954,13 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
         state.earnedXp += victoryXp;
         awardHorizonXp(victoryXp);
         state.earnedQc += victoryQc;
-        setHud({ hp: p.hp, shield: p.shield, kills: state.kills, earnedXp: state.earnedXp, earnedQc: state.earnedQc, enemies: state.enemies.length, ended: true, result: 'victory' });
+        setHud({ hp: p.hp, shield: p.shield, kills: state.regularEnemiesDefeated, earnedXp: state.earnedXp, earnedQc: state.earnedQc, enemies: state.enemies.length, ended: true, result: 'victory' });
         setResult('victory');
         return;
       }
 
       draw();
-      setHud({ hp: p.hp, shield: p.shield, kills: state.kills, earnedXp: state.earnedXp, earnedQc: state.earnedQc, enemies: state.enemies.length, ended: false, result: '' });
+      setHud({ hp: p.hp, shield: p.shield, kills: state.regularEnemiesDefeated, earnedXp: state.earnedXp, earnedQc: state.earnedQc, enemies: state.enemies.length, ended: false, result: '' });
       rafRef.current = requestAnimationFrame(loop);
     };
 
@@ -2284,7 +3038,7 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
             <canvas ref={canvasRef} width={WIDTH} height={HEIGHT} className="h-full w-full" />
             <div className="pointer-events-none absolute left-4 top-4 rounded-2xl border border-cyan-300/20 bg-black/55 px-4 py-3 backdrop-blur-md">
               <p className="font-mono text-[10px] uppercase tracking-[0.28em] text-cyan-200">{t('Objective', 'Objetivo')}</p>
-              <p className="mt-1 font-orbitron text-sm font-black uppercase text-white">{t('Neutralize 19 ships and the final monster boss', 'Neutralize 19 naves e o monstro boss final')}</p>
+              <p className="mt-1 font-orbitron text-sm font-black uppercase text-white">{t('Neutralize 20 enemies and the final boss', 'Neutralize 20 inimigos e o boss final')}</p>
             </div>
 
             {!result && (

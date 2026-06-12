@@ -55,6 +55,12 @@ const VoidMap: React.FC<VoidMapProps> = ({
     { id: 'meds', name: language === 'pt' ? 'Medicamentos' : 'Meds', icon: Activity, color: 'text-red-400', key: 'meds' }
   ];
 
+  const getDonationSfx = (mode: '1x' | '10x' | 'max') => {
+    if (mode === 'max') return 'donation_3_void';
+    if (mode === '10x') return 'donation_2_void';
+    return 'donation_1_void';
+  };
+
   return (
     <div className="h-full flex flex-col space-y-4 p-1 overflow-hidden">
       <div className="grid grid-cols-2 grid-rows-2 gap-2 h-full flex-1">
@@ -127,7 +133,7 @@ const VoidMap: React.FC<VoidMapProps> = ({
                              <button
                                onClick={() => {
                                  donateToPOI(poi.id, res.name);
-                                 playSfx('level_up');
+                                 playSfx(getDonationSfx(currentDonationMode));
                                }}
                                disabled={progress >= 20}
                                className={`px-1.5 py-0.5 rounded text-[9px] font-black uppercase transition-all flex items-center gap-0.5 ${
@@ -181,7 +187,10 @@ const VoidMap: React.FC<VoidMapProps> = ({
 
                 <div className="flex gap-2">
                    <button
-                     onClick={() => donateQCToPOI(poi.id)}
+                     onClick={() => {
+                       donateQCToPOI(poi.id);
+                       playSfx(getDonationSfx(currentDonationMode));
+                     }}
                      disabled={qcDonations >= 500000}
                      className={`px-3 py-1.5 rounded-lg flex flex-col items-center gap-0.5 transition-all border ${
                        qcDonations >= 500000

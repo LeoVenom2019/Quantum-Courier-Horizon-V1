@@ -32,6 +32,7 @@ import {
   getCardBackgroundImage,
   getCardClass,
   getCardLevel,
+  getCardModalBackgroundImage,
   getCardStyle,
   getCardUpgradeCost,
   getPoliticalEffects,
@@ -930,6 +931,13 @@ const CardsTab = memo(function CardsTab() {
               exit={{ opacity: 0, scale: 0.94, y: 10 }}
               className={`relative grid h-[min(736px,calc(100vh-1rem))] w-full max-w-5xl gap-5 overflow-hidden rounded-[2rem] border border-white/15 bg-zinc-950 p-5 md:grid-cols-[0.9fr_1.1fr] md:p-6 ${getCardStyle(selectedCard.card.rarity, getCardClass(selectedCard.card))}`}
             >
+              <img
+                src={getCardModalBackgroundImage(selectedCard.card.rarity, getCardClass(selectedCard.card))}
+                alt=""
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-0 z-0 h-full w-full object-cover opacity-90"
+              />
+              <div className="pointer-events-none absolute inset-0 z-0 bg-black/16" />
               <PremiumCanvasButton
                 onClick={() => setSelectedCard(null)}
                 tone="steel"
@@ -967,11 +975,11 @@ const CardsTab = memo(function CardsTab() {
                 </div>
               )}
 
-              <div className="flex min-h-0 items-center">
+              <div className="relative z-10 flex min-h-0 items-center">
                 <CardTile card={selectedCard.card} language={lang} owned={ownedCardIds.includes(selectedCard.card.id)} size="large" cardLevels={cardLevels} />
               </div>
 
-              <div className="flex min-h-0 flex-col justify-between gap-4">
+              <div className="relative z-10 flex min-h-0 flex-col justify-between gap-4">
                 <div className="min-h-0">
                   {(() => {
                     const selectedRequirement = getRequirement(selectedCard.card);
@@ -998,19 +1006,19 @@ const CardsTab = memo(function CardsTab() {
                         : tl(lang, 'Not currently equipped', 'Não está sendo usada');
                     return (
                       <>
-                  <p className="font-mono text-[10px] uppercase tracking-[0.42em] text-cyan-200">{tl(lang, 'Council Dossier', 'Dossiê do Conselho')}</p>
-                  <h3 className="mt-2 font-orbitron text-3xl font-black uppercase tracking-tight text-white">{selectedCard.card.name[lang]}</h3>
-                  <p className="mt-4 text-sm leading-relaxed text-zinc-200">{selectedCard.card.role[lang]}</p>
-                  <p className="mt-3 text-sm leading-relaxed text-zinc-400">{selectedCard.card.lore[lang]}</p>
-                  <div className="mt-5 rounded-2xl border border-white/10 bg-black/35 p-4">
-                    <p className="mb-3 font-mono text-[10px] uppercase tracking-[0.3em] text-zinc-500">{tl(lang, 'Direct impact', 'Impacto direto')}</p>
+                  <p className="font-mono text-[10px] font-bold uppercase tracking-[0.42em] text-cyan-100 drop-shadow-[0_0_10px_rgba(103,232,249,0.55)]">{tl(lang, 'Council Dossier', 'Dossiê do Conselho')}</p>
+                  <h3 className="mt-2 font-orbitron text-3xl font-black uppercase tracking-tight text-white drop-shadow-[0_0_14px_rgba(255,255,255,0.25)]">{selectedCard.card.name[lang]}</h3>
+                  <p className="mt-4 text-sm font-semibold leading-relaxed text-zinc-50 drop-shadow-[0_1px_6px_rgba(0,0,0,0.85)]">{selectedCard.card.role[lang]}</p>
+                  <p className="mt-3 text-sm leading-relaxed text-zinc-200 drop-shadow-[0_1px_6px_rgba(0,0,0,0.85)]">{selectedCard.card.lore[lang]}</p>
+                  <div className="mt-5 rounded-2xl border border-white/15 bg-black/55 p-4 shadow-[inset_0_0_24px_rgba(0,0,0,0.45)]">
+                    <p className="mb-3 font-mono text-[10px] font-bold uppercase tracking-[0.3em] text-cyan-100/85">{tl(lang, 'Direct impact', 'Impacto direto')}</p>
                     <CardEffectPills card={selectedCard.card} language={lang} cardLevels={cardLevels} />
                   </div>
                   {alreadyOwned && !isWildcard && (
-                    <div className="mt-3 rounded-2xl border border-amber-300/25 bg-amber-300/10 p-4">
+                    <div className="mt-3 rounded-2xl border border-amber-200/35 bg-black/50 p-4 shadow-[inset_0_0_22px_rgba(251,191,36,0.08)]">
                       <div className="flex items-center justify-between gap-3">
                         <div>
-                          <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-amber-200">{tl(lang, 'Card Level', 'Nível da Carta')}</p>
+                          <p className="font-mono text-[10px] font-bold uppercase tracking-[0.3em] text-amber-100">{tl(lang, 'Card Level', 'Nível da Carta')}</p>
                           <p className="mt-1 font-orbitron text-lg font-black text-white">LVL {cardLevel} / {MAX_COLONY_CARD_LEVEL}</p>
                         </div>
                         <PremiumCanvasButton
@@ -1027,15 +1035,15 @@ const CardsTab = memo(function CardsTab() {
                     </div>
                   )}
                   {alreadyOwned && !isWildcard && (
-                    <div className={`mt-3 rounded-2xl border p-4 ${
+                    <div className={`mt-3 rounded-2xl border p-4 shadow-[inset_0_0_22px_rgba(0,0,0,0.34)] ${
                       isEquipped
-                        ? 'border-emerald-300/25 bg-emerald-300/10'
-                        : 'border-zinc-600/40 bg-black/35'
+                        ? 'border-emerald-200/35 bg-black/50'
+                        : 'border-zinc-300/20 bg-black/50'
                     }`}>
                       <div className="flex items-center justify-between gap-3">
                         <div>
-                          <p className={`font-mono text-[10px] uppercase tracking-[0.3em] ${isEquipped ? 'text-emerald-200' : 'text-zinc-500'}`}>{usageEyebrow}</p>
-                          <p className="mt-1 font-orbitron text-lg font-black uppercase text-white">{usageText}</p>
+                          <p className={`font-mono text-[10px] font-bold uppercase tracking-[0.3em] ${isEquipped ? 'text-emerald-100' : 'text-zinc-200'}`}>{usageEyebrow}</p>
+                          <p className="mt-1 font-orbitron text-lg font-black uppercase text-white drop-shadow-[0_0_10px_rgba(255,255,255,0.18)]">{usageText}</p>
                         </div>
                         <span className={`rounded-full border px-3 py-1 font-mono text-[10px] uppercase tracking-widest ${
                           isEquipped
@@ -1047,15 +1055,15 @@ const CardsTab = memo(function CardsTab() {
                       </div>
                     </div>
                   )}
-                  <div className={`mt-3 min-h-[85px] rounded-2xl border p-4 ${
+                  <div className={`mt-3 min-h-[85px] rounded-2xl border p-4 shadow-[inset_0_0_22px_rgba(0,0,0,0.34)] ${
                     selectedCard.card.unlocksArcadeId
-                      ? 'border-violet-300/30 bg-violet-300/10'
+                      ? 'border-violet-200/35 bg-black/50'
                       : 'pointer-events-none border-transparent bg-transparent opacity-0'
                   }`}>
                     {selectedCard.card.unlocksArcadeId && (
                       <>
-                      <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-violet-200">{tl(lang, 'Linked arcade', 'Fliperama vinculado')}</p>
-                      <p className="mt-2 font-orbitron text-lg font-black uppercase text-white">
+                      <p className="font-mono text-[10px] font-bold uppercase tracking-[0.3em] text-violet-100">{tl(lang, 'Linked arcade', 'Fliperama vinculado')}</p>
+                      <p className="mt-2 font-orbitron text-lg font-black uppercase text-white drop-shadow-[0_0_10px_rgba(255,255,255,0.18)]">
                         {MINI_GAMES_CONFIG.find(game => game.id === selectedCard.card.unlocksArcadeId)?.name[lang]}
                       </p>
                       </>

@@ -27,6 +27,39 @@ const ROUTE4_DUST_PARTICLES = [
   { left: 54, top: 16, size: 0.8, delay: 4.0, duration: 11.8 },
   { left: 81, top: 12, size: 0.7, delay: 3.8, duration: 10.9 },
 ];
+const ROUTE4_LOCKED_TV_SFX = [
+  '/audio/sfx/bobby_blue/video tv/video_tv1.ogg',
+  '/audio/sfx/bobby_blue/video tv/video_tv2.ogg',
+  '/audio/sfx/bobby_blue/video tv/video_tv3.ogg',
+];
+const route4LockedTvSfxCache = new Map<string, HTMLAudioElement>();
+let route4LockedTvSfxPlaying = false;
+
+const playRandomRoute4LockedTvSfx = () => {
+  if (typeof Audio === 'undefined' || route4LockedTvSfxPlaying) return;
+  const src = ROUTE4_LOCKED_TV_SFX[Math.floor(Math.random() * ROUTE4_LOCKED_TV_SFX.length)];
+  if (!src) return;
+
+  let audio = route4LockedTvSfxCache.get(src);
+  if (!audio) {
+    audio = new Audio(src);
+    audio.preload = 'auto';
+    route4LockedTvSfxCache.set(src, audio);
+  }
+
+  route4LockedTvSfxPlaying = true;
+  audio.currentTime = 0;
+  audio.volume = 0.82;
+  audio.onended = () => {
+    route4LockedTvSfxPlaying = false;
+  };
+  audio.onerror = () => {
+    route4LockedTvSfxPlaying = false;
+  };
+  audio.play().catch(() => {
+    route4LockedTvSfxPlaying = false;
+  });
+};
 
 const HistoryTab = memo(function HistoryTab() {
   const { 
@@ -103,7 +136,7 @@ const HistoryTab = memo(function HistoryTab() {
   const toggleRoute4Credits = async () => {
     const video = creditsVideoRef.current;
     if (!video || !route4CreditsUnlocked) {
-      playSfx('warning_gaming');
+      playRandomRoute4LockedTvSfx();
       return;
     }
 
