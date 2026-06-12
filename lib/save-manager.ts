@@ -24,7 +24,8 @@ const hasRoute4SaveSignals = (data: any): boolean => {
     hasArrayItems(colonySystem.colonies) ||
     hasArrayItems(colonyStorage.colonies_data) ||
     Boolean(colonySystem.newEarthMissions || colonyStorage.new_earth_missions) ||
-    Boolean(colonySystem.newEarthSubmarines || colonyStorage.new_earth_submarines)
+    Boolean(colonySystem.newEarthSubmarines || colonyStorage.new_earth_submarines) ||
+    Boolean(colonySystem.newEarthMuseumTreasures || colonyStorage.new_earth_museum_treasures)
   );
 };
 
@@ -58,6 +59,7 @@ export const COLONY_SAVE_STORAGE_KEYS = [
   'arcade_card_reward_milestones',
   'new_earth_missions',
   'new_earth_submarines',
+  'new_earth_museum_treasures',
   'route4_qc_reset_done',
 ] as const;
 
@@ -84,6 +86,7 @@ export interface ColonySystemSaveData {
   arcadeCardRewardMilestones: Record<string, any>;
   newEarthMissions: any;
   newEarthSubmarines: any;
+  newEarthMuseumTreasures: any;
   storage: Partial<Record<ColonySaveStorageKey, any>>;
 }
 
@@ -142,6 +145,7 @@ const createColonySystemSave = (flatData: any): ColonySystemSaveData => {
   const arcadeCardRewardMilestones = getFlatOrStorageValue(flatData, 'arcadeCardRewardMilestones', 'arcade_card_reward_milestones', {});
   const newEarthMissions = getFlatOrStorageValue(flatData, 'newEarthMissions', 'new_earth_missions', null);
   const newEarthSubmarines = getFlatOrStorageValue(flatData, 'newEarthSubmarines', 'new_earth_submarines', null);
+  const newEarthMuseumTreasures = getFlatOrStorageValue(flatData, 'newEarthMuseumTreasures', 'new_earth_museum_treasures', {});
   const route4QcResetDone = Boolean(getFlatOrStorageValue(flatData, 'route4QcResetDone', 'route4_qc_reset_done', false));
   const normalizedPendingDefenseThreats = Array.isArray(pendingDefenseThreats)
     ? pendingDefenseThreats.filter(threat => threat?.status === 'pending').slice(0, MAX_PENDING_DEFENSE_THREATS)
@@ -172,6 +176,7 @@ const createColonySystemSave = (flatData: any): ColonySystemSaveData => {
     arcadeCardRewardMilestones: arcadeCardRewardMilestones && typeof arcadeCardRewardMilestones === 'object' ? arcadeCardRewardMilestones : {},
     newEarthMissions: newEarthMissions && typeof newEarthMissions === 'object' ? newEarthMissions : null,
     newEarthSubmarines: newEarthSubmarines && typeof newEarthSubmarines === 'object' ? newEarthSubmarines : null,
+    newEarthMuseumTreasures: newEarthMuseumTreasures && typeof newEarthMuseumTreasures === 'object' ? newEarthMuseumTreasures : {},
     storage: {
       colonies_data: Array.isArray(colonies) ? colonies : [],
       colony_cards_data: Array.isArray(ownedCardIds) ? ownedCardIds : [],
@@ -190,6 +195,7 @@ const createColonySystemSave = (flatData: any): ColonySystemSaveData => {
       arcade_card_reward_milestones: arcadeCardRewardMilestones && typeof arcadeCardRewardMilestones === 'object' ? arcadeCardRewardMilestones : {},
       new_earth_missions: newEarthMissions && typeof newEarthMissions === 'object' ? newEarthMissions : null,
       new_earth_submarines: newEarthSubmarines && typeof newEarthSubmarines === 'object' ? newEarthSubmarines : null,
+      new_earth_museum_treasures: newEarthMuseumTreasures && typeof newEarthMuseumTreasures === 'object' ? newEarthMuseumTreasures : {},
       route4_qc_reset_done: route4QcResetDone,
     },
   };

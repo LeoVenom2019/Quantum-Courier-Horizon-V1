@@ -110,6 +110,7 @@ export const getNewEarthSubmarineStats = (levels: NewEarthSubmarineUpgradeLevels
     missileDamageBonus: Math.round(levels.missile * 12),
     missileSpeedBonus: Math.round(levels.missile * 3),
     speedBonus: Math.round(levels.thrusters * 4),
+    oxygenSeconds: 120 + levels.airTanks * 60 + levels.glassArmor * 24 + levels.hullArmor * 12,
   };
 };
 

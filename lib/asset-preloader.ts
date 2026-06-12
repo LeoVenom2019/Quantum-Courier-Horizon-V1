@@ -1,6 +1,7 @@
 import { CARD_BACKGROUND_BY_RARITY, CARD_MODAL_BACKGROUND_BY_RARITY } from './colony-cards';
 import { MINI_GAMES_CONFIG } from './mini-games-config';
 import { ARCADE_THEMES, ROUTE_THEMES } from './music-data';
+import { NEW_EARTH_TREASURE_CATALOG } from './new-earth-treasures';
 import { AETHERION_CHAMBER_BACKGROUND, ACTIVE_DELIVERY_BACKGROUNDS, MISSION_HEADER_BACKGROUNDS, ROUTE1_UI_BACKGROUNDS, ROUTE2_UI_BACKGROUNDS, SCIFI_TEXTURE_BACKGROUND } from './ui-backgrounds';
 
 export type AssetKind = 'image' | 'audio' | 'video';
@@ -158,6 +159,9 @@ const route4LayoutImages = [
   '/assets/rota4/layout_cap4/historico_card_rgb.webp',
   '/assets/rota4/layout_cap4/ano_atual.webp',
   '/assets/rota4/layout_cap4/populacao_atual.webp',
+  '/assets/rota4/layout_cap4/bg_peixes.webp',
+  '/assets/rota4/layout_cap4/bg_reliquias.webp',
+  '/assets/rota4/layout_cap4/bg_aneis.webp',
   '/assets/texturas/textura_ficsi_2400x240.webp',
 ];
 
@@ -245,33 +249,7 @@ const route4SubmarineSpriteImages = [
   ...submarineSpriteKeys.map(key => `/assets/rota4/colonys/enemy_submarine2/enemy_submarine2_${key}.webp`),
   ...submarineSpriteKeys.map(key => `/assets/rota4/colonys/enemy_submarine3/enemy_submarine3_${key}.webp`),
 ];
-const route4TreasureRelicBase = '/assets/rota4/treasures/relics';
-const route4TreasureRelicImages = [
-  ...Array.from({ length: 17 }, (_, index) => `${route4TreasureRelicBase}/fishs/${index + 1}_fish.webp`),
-  ...Array.from({ length: 10 }, (_, index) => `${route4TreasureRelicBase}/rings/${index + 1}_ring.webp`),
-  ...[
-    'collar_necklace.webp',
-    'dead_pirate.webp',
-    'futuristic_artifact.webp',
-    'golden_anchor.webp',
-    'golden_coins.webp',
-    'golden_cup.webp',
-    'golden_north.webp',
-    'golden_watch.webp',
-    'hourglass.webp',
-    'j_j_1866_revolver.webp',
-    'lz_vinyl.webp',
-    'message_in_a_bottle.webp',
-    'old_artifact.webp',
-    'old_book.webp',
-    'old_golden_key.webp',
-    'old_joystick.webp',
-    'old_map.webp',
-    'old_shield.webp',
-    'shell_pearl.webp',
-    'strange_mask.webp',
-  ].map(file => `${route4TreasureRelicBase}/others/${file}`),
-];
+const route4TreasureRelicImages = NEW_EARTH_TREASURE_CATALOG.map(treasure => treasure.src);
 
 const route4BattleImages = [
   `${route4BattleBase}/backgrounds/day/rt4_background_day.webp`,

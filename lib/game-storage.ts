@@ -26,6 +26,7 @@ const SUPPLEMENTAL_LEGACY_KEYS: Partial<Record<ColonySaveStorageKey, string>> = 
   arcade_card_reward_milestones: 'arcadeCardRewardMilestones',
   new_earth_missions: 'newEarthMissions',
   new_earth_submarines: 'newEarthSubmarines',
+  new_earth_museum_treasures: 'newEarthMuseumTreasures',
   route4_qc_reset_done: 'route4QcResetDone',
 };
 
@@ -70,6 +71,13 @@ const mergeSupplementalSaveValue = (key: ColonySaveStorageKey, localValue: any, 
       merged[cardId] = Math.max(Number(merged[cardId]) || 0, Number(level) || 0);
     });
     return merged;
+  }
+
+  if (key === 'new_earth_museum_treasures') {
+    return {
+      ...(mainValue && typeof mainValue === 'object' ? mainValue : {}),
+      ...(localValue && typeof localValue === 'object' ? localValue : {}),
+    };
   }
 
   return localValue;

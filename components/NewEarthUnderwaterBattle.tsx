@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { NEW_EARTH_SUBMARINE_DEPTH_STAGES } from '@/lib/new-earth-submarines';
+import { NEW_EARTH_TREASURES_BY_RARITY, type NewEarthTreasure } from '@/lib/new-earth-treasures';
 import { PremiumCanvasButton } from './ui/PremiumCanvasButton';
 
 export type UnderwaterBattleSiteId = 'oceano-abissal' | 'cemiterio-navios';
@@ -51,6 +52,7 @@ interface NewEarthUnderwaterBattleProps {
     missileDamageBonus: number;
     missileSpeedBonus: number;
     speedBonus: number;
+    oxygenSeconds?: number;
   };
   onVictory?: () => void;
   onDefeat?: () => void;
@@ -131,17 +133,10 @@ type Bubble = {
 
 type TreasureRarity = 'normal' | 'rare' | 'legendary' | 'epic';
 
-type TreasureRelic = {
-  id: string;
-  name: string;
-  src: string;
-  rarity: Exclude<TreasureRarity, 'normal'>;
-};
-
 type TreasureRewardPayload = {
   type: string;
   amount: number;
-  relic?: TreasureRelic;
+  relic?: NewEarthTreasure;
 };
 
 type Treasure = {
@@ -315,52 +310,9 @@ const ENEMY_SUBMARINE_SPRITES: Record<EnemySubmarineSpriteSetId, Record<PlayerSu
   enemy_submarine3: createSubmarineSpriteSet('/assets/rota4/colonys/enemy_submarine3', 'enemy_submarine3'),
 };
 const imageCache = new Map<string, HTMLImageElement>();
-const TREASURE_RELIC_BASE = '/assets/rota4/treasures/relics';
-const createTreasureRelic = (
-  folder: 'fishs' | 'rings' | 'others',
-  file: string,
-  rarity: Exclude<TreasureRarity, 'normal'>
-): TreasureRelic => {
-  const id = file.replace(/\.(webp|png)$/i, '');
-  return {
-    id: `${folder}-${id}`,
-    name: id
-      .replace(/^\d+_/, '')
-      .replace(/_/g, ' ')
-      .replace(/\b\w/g, char => char.toUpperCase()),
-    src: `${TREASURE_RELIC_BASE}/${folder}/${file}`,
-    rarity,
-  };
-};
-const TREASURE_RELICS_BY_RARITY: Record<Exclude<TreasureRarity, 'normal'>, TreasureRelic[]> = {
-  epic: Array.from({ length: 17 }, (_, index) => createTreasureRelic('fishs', `${index + 1}_fish.webp`, 'epic')),
-  legendary: Array.from({ length: 10 }, (_, index) => createTreasureRelic('rings', `${index + 1}_ring.webp`, 'legendary')),
-  rare: [
-    'collar_necklace.webp',
-    'dead_pirate.webp',
-    'futuristic_artifact.webp',
-    'golden_anchor.webp',
-    'golden_coins.webp',
-    'golden_cup.webp',
-    'golden_north.webp',
-    'golden_watch.webp',
-    'hourglass.webp',
-    'j_j_1866_revolver.webp',
-    'lz_vinyl.webp',
-    'message_in_a_bottle.webp',
-    'old_artifact.webp',
-    'old_book.webp',
-    'old_golden_key.webp',
-    'old_joystick.webp',
-    'old_map.webp',
-    'old_shield.webp',
-    'shell_pearl.webp',
-    'strange_mask.webp',
-  ].map(file => createTreasureRelic('others', file, 'rare')),
-};
 const pickTreasureRelic = (rarity: TreasureRarity) => {
   if (rarity === 'normal') return undefined;
-  const relics = TREASURE_RELICS_BY_RARITY[rarity];
+  const relics = NEW_EARTH_TREASURES_BY_RARITY[rarity];
   return relics[Math.floor(Math.random() * relics.length)];
 };
 const spotlightParticles: SpotlightParticle[] = Array.from({ length: 220 }, (_, index) => ({
@@ -2125,8 +2077,13 @@ export default function NewEarthUnderwaterBattle({
   const [kills, setKills] = useState(0);
   const [hull, setHull] = useState(100);
   const [treasuresFound, setTreasuresFound] = useState(0);
+  const [oxygenPercent, setOxygenPercent] = useState(100);
+  const [currentDepthMeters, setCurrentDepthMeters] = useState(0);
   const [portalFeedback, setPortalFeedback] = useState<string | null>(null);
   const portalFeedbackRef = useRef<string | null>(null);
+  const oxygenRemainingMsRef = useRef(0);
+  const oxygenInitializedRef = useRef(false);
+  const lastHudUpdateAtRef = useRef(0);
   const [currentDepthIndex, setCurrentDepthIndex] = useState(0);
   const site = SITE_CONFIG[siteId];
   const maxDepth = submarineStats.maxDepth;
@@ -2135,6 +2092,7 @@ export default function NewEarthUnderwaterBattle({
   const playerShotSpeed = PLAYER_SHOT_SPEED * (1 + submarineStats.missileSpeedBonus / 100);
   const playerShotDamage = 16 * (1 + submarineStats.missileDamageBonus / 100);
   const treasureTotal = clamp(Math.floor(submarineStats.treasurePotential), 3, 8);
+  const oxygenReserveMs = Math.max(45000, Math.round((submarineStats.oxygenSeconds || 75) * 1000));
   const unlockedDepthIndex = useMemo(() => (
     NEW_EARTH_SUBMARINE_DEPTH_STAGES.reduce((highest, depth, index) => (
       maxDepth >= depth ? index : highest
@@ -2154,6 +2112,15 @@ export default function NewEarthUnderwaterBattle({
     treasures: language === 'pt' ? 'Tesouros' : 'Treasures',
     depth: language === 'pt' ? 'Profundidade' : 'Depth',
     maxDepth: language === 'pt' ? 'Capacidade' : 'Capacity',
+    oxygen: language === 'pt' ? 'Oxigênio' : 'Oxygen',
+    power: language === 'pt' ? 'Energia' : 'Power',
+    missionStatus: language === 'pt' ? 'Status da Missão' : 'Mission Status',
+    objective: language === 'pt' ? 'Objetivo' : 'Objective',
+    locateAnomaly: language === 'pt' ? 'Localize e abra tesouros' : 'Locate and open treasures',
+    currentDepth: language === 'pt' ? 'Profundidade Atual' : 'Current Depth',
+    surface: language === 'pt' ? 'Sair para a superfície' : 'Return to surface',
+    oxygenCritical: language === 'pt' ? 'Oxigênio crítico. Retorne à superfície.' : 'Oxygen critical. Return to surface.',
+    oxygenDepleted: language === 'pt' ? 'Oxigênio esgotado' : 'Oxygen depleted',
     portal: language === 'pt' ? 'Portal Profundo' : 'Deep Portal',
     finalDepth: language === 'pt' ? 'Limite explorado deste setor.' : 'Sector depth limit explored.',
   }), [language]);
@@ -2163,8 +2130,9 @@ export default function NewEarthUnderwaterBattle({
   }, []);
 
   useEffect(() => {
+    oxygenInitializedRef.current = false;
     setCurrentDepthIndex(0);
-  }, [siteId]);
+  }, [siteId, colonyId]);
 
   const updateAimFromPointer = (event: React.PointerEvent<HTMLCanvasElement>) => {
     const rect = event.currentTarget.getBoundingClientRect();
@@ -2329,8 +2297,15 @@ export default function NewEarthUnderwaterBattle({
     setHull(playerMaxHp);
     setKills(0);
     setTreasuresFound(0);
+    if (!oxygenInitializedRef.current) {
+      oxygenInitializedRef.current = true;
+      oxygenRemainingMsRef.current = oxygenReserveMs;
+    }
+    lastHudUpdateAtRef.current = 0;
+    setOxygenPercent(Math.max(0, Math.min(100, Math.round((oxygenRemainingMsRef.current / oxygenReserveMs) * 100))));
+    setCurrentDepthMeters(NEW_EARTH_SUBMARINE_DEPTH_STAGES[currentDepthIndex]);
     setPortalFeedback(null);
-  }, [currentDepthIndex, playerMaxHp, siteId, treasureTotal]);
+  }, [currentDepthIndex, oxygenReserveMs, playerMaxHp, siteId, treasureTotal]);
 
   useEffect(() => {
     mysteryRolledDepthsRef.current.clear();
@@ -2608,6 +2583,38 @@ export default function NewEarthUnderwaterBattle({
           state.player.vy *= -0.22;
         }
         state.player.cooldown = Math.max(0, state.player.cooldown - delta);
+
+        const depthRangeStart = currentDepthIndex === 0 ? 0 : NEW_EARTH_SUBMARINE_DEPTH_STAGES[currentDepthIndex - 1];
+        const depthRangeEnd = NEW_EARTH_SUBMARINE_DEPTH_STAGES[currentDepthIndex];
+        const verticalFactor = clamp((state.player.y - 48) / Math.max(1, HEIGHT - 90), 0, 1);
+        const motionFactor = clamp(Math.hypot(state.player.vx, state.player.vy) / Math.max(0.1, playerMaxSpeed), 0, 1);
+        const simulatedDepth = Math.round(depthRangeStart + (depthRangeEnd - depthRangeStart) * (0.28 + verticalFactor * 0.64 + Math.sin(time * 0.0016) * 0.015));
+        const drainMultiplier = 1 + currentDepthIndex * 0.08 + motionFactor * 0.12;
+        oxygenRemainingMsRef.current = Math.max(0, oxygenRemainingMsRef.current - delta * drainMultiplier);
+
+        if (time - lastHudUpdateAtRef.current > 140) {
+          lastHudUpdateAtRef.current = time;
+          setCurrentDepthMeters(clamp(simulatedDepth, 0, depthRangeEnd));
+          setOxygenPercent(Math.max(0, Math.min(100, Math.round((oxygenRemainingMsRef.current / oxygenReserveMs) * 100))));
+        }
+
+        if (oxygenRemainingMsRef.current <= 0) {
+          if (!playerExplosionPlayedRef.current) {
+            playerExplosionPlayedRef.current = true;
+            playRandomUnderwaterSound(SUBMARINE_EXPLOSION_SFX, 0.72);
+          }
+          stopUnderwaterSound(playerConstantMotorAudioRef.current);
+          playerConstantMotorAudioRef.current = null;
+          state.phase = 'defeat';
+          setStatus('defeat');
+          setPortalFeedback(labels.oxygenDepleted);
+          onDefeat?.();
+        }
+
+        if (state.phase === 'defeat') {
+          frameRef.current = requestAnimationFrame(loop);
+          return;
+        }
 
         if (!ambientRolledDepthsRef.current.has(currentDepthIndex)) {
           if (nextAmbientRollAtRef.current === 0) {
@@ -3169,7 +3176,7 @@ export default function NewEarthUnderwaterBattle({
     return () => {
       if (frameRef.current) cancelAnimationFrame(frameRef.current);
     };
-  }, [backgroundSrc, colonyId, currentDepthIndex, labels.finalDepth, labels.portal, language, mounted, nextDepthMeters, onDefeat, onTreasureLoot, onVictory, playerMaxSpeed, playerShotDamage, playerShotSpeed, unlockedDepthIndex, defenseBattleLevel]);
+  }, [backgroundSrc, colonyId, currentDepthIndex, labels.finalDepth, labels.oxygenDepleted, labels.portal, language, mounted, nextDepthMeters, onDefeat, onTreasureLoot, onVictory, oxygenReserveMs, playerMaxSpeed, playerShotDamage, playerShotSpeed, unlockedDepthIndex, defenseBattleLevel]);
 
   useEffect(() => () => {
     activeLaunchAudiosRef.current.forEach(stopUnderwaterSound);
@@ -3182,6 +3189,10 @@ export default function NewEarthUnderwaterBattle({
 
   const hp = Math.max(0, hull);
   const hpPercent = Math.max(0, Math.min(100, Math.round((hp / Math.max(1, playerMaxHp)) * 100)));
+  const powerPercent = Math.max(0, Math.min(100, Math.round(64 + submarineStats.speedBonus * 0.9 + submarineStats.missileSpeedBonus * 0.45)));
+  const oxygenCritical = status !== 'defeat' && oxygenPercent <= 18;
+  const formattedCurrentDepth = currentDepthMeters.toLocaleString(language === 'pt' ? 'pt-BR' : 'en-US');
+  const formattedStageDepth = depthMeters.toLocaleString(language === 'pt' ? 'pt-BR' : 'en-US');
 
   if (!mounted) return null;
 
@@ -3209,6 +3220,68 @@ export default function NewEarthUnderwaterBattle({
             onPointerLeave={handleCanvasPointerLeave}
             onPointerDown={handleCanvasPointerDown}
           />
+          <div className="pointer-events-none absolute left-5 top-5 w-[250px] border border-cyan-200/35 bg-slate-950/55 px-4 py-3 shadow-[0_0_26px_rgba(34,211,238,0.18)] backdrop-blur-sm">
+            <div className="flex items-center justify-between gap-3">
+              <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-cyan-100/75">{labels.oxygen}</p>
+              <span className={`font-orbitron text-lg font-black ${oxygenCritical ? 'text-red-200' : 'text-cyan-50'}`}>{oxygenPercent}%</span>
+            </div>
+            <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.24em] text-cyan-100/60">{language === 'pt' ? 'Reserva restante' : 'Remaining reserve'}</p>
+            <div className="mt-2 h-2.5 overflow-hidden rounded-sm border border-cyan-100/20 bg-black/58">
+              <div
+                className={`h-full transition-[width] duration-200 ${oxygenCritical ? 'bg-red-400' : 'bg-cyan-300'}`}
+                style={{ width: `${oxygenPercent}%` }}
+              />
+            </div>
+          </div>
+
+          <div className="pointer-events-none absolute left-5 top-[150px] flex gap-3 border border-cyan-200/25 bg-slate-950/45 px-3 py-3 shadow-[0_0_24px_rgba(34,211,238,0.14)] backdrop-blur-sm">
+            <div className="flex h-[172px] w-3 items-end overflow-hidden rounded-sm border border-cyan-100/25 bg-black/65">
+              <div
+                className={`mt-auto w-full ${oxygenCritical ? 'bg-gradient-to-t from-red-400 to-cyan-300' : 'bg-cyan-300'}`}
+                style={{ height: `${Math.max(6, oxygenPercent)}%` }}
+              />
+            </div>
+            <div className="w-[170px] space-y-3">
+              <div>
+                <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-cyan-100/62">{labels.hp}</p>
+                <p className="font-orbitron text-2xl font-black leading-none text-cyan-50">{hpPercent}%</p>
+                <div className="mt-1.5 h-1.5 overflow-hidden bg-black/55">
+                  <div className="h-full bg-cyan-300" style={{ width: `${hpPercent}%` }} />
+                </div>
+              </div>
+              <div>
+                <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-cyan-100/62">{labels.currentDepth}</p>
+                <p className="font-orbitron text-2xl font-black leading-none text-cyan-50">{formattedCurrentDepth}m</p>
+              </div>
+              <div>
+                <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-cyan-100/62">{labels.power}</p>
+                <p className="font-orbitron text-2xl font-black leading-none text-cyan-50">{powerPercent}%</p>
+                <div className="mt-1.5 h-1.5 overflow-hidden bg-black/55">
+                  <div className="h-full bg-cyan-300" style={{ width: `${powerPercent}%` }} />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="pointer-events-none absolute right-5 top-[88px] w-[330px] border border-cyan-200/35 bg-slate-950/50 px-4 py-3 shadow-[0_0_26px_rgba(34,211,238,0.16)] backdrop-blur-sm">
+            <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-cyan-100/70">{labels.missionStatus}</p>
+            <div className="mt-2 flex items-start gap-2">
+              <span className="mt-1 h-3 w-3 rounded-full border border-cyan-200 bg-cyan-400/35 shadow-[0_0_10px_rgba(34,211,238,0.8)]" />
+              <div>
+                <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-cyan-200/70">{labels.objective}</p>
+                <p className="font-orbitron text-sm font-black uppercase leading-tight text-white">{labels.locateAnomaly}</p>
+                <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.18em] text-cyan-100/55">
+                  {formattedStageDepth}m · {treasuresFound}/{treasureTotal}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {oxygenCritical && (
+            <div className="pointer-events-none absolute bottom-5 left-1/2 -translate-x-1/2 rounded-xl border border-red-300/35 bg-red-950/72 px-5 py-3 font-orbitron text-xs font-black uppercase tracking-[0.16em] text-red-100 shadow-[0_0_26px_rgba(248,113,113,0.22)]">
+              {labels.oxygenCritical}
+            </div>
+          )}
           {status === 'defeat' && (
             <div className="absolute inset-0 flex items-center justify-center bg-black/42">
               <div className="rounded-2xl border border-cyan-300/35 bg-slate-950/88 px-8 py-6 text-center shadow-[0_0_40px_rgba(34,211,238,0.24)]">
@@ -3269,7 +3342,7 @@ export default function NewEarthUnderwaterBattle({
             className="h-12 rounded-2xl"
             contentClassName="px-4 text-[12px] font-black uppercase tracking-[0.22em] text-white"
           >
-            {labels.close}
+            {labels.surface}
           </PremiumCanvasButton>
         </aside>
       </div>

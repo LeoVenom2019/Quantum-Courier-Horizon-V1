@@ -151,6 +151,16 @@ import {
   type NewEarthSubmarineUpgradeId,
   type NewEarthSubmarineState,
 } from '@/lib/new-earth-submarines';
+import {
+  NEW_EARTH_MUSEUM_STORAGE_KEY,
+  NEW_EARTH_RARE_FISH_TREASURES,
+  NEW_EARTH_RARE_RING_TREASURES,
+  NEW_EARTH_RELIC_TREASURES,
+  normalizeNewEarthMuseumTreasures,
+  type NewEarthMuseumTreasures,
+  type NewEarthTreasure,
+  type NewEarthTreasureCategory,
+} from '@/lib/new-earth-treasures';
 import { LoreScreen, RobotVisual } from './LoreSystem';
 import Lottie from 'lottie-react';
 import EconomicGoals from './dashboard/EconomicGoals';
@@ -247,6 +257,45 @@ const NEW_EARTH_DANGER_MARKERS = [
 ] as const;
 
 type NewEarthUnderwaterSiteId = Extract<typeof NEW_EARTH_DANGER_MARKERS[number]['id'], 'oceano-abissal' | 'cemiterio-navios'>;
+
+const NEW_EARTH_MUSEUM_MARKER = {
+  id: 'new-earth-museum',
+  label: 'MUSEU',
+  left: '59.6%',
+  top: '44.7%',
+} as const;
+
+const NEW_EARTH_MUSEUM_CATEGORIES: {
+  id: NewEarthTreasureCategory;
+  label: Record<'pt' | 'en', string>;
+  treasures: NewEarthTreasure[];
+  tone: string;
+  background: string;
+}[] = [
+  {
+    id: 'rare_fish',
+    label: { pt: 'Peixes Raros', en: 'Rare Fish' },
+    treasures: NEW_EARTH_RARE_FISH_TREASURES,
+    tone: 'cyan',
+    background: '/assets/rota4/layout_cap4/bg_peixes.webp',
+  },
+  {
+    id: 'relic',
+    label: { pt: 'Relíquias', en: 'Relics' },
+    treasures: NEW_EARTH_RELIC_TREASURES,
+    tone: 'amber',
+    background: '/assets/rota4/layout_cap4/bg_reliquias.webp',
+  },
+  {
+    id: 'rare_ring',
+    label: { pt: 'Anéis Raros', en: 'Rare Rings' },
+    treasures: NEW_EARTH_RARE_RING_TREASURES,
+    tone: 'violet',
+    background: '/assets/rota4/layout_cap4/bg_aneis.webp',
+  },
+];
+
+const NEW_EARTH_MUSEUM_ITEMS_PER_PAGE = 4;
 
 const NEW_EARTH_SUBMARINE_NAMES: Record<NewEarthSubmarineColonyId, string> = {
   'colony-4': 'NEPTUNE',
@@ -791,6 +840,10 @@ const DashboardContent = memo(({
   const [selectedNewEarthCardIndex, setSelectedNewEarthCardIndex] = useState<number | null>(null);
   const [newEarthMapFeedback, setNewEarthMapFeedback] = useState<string | null>(null);
   const [newEarthSubmarines, setNewEarthSubmarines] = useState<NewEarthSubmarineState>(() => createDefaultNewEarthSubmarineState());
+  const [newEarthMuseumOpen, setNewEarthMuseumOpen] = useState(false);
+  const [newEarthMuseumCategory, setNewEarthMuseumCategory] = useState<NewEarthTreasureCategory>('rare_fish');
+  const [newEarthMuseumPage, setNewEarthMuseumPage] = useState(0);
+  const [newEarthMuseumTreasures, setNewEarthMuseumTreasures] = useState<NewEarthMuseumTreasures>({});
   const [activeUnderwaterBattle, setActiveUnderwaterBattle] = useState<{
     siteId: NewEarthUnderwaterSiteId;
     colonyId: NewEarthSubmarineColonyId;
@@ -823,6 +876,27 @@ const DashboardContent = memo(({
       })
       .catch(error => {
         console.warn('Unable to load New Earth submarine save data', error);
+      });
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+    GameStorage.load(NEW_EARTH_MUSEUM_STORAGE_KEY)
+      .then(saved => {
+        if (!mounted) return;
+        const normalized = normalizeNewEarthMuseumTreasures(saved);
+        setNewEarthMuseumTreasures(normalized);
+        if (!saved || typeof saved !== 'object') {
+          GameStorage.save(normalized, NEW_EARTH_MUSEUM_STORAGE_KEY).catch(error => {
+            console.warn('Unable to initialize New Earth museum save data', error);
+          });
+        }
+      })
+      .catch(error => {
+        console.warn('Unable to load New Earth museum save data', error);
       });
     return () => {
       mounted = false;
@@ -1466,6 +1540,7 @@ const DashboardContent = memo(({
     setSelectedNewEarthColonyId(colony.id);
     setSelectedNewEarthCardIndex(null);
     setNewEarthMapFeedback(null);
+    setNewEarthMuseumOpen(false);
     playSfx('aba_click');
   }, [colonies, language, playRandomNewEarthAccessDenied, playSfx]);
 
@@ -3026,6 +3101,14 @@ const DashboardContent = memo(({
     }
   }, []);
 
+  const handleNewEarthMuseumMarkerClick = useCallback(() => {
+    setSelectedNewEarthColonyId(null);
+    setSelectedNewEarthCardIndex(null);
+    setNewEarthMapFeedback(null);
+    setNewEarthMuseumOpen(true);
+    playSfx('aba_click');
+  }, [playSfx]);
+
   const handleNewEarthDangerMarkerClick = useCallback((marker: typeof NEW_EARTH_DANGER_MARKERS[number]) => {
     if (!('submarineColonyId' in marker)) {
       setNewEarthMapFeedback(language === 'pt' ? 'Zona hostil. Operação ainda indisponível.' : 'Hostile zone. Operation unavailable.');
@@ -3047,6 +3130,7 @@ const DashboardContent = memo(({
     setSelectedNewEarthColonyId(null);
     setSelectedNewEarthCardIndex(null);
     setNewEarthMapFeedback(null);
+    setNewEarthMuseumOpen(false);
     setActiveUnderwaterBattle({
       siteId: marker.id as NewEarthUnderwaterSiteId,
       colonyId: marker.submarineColonyId as NewEarthSubmarineColonyId,
@@ -3057,6 +3141,27 @@ const DashboardContent = memo(({
   const handleUnderwaterTreasureLoot = useCallback((payload: any) => {
     recordSubmarineMissionProgress({ type: 'submarine-treasure', amount: 1 });
     if (!payload || typeof payload !== 'object') return;
+
+    if (payload.type === 'relic' && payload.relic && typeof payload.relic === 'object') {
+      const treasure = payload.relic as NewEarthTreasure;
+      setNewEarthMuseumTreasures(current => {
+        const normalized = normalizeNewEarthMuseumTreasures(current);
+        const next = normalizeNewEarthMuseumTreasures({
+          ...normalized,
+          [treasure.id]: {
+            ...treasure,
+            foundAt: Date.now(),
+            siteId: activeUnderwaterBattle?.siteId,
+            colonyId: activeUnderwaterBattle?.colonyId,
+          },
+        });
+        GameStorage.save(next, NEW_EARTH_MUSEUM_STORAGE_KEY).catch(error => {
+          console.warn('Unable to save New Earth museum treasure', error);
+        });
+        return next;
+      });
+      return;
+    }
 
     if (payload.type === 'qc' && Number(payload.amount) > 0) {
       const amount = Math.max(0, Math.floor(Number(payload.amount)));
@@ -3092,7 +3197,7 @@ const DashboardContent = memo(({
         })
         .catch(error => console.warn('Failed to persist underwater treasure reward', error));
     }
-  }, [dispatch, recordSubmarineMissionProgress]);
+  }, [activeUnderwaterBattle?.colonyId, activeUnderwaterBattle?.siteId, dispatch, recordSubmarineMissionProgress]);
 
   const activeUnderwaterBattleColony = useMemo(() => (
     activeUnderwaterBattle
@@ -8748,6 +8853,10 @@ const DashboardContent = memo(({
                           0%, 100% { box-shadow: 0 0 10px rgba(248,113,113,0.85), 0 0 22px rgba(239,68,68,0.35); }
                           50% { box-shadow: 0 0 16px rgba(252,165,165,0.95), 0 0 34px rgba(239,68,68,0.48); }
                         }
+                        @keyframes newEarthMuseumDot {
+                          0%, 100% { box-shadow: 0 0 10px rgba(251,191,36,0.9), 0 0 22px rgba(245,158,11,0.35); }
+                          50% { box-shadow: 0 0 18px rgba(254,240,138,0.98), 0 0 38px rgba(245,158,11,0.5); }
+                        }
                       `}</style>
                       <div className="absolute inset-0 bg-gradient-to-b from-black/25 via-black/10 to-black/55" />
                       <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_38%,transparent_0%,rgba(0,0,0,0.28)_72%)]" />
@@ -8804,6 +8913,26 @@ const DashboardContent = memo(({
                             </span>
                           </button>
                         ))}
+
+                        <button
+                          type="button"
+                          key={NEW_EARTH_MUSEUM_MARKER.id}
+                          onClick={handleNewEarthMuseumMarkerClick}
+                          className="absolute h-8 w-8 text-left transition hover:scale-110"
+                          style={{ left: NEW_EARTH_MUSEUM_MARKER.left, top: NEW_EARTH_MUSEUM_MARKER.top }}
+                        >
+                          <span
+                            className="absolute left-0 top-0 h-8 w-8 rounded-full border border-amber-200/75"
+                            style={{ animation: 'newEarthRadarPulse 2.2s ease-out infinite' }}
+                          />
+                          <span
+                            className="absolute left-0 top-0 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full border border-amber-50/85 bg-amber-300/90"
+                            style={{ animation: 'newEarthMuseumDot 2.2s ease-in-out infinite' }}
+                          />
+                          <span className="absolute left-4 top-[-1.15rem] whitespace-nowrap rounded-full border border-amber-200/25 bg-black/50 px-2 py-0.5 font-mono text-[8px] font-bold uppercase tracking-[0.22em] text-amber-50 shadow-[0_0_14px_rgba(251,191,36,0.2)]">
+                            {NEW_EARTH_MUSEUM_MARKER.label}
+                          </span>
+                        </button>
                       </div>
                       <AnimatePresence>
                         {newEarthMapFeedback && (
@@ -8816,6 +8945,202 @@ const DashboardContent = memo(({
                             {newEarthMapFeedback}
                           </motion.div>
                         )}
+                      </AnimatePresence>
+                      <AnimatePresence>
+                        {newEarthMuseumOpen && (() => {
+                          const activeCategory = NEW_EARTH_MUSEUM_CATEGORIES.find(category => category.id === newEarthMuseumCategory) || NEW_EARTH_MUSEUM_CATEGORIES[0];
+                          const recoveredTotal = Object.keys(newEarthMuseumTreasures).length;
+                          const recoveredInCategory = activeCategory.treasures.filter(treasure => newEarthMuseumTreasures[treasure.id]).length;
+                          const totalMuseumPages = Math.max(1, Math.ceil(activeCategory.treasures.length / NEW_EARTH_MUSEUM_ITEMS_PER_PAGE));
+                          const safeMuseumPage = Math.min(Math.max(0, newEarthMuseumPage), totalMuseumPages - 1);
+                          const museumPageTreasures = activeCategory.treasures.slice(
+                            safeMuseumPage * NEW_EARTH_MUSEUM_ITEMS_PER_PAGE,
+                            safeMuseumPage * NEW_EARTH_MUSEUM_ITEMS_PER_PAGE + NEW_EARTH_MUSEUM_ITEMS_PER_PAGE
+                          );
+
+                          return (
+                            <motion.div
+                              initial={{ opacity: 0, scale: 0.97, y: 18 }}
+                              animate={{ opacity: 1, scale: 1, y: 0 }}
+                              exit={{ opacity: 0, scale: 0.97, y: 18 }}
+                              className="absolute inset-4 z-30 overflow-hidden rounded-3xl border border-amber-200/25 bg-slate-950/95 p-4 shadow-[0_0_54px_rgba(245,158,11,0.18)] backdrop-blur-md"
+                            >
+                              <img
+                                src={activeCategory.background}
+                                alt=""
+                                aria-hidden="true"
+                                className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-28"
+                              />
+                              <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_20%,rgba(245,158,11,0.13),transparent_44%),linear-gradient(180deg,rgba(2,6,23,0.62),rgba(2,6,23,0.92))]" />
+                              <PremiumCanvasButton
+                                type="button"
+                                onClick={() => {
+                                  setNewEarthMuseumOpen(false);
+                                  playSfx('close_window');
+                                }}
+                                tone="steel"
+                                className="absolute right-5 top-5 z-20 h-10 w-10 rounded-full"
+                                contentClassName="text-cyan-100"
+                              >
+                                <X size={18} />
+                              </PremiumCanvasButton>
+
+                              <div className="relative z-10 flex h-full min-h-0 flex-col gap-4">
+                                <div className="pr-14">
+                                  <p className="font-mono text-[10px] font-black uppercase tracking-[0.42em] text-amber-100/70">
+                                    {language === 'pt' ? 'Arquivo da Nova Terra' : 'New Earth Archive'}
+                                  </p>
+                                  <div className="mt-2 flex items-end justify-between gap-5">
+                                    <div>
+                                      <h2 className="font-orbitron text-4xl font-black uppercase leading-none text-white drop-shadow-[0_0_18px_rgba(251,191,36,0.18)]">
+                                        {language === 'pt' ? 'Museu' : 'Museum'}
+                                      </h2>
+                                      <p className="mt-2 max-w-2xl text-sm font-semibold text-slate-200/76">
+                                        {language === 'pt'
+                                          ? 'Tesouros recuperados nas expedições submarinas ficam preservados aqui.'
+                                          : 'Treasures recovered during submarine expeditions are preserved here.'}
+                                      </p>
+                                    </div>
+                                    <div className="rounded-2xl border border-amber-100/18 bg-black/50 px-4 py-3 text-right">
+                                      <p className="font-mono text-[9px] font-black uppercase tracking-[0.24em] text-amber-100/64">
+                                        {language === 'pt' ? 'Coleção' : 'Collection'}
+                                      </p>
+                                      <p className="mt-1 font-orbitron text-2xl font-black leading-none text-white">
+                                        {recoveredTotal} / {NEW_EARTH_RARE_FISH_TREASURES.length + NEW_EARTH_RELIC_TREASURES.length + NEW_EARTH_RARE_RING_TREASURES.length}
+                                      </p>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div className="grid grid-cols-3 gap-2">
+                                  {NEW_EARTH_MUSEUM_CATEGORIES.map(category => {
+                                    const categoryRecovered = category.treasures.filter(treasure => newEarthMuseumTreasures[treasure.id]).length;
+                                    const active = category.id === activeCategory.id;
+                                    const toneClass = category.tone === 'cyan'
+                                      ? 'border-cyan-300/40 text-cyan-50 shadow-[0_0_18px_rgba(34,211,238,0.16)]'
+                                      : category.tone === 'violet'
+                                        ? 'border-fuchsia-300/40 text-fuchsia-50 shadow-[0_0_18px_rgba(217,70,239,0.14)]'
+                                        : 'border-amber-200/45 text-amber-50 shadow-[0_0_18px_rgba(245,158,11,0.16)]';
+
+                                    return (
+                                      <button
+                                        key={category.id}
+                                        type="button"
+                                        onClick={() => {
+                                          setNewEarthMuseumCategory(category.id);
+                                          setNewEarthMuseumPage(0);
+                                          playSfx('aba_click');
+                                        }}
+                                        className={`h-14 rounded-xl border px-4 text-left transition ${active ? `${toneClass} bg-white/10` : 'border-white/10 bg-black/36 text-slate-300/70 hover:border-white/22 hover:bg-white/5'}`}
+                                      >
+                                        <span className="block truncate font-orbitron text-sm font-black uppercase tracking-[0.12em]">
+                                          {category.label[language as 'pt' | 'en']}
+                                        </span>
+                                        <span className="mt-1 block font-mono text-[9px] font-black uppercase tracking-[0.18em] opacity-70">
+                                          {categoryRecovered} / {category.treasures.length}
+                                        </span>
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+
+                                <div className="relative min-h-0 flex-1 overflow-hidden rounded-2xl border border-cyan-200/14 bg-black/42 p-3">
+                                  <div className="mb-2 flex h-14 items-center justify-between gap-3">
+                                    <div className="flex min-w-0 items-center gap-3">
+                                      <PremiumCanvasButton
+                                        type="button"
+                                        onClick={() => {
+                                          setNewEarthMuseumPage(page => Math.max(0, page - 1));
+                                          playSfx('aba_click');
+                                        }}
+                                        disabled={safeMuseumPage <= 0}
+                                        tone="steel"
+                                        className="h-14 w-14 rounded-full"
+                                        contentClassName={safeMuseumPage <= 0 ? 'text-slate-500' : 'text-cyan-100'}
+                                      >
+                                        <ChevronLeft size={24} />
+                                      </PremiumCanvasButton>
+                                      <h3 className="truncate font-orbitron text-3xl font-black uppercase leading-none text-white">
+                                        {activeCategory.label[language as 'pt' | 'en']}
+                                      </h3>
+                                    </div>
+                                    <div className="flex shrink-0 items-center gap-2">
+                                      <div className="rounded-full border border-white/12 bg-white/7 px-3 py-1.5 font-mono text-[10px] font-black uppercase tracking-[0.16em] text-slate-100/78">
+                                        {recoveredInCategory} / {activeCategory.treasures.length}
+                                      </div>
+                                      <div className="rounded-full border border-cyan-100/12 bg-black/46 px-3 py-1.5 font-mono text-[10px] font-black uppercase tracking-[0.16em] text-cyan-100/72">
+                                        {language === 'pt' ? 'Página' : 'Page'} {safeMuseumPage + 1} / {totalMuseumPages}
+                                      </div>
+                                      <PremiumCanvasButton
+                                        type="button"
+                                        onClick={() => {
+                                          setNewEarthMuseumPage(page => Math.min(totalMuseumPages - 1, page + 1));
+                                          playSfx('aba_click');
+                                        }}
+                                        disabled={safeMuseumPage >= totalMuseumPages - 1}
+                                        tone="steel"
+                                        className="h-14 w-14 rounded-full"
+                                        contentClassName={safeMuseumPage >= totalMuseumPages - 1 ? 'text-slate-500' : 'text-cyan-100'}
+                                      >
+                                        <ChevronRight size={24} />
+                                      </PremiumCanvasButton>
+                                    </div>
+                                  </div>
+
+                                  <div className="grid h-[calc(100%-64px)] min-h-0 grid-cols-2 grid-rows-[minmax(0,1fr)_minmax(0,1fr)] gap-3">
+                                    {museumPageTreasures.map(treasure => {
+                                      const recovered = Boolean(newEarthMuseumTreasures[treasure.id]);
+                                      return (
+                                        <div
+                                          key={treasure.id}
+                                          className={`relative h-full min-h-0 overflow-hidden rounded-xl border bg-slate-950/76 p-3 ${recovered ? 'border-cyan-200/24 shadow-[0_0_22px_rgba(34,211,238,0.14)]' : 'border-white/10'}`}
+                                        >
+                                          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_28%,rgba(34,211,238,0.14),transparent_58%)]" />
+                                          <div className="relative z-10 grid h-full min-h-0 grid-rows-[96px_58px_1fr] justify-items-center text-center">
+                                            <div className={`relative h-24 w-24 overflow-hidden rounded-lg border ${recovered ? 'border-cyan-200/22 bg-cyan-950/16' : 'border-white/10 bg-black/48'}`}>
+                                              <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_45%,rgba(125,211,252,0.2),transparent_62%)]" />
+                                              {recovered ? (
+                                                <img
+                                                  src={treasure.src}
+                                                  alt={treasure.name}
+                                                  className="absolute inset-0 h-full w-full object-contain p-2.5 drop-shadow-[0_0_20px_rgba(125,211,252,0.26)]"
+                                                />
+                                              ) : (
+                                                <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/36 text-slate-300/72">
+                                                  <Lock size={24} />
+                                                  <span className="text-center font-mono text-[7px] font-black uppercase tracking-[0.18em]">
+                                                    {language === 'pt' ? 'Imagem bloqueada' : 'Image locked'}
+                                                  </span>
+                                                </div>
+                                              )}
+                                            </div>
+                                            <div className="flex min-h-0 min-w-0 flex-col items-center justify-center px-1">
+                                              <p className={`line-clamp-2 font-orbitron text-[15px] font-black uppercase leading-tight ${recovered ? 'text-white' : 'text-slate-300'}`}>
+                                                {treasure.name}
+                                              </p>
+                                              <p className="mt-1 font-mono text-[8px] font-black uppercase tracking-[0.18em] text-cyan-100/50">
+                                                {recovered ? (language === 'pt' ? 'Recuperado' : 'Recovered') : (language === 'pt' ? 'Ainda não recuperado' : 'Not recovered yet')}
+                                              </p>
+                                            </div>
+                                            <p className="line-clamp-3 min-h-0 max-w-[94%] overflow-hidden text-[12px] font-semibold leading-snug text-slate-100/84">
+                                              {treasure.lore[language as 'pt' | 'en']}
+                                            </p>
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                    {Array.from({ length: NEW_EARTH_MUSEUM_ITEMS_PER_PAGE - museumPageTreasures.length }).map((_, index) => (
+                                      <div
+                                        key={`empty-${safeMuseumPage}-${index}`}
+                                        className="rounded-xl border border-white/8 bg-black/26"
+                                      />
+                                    ))}
+                                  </div>
+                                </div>
+                              </div>
+                            </motion.div>
+                          );
+                        })()}
                       </AnimatePresence>
                       <AnimatePresence>
                         {selectedNewEarthColony && selectedNewEarthColonySectors && (
