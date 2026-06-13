@@ -37,6 +37,7 @@ import { PremiumCanvasButton } from './ui/PremiumCanvasButton';
 import {
   BATTLE_CARD_SLOTS,
   BATTLE_STAT_CONFIG,
+  BASE_HORIZON_LEVEL_CAP,
   BASE_BATTLE_SHIP_STATS,
   COLONY_CARD_CATALOG,
   ColonyCardLevels,
@@ -56,6 +57,7 @@ import {
   getCardLevel,
   getCardModalBackgroundImage,
   getHorizonLevelFromXp,
+  MAX_HORIZON_LEVEL,
   getCardStyle,
   getPoliticalEffects,
   getPoliticalPassiveBonuses,
@@ -263,9 +265,11 @@ const ROUTE4_SPECIAL_UNEQUIP_SFX = `${ROUTE4_SEARCH_SFX_BASE}/unequip_special.og
 const ROUTE4_CANT_EQUIP_SFX = `${ROUTE4_SEARCH_SFX_BASE}/cant_equip.ogg`;
 const NEW_EARTH_MISSION_COMPLETE_SFX_COUNT = 10;
 const BOBBY_BLUE_WARNING_SFX_COUNT = 9;
+const BOBBY_BLUE_PREPARE_FOR_BATTLE_SFX_COUNT = 7;
 const HORIZON_LEVEL_UP_SFX = '/assets/rota4/battles/player/horizon/horizon_level_up.ogg';
 const route4SearchSfxCache = new Map<string, HTMLAudioElement>();
 const route4BattleSfxCache = new Map<string, HTMLAudioElement>();
+let activePrepareForBattleSfx: HTMLAudioElement | null = null;
 
 type NewEarthMissionCycleBonusAnimation = {
   cycle: number;
@@ -306,6 +310,33 @@ const playRoute4UiSfx = (src: string, volume = 0.68) => {
 const playRandomBobbyBlueWarningSfx = () => {
   const randomWarningIndex = Math.floor(Math.random() * BOBBY_BLUE_WARNING_SFX_COUNT) + 1;
   playRoute4UiSfx(`/audio/sfx/bobby_blue/warnings/warning_${randomWarningIndex}.ogg`, 0.8);
+};
+
+const playRandomBobbyBluePrepareForBattleSfx = () => {
+  if (typeof Audio === 'undefined') return;
+  if (activePrepareForBattleSfx && !activePrepareForBattleSfx.paused) return;
+
+  const randomIndex = Math.floor(Math.random() * BOBBY_BLUE_PREPARE_FOR_BATTLE_SFX_COUNT) + 1;
+  const src = `/audio/sfx/bobby_blue/prepare_for_battle/${randomIndex}_prepare_for_battle.ogg`;
+  let audio = route4BattleSfxCache.get(src);
+  if (!audio) {
+    audio = new Audio(src);
+    audio.preload = 'auto';
+    route4BattleSfxCache.set(src, audio);
+  }
+
+  audio.currentTime = 0;
+  audio.volume = 0.82;
+  activePrepareForBattleSfx = audio;
+  audio.onended = () => {
+    if (activePrepareForBattleSfx === audio) activePrepareForBattleSfx = null;
+  };
+  audio.onerror = () => {
+    if (activePrepareForBattleSfx === audio) activePrepareForBattleSfx = null;
+  };
+  audio.play().catch(() => {
+    if (activePrepareForBattleSfx === audio) activePrepareForBattleSfx = null;
+  });
 };
 
 const playRoute4BattleSfx = (src: string, volume = 0.74) => {
@@ -1320,13 +1351,15 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
       (colony.id === 'colony-2' || colony.id === 'colony-4') &&
       isColonyReadyForPopulation(colony.constructions)
     ));
+    const directBattlesUnlocked = colonies.length > 0 && colonies.every(colony => isColonyReadyForPopulation(colony.constructions));
 
     return {
       unlockedArcadeIds,
       hasMissingCards,
-      canRunLandSearch: true,
-      canRunSeaSearch: true,
+      canRunLandSearch: !directBattlesUnlocked,
+      canRunSeaSearch: !directBattlesUnlocked,
       canDefendSearches: pendingDefenseThreats.length > 0 || Boolean(activeDefenseThreat),
+      directBattlesUnlocked,
       canUseSubmarines: submarineColoniesReady,
       upgradeableCards,
       colonies: colonies.map(colony => ({
@@ -2229,7 +2262,8 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
       .filter(card => card && isBattleCard(card)) as ColonyCard[]
   , [battleLoadout]);
 
-  const horizonProgress = useMemo(() => getHorizonLevelFromXp(horizonXp), [horizonXp]);
+  const horizonMaxLevel = allColoniesFullyBuilt ? MAX_HORIZON_LEVEL : BASE_HORIZON_LEVEL_CAP;
+  const horizonProgress = useMemo(() => getHorizonLevelFromXp(horizonXp, horizonMaxLevel), [horizonMaxLevel, horizonXp]);
   const battleStatTotals = useMemo(() => calculateBattleStatTotals(battleLoadoutCards, cardLevels), [battleLoadoutCards, cardLevels]);
   const battleShipStats = useMemo(() => calculateBattleShipStats(battleLoadoutCards, BASE_BATTLE_SHIP_STATS, cardLevels, horizonProgress.level), [battleLoadoutCards, cardLevels, horizonProgress.level]);
   const trinityShotEnabled = useMemo(() => (
@@ -2796,6 +2830,37 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
     );
   }, [newEarthMissions, newEarthMissionContext, onEarnQC, effectiveActiveColonyId, setColonies, ownedCardIds, playSfx, t]);
 
+  const renewNewEarthMissionsWithoutBonus = useCallback(() => {
+    if (newEarthMissionCycleBonusTimeoutRef.current) {
+      window.clearTimeout(newEarthMissionCycleBonusTimeoutRef.current);
+      newEarthMissionCycleBonusTimeoutRef.current = null;
+    }
+    if (newEarthMissionCycleBonusDrainIntervalRef.current) {
+      window.clearInterval(newEarthMissionCycleBonusDrainIntervalRef.current);
+      newEarthMissionCycleBonusDrainIntervalRef.current = null;
+    }
+    scheduledNewEarthMissionCycleBonusRef.current = null;
+    paidNewEarthMissionCycleBonusRef.current = newEarthMissions.cycle;
+    setNewEarthMissionCycleBonusAnimation(null);
+
+    const resetBase = {
+      ...newEarthMissions,
+      missions: [],
+      completedMissionIds: [],
+      claimedMissionIds: [],
+      renewAvailableAt: null,
+      cycleRewardClaimed: true,
+    };
+    const next = refreshNewEarthMissionBoard(resetBase, newEarthMissionContext, Date.now(), true);
+    setNewEarthMissions(next);
+    GameStorage.save(next, NEW_EARTH_MISSIONS_STORAGE_KEY);
+    playRoute4UiSfx(ROUTE4_QUESTS_RENEW_SFX);
+    setCardFeedback(t(
+      'Mission board renewed. Current bonus was forfeited.',
+      'Painel de missões renovado. A bonificação atual foi perdida.'
+    ));
+  }, [newEarthMissions, newEarthMissionContext, t]);
+
   const resolveDefenseVictory = useCallback((summary?: BattleResultSummary) => {
     if (!activeDefenseThreat) return;
     const reward = rollAnyMissingColonyCardReward(ownedCardIds);
@@ -2820,8 +2885,8 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
     setColonySupplies(nextSupplies);
     const previousHorizonXp = horizonXpRef.current;
     const nextHorizonXp = previousHorizonXp + battleXp;
-    const previousHorizonLevel = getHorizonLevelFromXp(previousHorizonXp).level;
-    const nextHorizonLevel = getHorizonLevelFromXp(nextHorizonXp).level;
+    const previousHorizonLevel = getHorizonLevelFromXp(previousHorizonXp, horizonMaxLevel).level;
+    const nextHorizonLevel = getHorizonLevelFromXp(nextHorizonXp, horizonMaxLevel).level;
     horizonXpRef.current = nextHorizonXp;
     setHorizonXp(nextHorizonXp);
     if (nextHorizonLevel > previousHorizonLevel && !summary?.levelUpSfxHandled) {
@@ -2871,7 +2936,7 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
       `Threat neutralized: +${battleXp} XP and +${formatValue(battleQc)} QC`,
       `Ameaça neutralizada: +${battleXp} XP e +${formatValue(battleQc)} QC`
     ));
-  }, [activeDefenseThreat, ownedCardIds, playSfx, onEarnQC, formatValue, recordNewEarthMissionProgress]);
+  }, [activeDefenseThreat, ownedCardIds, playSfx, onEarnQC, formatValue, horizonMaxLevel, recordNewEarthMissionProgress]);
 
   const resolveDefenseDefeat = useCallback(() => {
     const retryUntil = Date.now() + DEFENSE_THREAT_RESPONSE_SECONDS * 1000;
@@ -2905,8 +2970,8 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
 
     const previousHorizonXp = horizonXpRef.current;
     const nextHorizonXp = previousHorizonXp + battleXp;
-    const previousHorizonLevel = getHorizonLevelFromXp(previousHorizonXp).level;
-    const nextHorizonLevel = getHorizonLevelFromXp(nextHorizonXp).level;
+    const previousHorizonLevel = getHorizonLevelFromXp(previousHorizonXp, horizonMaxLevel).level;
+    const nextHorizonLevel = getHorizonLevelFromXp(nextHorizonXp, horizonMaxLevel).level;
     horizonXpRef.current = nextHorizonXp;
     setHorizonXp(nextHorizonXp);
     if (nextHorizonLevel > previousHorizonLevel && !summary?.levelUpSfxHandled) {
@@ -2983,6 +3048,7 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
     colonies,
     effectiveActiveColonyId,
     formatValue,
+    horizonMaxLevel,
     language,
     onEarnQC,
     ownedCardIds,
@@ -3043,7 +3109,7 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
       return;
     }
 
-    playRoute4SearchSfx(option.id, slotIndex);
+    playRandomBobbyBluePrepareForBattleSfx();
     setLastSearchReport(null);
     setActiveSearchBattle({
       battleIndex,
@@ -3250,6 +3316,7 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
             language={language}
             shipStats={battleShipStats}
             horizonLevel={horizonProgress.level}
+            horizonMaxLevel={horizonMaxLevel}
             defenseBattleLevel={defenseBattleLevel}
             horizonXp={horizonProgress.currentXp}
             horizonNextXp={horizonProgress.nextXp}
@@ -3269,6 +3336,7 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
             language={language}
             shipStats={battleShipStats}
             horizonLevel={horizonProgress.level}
+            horizonMaxLevel={horizonMaxLevel}
             defenseBattleLevel={defenseBattleLevel}
             horizonXp={horizonProgress.currentXp}
             horizonNextXp={horizonProgress.nextXp}
@@ -3326,7 +3394,7 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
                       <div className="flex items-center justify-between gap-3">
                         <div>
                           <p className="font-mono text-[9px] uppercase tracking-[0.22em] text-amber-200">Horizon XP</p>
-                          <p className="mt-0.5 font-orbitron text-base font-black text-white">LVL {horizonProgress.level} / 50</p>
+                          <p className="mt-0.5 font-orbitron text-base font-black text-white">LVL {horizonProgress.level} / {horizonMaxLevel}</p>
                         </div>
                         <span className="rounded-lg border border-yellow-300/25 bg-black/35 px-2 py-1 font-mono text-[10px] uppercase tracking-widest text-yellow-200">
                           <Coins size={11} className="mr-1 inline" />{formatValue(qc)} QC
@@ -3387,6 +3455,13 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
                   <div className="grid min-h-0 grid-cols-2 gap-2">
                     {DEFENSE_SPECIALS.map(special => {
                       const selected = selectedSpecialIds.includes(special.id);
+                      const specialButtonLabel = special.id === 'thor-oath'
+                        ? t('Thor\nOath', 'Juramento de\nThor')
+                        : special.id === 'apocalypse-laser'
+                          ? 'Horizon\nLaser'
+                          : special.id === 'hellfire-barrage'
+                            ? 'Horizon\nBarrage'
+                            : t('Special\n4', 'Especial\n4');
                       return (
                         <PremiumCanvasButton
                           key={special.id}
@@ -3394,13 +3469,11 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
                           onClick={() => toggleDefenseSpecial(special.id)}
                           tone={selected ? 'brown' : 'steel'}
                           className={`min-h-0 rounded-xl ${selected ? DEFENSE_SPECIAL_BUTTON_SELECTED_CLASS : DEFENSE_SPECIAL_BUTTON_UNSELECTED_CLASS}`}
-                          contentClassName={`flex h-full flex-col items-stretch justify-between p-3 text-left ${selected ? 'text-white' : 'text-stone-300/72'}`}
+                          contentClassName={`flex h-full items-center justify-center p-3 text-center ${selected ? 'text-white' : 'text-stone-300/72'}`}
                         >
-                          <div className="flex items-center justify-between gap-2">
-                            <span className={`font-orbitron text-[10px] font-black uppercase leading-tight ${selected ? 'text-amber-50' : 'text-stone-300/75'}`}>{special.name[language]}</span>
-                            <span className={`h-2 w-2 shrink-0 rounded-full ${selected ? 'bg-amber-200 shadow-[0_0_10px_rgba(251,191,36,0.8)]' : special.implemented ? 'border border-stone-400/45 bg-stone-950/70' : 'bg-zinc-700'}`} />
-                          </div>
-                          <p className={`mt-2 line-clamp-2 text-[10px] leading-snug ${selected ? 'text-amber-100/78' : 'text-stone-400/70'}`}>{special.description[language]}</p>
+                          <span className={`whitespace-pre-line font-orbitron text-[13px] font-black uppercase leading-tight tracking-tight ${selected ? 'text-amber-50' : 'text-stone-300/78'}`}>
+                            {specialButtonLabel}
+                          </span>
                         </PremiumCanvasButton>
                       );
                     })}
@@ -3685,6 +3758,15 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
                 {newEarthMissions.missions.filter(mission => mission.completed && !mission.claimed).length}
               </p>
             </div>
+            <PremiumCanvasButton
+              type="button"
+              onClick={renewNewEarthMissionsWithoutBonus}
+              tone="steel"
+              className="h-[58px] w-[118px] shrink-0 rounded-xl"
+              contentClassName="px-3 text-center text-[10px] font-black uppercase tracking-[0.18em] text-zinc-200"
+            >
+              {t('Renew missions', 'Renovar missões')}
+            </PremiumCanvasButton>
           </div>
 
           <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 overflow-y-auto pr-1 xl:grid-cols-2">
@@ -4001,13 +4083,22 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
         <div className="flex flex-1 flex-col overflow-hidden rounded-2xl border border-cyan-300/20 bg-zinc-950/70 p-5">
           <div className="mb-3 flex shrink-0 items-start justify-between gap-3">
             <div>
-              <p className="font-mono text-[10px] uppercase tracking-[0.35em] text-cyan-300">{t('Supply Recon', 'Reconhecimento de Suprimentos')}</p>
-              <h3 className="font-orbitron text-xl font-black uppercase tracking-tight text-white">{t('Search Operations', 'Operações de Busca')}</h3>
+              <p className="font-mono text-[10px] uppercase tracking-[0.35em] text-cyan-300">
+                {allColoniesFullyBuilt ? t('Direct Combat Front', 'Frente de Combate Direto') : t('Supply Recon', 'Reconhecimento de Suprimentos')}
+              </p>
+              <h3 className="font-orbitron text-xl font-black uppercase tracking-tight text-white">
+                {allColoniesFullyBuilt ? t('Battle Operations', 'Operações de Batalha') : t('Search Operations', 'Operações de Busca')}
+              </h3>
               <p className="mt-1 max-w-2xl text-xs text-zinc-500">
-                {t(
-                  'Land and sea expeditions can run at the same time. Aerial defense is configured separately.',
-                  'Expedições por terra e mar podem rodar ao mesmo tempo. A defesa aérea é configurada separadamente.'
-                )}
+                {allColoniesFullyBuilt
+                  ? t(
+                    'All colonies are built. Search crews now open direct battle routes in sequence.',
+                    'Todas as colônias foram construídas. As equipes de busca agora abrem rotas de batalha direta em sequência.'
+                  )
+                  : t(
+                    'Land and sea expeditions can run at the same time. Aerial defense is configured separately.',
+                    'Expedições por terra e mar podem rodar ao mesmo tempo. A defesa aérea é configurada separadamente.'
+                  )}
               </p>
             </div>
             <div className="flex max-w-[48%] flex-wrap justify-end gap-2">
@@ -4045,6 +4136,31 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
 
           <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 lg:grid-cols-3">
             {searchOptions.map(option => {
+              const directBattleMode = allColoniesFullyBuilt;
+              const battleRewardRange = option.id === 'land'
+                ? `${formatValue(SEARCH_BATTLE_QC_REWARDS[0])}-${formatValue(SEARCH_BATTLE_QC_REWARDS[2])}`
+                : `${formatValue(SEARCH_BATTLE_QC_REWARDS[3])}-${formatValue(SEARCH_BATTLE_QC_REWARDS[5])}`;
+              const optionTitle = directBattleMode
+                ? option.id === 'land'
+                  ? t('Land Battlefront', 'Frente de Batalha Terrestre')
+                  : t('Sea and Air Battlefront', 'Frente de Batalha Marítima e Aérea')
+                : option.title;
+              const optionSubtitle = directBattleMode
+                ? option.id === 'land'
+                  ? t('Ground Combat Route', 'Rota de Combate Terrestre')
+                  : t('Aquatic and Air Combat Route', 'Rota de Combate Aquática e Aérea')
+                : option.subtitle;
+              const optionDescription = directBattleMode
+                ? option.id === 'land'
+                  ? t(
+                    'Horizon advances through fortified ground sectors to secure the finished colonies.',
+                    'A Horizon avança por setores terrestres fortificados para proteger as colônias finalizadas.'
+                  )
+                  : t(
+                    'Horizon intercepts hostile fleets across coastlines, air lanes, wreckage, and open sea.',
+                    'A Horizon intercepta frotas hostis entre costas, rotas aéreas, destroços e mar aberto.'
+                  )
+                : option.description;
               const searchSlots = Array.from({ length: MAX_PARALLEL_SEARCHES_PER_TYPE }, (_, slotIndex) => {
                 const searchKey = getSearchSlotKey(option.id, slotIndex);
                 const battleIndex = getSearchBattleIndex(option.id, slotIndex);
@@ -4069,19 +4185,21 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
                 <div className="relative z-10 flex min-h-0 flex-1 flex-col">
                 <div className="mb-2 flex items-start justify-between gap-3">
                   <div>
-                    <p className="font-mono text-[10px] uppercase tracking-[0.28em] opacity-80">{option.subtitle}</p>
-                    <h4 className="font-orbitron text-xl font-black uppercase leading-tight text-white">{option.title}</h4>
+                    <p className="font-mono text-[10px] uppercase tracking-[0.28em] opacity-80">{optionSubtitle}</p>
+                    <h4 className="font-orbitron text-xl font-black uppercase leading-tight text-white">{optionTitle}</h4>
                   </div>
                   <div className="rounded-2xl border border-white/10 bg-black/35 p-3">
                     <option.icon size={24} />
                   </div>
                 </div>
 
-                <p className="line-clamp-2 text-sm leading-snug text-zinc-300">{option.description}</p>
+                <p className="line-clamp-2 text-sm leading-snug text-zinc-300">{optionDescription}</p>
 
                 <div className="mt-3 grid grid-cols-2 gap-2">
                   <div className="rounded-xl border border-white/10 bg-black/25 p-3">
-                    <p className="font-mono text-[9px] uppercase tracking-[0.24em] text-zinc-500">{t('Duration', 'Duração')}</p>
+                    <p className="font-mono text-[9px] uppercase tracking-[0.24em] text-zinc-500">
+                      {directBattleMode ? t('Battle Sequence', 'Sequência de Batalha') : t('Duration', 'Duração')}
+                    </p>
                     <div className="mt-2 grid grid-cols-3 gap-1">
                       {searchSlots.map(slot => (
                         <span
@@ -4096,56 +4214,97 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
                     </div>
                   </div>
                   <div className="rounded-xl border border-white/10 bg-black/25 p-3">
-                    <p className="font-mono text-[9px] uppercase tracking-[0.24em] text-zinc-500">{t('Attack Risk', 'Risco de Ataque')}</p>
-                    <p className="mt-1 font-orbitron text-sm font-black text-red-200">
-                      {option.threatChance}%
-                      {searchThreatBonus[option.id] > 0 && (
-                        <span className="ml-2 font-mono text-[9px] uppercase tracking-wider text-amber-200">
-                          +{searchThreatBonus[option.id]}%
-                        </span>
-                      )}
+                    <p className="font-mono text-[9px] uppercase tracking-[0.24em] text-zinc-500">
+                      {directBattleMode ? t('Victory Reward', 'Recompensa da Vitória') : t('Attack Risk', 'Risco de Ataque')}
                     </p>
+                    {directBattleMode ? (
+                      <p className="mt-1 font-orbitron text-sm font-black text-emerald-200">
+                        {battleRewardRange} QC
+                      </p>
+                    ) : (
+                      <p className="mt-1 font-orbitron text-sm font-black text-red-200">
+                        {option.threatChance}%
+                        {searchThreatBonus[option.id] > 0 && (
+                          <span className="ml-2 font-mono text-[9px] uppercase tracking-wider text-amber-200">
+                            +{searchThreatBonus[option.id]}%
+                          </span>
+                        )}
+                      </p>
+                    )}
                   </div>
                 </div>
 
                 <div className="mt-2 rounded-2xl border border-white/10 bg-black/30 p-3">
                   <div className="flex items-center justify-between gap-3">
                     <div>
-                      <p className="font-mono text-[9px] uppercase tracking-[0.24em] text-zinc-500">{t('Search Protocol', 'Protocolo de Busca')}</p>
+                      <p className="font-mono text-[9px] uppercase tracking-[0.24em] text-zinc-500">
+                        {directBattleMode ? t('Battle Protocol', 'Protocolo de Batalha') : t('Search Protocol', 'Protocolo de Busca')}
+                      </p>
                       <p className="mt-1 font-orbitron text-sm font-black uppercase text-white">
-                        LVL {option.upgradeLevel} / {MAX_SEARCH_UPGRADE_LEVEL}
+                        {directBattleMode ? `HORIZON LVL ${horizonProgress.level} / ${horizonMaxLevel}` : `LVL ${option.upgradeLevel} / ${MAX_SEARCH_UPGRADE_LEVEL}`}
                       </p>
                     </div>
                     <div className="text-right">
-                      <p className="font-mono text-[9px] uppercase tracking-widest text-emerald-200">+{option.resourceBonusPercent}% {t('Resources', 'Recursos')}</p>
-                      <p className="mt-1 font-mono text-[9px] uppercase tracking-widest text-red-200">+{option.upgradeThreatBonus}% {t('Risk', 'Risco')}</p>
+                      {directBattleMode ? (
+                        <>
+                          <p className="font-mono text-[9px] uppercase tracking-widest text-emerald-200">{t('Card chance', 'Chance de carta')}</p>
+                          <p className="mt-1 font-mono text-[9px] uppercase tracking-widest text-cyan-200">{t('Random sentiment', 'Sentimento aleatório')}</p>
+                        </>
+                      ) : (
+                        <>
+                          <p className="font-mono text-[9px] uppercase tracking-widest text-emerald-200">+{option.resourceBonusPercent}% {t('Resources', 'Recursos')}</p>
+                          <p className="mt-1 font-mono text-[9px] uppercase tracking-widest text-red-200">+{option.upgradeThreatBonus}% {t('Risk', 'Risco')}</p>
+                        </>
+                      )}
                     </div>
                   </div>
-                  <PremiumCanvasButton
-                    type="button"
-                    onClick={() => upgradeSearch(option.id)}
-                    disabled={option.upgradeLevel >= MAX_SEARCH_UPGRADE_LEVEL || qc < option.upgradeCost}
-                    tone="green"
-                    className="mt-3 h-10 w-full rounded-xl"
-                    contentClassName="px-3 text-[10px] font-black uppercase tracking-[0.2em] text-emerald-50"
-                  >
-                    {option.upgradeLevel >= MAX_SEARCH_UPGRADE_LEVEL
-                      ? 'MAX'
-                      : `${t('Upgrade', 'Melhorar')} · ${formatValue(option.upgradeCost)} QC`}
-                  </PremiumCanvasButton>
+                  {directBattleMode ? (
+                    <div className="mt-3 h-10 rounded-xl border border-cyan-300/18 bg-cyan-300/8 px-3 py-2 text-center font-mono text-[10px] font-black uppercase tracking-[0.2em] text-cyan-100">
+                      {t('Horizon level cap expanded to 100', 'Horizon liberada até o nível 100')}
+                    </div>
+                  ) : (
+                    <PremiumCanvasButton
+                      type="button"
+                      onClick={() => upgradeSearch(option.id)}
+                      disabled={option.upgradeLevel >= MAX_SEARCH_UPGRADE_LEVEL || qc < option.upgradeCost}
+                      tone="green"
+                      className="mt-3 h-10 w-full rounded-xl"
+                      contentClassName="px-3 text-[10px] font-black uppercase tracking-[0.2em] text-emerald-50"
+                    >
+                      {option.upgradeLevel >= MAX_SEARCH_UPGRADE_LEVEL
+                        ? 'MAX'
+                        : `${t('Upgrade', 'Melhorar')} · ${formatValue(option.upgradeCost)} QC`}
+                    </PremiumCanvasButton>
+                  )}
                 </div>
 
                 <div className="mt-2 rounded-2xl border border-white/10 bg-black/35 p-3">
-                  <p className="font-mono text-[10px] uppercase tracking-[0.28em] text-zinc-500">{t('Recovered Supplies', 'Suprimentos Recuperados')}</p>
+                  <p className="font-mono text-[10px] uppercase tracking-[0.28em] text-zinc-500">
+                    {directBattleMode ? t('Battle Spoils', 'Espólios da Batalha') : t('Recovered Supplies', 'Suprimentos Recuperados')}
+                  </p>
                   <div className="mt-3 flex flex-wrap gap-2">
-                    {(Object.entries(option.rewards) as Array<[ColonySupplyId, number]>).map(([key, value]) => (
-                      <span
-                        key={`${option.id}-${key}`}
-                        className={`rounded-lg border px-2 py-1 font-mono text-[10px] uppercase tracking-widest ${SUPPLY_CONFIG[key].border} ${SUPPLY_CONFIG[key].color}`}
-                      >
-                        +{value} {SUPPLY_CONFIG[key].label[language]}
-                      </span>
-                    ))}
+                    {directBattleMode ? (
+                      <>
+                        <span className="rounded-lg border border-emerald-300/30 bg-emerald-300/10 px-2 py-1 font-mono text-[10px] uppercase tracking-widest text-emerald-200">
+                          {battleRewardRange} QC
+                        </span>
+                        <span className="rounded-lg border border-cyan-300/30 bg-cyan-300/10 px-2 py-1 font-mono text-[10px] uppercase tracking-widest text-cyan-200">
+                          {t('Sentiment', 'Sentimento')}
+                        </span>
+                        <span className="rounded-lg border border-fuchsia-300/30 bg-fuchsia-300/10 px-2 py-1 font-mono text-[10px] uppercase tracking-widest text-fuchsia-200">
+                          {t('Card chance', 'Chance de carta')}
+                        </span>
+                      </>
+                    ) : (
+                      (Object.entries(option.rewards) as Array<[ColonySupplyId, number]>).map(([key, value]) => (
+                        <span
+                          key={`${option.id}-${key}`}
+                          className={`rounded-lg border px-2 py-1 font-mono text-[10px] uppercase tracking-widest ${SUPPLY_CONFIG[key].border} ${SUPPLY_CONFIG[key].color}`}
+                        >
+                          +{value} {SUPPLY_CONFIG[key].label[language]}
+                        </span>
+                      ))
+                    )}
                   </div>
                 </div>
 

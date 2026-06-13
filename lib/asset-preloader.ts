@@ -179,6 +179,11 @@ const route4ColonyAudio = [
   '/assets/rota4/SFX_new_land/hangar_close_door.ogg',
   '/assets/rota4/SFX_new_land/warning_gaming.ogg',
   '/assets/rota4/SFX_new_land/bonus_qc_final.ogg',
+  '/assets/rota4/SFX_new_land/special thor/thunder_special.ogg',
+  '/assets/rota4/SFX_new_land/special thor/tornado_thor.ogg',
+  '/assets/rota4/SFX_new_land/special thor/thunder_a.ogg',
+  '/assets/rota4/SFX_new_land/special thor/thunder_b.ogg',
+  '/assets/rota4/SFX_new_land/special thor/thunder_c.ogg',
 ];
 
 const route4BobbyAccessDeniedAudio = Array.from({ length: 10 }, (_, index) => (
@@ -191,6 +196,10 @@ const route4BobbyMissionCompleteAudio = Array.from({ length: 10 }, (_, index) =>
 
 const route4BobbyWarningAudio = Array.from({ length: 9 }, (_, index) => (
   `/audio/sfx/bobby_blue/warnings/warning_${index + 1}.ogg`
+));
+
+const route4BobbyPrepareForBattleAudio = Array.from({ length: 7 }, (_, index) => (
+  `/audio/sfx/bobby_blue/prepare_for_battle/${index + 1}_prepare_for_battle.ogg`
 ));
 
 const route4BobbyLockedArcadeCardAudio = [
@@ -297,6 +306,10 @@ const route4BattleImages = [
 ];
 
 const route4BattleAudio = [
+  '/audio/sfx/shoot_enemy.ogg',
+  '/audio/sfx/shoot_player.ogg',
+  '/assets/rota4/SFX_new_land/airplane_enemys_sounds.ogg',
+  '/assets/rota4/SFX_new_land/airplane_player_sounds.ogg',
   `${route4BattleBase}/player/horizon/shoot_rt4.ogg`,
   `${route4BattleBase}/player/horizon/eletric_shoot.ogg`,
   `${route4BattleBase}/player/horizon/fire_shoot.ogg`,
@@ -572,7 +585,7 @@ export const ASSET_GROUPS: Record<AssetGroupId, AssetPreloadEntry[]> = {
   route4: [
     ...asEntries([routeHeaderImages.route4, '/images/bobby_blue/bobby_blue_new_land.webp', '/assets/rota4/new_land_map.webp', ...route4TextureImages], 'image'),
     ...asEntries(['/assets/rota4/videos/quantum_courier_credits.webm'], 'video'),
-    ...asEntries([...routeThemeAudio('Earth'), '/audio/themes/infinite_horizon_short_version.ogg', ...route4BobbyAccessDeniedAudio, ...route4BobbyMissionCompleteAudio, ...route4BobbyWarningAudio, ...route4BobbyLockedTvAudio, ...route4BobbyPopulationMilestoneAudio, ...route4BobbyMuralAudio], 'audio'),
+    ...asEntries([...routeThemeAudio('Earth'), '/audio/themes/infinite_horizon_short_version.ogg', ...route4BobbyAccessDeniedAudio, ...route4BobbyMissionCompleteAudio, ...route4BobbyWarningAudio, ...route4BobbyPrepareForBattleAudio, ...route4BobbyLockedTvAudio, ...route4BobbyPopulationMilestoneAudio, ...route4BobbyMuralAudio], 'audio'),
   ],
   'route4-colonies': [
     ...asEntries([...route4ColonyImages, ...route4LayoutImages], 'image'),

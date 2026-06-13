@@ -258,6 +258,41 @@ const NEW_EARTH_DANGER_MARKERS = [
 
 type NewEarthUnderwaterSiteId = Extract<typeof NEW_EARTH_DANGER_MARKERS[number]['id'], 'oceano-abissal' | 'cemiterio-navios'>;
 
+const NEW_EARTH_UNDERWATER_SITE_BRIEFINGS: Record<NewEarthUnderwaterSiteId, {
+  title: Record<'pt' | 'en', string>;
+  subtitle: Record<'pt' | 'en', string>;
+  lore: Record<'pt' | 'en', string>;
+  objective: Record<'pt' | 'en', string>;
+  background: string;
+}> = {
+  'oceano-abissal': {
+    title: { pt: 'Oceano Abissal', en: 'Abyssal Ocean' },
+    subtitle: { pt: 'Expedição de Gaia', en: 'Gaia Expedition' },
+    lore: {
+      pt: 'Uma massa oceânica profunda cobre antigas fissuras da Nova Terra. Sensores captam cofres perdidos, cardumes raros e sinais de tecnologia soterrada sob a pressão absoluta.',
+      en: 'A deep ocean mass covers ancient fractures of New Earth. Sensors detect lost vaults, rare fish, and traces of technology buried beneath crushing pressure.',
+    },
+    objective: {
+      pt: 'Mantenha o oxigênio sob controle, recupere tesouros e retorne antes que a pressão vença o casco.',
+      en: 'Control oxygen, recover treasures, and return before the pressure overwhelms the hull.',
+    },
+    background: '/assets/rota4/new_land_assets/abyssal_ocean_new_land_system/abissal_01.webp',
+  },
+  'cemiterio-navios': {
+    title: { pt: 'Cemitério de Navios', en: 'Ship Graveyard' },
+    subtitle: { pt: 'Expedição de Eden', en: 'Eden Expedition' },
+    lore: {
+      pt: 'Cascos partidos repousam em silêncio entre correntes frias. Cada destroço guarda cargas antigas, anéis raros e ecos de tripulações que nunca voltaram à superfície.',
+      en: 'Broken hulls rest silently between cold currents. Every wreck holds old cargo, rare rings, and echoes of crews that never returned to the surface.',
+    },
+    objective: {
+      pt: 'Explore os destroços, marque os tesouros recuperáveis e saia antes que o oxigênio chegue ao limite.',
+      en: 'Explore the wrecks, mark recoverable treasures, and leave before oxygen reaches its limit.',
+    },
+    background: '/assets/rota4/new_land_assets/ship_graveyard_new_land_system/graveyard_01.webp',
+  },
+};
+
 const NEW_EARTH_MUSEUM_MARKER = {
   id: 'new-earth-museum',
   label: 'MUSEU',
@@ -844,6 +879,10 @@ const DashboardContent = memo(({
   const [newEarthMuseumCategory, setNewEarthMuseumCategory] = useState<NewEarthTreasureCategory>('rare_fish');
   const [newEarthMuseumPage, setNewEarthMuseumPage] = useState(0);
   const [newEarthMuseumTreasures, setNewEarthMuseumTreasures] = useState<NewEarthMuseumTreasures>({});
+  const [selectedUnderwaterBriefing, setSelectedUnderwaterBriefing] = useState<{
+    siteId: NewEarthUnderwaterSiteId;
+    colonyId: NewEarthSubmarineColonyId;
+  } | null>(null);
   const [activeUnderwaterBattle, setActiveUnderwaterBattle] = useState<{
     siteId: NewEarthUnderwaterSiteId;
     colonyId: NewEarthSubmarineColonyId;
@@ -1540,6 +1579,7 @@ const DashboardContent = memo(({
     setSelectedNewEarthColonyId(colony.id);
     setSelectedNewEarthCardIndex(null);
     setNewEarthMapFeedback(null);
+    setSelectedUnderwaterBriefing(null);
     setNewEarthMuseumOpen(false);
     playSfx('aba_click');
   }, [colonies, language, playRandomNewEarthAccessDenied, playSfx]);
@@ -3105,6 +3145,7 @@ const DashboardContent = memo(({
     setSelectedNewEarthColonyId(null);
     setSelectedNewEarthCardIndex(null);
     setNewEarthMapFeedback(null);
+    setSelectedUnderwaterBriefing(null);
     setNewEarthMuseumOpen(true);
     playSfx('aba_click');
   }, [playSfx]);
@@ -3131,12 +3172,20 @@ const DashboardContent = memo(({
     setSelectedNewEarthCardIndex(null);
     setNewEarthMapFeedback(null);
     setNewEarthMuseumOpen(false);
-    setActiveUnderwaterBattle({
+    setSelectedUnderwaterBriefing({
       siteId: marker.id as NewEarthUnderwaterSiteId,
       colonyId: marker.submarineColonyId as NewEarthSubmarineColonyId,
     });
     playSfx('aba_click');
   }, [colonies, language, playRandomNewEarthAccessDenied, playSfx]);
+
+  const startNewEarthUnderwaterExploration = useCallback(() => {
+    if (!selectedUnderwaterBriefing) return;
+    setActiveUnderwaterBattle(selectedUnderwaterBriefing);
+    setSelectedUnderwaterBriefing(null);
+    setNewEarthMapFeedback(null);
+    playSfx('battle_click');
+  }, [playSfx, selectedUnderwaterBriefing]);
 
   const handleUnderwaterTreasureLoot = useCallback((payload: any) => {
     recordSubmarineMissionProgress({ type: 'submarine-treasure', amount: 1 });
@@ -8947,6 +8996,120 @@ const DashboardContent = memo(({
                         )}
                       </AnimatePresence>
                       <AnimatePresence>
+                        {selectedUnderwaterBriefing && (() => {
+                          const briefing = NEW_EARTH_UNDERWATER_SITE_BRIEFINGS[selectedUnderwaterBriefing.siteId];
+                          const submarineName = NEW_EARTH_SUBMARINE_NAMES[selectedUnderwaterBriefing.colonyId];
+                          const colonyName = selectedUnderwaterBriefing.colonyId === 'colony-4' ? 'Gaia' : 'Eden';
+                          const submarineStats = getNewEarthSubmarineStats(newEarthSubmarines[selectedUnderwaterBriefing.colonyId]);
+
+                          return (
+                            <motion.div
+                              initial={{ opacity: 0, scale: 0.97, y: 18 }}
+                              animate={{ opacity: 1, scale: 1, y: 0 }}
+                              exit={{ opacity: 0, scale: 0.97, y: 18 }}
+                              className="absolute inset-6 z-30 overflow-hidden rounded-3xl border border-cyan-200/30 bg-slate-950/96 p-5 shadow-[0_0_58px_rgba(34,211,238,0.18)] backdrop-blur-md"
+                            >
+                              <img
+                                src={briefing.background}
+                                alt=""
+                                aria-hidden="true"
+                                className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-34"
+                              />
+                              <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_34%_26%,rgba(34,211,238,0.16),transparent_38%),linear-gradient(90deg,rgba(2,6,23,0.92),rgba(2,6,23,0.72)_48%,rgba(2,6,23,0.9))]" />
+                              <PremiumCanvasButton
+                                type="button"
+                                onClick={() => {
+                                  setSelectedUnderwaterBriefing(null);
+                                  playSfx('close_window');
+                                }}
+                                tone="steel"
+                                className="absolute right-5 top-5 z-20 h-10 w-10 rounded-full"
+                                contentClassName="text-cyan-100"
+                              >
+                                <X size={18} />
+                              </PremiumCanvasButton>
+
+                              <div className="relative z-10 flex h-full min-h-0 flex-col justify-between gap-5 pr-14">
+                                <div className="max-w-4xl">
+                                  <p className="font-mono text-[10px] font-black uppercase tracking-[0.42em] text-cyan-100/74">
+                                    {language === 'pt' ? 'Radar submarino' : 'Submarine radar'}
+                                  </p>
+                                  <h2 className="mt-3 font-orbitron text-5xl font-black uppercase leading-none text-white drop-shadow-[0_0_22px_rgba(34,211,238,0.2)]">
+                                    {briefing.title[language]}
+                                  </h2>
+                                  <p className="mt-3 font-orbitron text-sm font-black uppercase tracking-[0.24em] text-cyan-200/78">
+                                    {briefing.subtitle[language]}
+                                  </p>
+                                  <p className="mt-6 max-w-3xl text-lg font-semibold leading-relaxed text-slate-100/88">
+                                    {briefing.lore[language]}
+                                  </p>
+                                </div>
+
+                                <div className="grid min-h-0 grid-cols-[1.1fr_0.9fr] gap-4">
+                                  <div className="rounded-2xl border border-cyan-200/18 bg-black/46 p-5 shadow-[inset_0_0_28px_rgba(8,145,178,0.12)]">
+                                    <p className="font-mono text-[10px] font-black uppercase tracking-[0.34em] text-cyan-100/65">
+                                      {language === 'pt' ? 'Objetivo' : 'Objective'}
+                                    </p>
+                                    <p className="mt-3 text-base font-semibold leading-relaxed text-slate-100/86">
+                                      {briefing.objective[language]}
+                                    </p>
+                                  </div>
+                                  <div className="grid grid-cols-2 gap-3">
+                                    <div className="rounded-2xl border border-cyan-200/18 bg-black/50 p-4">
+                                      <p className="font-mono text-[9px] font-black uppercase tracking-[0.26em] text-cyan-100/60">
+                                        {language === 'pt' ? 'Colônia' : 'Colony'}
+                                      </p>
+                                      <p className="mt-2 font-orbitron text-2xl font-black uppercase text-white">{colonyName}</p>
+                                    </div>
+                                    <div className="rounded-2xl border border-cyan-200/18 bg-black/50 p-4">
+                                      <p className="font-mono text-[9px] font-black uppercase tracking-[0.26em] text-cyan-100/60">
+                                        {language === 'pt' ? 'Submarino' : 'Submarine'}
+                                      </p>
+                                      <p className="mt-2 font-orbitron text-2xl font-black uppercase text-white">{submarineName}</p>
+                                    </div>
+                                    <div className="rounded-2xl border border-cyan-200/18 bg-black/50 p-4">
+                                      <p className="font-mono text-[9px] font-black uppercase tracking-[0.26em] text-cyan-100/60">
+                                        {language === 'pt' ? 'Profundidade' : 'Depth'}
+                                      </p>
+                                      <p className="mt-2 font-orbitron text-2xl font-black uppercase text-white">{submarineStats.maxDepth.toLocaleString(language === 'pt' ? 'pt-BR' : 'en-US')}m</p>
+                                    </div>
+                                    <div className="rounded-2xl border border-cyan-200/18 bg-black/50 p-4">
+                                      <p className="font-mono text-[9px] font-black uppercase tracking-[0.26em] text-cyan-100/60">
+                                        {language === 'pt' ? 'Tesouros' : 'Treasures'}
+                                      </p>
+                                      <p className="mt-2 font-orbitron text-2xl font-black uppercase text-white">{submarineStats.treasurePotential}</p>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div className="flex items-end justify-between gap-4">
+                                  <div className="rounded-2xl border border-emerald-200/16 bg-emerald-950/28 px-4 py-3">
+                                    <p className="font-mono text-[9px] font-black uppercase tracking-[0.26em] text-emerald-100/60">
+                                      {language === 'pt' ? 'Recompensas possíveis' : 'Possible rewards'}
+                                    </p>
+                                    <p className="mt-1 text-sm font-bold text-emerald-50/82">
+                                      {language === 'pt'
+                                        ? 'QC alto, recursos, peixes raros, relíquias e anéis raros.'
+                                        : 'High QC, resources, rare fish, relics, and rare rings.'}
+                                    </p>
+                                  </div>
+                                  <PremiumCanvasButton
+                                    type="button"
+                                    tone="cyan"
+                                    onClick={startNewEarthUnderwaterExploration}
+                                    className="h-14 w-64"
+                                    contentClassName="gap-3 text-sm tracking-[0.24em]"
+                                  >
+                                    <Radar size={18} />
+                                    {language === 'pt' ? 'Explorar' : 'Explore'}
+                                  </PremiumCanvasButton>
+                                </div>
+                              </div>
+                            </motion.div>
+                          );
+                        })()}
+                      </AnimatePresence>
+                      <AnimatePresence>
                         {newEarthMuseumOpen && (() => {
                           const activeCategory = NEW_EARTH_MUSEUM_CATEGORIES.find(category => category.id === newEarthMuseumCategory) || NEW_EARTH_MUSEUM_CATEGORIES[0];
                           const recoveredTotal = Object.keys(newEarthMuseumTreasures).length;
@@ -8969,9 +9132,9 @@ const DashboardContent = memo(({
                                 src={activeCategory.background}
                                 alt=""
                                 aria-hidden="true"
-                                className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-28"
+                                className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-48 saturate-125 contrast-110"
                               />
-                              <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_20%,rgba(245,158,11,0.13),transparent_44%),linear-gradient(180deg,rgba(2,6,23,0.62),rgba(2,6,23,0.92))]" />
+                              <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_20%,rgba(245,158,11,0.1),transparent_46%),linear-gradient(180deg,rgba(2,6,23,0.42),rgba(2,6,23,0.78))]" />
                               <PremiumCanvasButton
                                 type="button"
                                 onClick={() => {
@@ -9016,14 +9179,14 @@ const DashboardContent = memo(({
                                   {NEW_EARTH_MUSEUM_CATEGORIES.map(category => {
                                     const categoryRecovered = category.treasures.filter(treasure => newEarthMuseumTreasures[treasure.id]).length;
                                     const active = category.id === activeCategory.id;
-                                    const toneClass = category.tone === 'cyan'
-                                      ? 'border-cyan-300/40 text-cyan-50 shadow-[0_0_18px_rgba(34,211,238,0.16)]'
-                                      : category.tone === 'violet'
-                                        ? 'border-fuchsia-300/40 text-fuchsia-50 shadow-[0_0_18px_rgba(217,70,239,0.14)]'
-                                        : 'border-amber-200/45 text-amber-50 shadow-[0_0_18px_rgba(245,158,11,0.16)]';
+                                    const buttonTone: PremiumCanvasButtonTone = active
+                                      ? category.tone === 'amber'
+                                        ? 'amber'
+                                        : 'cyan'
+                                      : 'steel';
 
                                     return (
-                                      <button
+                                      <PremiumCanvasButton
                                         key={category.id}
                                         type="button"
                                         onClick={() => {
@@ -9031,7 +9194,9 @@ const DashboardContent = memo(({
                                           setNewEarthMuseumPage(0);
                                           playSfx('aba_click');
                                         }}
-                                        className={`h-14 rounded-xl border px-4 text-left transition ${active ? `${toneClass} bg-white/10` : 'border-white/10 bg-black/36 text-slate-300/70 hover:border-white/22 hover:bg-white/5'}`}
+                                        tone={buttonTone}
+                                        className="h-14 rounded-xl"
+                                        contentClassName={`flex h-full flex-col items-start justify-center px-4 py-2 text-left ${active ? 'text-white' : 'text-slate-300'}`}
                                       >
                                         <span className="block truncate font-orbitron text-sm font-black uppercase tracking-[0.12em]">
                                           {category.label[language as 'pt' | 'en']}
@@ -9039,7 +9204,7 @@ const DashboardContent = memo(({
                                         <span className="mt-1 block font-mono text-[9px] font-black uppercase tracking-[0.18em] opacity-70">
                                           {categoryRecovered} / {category.treasures.length}
                                         </span>
-                                      </button>
+                                      </PremiumCanvasButton>
                                     );
                                   })}
                                 </div>

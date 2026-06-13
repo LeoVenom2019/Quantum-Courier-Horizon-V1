@@ -75,6 +75,7 @@ export type NewEarthMissionGenerationContext = {
   canRunLandSearch?: boolean;
   canRunSeaSearch?: boolean;
   canDefendSearches?: boolean;
+  directBattlesUnlocked?: boolean;
   canUseSubmarines?: boolean;
   colonies?: NewEarthMissionColonyContext[];
   upgradeableCards?: Array<{
@@ -366,6 +367,60 @@ const NEW_EARTH_MISSION_CATALOG: NewEarthMission[] = [
     },
   }),
   makeMission({
+    id: 'direct-battle-2-victories',
+    title: { en: 'Direct Battle Line', pt: 'Linha de Batalha Direta' },
+    description: {
+      en: 'Win two direct battles after the colonies are fully built.',
+      pt: 'Vença duas batalhas diretas depois que as colônias estiverem totalmente construídas.',
+    },
+    objectiveLabel: { en: 'Direct battles won', pt: 'Batalhas diretas vencidas' },
+    eventType: 'defense-victory',
+    target: 2,
+    progress: 0,
+    completed: false,
+    claimed: false,
+    reward: {
+      qc: scaleNewEarthMissionQcReward(52000),
+      missingCard: true,
+    },
+  }),
+  makeMission({
+    id: 'direct-battle-40-ships',
+    title: { en: 'Battle Route Cleanup', pt: 'Limpeza da Rota de Batalha' },
+    description: {
+      en: 'Destroy 40 enemy ships in direct battles.',
+      pt: 'Destrua 40 naves inimigas em batalhas diretas.',
+    },
+    objectiveLabel: { en: 'Direct battle ships', pt: 'Naves em batalha direta' },
+    eventType: 'defense-kills',
+    target: 40,
+    progress: 0,
+    completed: false,
+    claimed: false,
+    reward: {
+      qc: scaleNewEarthMissionQcReward(62000),
+      supplies: { defense: 20, tech: 16, materials: 18 },
+    },
+  }),
+  makeMission({
+    id: 'direct-battle-2-bosses',
+    title: { en: 'Direct Command Breaker', pt: 'Quebra-Comando Direto' },
+    description: {
+      en: 'Defeat two bosses in direct battles.',
+      pt: 'Vença dois bosses em batalhas diretas.',
+    },
+    objectiveLabel: { en: 'Direct battle bosses', pt: 'Bosses em batalha direta' },
+    eventType: 'defense-bosses',
+    target: 2,
+    progress: 0,
+    completed: false,
+    claimed: false,
+    reward: {
+      qc: scaleNewEarthMissionQcReward(76000),
+      missingCard: true,
+    },
+  }),
+  makeMission({
     id: 'submarine-win-abyssal',
     title: { en: 'Abyssal Contact', pt: 'Contato Abissal' },
     description: {
@@ -499,8 +554,10 @@ const isMissionEligible = (mission: NewEarthMission, context: NewEarthMissionGen
     return new Set(context.unlockedArcadeIds || []).has(mission.gameId);
   }
   if (mission.eventType === 'search-complete') {
+    if (context.directBattlesUnlocked === true) return false;
     return mission.searchId === 'sea' ? context.canRunSeaSearch === true : context.canRunLandSearch === true;
   }
+  if (mission.id.startsWith('direct-battle-')) return context.directBattlesUnlocked === true;
   if (mission.eventType === 'defense-victory') return context.canDefendSearches === true;
   if (mission.eventType === 'defense-kills' || mission.eventType === 'defense-bosses') return context.canDefendSearches === true;
   if (mission.eventType === 'construction-complete') {
@@ -601,7 +658,12 @@ export const normalizeNewEarthMissionState = (saved: any, context?: NewEarthMiss
 
   const missions = sourceMissions.filter(mission => {
     const savedMission: any = savedById.get(mission.id);
-    if (savedMission) return true;
+    if (savedMission) {
+      const progress = Math.max(0, Math.floor(Number(savedMission?.progress) || 0));
+      const completed = Boolean(savedMission?.completed) || progress >= Number(mission.target || 0);
+      const claimed = Boolean(savedMission?.claimed);
+      return claimed || completed || isMissionEligible(mission, context);
+    }
     return isMissionEligible(mission, context);
   }).map(defaultMission => {
     const savedMission: any = savedById.get(defaultMission.id);

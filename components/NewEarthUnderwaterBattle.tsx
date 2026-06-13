@@ -2014,7 +2014,6 @@ export default function NewEarthUnderwaterBattle({
   onVictory,
   onDefeat,
   onTreasureLoot,
-  defenseBattleLevel,
   onClose,
 }: NewEarthUnderwaterBattleProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -2241,9 +2240,14 @@ export default function NewEarthUnderwaterBattle({
         rewardType = types[Math.floor(Math.random() * types.length)];
         
         if (rewardType === 'qc') {
-          const battleLevelScale = 1 + Math.max(0, defenseBattleLevel - 1) * 0.1;
-          const baseQC = 1500;
-          rewardAmount = Math.round(baseQC * battleLevelScale * (0.9 + Math.random() * 0.2));
+          const minQC = 200_000;
+          const commonMaxQC = 1_000_000;
+          const hardMaxQC = 1_500_000;
+          const commonRoll = Math.pow(Math.random(), 1.28);
+          const rolledQC = Math.random() < 0.86
+            ? minQC + commonRoll * (commonMaxQC - minQC)
+            : commonMaxQC + Math.random() * (hardMaxQC - commonMaxQC);
+          rewardAmount = Math.min(hardMaxQC, Math.max(minQC, Math.round(rolledQC)));
         } else {
           rewardAmount = Math.round(40 + Math.floor(Math.pow(Math.random(), 2) * 110));
         }
@@ -3176,7 +3180,7 @@ export default function NewEarthUnderwaterBattle({
     return () => {
       if (frameRef.current) cancelAnimationFrame(frameRef.current);
     };
-  }, [backgroundSrc, colonyId, currentDepthIndex, labels.finalDepth, labels.oxygenDepleted, labels.portal, language, mounted, nextDepthMeters, onDefeat, onTreasureLoot, onVictory, oxygenReserveMs, playerMaxSpeed, playerShotDamage, playerShotSpeed, unlockedDepthIndex, defenseBattleLevel]);
+  }, [backgroundSrc, colonyId, currentDepthIndex, labels.finalDepth, labels.oxygenDepleted, labels.portal, language, mounted, nextDepthMeters, onDefeat, onTreasureLoot, onVictory, oxygenReserveMs, playerMaxSpeed, playerShotDamage, playerShotSpeed, unlockedDepthIndex]);
 
   useEffect(() => () => {
     activeLaunchAudiosRef.current.forEach(stopUnderwaterSound);

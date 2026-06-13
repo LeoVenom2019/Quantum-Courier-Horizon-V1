@@ -75,23 +75,25 @@ export const isWildcardCard = (card: ColonyCard) => getCardClass(card) === 'wild
 
 export type ColonyCardLevels = Record<string, number>;
 export const MAX_COLONY_CARD_LEVEL = 10;
-export const MAX_HORIZON_LEVEL = 50;
+export const BASE_HORIZON_LEVEL_CAP = 50;
+export const MAX_HORIZON_LEVEL = 100;
 export const getCardLevel = (cardId?: string, levels: ColonyCardLevels = {}) => (
   Math.max(1, Math.min(MAX_COLONY_CARD_LEVEL, Number(levels[cardId || '']) || 1))
 );
 
-export const getHorizonLevelFromXp = (xp = 0) => {
+export const getHorizonLevelFromXp = (xp = 0, maxLevel = BASE_HORIZON_LEVEL_CAP) => {
+  const safeMaxLevel = Math.max(1, Math.min(MAX_HORIZON_LEVEL, Math.floor(Number(maxLevel) || BASE_HORIZON_LEVEL_CAP)));
   let level = 1;
   let remainingXp = Math.max(0, Math.floor(xp));
 
-  while (level < MAX_HORIZON_LEVEL) {
+  while (level < safeMaxLevel) {
     const needed = getHorizonXpForNextLevel(level);
     if (remainingXp < needed) break;
     remainingXp -= needed;
     level += 1;
   }
 
-  return { level, currentXp: remainingXp, nextXp: level >= MAX_HORIZON_LEVEL ? 0 : getHorizonXpForNextLevel(level) };
+  return { level, currentXp: remainingXp, nextXp: level >= safeMaxLevel ? 0 : getHorizonXpForNextLevel(level) };
 };
 
 export const getHorizonXpForNextLevel = (level: number) => (

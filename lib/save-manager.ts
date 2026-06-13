@@ -111,7 +111,7 @@ const getHorizonLevelFromXp = (xp = 0) => {
   let level = 1;
   let remainingXp = Math.max(0, Math.floor(xp));
 
-  while (level < 50) {
+  while (level < 100) {
     const needed = getHorizonXpForNextLevel(level);
     if (remainingXp < needed) break;
     remainingXp -= needed;

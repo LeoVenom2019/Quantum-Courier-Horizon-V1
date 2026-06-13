@@ -21,6 +21,7 @@ interface NewEarthDefenseBattleProps {
   language: 'en' | 'pt';
   shipStats: BattleShipComputedStats;
   horizonLevel: number;
+  horizonMaxLevel?: number;
   defenseBattleLevel: number;
   horizonXp: number;
   horizonNextXp: number;
@@ -67,6 +68,7 @@ type Enemy = {
   shootSound: string;
   screamSound?: string;
   screamAudio?: HTMLAudioElement | null;
+  engineAudio?: HTMLAudioElement | null;
   explosionSound?: string;
   frameOffset: number;
   xp: number;
@@ -223,6 +225,12 @@ type EnemyBlueprint = {
 const WIDTH = 960;
 const HEIGHT = 540;
 const ASSET_BASE = '/assets/rota4/battles';
+const AIRPLANE_ENEMY_ENGINE_SOUND = '/assets/rota4/SFX_new_land/airplane_enemys_sounds.ogg';
+const AIRPLANE_PLAYER_ENGINE_SOUND = '/assets/rota4/SFX_new_land/airplane_player_sounds.ogg';
+const ROUTE4_ENEMY_VARIANT_SHOT_SOUNDS = [
+  '/audio/sfx/shoot_enemy.ogg',
+  '/audio/sfx/shoot_player.ogg',
+];
 
 const BATTLE_BACKGROUNDS = [
   `${ASSET_BASE}/backgrounds/day/rt4_background_day.webp`,
@@ -231,6 +239,7 @@ const BATTLE_BACKGROUNDS = [
 ];
 
 const PLAYER_IMAGE = `${ASSET_BASE}/player/horizon/horizon.webp`;
+const THOR_SPECIAL_SFX_BASE = '/assets/rota4/SFX_new_land/special thor';
 const PLAYER_SOUNDS = {
   normal: `${ASSET_BASE}/player/horizon/shoot_rt4.ogg`,
   electric: `${ASSET_BASE}/player/horizon/eletric_shoot.ogg`,
@@ -243,7 +252,18 @@ const PLAYER_SOUNDS = {
   hellfireShoot: `${ASSET_BASE}/player/horizon/hellfire_barrage_shoot.ogg`,
   hellfireImpact: `${ASSET_BASE}/player/horizon/hellfire_barrage_impact.ogg`,
   horizonLevelUp: `${ASSET_BASE}/player/horizon/horizon_level_up.ogg`,
+  thorSpecial: `${THOR_SPECIAL_SFX_BASE}/thunder_special.ogg`,
+  thorTornado: `${THOR_SPECIAL_SFX_BASE}/tornado_thor.ogg`,
+  thorThunder: [
+    `${THOR_SPECIAL_SFX_BASE}/thunder_a.ogg`,
+    `${THOR_SPECIAL_SFX_BASE}/thunder_b.ogg`,
+    `${THOR_SPECIAL_SFX_BASE}/thunder_c.ogg`,
+  ],
 };
+
+const randomThorThunderSfx = () => (
+  PLAYER_SOUNDS.thorThunder[Math.floor(Math.random() * PLAYER_SOUNDS.thorThunder.length)]
+);
 
 const COMMON_SHIP_IMAGES = [
   `${ASSET_BASE}/enemys/air_ships/enemy_rt4.webp`,
@@ -311,6 +331,22 @@ const playSound = (src: string, volume = 0.55) => {
   return instance;
 };
 
+const playLoopSound = (src: string, volume = 0.55) => {
+  if (typeof Audio === 'undefined') return null;
+  let audio = audioCache.get(src);
+  if (!audio) {
+    audio = new Audio(src);
+    audio.preload = 'auto';
+    audioCache.set(src, audio);
+  }
+  const instance = audio.cloneNode(true) as HTMLAudioElement;
+  instance.volume = volume;
+  instance.loop = true;
+  activeAudioInstances.add(instance);
+  instance.play().catch(() => {});
+  return instance;
+};
+
 const stopBattleSound = (audio?: HTMLAudioElement | null) => {
   if (!audio) return;
   audio.pause();
@@ -329,6 +365,11 @@ const stopAllBattleSounds = () => {
 const pick = <T,>(items: T[]) => items[Math.floor(Math.random() * items.length)];
 
 const isMonsterKind = (kind: EnemyKind) => kind === 'monster-1' || kind === 'monster-2';
+const enemyShotSoundFor = (enemy: Enemy) => (
+  enemy.kind === 'common-ship' || enemy.kind === 'elite-ship'
+    ? pick(ROUTE4_ENEMY_VARIANT_SHOT_SOUNDS)
+    : enemy.shootSound
+);
 
 const getDefenseDifficultyLabel = (level: number, language: 'en' | 'pt') => {
   const safeLevel = Math.max(1, Math.floor(level || 1));
@@ -418,6 +459,7 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
   language,
   shipStats,
   horizonLevel,
+  horizonMaxLevel = MAX_HORIZON_LEVEL,
   defenseBattleLevel,
   horizonXp,
   horizonNextXp,
@@ -630,6 +672,7 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
     horizonProgressRef.current = { level: horizonLevel, currentXp: horizonXp, nextXp: horizonNextXp };
     levelUpSfxHandledRef.current = false;
     setHorizonHud({ level: horizonLevel, currentXp: horizonXp, nextXp: horizonNextXp });
+    playLoopSound(AIRPLANE_PLAYER_ENGINE_SOUND, 0.42);
 
     const spawnFloat = (x: number, y: number, text: string, color: string) => {
       state.floats.push({ id: state.nextId++, x, y, text, color, life: 45 });
@@ -643,10 +686,11 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
       currentXp += safeAmount;
       let leveledUp = false;
 
-      while (level < MAX_HORIZON_LEVEL && nextXp > 0 && currentXp >= nextXp) {
+      const safeHorizonMaxLevel = Math.max(1, Math.min(MAX_HORIZON_LEVEL, Math.floor(Number(horizonMaxLevel) || MAX_HORIZON_LEVEL)));
+      while (level < safeHorizonMaxLevel && nextXp > 0 && currentXp >= nextXp) {
         currentXp -= nextXp;
         level += 1;
-        nextXp = level >= MAX_HORIZON_LEVEL ? 0 : getHorizonXpForNextLevel(level);
+        nextXp = level >= safeHorizonMaxLevel ? 0 : getHorizonXpForNextLevel(level);
         leveledUp = true;
       }
 
@@ -885,7 +929,7 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
       spawnThorShockwave(endX, endY, isFinal ? 'rgba(255,255,255,0.9)' : 'rgba(253,230,138,0.82)', isFinal ? 360 : 230);
       state.thorShake = Math.max(state.thorShake, isFinal ? 36 : empowered ? 24 : 14);
       state.thorFlashAlpha = Math.max(state.thorFlashAlpha, isFinal ? 0.78 : empowered ? 0.52 : 0.34);
-      if (hits > 0 || isFinal) playSound(PLAYER_SOUNDS.electric, isFinal ? 0.86 : 0.68);
+      if (hits > 0 || isFinal) playSound(randomThorThunderSfx(), isFinal ? 0.9 : 0.72);
       state.thorNextBolt = now + (empowered ? rand(340, 740) : rand(480, 980));
     };
 
@@ -1402,6 +1446,9 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
         qc: Math.round(blueprint.qc * rewardScale),
       };
       if (blueprint.screamSound) enemy.screamAudio = playSound(blueprint.screamSound, 0.72);
+      if (enemy.kind === 'common-ship' || enemy.kind === 'elite-ship') {
+        enemy.engineAudio = playLoopSound(AIRPLANE_ENEMY_ENGINE_SOUND, enemy.kind === 'elite-ship' ? 0.34 : 0.28);
+      }
       state.enemies.push(enemy);
     };
 
@@ -1568,7 +1615,7 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
         spawnFloat(enemy.x - 14, enemy.y - 24, 'FAIL', '#7dd3fc');
         return;
       }
-      playSound(enemy.shootSound, enemy.kind === 'boss-ship' ? 0.62 : 0.46);
+      playSound(enemyShotSoundFor(enemy), enemy.kind === 'boss-ship' ? 0.62 : 0.46);
       const dx = state.player.x - enemy.x;
       const dy = state.player.y - enemy.y;
       const length = Math.max(1, Math.sqrt(dx * dx + dy * dy));
@@ -1761,7 +1808,8 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
         state.thorFlashAlpha = 0.32;
         state.thorShake = 12;
         spawnFloat(state.player.x + 78, state.player.y - 62, 'JURAMENTO DE THOR', '#fde68a');
-        playSound(PLAYER_SOUNDS.electric, 0.82);
+        playSound(PLAYER_SOUNDS.thorSpecial, 0.88);
+        playSound(PLAYER_SOUNDS.thorTornado, 0.78);
       }
     };
 
@@ -1846,7 +1894,7 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
           state.thorShake = 20;
           state.thorFlashAlpha = 0.48;
           spawnThorRing(WIDTH * 0.71, HEIGHT * 0.5, 56, 'rgba(103,232,249,1)');
-          playSound(PLAYER_SOUNDS.electric, 0.76);
+          playSound(randomThorThunderSfx(), 0.72);
         }
       } else if (state.thorPhase === 'small') {
         if (now >= state.thorNextBolt) spawnThorBolt(now, true);
@@ -1870,7 +1918,7 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
           state.thorShake = 28;
           state.thorFlashAlpha = 0.62;
           spawnThorRing(WIDTH * 0.72, HEIGHT * 0.52, 96, 'rgba(253,230,138,1)');
-          playSound(PLAYER_SOUNDS.electric, 0.86);
+          playSound(randomThorThunderSfx(), 0.78);
         }
       } else if (state.thorPhase === 'big') {
         if (now >= state.thorNextBolt) spawnThorBolt(now, true);
@@ -2235,33 +2283,16 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
       }
 
       ctx.globalCompositeOperation = 'source-over';
-      const label = state.thorPhase === 'prelude'
-        ? 'O CEU RESPONDE'
-        : state.thorPhase === 'small'
-          ? '3 TORNADOS INICIAIS'
-          : state.thorPhase === 'big'
-            ? 'MEGA TORNADO DIVINO'
-            : state.thorPhase === 'ending'
-              ? 'ULTIMO RAIO'
-              : 'JURAMENTO SELADO';
-      const elapsed = Math.min(10, (now - state.thorStart) / 1000);
       ctx.fillStyle = 'rgba(1,3,9,0.72)';
       ctx.strokeStyle = 'rgba(253,230,138,0.32)';
       ctx.lineWidth = 1;
       ctx.beginPath();
-      ctx.roundRect(18, 118, 330, 82, 7);
+      ctx.roundRect(18, 118, 330, 46, 7);
       ctx.fill();
       ctx.stroke();
-      ctx.font = '700 10px Orbitron, sans-serif';
+      ctx.font = '900 14px Orbitron, sans-serif';
       ctx.fillStyle = '#fde68a';
-      ctx.fillText('JURAMENTO DE THOR', 34, 142);
-      ctx.font = '900 16px Orbitron, sans-serif';
-      ctx.fillStyle = '#e2e8f0';
-      ctx.fillText(label, 34, 164);
-      ctx.fillStyle = 'rgba(56,189,248,0.22)';
-      ctx.fillRect(34, 176, 278, 7);
-      ctx.fillStyle = '#67e8f9';
-      ctx.fillRect(34, 176, 278 * (elapsed / 10), 7);
+      ctx.fillText('JURAMENTO DE THOR', 34, 147);
       ctx.restore();
     };
 
@@ -2923,10 +2954,13 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
             state.monsterDefeated = true;
             stopBattleSound(enemy.screamAudio);
           }
+          stopBattleSound(enemy.engineAudio);
           if (enemy.explosionSound) playSound(enemy.explosionSound, 0.68);
           return false;
         }
-        return enemy.x > -90;
+        const staysOnScreen = enemy.x > -90;
+        if (!staysOnScreen) stopBattleSound(enemy.engineAudio);
+        return staysOnScreen;
       });
       state.projectiles = state.projectiles.filter(projectile => projectile.x < WIDTH + 80 && projectile.x > -80 && projectile.y > -80 && projectile.y < HEIGHT + 80);
       if (state.hellfireSequence.waitingForImpact && !state.projectiles.some(projectile => projectile.sequence === 'hellfire')) {
@@ -2973,7 +3007,7 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
       canvas?.removeEventListener('click', handleCanvasClick);
       stopAllBattleSounds();
     };
-  }, [shipStats, specials, horizonLevel, trinityShotEnabled, currentDefenseBattleLevel]);
+  }, [shipStats, specials, horizonLevel, horizonMaxLevel, trinityShotEnabled, currentDefenseBattleLevel]);
 
   const finishResult = () => {
     if (result === 'victory') {
