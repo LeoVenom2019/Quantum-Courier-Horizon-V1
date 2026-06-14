@@ -211,6 +211,7 @@ type BlizzardState = {
   active: boolean;
   start: number;
   duration: number;
+  blocksSpawned: number;
   tickAccum: number;
   tickInterval: number;
   blockAccum: number;
@@ -321,6 +322,12 @@ const randomThorThunderSfx = () => (
   PLAYER_SOUNDS.thorThunder[Math.floor(Math.random() * PLAYER_SOUNDS.thorThunder.length)]
 );
 
+const playBlizzardExplosionSfx = () => {
+  const sfx = pick(PLAYER_SOUNDS.blizzardIceExplosions);
+  playSound(sfx, 1);
+  window.setTimeout(() => playSound(sfx, 0.72), 18);
+};
+
 const COMMON_SHIP_IMAGES = [
   `${ASSET_BASE}/enemys/air_ships/enemy_rt4.webp`,
   `${ASSET_BASE}/enemys/air_ships/enemy_rt4_2.webp`,
@@ -354,6 +361,13 @@ const SPECIAL_LABEL: Record<DefenseSpecialId, Record<'en' | 'pt', string>> = {
 const HORIZON_LASER_DAMAGE_INTERVAL = 1000 / 3;
 const HORIZON_LASER_DAMAGE_RADIUS = 72;
 const HORIZON_LASER_DAMAGE_MULTIPLIER = 1.85;
+const HORIZON_SPECIAL_BASE_COOLDOWN = 30000;
+const HORIZON_SPECIAL_MIN_COOLDOWN = 3000;
+
+const getHorizonSpecialCooldownDuration = (reductionPercent: number) => {
+  const reduction = Math.max(0, Math.min(90, reductionPercent || 0));
+  return Math.max(HORIZON_SPECIAL_MIN_COOLDOWN, HORIZON_SPECIAL_BASE_COOLDOWN * (1 - reduction / 100));
+};
 
 const imageCache = new Map<string, HTMLImageElement>();
 const audioCache = new Map<string, HTMLAudioElement>();
@@ -603,6 +617,7 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
       active: false,
       start: 0,
       duration: 8000,
+      blocksSpawned: 0,
       tickAccum: 0,
       tickInterval: 250,
       blockAccum: 0,
@@ -748,6 +763,7 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
       active: false,
       start: 0,
       duration: 8000,
+      blocksSpawned: 0,
       tickAccum: 0,
       tickInterval: 250,
       blockAccum: 0,
@@ -1063,7 +1079,7 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
 
     const applyBlizzardDamage = (multiplier: number, x: number, y: number, radius: number, label: string, color: string) => {
       const now = performance.now();
-      const payload = createSpecialDamagePayload(multiplier, { ice: 72 });
+      const payload = createSpecialDamagePayload(multiplier, { ice: 36 });
       let hitCount = 0;
       state.enemies.forEach(enemy => {
         if (enemy.hp <= 0) return;
@@ -1083,7 +1099,7 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
 
     const applyBlizzardTick = () => {
       const now = performance.now();
-      const payload = createSpecialDamagePayload(1.35, { ice: 88 });
+      const payload = createSpecialDamagePayload(0.675, { ice: 44 });
       state.enemies.forEach(enemy => {
         if (enemy.hp <= 0 || enemy.x <= WIDTH * 0.5) return;
         const baseDamage = payload.crit ? payload.damage * shipStats.critMultiplier : payload.damage;
@@ -1119,7 +1135,7 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
     const explodeBlizzardIceBlock = (block: BlizzardIceBlock) => {
       block.exploded = true;
       const { x, y } = block;
-      playSound(pick(PLAYER_SOUNDS.blizzardIceExplosions), 0.82);
+      playBlizzardExplosionSfx();
       state.blizzard.shake = Math.max(state.blizzard.shake, 28);
       state.blizzard.flashAlpha = Math.max(state.blizzard.flashAlpha, 0.52);
       spawnBlizzardShockwave(x, y, 'rgba(147,197,253,1)', WIDTH * 0.5);
@@ -1128,8 +1144,8 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
       spawnBlizzardBurst(x, y, 'rgba(147,197,253,0.88)', 48);
       spawnBlizzardBurst(x, y, 'rgba(255,255,255,0.92)', 28);
       for (let i = 0; i < 24; i++) spawnBlizzardCrystal(x, y);
-      applyBlizzardDamage(2.1, x, y, 90, 'GELO', '#bae6fd');
-      applyBlizzardDamage(1.05, x, y, WIDTH * 0.5, 'AREA', '#93c5fd');
+      applyBlizzardDamage(1.05, x, y, 90, 'GELO', '#bae6fd');
+      applyBlizzardDamage(0.525, x, y, WIDTH * 0.5, 'AREA', '#93c5fd');
       spawnFloat(x, y - 40, 'BLIZZARD IMPACT', '#e0f2fe');
     };
 
@@ -1975,11 +1991,16 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
       const specialId = specials[index];
       if (!specialId) return;
       const now = performance.now();
-      const cooldown = Math.max(5500, 16000 * (1 - shipStats.specialCooldownReductionPercent / 100));
+      const cooldown = getHorizonSpecialCooldownDuration(shipStats.specialCooldownReductionPercent);
+      const anySpecialActive = state.laserState !== 'idle'
+        || state.hellfireSequence.active
+        || state.thorPhase !== 'idle'
+        || state.blizzard.active
+        || state.blizzard.coverAlpha > 0.01
+        || state.blizzardIceBlocks.length > 0
+        || state.blizzardShockwaves.length > 0;
       if ((state.specialCooldowns[specialId] || 0) > now) return;
-      if (specialId === 'apocalypse-laser' && state.laserState !== 'idle') return;
-      if (specialId === 'thor-oath' && state.thorPhase !== 'idle') return;
-      if (specialId === 'special-slot-4' && state.blizzard.active) return;
+      if (anySpecialActive) return;
       state.specialCooldowns[specialId] = now + cooldown;
 
       if (specialId === 'apocalypse-laser') {
@@ -2064,6 +2085,7 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
           active: true,
           start: now,
           duration: 8000,
+          blocksSpawned: 1,
           tickAccum: 0,
           tickInterval: 250,
           blockAccum: 0,
@@ -2082,7 +2104,8 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
           if (enemy.x > WIDTH * 0.5) enemy.status.slowUntil = now + 4200;
         });
         spawnFloat(state.player.x + 78, state.player.y - 62, 'BLIZZARD', '#bae6fd');
-        playSound(PLAYER_SOUNDS.blizzardSpecial, 0.86);
+        playSound(PLAYER_SOUNDS.blizzardSpecial, 0.6);
+        spawnBlizzardIceBlock();
       }
     };
 
@@ -2427,15 +2450,15 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
         }
 
         blizzard.blockAccum += dt;
-        if (blizzard.blockAccum >= blizzard.blockInterval) {
+        while (blizzard.blockAccum >= blizzard.blockInterval && blizzard.blocksSpawned < 4) {
           blizzard.blockAccum -= blizzard.blockInterval;
-          if (age < blizzard.duration - 500) spawnBlizzardIceBlock();
+          blizzard.blocksSpawned += 1;
+          spawnBlizzardIceBlock();
         }
 
         if (age >= blizzard.duration) {
           blizzard.active = false;
           blizzard.coverAlpha = 0;
-          state.blizzardIceBlocks = [];
         }
       } else {
         blizzard.coverAlpha = Math.max(0, blizzard.coverAlpha - 0.025);
@@ -3734,6 +3757,31 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
   };
 
   const xpPercent = horizonHud.nextXp > 0 ? Math.min(100, (horizonHud.currentXp / horizonHud.nextXp) * 100) : 100;
+  const specialHudNow = typeof performance !== 'undefined' ? performance.now() : Date.now();
+  const specialHudState = stateRef.current;
+  const specialEffectActive = specialHudState.laserState !== 'idle'
+    || specialHudState.hellfireSequence.active
+    || specialHudState.thorPhase !== 'idle'
+    || specialHudState.blizzard.active
+    || specialHudState.blizzard.coverAlpha > 0.01
+    || specialHudState.blizzardIceBlocks.length > 0
+    || specialHudState.blizzardShockwaves.length > 0;
+  const getSpecialButtonState = (specialId?: DefenseSpecialId) => {
+    const remainingMs = specialId ? Math.max(0, (specialHudState.specialCooldowns[specialId] || 0) - specialHudNow) : 0;
+    const cooldownSeconds = Math.ceil(remainingMs / 1000);
+    return {
+      disabled: !specialId || specialEffectActive || remainingMs > 0,
+      label: !specialId
+        ? t('Empty', 'Vazio')
+        : remainingMs > 0
+        ? `${cooldownSeconds}s`
+        : specialEffectActive
+          ? t('Active', 'Ativo')
+          : t('Ready', 'Pronto'),
+    };
+  };
+  const specialOneButton = getSpecialButtonState(specials[0]);
+  const specialTwoButton = getSpecialButtonState(specials[1]);
 
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/95 p-3 backdrop-blur-xl">
@@ -3794,22 +3842,26 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
                   <PremiumCanvasButton
                     type="button"
                     onClick={() => { controlsRef.current.specialOne += 1; }}
+                    disabled={specialOneButton.disabled}
                     tone="purple"
                     className="h-16 w-36 rounded-2xl"
                     contentClassName="flex-col px-3 text-[11px] font-black uppercase tracking-[0.16em] text-fuchsia-100"
                   >
                     <span className="block text-[9px] opacity-65">C</span>
-                    {SPECIAL_LABEL[specials[0]]?.[language] || t('Special 1', 'Especial 1')}
+                    <span>{SPECIAL_LABEL[specials[0]]?.[language] || t('Special 1', 'Especial 1')}</span>
+                    <span className="mt-0.5 block font-mono text-[9px] tracking-widest opacity-70">{specialOneButton.label}</span>
                   </PremiumCanvasButton>
                   <PremiumCanvasButton
                     type="button"
                     onClick={() => { controlsRef.current.specialTwo += 1; }}
+                    disabled={specialTwoButton.disabled}
                     tone="orange"
                     className="h-16 w-36 rounded-2xl"
                     contentClassName="flex-col px-3 text-[11px] font-black uppercase tracking-[0.16em] text-orange-100"
                   >
                     <span className="block text-[9px] opacity-65">F</span>
-                    {SPECIAL_LABEL[specials[1]]?.[language] || t('Special 2', 'Especial 2')}
+                    <span>{SPECIAL_LABEL[specials[1]]?.[language] || t('Special 2', 'Especial 2')}</span>
+                    <span className="mt-0.5 block font-mono text-[9px] tracking-widest opacity-70">{specialTwoButton.label}</span>
                   </PremiumCanvasButton>
                 </div>
               </div>
