@@ -48,6 +48,11 @@ import {
 } from '@/lib/colony-cards';
 import { MINI_GAMES_CONFIG } from '@/lib/mini-games-config';
 import { preloadAssetGroupPassive } from '@/lib/asset-preloader';
+import {
+  NEW_EARTH_MISSIONS_STORAGE_KEY,
+  NewEarthMission,
+  NewEarthMissionState,
+} from '@/lib/new-earth-missions';
 import { Colony } from '../ColonySystem';
 import { useDashboard } from './DashboardProvider';
 import { PremiumCanvasButton, type PremiumCanvasButtonTone } from '../ui/PremiumCanvasButton';
@@ -306,6 +311,52 @@ const notifyNewEarthCardUpgradeMission = (cardId: string, level: number) => {
   window.dispatchEvent(new CustomEvent('qch:new-earth-mission-event', {
     detail: { type: 'card-upgrade', cardId, level },
   }));
+};
+
+const saveNewEarthCardUpgradeMissionProgress = async (cardId: string, level: number) => {
+  try {
+    const saved = await GameStorage.load(NEW_EARTH_MISSIONS_STORAGE_KEY);
+    if (!saved || !Array.isArray(saved.missions)) return;
+
+    let changed = false;
+    const missions = (saved.missions as NewEarthMission[]).map(mission => {
+      if (
+        mission.eventType !== 'card-upgrade' ||
+        mission.claimed ||
+        mission.cardId !== cardId ||
+        Number(level || 0) < Number(mission.cardTargetLevel || 0)
+      ) {
+        return mission;
+      }
+
+      const completedMission = {
+        ...mission,
+        progress: mission.target,
+        completed: true,
+      };
+      changed = changed || mission.progress !== completedMission.progress || !mission.completed;
+      return completedMission;
+    });
+    if (!changed) return;
+
+    const nextState: NewEarthMissionState = {
+      ...(saved as NewEarthMissionState),
+      missions,
+      completedMissionIds: missions.filter(mission => mission.completed).map(mission => mission.id),
+      claimedMissionIds: missions.filter(mission => mission.claimed).map(mission => mission.id),
+      cycle: Math.max(0, Math.floor(Number(saved.cycle) || 0)),
+      generatedAt: Number(saved.generatedAt) || Date.now(),
+      renewAvailableAt: saved.renewAvailableAt ? Number(saved.renewAvailableAt) : null,
+      cycleRewardClaimed: Boolean(saved.cycleRewardClaimed),
+    };
+
+    await GameStorage.save(nextState, NEW_EARTH_MISSIONS_STORAGE_KEY);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('qch:new-earth-missions-updated', { detail: nextState }));
+    }
+  } catch (error) {
+    console.warn('Unable to update New Earth card mission progress', error);
+  }
 };
 
 type CardClassFilter = 'all' | ColonyCardClass;
@@ -590,9 +641,14 @@ const CardsTab = memo(function CardsTab() {
       setFeedback(tl(lang, 'Not enough QC', 'QC insuficiente'));
       return;
     }
+    const nextLevel = level + 1;
+    const nextCardLevels = { ...cardLevels, [card.id]: nextLevel };
     dispatch({ type: 'SPEND_QC', payload: { amount: cost } });
-    setCardLevels(prev => ({ ...prev, [card.id]: level + 1 }));
-    notifyNewEarthCardUpgradeMission(card.id, level + 1);
+    setCardLevels(nextCardLevels);
+    GameStorage.save(nextCardLevels, 'colony_card_levels');
+    notifyColonyCardLevelsChanged(nextCardLevels);
+    notifyNewEarthCardUpgradeMission(card.id, nextLevel);
+    void saveNewEarthCardUpgradeMissionProgress(card.id, nextLevel);
     playSfx('level_up');
     setFeedback(tl(lang, 'Card upgraded', 'Carta aprimorada'));
   };

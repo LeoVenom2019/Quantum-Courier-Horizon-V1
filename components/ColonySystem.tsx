@@ -1331,6 +1331,8 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
   const newEarthMissionCycleBonusDrainIntervalRef = useRef<number | null>(null);
   const scheduledNewEarthMissionCycleBonusRef = useRef<number | null>(null);
   const paidNewEarthMissionCycleBonusRef = useRef<number | null>(null);
+  const readyNewEarthMissionIdsRef = useRef<Set<string>>(new Set());
+  const readyNewEarthMissionAudioInitializedRef = useRef(false);
 
   const t = useCallback((en: string, pt: string) => language === 'pt' ? pt : en, [language]);
   const effectiveActiveColonyId = activeColonyId ?? colonies[0]?.id ?? null;
@@ -1836,10 +1838,7 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
     if (!isLoaded || !isNewEarthMissionsLoaded) return;
     if (isNewEarthMissionCycleFullyClaimed && !newEarthMissions.cycleRewardClaimed) return;
     setNewEarthMissions(prev => {
-      const next = refreshNewEarthMissionBoard(
-        normalizeNewEarthMissionState(prev, newEarthMissionContext),
-        newEarthMissionContext
-      );
+      const next = refreshNewEarthMissionBoard(prev, newEarthMissionContext);
       if (next.cycle !== prev.cycle && prev.cycle > 0) {
         playRoute4UiSfx(ROUTE4_QUESTS_RENEW_SFX);
       }
@@ -1945,18 +1944,92 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
     });
   }, [playSfx]);
 
-  const recordNewEarthMissionProgress = useCallback((event: Parameters<typeof recordNewEarthMissionEvent>[1]) => {
-    let completedCount = 0;
-    setNewEarthMissions(prev => {
-      const result = recordNewEarthMissionEvent(normalizeNewEarthMissionState(prev, newEarthMissionContext), event);
-      completedCount = result.completedMissionIds.length;
-      return result.changed ? result.state : prev;
-    });
-    if (completedCount > 0) {
+  useEffect(() => {
+    if (!isLoaded || !isNewEarthMissionsLoaded) return;
+
+    const readyMissionIds = new Set(
+      newEarthMissions.missions
+        .filter(mission => mission.completed && !mission.claimed)
+        .map(mission => mission.id)
+    );
+
+    if (!readyNewEarthMissionAudioInitializedRef.current) {
+      readyNewEarthMissionIdsRef.current = readyMissionIds;
+      readyNewEarthMissionAudioInitializedRef.current = true;
+      return;
+    }
+
+    const hasNewReadyMission = [...readyMissionIds].some(id => !readyNewEarthMissionIdsRef.current.has(id));
+    readyNewEarthMissionIdsRef.current = readyMissionIds;
+
+    if (hasNewReadyMission) {
       setCardFeedback(t('New Earth mission completed', 'Missão da Nova Terra concluída'));
       playNewEarthMissionCompleteVoice();
     }
-  }, [newEarthMissionContext, playNewEarthMissionCompleteVoice, t]);
+  }, [isLoaded, isNewEarthMissionsLoaded, newEarthMissions.missions, playNewEarthMissionCompleteVoice, t]);
+
+  useEffect(() => {
+    if (!isLoaded || !isNewEarthMissionsLoaded || !isCardLevelsLoaded) return;
+
+    setNewEarthMissions(prev => {
+      let changed = false;
+      const missions = prev.missions.map(mission => {
+        if (
+          mission.eventType !== 'card-upgrade' ||
+          mission.claimed ||
+          !mission.cardId ||
+          !mission.cardTargetLevel ||
+          getCardLevel(mission.cardId, cardLevels) < mission.cardTargetLevel
+        ) {
+          return mission;
+        }
+
+        const completedMission = {
+          ...mission,
+          progress: mission.target,
+          completed: true,
+        };
+        changed = changed || mission.progress !== completedMission.progress || !mission.completed;
+        return completedMission;
+      });
+
+      if (!changed) return prev;
+
+      return {
+        ...prev,
+        missions,
+        completedMissionIds: missions.filter(mission => mission.completed).map(mission => mission.id),
+        claimedMissionIds: missions.filter(mission => mission.claimed).map(mission => mission.id),
+      };
+    });
+  }, [
+    cardLevels,
+    isCardLevelsLoaded,
+    isLoaded,
+    isNewEarthMissionsLoaded,
+  ]);
+
+  const recordNewEarthMissionProgress = useCallback((event: Parameters<typeof recordNewEarthMissionEvent>[1]) => {
+    setNewEarthMissions(prev => {
+      const baseContext = newEarthMissionContextRef.current;
+      const eventResult = recordNewEarthMissionEvent(prev, event);
+      let context = baseContext;
+      if (event.type === 'card-upgrade' && event.cardId && event.level != null) {
+        const upgradedLevel = Math.max(1, Math.floor(Number(event.level) || 1));
+        context = {
+          ...context,
+          upgradeableCards: (context.upgradeableCards || []).map(card => (
+            card.id === event.cardId ? { ...card, level: upgradedLevel } : card
+          )),
+        };
+      }
+      const normalized = normalizeNewEarthMissionState(
+        eventResult.changed ? eventResult.state : prev,
+        context
+      );
+      return JSON.stringify(normalized) === JSON.stringify(prev) ? prev : normalized;
+    });
+  }, []);
 
   useEffect(() => {
     const handleNewEarthMissionEvent = (event: Event) => {
@@ -2831,6 +2904,14 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
   }, [newEarthMissions, newEarthMissionContext, onEarnQC, effectiveActiveColonyId, setColonies, ownedCardIds, playSfx, t]);
 
   const renewNewEarthMissionsWithoutBonus = useCallback(() => {
+    if (newEarthMissions.missions.some(mission => mission.completed && !mission.claimed)) {
+      setCardFeedback(t(
+        'Claim ready mission rewards before renewing.',
+        'Resgate as missões prontas antes de renovar.'
+      ));
+      return;
+    }
+
     if (newEarthMissionCycleBonusTimeoutRef.current) {
       window.clearTimeout(newEarthMissionCycleBonusTimeoutRef.current);
       newEarthMissionCycleBonusTimeoutRef.current = null;
@@ -3761,9 +3842,10 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
             <PremiumCanvasButton
               type="button"
               onClick={renewNewEarthMissionsWithoutBonus}
+              disabled={newEarthMissions.missions.some(mission => mission.completed && !mission.claimed)}
               tone="steel"
               className="h-[58px] w-[118px] shrink-0 rounded-xl"
-              contentClassName="px-3 text-center text-[10px] font-black uppercase tracking-[0.18em] text-zinc-200"
+              contentClassName={`px-3 text-center text-[10px] font-black uppercase tracking-[0.18em] ${newEarthMissions.missions.some(mission => mission.completed && !mission.claimed) ? 'text-zinc-500' : 'text-zinc-200'}`}
             >
               {t('Renew missions', 'Renovar missões')}
             </PremiumCanvasButton>

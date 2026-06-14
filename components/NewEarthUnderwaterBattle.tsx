@@ -226,6 +226,10 @@ type SpotlightParticle = {
 
 const WIDTH = 1280;
 const HEIGHT = 720;
+const PLAYER_MIN_X = 42;
+const PLAYER_MAX_X = WIDTH - 42;
+const PLAYER_MIN_Y = 48;
+const PLAYER_MAX_Y = HEIGHT - 42;
 const PLAYER_ACCELERATION = 0.1;
 const PLAYER_MAX_SPEED = 2.55;
 const PLAYER_WATER_DRAG = 0.972;
@@ -348,6 +352,14 @@ const SITE_CONFIG: Record<UnderwaterBattleSiteId, {
 };
 
 const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
+
+const getSimulatedDepthFromPlayerY = (playerY: number, depthIndex: number) => {
+  const depthRangeStart = depthIndex === 0 ? 0 : NEW_EARTH_SUBMARINE_DEPTH_STAGES[depthIndex - 1];
+  const depthRangeEnd = NEW_EARTH_SUBMARINE_DEPTH_STAGES[depthIndex];
+  const verticalFactor = clamp((playerY - PLAYER_MIN_Y) / Math.max(1, PLAYER_MAX_Y - PLAYER_MIN_Y), 0, 1);
+
+  return Math.round(depthRangeStart + (depthRangeEnd - depthRangeStart) * verticalFactor);
+};
 
 const getImage = (src: string) => {
   let image = imageCache.get(src);
@@ -2307,7 +2319,7 @@ export default function NewEarthUnderwaterBattle({
     }
     lastHudUpdateAtRef.current = 0;
     setOxygenPercent(Math.max(0, Math.min(100, Math.round((oxygenRemainingMsRef.current / oxygenReserveMs) * 100))));
-    setCurrentDepthMeters(NEW_EARTH_SUBMARINE_DEPTH_STAGES[currentDepthIndex]);
+    setCurrentDepthMeters(getSimulatedDepthFromPlayerY(state.player.y, currentDepthIndex));
     setPortalFeedback(null);
   }, [currentDepthIndex, oxygenReserveMs, playerMaxHp, siteId, treasureTotal]);
 
@@ -2578,21 +2590,19 @@ export default function NewEarthUnderwaterBattle({
         }
         state.player.x += state.player.vx * step;
         state.player.y += state.player.vy * step;
-        if (state.player.x < 42 || state.player.x > WIDTH - 42) {
-          state.player.x = clamp(state.player.x, 42, WIDTH - 42);
+        if (state.player.x < PLAYER_MIN_X || state.player.x > PLAYER_MAX_X) {
+          state.player.x = clamp(state.player.x, PLAYER_MIN_X, PLAYER_MAX_X);
           state.player.vx *= -0.22;
         }
-        if (state.player.y < 48 || state.player.y > HEIGHT - 42) {
-          state.player.y = clamp(state.player.y, 48, HEIGHT - 42);
+        if (state.player.y < PLAYER_MIN_Y || state.player.y > PLAYER_MAX_Y) {
+          state.player.y = clamp(state.player.y, PLAYER_MIN_Y, PLAYER_MAX_Y);
           state.player.vy *= -0.22;
         }
         state.player.cooldown = Math.max(0, state.player.cooldown - delta);
 
-        const depthRangeStart = currentDepthIndex === 0 ? 0 : NEW_EARTH_SUBMARINE_DEPTH_STAGES[currentDepthIndex - 1];
         const depthRangeEnd = NEW_EARTH_SUBMARINE_DEPTH_STAGES[currentDepthIndex];
-        const verticalFactor = clamp((state.player.y - 48) / Math.max(1, HEIGHT - 90), 0, 1);
         const motionFactor = clamp(Math.hypot(state.player.vx, state.player.vy) / Math.max(0.1, playerMaxSpeed), 0, 1);
-        const simulatedDepth = Math.round(depthRangeStart + (depthRangeEnd - depthRangeStart) * (0.28 + verticalFactor * 0.64 + Math.sin(time * 0.0016) * 0.015));
+        const simulatedDepth = getSimulatedDepthFromPlayerY(state.player.y, currentDepthIndex);
         const drainMultiplier = 1 + currentDepthIndex * 0.08 + motionFactor * 0.12;
         oxygenRemainingMsRef.current = Math.max(0, oxygenRemainingMsRef.current - delta * drainMultiplier);
 

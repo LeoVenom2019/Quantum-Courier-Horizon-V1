@@ -135,6 +135,8 @@ import {
 } from '@/lib/colony-cards';
 import {
   NEW_EARTH_MISSIONS_STORAGE_KEY,
+  NewEarthMission,
+  NewEarthMissionState,
   normalizeNewEarthMissionState,
   recordNewEarthMissionEvent,
 } from '@/lib/new-earth-missions';
@@ -3126,6 +3128,61 @@ const DashboardContent = memo(({
     }
   }, []);
 
+  const recordCardUpgradeMissionProgress = useCallback(async (cardId: string, level: number) => {
+    try {
+      const saved = await GameStorage.load(NEW_EARTH_MISSIONS_STORAGE_KEY);
+      if (!saved || !Array.isArray(saved.missions)) return;
+
+      let changed = false;
+      const missions = (saved.missions as NewEarthMission[]).map(mission => {
+        if (
+          mission.eventType !== 'card-upgrade' ||
+          mission.claimed ||
+          mission.cardId !== cardId ||
+          Number(level || 0) < Number(mission.cardTargetLevel || 0)
+        ) {
+          return mission;
+        }
+
+        const completedMission = {
+          ...mission,
+          progress: mission.target,
+          completed: true,
+        };
+        changed = changed || mission.progress !== completedMission.progress || !mission.completed;
+        return completedMission;
+      });
+      if (!changed) return;
+
+      const nextState: NewEarthMissionState = {
+        ...(saved as NewEarthMissionState),
+        missions,
+        completedMissionIds: missions.filter(mission => mission.completed).map(mission => mission.id),
+        claimedMissionIds: missions.filter(mission => mission.claimed).map(mission => mission.id),
+        cycle: Math.max(0, Math.floor(Number(saved.cycle) || 0)),
+        generatedAt: Number(saved.generatedAt) || Date.now(),
+        renewAvailableAt: saved.renewAvailableAt ? Number(saved.renewAvailableAt) : null,
+        cycleRewardClaimed: Boolean(saved.cycleRewardClaimed),
+      };
+
+      await GameStorage.save(nextState, NEW_EARTH_MISSIONS_STORAGE_KEY);
+      window.dispatchEvent(new CustomEvent('qch:new-earth-missions-updated', { detail: nextState }));
+    } catch (error) {
+      console.warn('Unable to update New Earth card mission progress', error);
+    }
+  }, []);
+
+  useEffect(() => {
+    const handleNewEarthMissionEvent = (event: Event) => {
+      const detail = (event as CustomEvent<{ type?: string; cardId?: string; level?: number }>).detail;
+      if (detail?.type !== 'card-upgrade' || !detail.cardId) return;
+      void recordCardUpgradeMissionProgress(detail.cardId, Number(detail.level) || 0);
+    };
+
+    window.addEventListener('qch:new-earth-mission-event', handleNewEarthMissionEvent);
+    return () => window.removeEventListener('qch:new-earth-mission-event', handleNewEarthMissionEvent);
+  }, [recordCardUpgradeMissionProgress]);
+
   const recordSubmarineMissionProgress = useCallback(async (
     event: { type: 'submarine-victory'; siteId: string; colonyId: string } | { type: 'submarine-treasure'; amount?: number }
   ) => {
@@ -4094,15 +4151,20 @@ const DashboardContent = memo(({
     if (deliveryId.startsWith('auto-')) {
       const routeId = deliveryId.replace('auto-', '');
       if (!isVictory) {
+        autoTravelActiveRef.current = { ...autoTravelActiveRef.current, [routeId]: false };
+        autoTravelProgressRef.current = { ...autoTravelProgressRef.current, [routeId]: 0 };
         setAutoTravelActive(prev => ({ ...prev, [routeId]: false }));
         setAutoTravelProgress(prev => ({ ...prev, [routeId]: 0 }));
         const route = ROUTES_MAP.get(routeId);
         addLog(`${t('autoDeliveryInterrupted')} ${route?.destination || routeId} ${t('interruptedByDefeat')}`, 'error');
       }
+      activeBattleRef.current = null;
       setActiveBattle(null);
       return;
     }
 
+    const nextDeliveries = activeDeliveriesRef.current.filter(d => d.id !== deliveryId);
+    activeDeliveriesRef.current = nextDeliveries;
     setActiveDeliveries(prev => prev.map(d => {
       if (d.id === deliveryId) {
         if (isVictory) {
@@ -4114,6 +4176,7 @@ const DashboardContent = memo(({
       return d;
     }).filter(d => d !== null) as ActiveDelivery[]);
 
+    activeBattleRef.current = null;
     setActiveBattle(null);
   }, [language, addLog]);
 
@@ -5629,7 +5692,7 @@ const DashboardContent = memo(({
       const battleFreqMultiplier = (battleLevelRef.current >= 35 && routeTierRef.current === 'Interstellar') ? 1.5 : 1;
       const candidateRouteIds = [
         ...nextManual.filter(d => d.status === 'delivering').map(d => d.routeId),
-        ...Object.keys(autoTravelActiveRef.current).filter(rid => autoTravelActiveRef.current[rid] && (autoTravelProgressRef.current[rid] || 0) > 0)
+        ...Object.keys(autoTravelActiveRef.current).filter(rid => autoTravelDesiredRef.current[rid] && autoTravelActiveRef.current[rid] && (autoTravelProgressRef.current[rid] || 0) > 0)
       ];
       const candidateRisks = candidateRouteIds
         .map(routeId => ROUTES_MAP.get(routeId))
@@ -5649,7 +5712,7 @@ const DashboardContent = memo(({
         });
         const autoRoutes = Object.keys(autoTravelActiveRef.current).filter(rid => {
           const r = ROUTES_MAP.get(rid);
-          return autoTravelActiveRef.current[rid] && (autoTravelProgressRef.current[rid] || 0) > 0 && r?.tier === routeTierRef.current;
+          return autoTravelDesiredRef.current[rid] && autoTravelActiveRef.current[rid] && (autoTravelProgressRef.current[rid] || 0) > 0 && r?.tier === routeTierRef.current;
         });
 
         if (manualShips.length > 0 || autoRoutes.length > 0) {
@@ -5840,7 +5903,7 @@ const DashboardContent = memo(({
       const autoCompletedRoutes: { routeId: string, count: number }[] = [];
 
       Object.keys(autoTravelActiveRef.current).forEach(routeId => {
-        if (autoTravelActiveRef.current[routeId]) {
+        if (autoTravelDesiredRef.current[routeId] && autoTravelActiveRef.current[routeId]) {
           if (activeBattleRef.current?.deliveryId === `auto-${routeId}`) return;
           const route = ROUTES_MAP.get(routeId);
           if (route) {
@@ -6195,6 +6258,14 @@ const DashboardContent = memo(({
 
     if (isActivating && slots === 0) {
       return;
+    }
+
+    autoTravelDesiredRef.current = { ...autoTravelDesiredRef.current, [routeId]: isActivating };
+    autoTravelActiveRef.current = { ...autoTravelActiveRef.current, [routeId]: isActivating };
+
+    if (!isActivating) {
+      autoTravelProgressRef.current = { ...autoTravelProgressRef.current, [routeId]: 0 };
+      setAutoTravelProgress(prev => ({ ...prev, [routeId]: 0 }));
     }
 
     setAutoTravelDesired(prev => ({ ...prev, [routeId]: isActivating }));

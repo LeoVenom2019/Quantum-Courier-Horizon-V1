@@ -658,23 +658,13 @@ export const normalizeNewEarthMissionState = (saved: any, context?: NewEarthMiss
 
   const missions = sourceMissions.filter(mission => {
     const savedMission: any = savedById.get(mission.id);
-    if (savedMission) {
-      const progress = Math.max(0, Math.floor(Number(savedMission?.progress) || 0));
-      const completed = Boolean(savedMission?.completed) || progress >= Number(mission.target || 0);
-      const claimed = Boolean(savedMission?.claimed);
-      return claimed || completed || isMissionEligible(mission, context);
-    }
+    if (savedMission) return true;
     return isMissionEligible(mission, context);
   }).map(defaultMission => {
     const savedMission: any = savedById.get(defaultMission.id);
     const progress = Math.max(0, Math.floor(Number(savedMission?.progress) || 0));
     const claimed = Boolean(savedMission?.claimed);
-    const cardUpgradeCurrentLevel = defaultMission.eventType === 'card-upgrade' && defaultMission.cardId
-      ? (context?.upgradeableCards || []).find(card => card.id === defaultMission.cardId)?.level
-      : undefined;
-    const completedByCardLevel = defaultMission.eventType === 'card-upgrade'
-      && Number(cardUpgradeCurrentLevel || 0) >= Number(defaultMission.cardTargetLevel || 0);
-    const completed = Boolean(savedMission?.completed) || completedByCardLevel || progress >= defaultMission.target;
+    const completed = Boolean(savedMission?.completed) || progress >= defaultMission.target;
 
     return {
       ...defaultMission,
