@@ -146,9 +146,11 @@ type Shockwave = {
 };
 
 type ThorPoint = { x: number; y: number };
+type ThorBoltBranch = { fromIdx: number; side: number; endX: number; endY: number };
 
 type ThorBolt = {
-  paths: ThorPoint[][];
+  anchors: { x1: number; y1: number; x2: number; y2: number };
+  branches: ThorBoltBranch[];
   life: number;
   maxLife: number;
   width: number;
@@ -205,6 +207,52 @@ type ThorRing = {
   color: string;
 };
 
+type BlizzardState = {
+  active: boolean;
+  start: number;
+  duration: number;
+  tickAccum: number;
+  tickInterval: number;
+  blockAccum: number;
+  blockInterval: number;
+  coverAlpha: number;
+  windPhase: number;
+  flashAlpha: number;
+  shake: number;
+};
+
+type BlizzardSnowflake = {
+  x: number; y: number; sz: number; spd: number; wx: number; alpha: number; phase: number; drift: number;
+};
+
+type BlizzardIceBlock = {
+  x: number;
+  y: number;
+  sz: number;
+  vy: number;
+  exploded: boolean;
+  explodeY: number;
+  life: number;
+  rot: number;
+  facets: Array<{ ax: number; ay: number; bx: number; by: number; alpha: number }>;
+};
+
+type BlizzardShard = {
+  x: number; y: number; vx: number; vy: number; sz: number; rot: number; vr: number; life: number; decay: number; color: string;
+};
+
+type BlizzardCrystal = {
+  x: number; y: number; vx: number; vy: number; sz: number; rot: number; vr: number; life: number; decay: number; color: string;
+};
+
+type BlizzardSpark = {
+  x: number; y: number; vx: number; vy: number; life: number; decay: number; color: string;
+};
+
+type BlizzardShockwave = {
+  x: number; y: number; radius: number; maxRadius: number; life: number; color: string; width: number; oval?: boolean;
+};
+
 type EnemyBlueprint = {
   kind: EnemyKind;
   image: string;
@@ -240,6 +288,7 @@ const BATTLE_BACKGROUNDS = [
 
 const PLAYER_IMAGE = `${ASSET_BASE}/player/horizon/horizon.webp`;
 const THOR_SPECIAL_SFX_BASE = '/assets/rota4/SFX_new_land/special thor';
+const BLIZZARD_SPECIAL_SFX_BASE = '/assets/rota4/SFX_new_land/special blizzard';
 const PLAYER_SOUNDS = {
   normal: `${ASSET_BASE}/player/horizon/shoot_rt4.ogg`,
   electric: `${ASSET_BASE}/player/horizon/eletric_shoot.ogg`,
@@ -258,6 +307,13 @@ const PLAYER_SOUNDS = {
     `${THOR_SPECIAL_SFX_BASE}/thunder_a.ogg`,
     `${THOR_SPECIAL_SFX_BASE}/thunder_b.ogg`,
     `${THOR_SPECIAL_SFX_BASE}/thunder_c.ogg`,
+  ],
+  blizzardSpecial: `${BLIZZARD_SPECIAL_SFX_BASE}/blizard_special.ogg`,
+  blizzardIceExplosions: [
+    `${BLIZZARD_SPECIAL_SFX_BASE}/ice_explosion_1.ogg`,
+    `${BLIZZARD_SPECIAL_SFX_BASE}/ice_explosion_2.ogg`,
+    `${BLIZZARD_SPECIAL_SFX_BASE}/ice_explosion_3.ogg`,
+    `${BLIZZARD_SPECIAL_SFX_BASE}/ice_explosion_4.ogg`,
   ],
 };
 
@@ -292,7 +348,7 @@ const SPECIAL_LABEL: Record<DefenseSpecialId, Record<'en' | 'pt', string>> = {
   'apocalypse-laser': { en: 'Horizon Laser', pt: 'Horizon Laser' },
   'hellfire-barrage': { en: 'Horizon Barrage', pt: 'Horizon Barrage' },
   'thor-oath': { en: 'Thor Oath', pt: 'Juramento de Thor' },
-  'special-slot-4': { en: 'Special 4', pt: 'Especial 4' },
+  'special-slot-4': { en: 'Blizzard', pt: 'Blizzard' },
 };
 
 const HORIZON_LASER_DAMAGE_INTERVAL = 1000 / 3;
@@ -543,6 +599,25 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
     thorRings: [] as ThorRing[],
     thorFlashAlpha: 0,
     thorShake: 0,
+    blizzard: {
+      active: false,
+      start: 0,
+      duration: 8000,
+      tickAccum: 0,
+      tickInterval: 250,
+      blockAccum: 0,
+      blockInterval: 2000,
+      coverAlpha: 0,
+      windPhase: 0,
+      flashAlpha: 0,
+      shake: 0,
+    } as BlizzardState,
+    blizzardIceBlocks: [] as BlizzardIceBlock[],
+    blizzardSnowflakes: [] as BlizzardSnowflake[],
+    blizzardShards: [] as BlizzardShard[],
+    blizzardCrystals: [] as BlizzardCrystal[],
+    blizzardSparks: [] as BlizzardSpark[],
+    blizzardShockwaves: [] as BlizzardShockwave[],
   });
   const currentDefenseBattleLevel = Math.max(1, Math.floor(defenseBattleLevel || 1));
   const [hud, setHud] = useState({
@@ -669,6 +744,37 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
     state.thorRings = [];
     state.thorFlashAlpha = 0;
     state.thorShake = 0;
+    state.blizzard = {
+      active: false,
+      start: 0,
+      duration: 8000,
+      tickAccum: 0,
+      tickInterval: 250,
+      blockAccum: 0,
+      blockInterval: 2000,
+      coverAlpha: 0,
+      windPhase: 0,
+      flashAlpha: 0,
+      shake: 0,
+    };
+    state.blizzardIceBlocks = [];
+    state.blizzardSnowflakes = [];
+    for (let i = 0; i < 320; i++) {
+      state.blizzardSnowflakes.push({
+        x: WIDTH * 0.5 + Math.random() * WIDTH * 0.5,
+        y: Math.random() * HEIGHT,
+        sz: 0.8 + Math.random() * 3,
+        spd: 1.2 + Math.random() * 3,
+        wx: -2.2 + Math.random() * 1.8,
+        alpha: 0.12 + Math.random() * 0.6,
+        phase: Math.random() * Math.PI * 2,
+        drift: 0.8 + Math.random() * 1.6,
+      });
+    }
+    state.blizzardShards = [];
+    state.blizzardCrystals = [];
+    state.blizzardSparks = [];
+    state.blizzardShockwaves = [];
     horizonProgressRef.current = { level: horizonLevel, currentXp: horizonXp, nextXp: horizonNextXp };
     levelUpSfxHandledRef.current = false;
     setHorizonHud({ level: horizonLevel, currentXp: horizonXp, nextXp: horizonNextXp });
@@ -836,7 +942,7 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
       };
     };
 
-    const createThorBoltPaths = (x1: number, y1: number, x2: number, y2: number, depth = 0): ThorPoint[][] => {
+    const buildLightningPoints = (x1: number, y1: number, x2: number, y2: number, depth = 0): ThorPoint[] => {
       const points: ThorPoint[] = [{ x: x1, y: y1 }];
       const segments = 10 + Math.floor(Math.random() * 8);
       for (let i = 1; i < segments; i++) {
@@ -847,18 +953,27 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
         points.push({ x: baseX + rand(-chaos * 0.5, chaos * 0.5), y: baseY + rand(-chaos * 0.5, chaos * 0.5) });
       }
       points.push({ x: x2, y: y2 });
-      const paths = [points];
-      if (depth < 3) {
-        for (let i = 2; i < points.length - 2; i += 2) {
-          const branchChance = depth === 0 ? 0.62 : depth === 1 ? 0.36 : 0.16;
-          if (Math.random() < branchChance) {
-            const point = points[i];
-            const side = Math.random() < 0.5 ? -1 : 1;
-            paths.push(...createThorBoltPaths(point.x, point.y, point.x + side * rand(28, 80), point.y + rand(22, 90), depth + 1));
-          }
+      return points;
+    };
+
+    const createThorBoltAnchors = (x1: number, y1: number, x2: number, y2: number, depth = 0): ThorBoltBranch[] => {
+      const branches: ThorBoltBranch[] = [];
+      const segments = 12;
+      if (depth >= 3) return branches;
+      for (let i = 2; i < segments - 2; i += 2) {
+        const branchChance = depth === 0 ? 0.62 : depth === 1 ? 0.36 : 0.16;
+        if (Math.random() < branchChance) {
+          const progress = i / segments;
+          const bx = x1 + (x2 - x1) * progress;
+          const by = y1 + (y2 - y1) * progress;
+          const side = Math.random() < 0.5 ? -1 : 1;
+          const endX = bx + side * rand(28, 80);
+          const endY = by + rand(22, 90);
+          branches.push({ fromIdx: i, side, endX, endY });
+          createThorBoltAnchors(bx, by, endX, endY, depth + 1).forEach(branch => branches.push(branch));
         }
       }
-      return paths;
+      return branches;
     };
 
     const spawnThorRing = (x: number, y: number, radius: number, color: string) => {
@@ -891,6 +1006,133 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
       }
     };
 
+    const spawnBlizzardBurst = (x: number, y: number, color: string, count: number) => {
+      for (let i = 0; i < count; i++) {
+        const angle = rand(0, Math.PI * 2);
+        const speed = rand(1.4, 7.5);
+        state.blizzardSparks.push({
+          x,
+          y,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed,
+          life: 1,
+          decay: rand(0.015, 0.04),
+          color,
+        });
+      }
+    };
+
+    const spawnBlizzardShards = (x: number, y: number, count: number) => {
+      for (let i = 0; i < count; i++) {
+        const angle = rand(0, Math.PI * 2);
+        const speed = rand(2, 12);
+        state.blizzardShards.push({
+          x,
+          y,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed - rand(1, 4),
+          sz: rand(3, 18),
+          rot: rand(0, Math.PI * 2),
+          vr: rand(-0.22, 0.22),
+          life: 1,
+          decay: rand(0.008, 0.022),
+          color: Math.random() < 0.6 ? 'rgba(186,230,253,0.88)' : Math.random() < 0.5 ? 'rgba(147,197,253,0.78)' : 'rgba(255,255,255,0.90)',
+        });
+      }
+    };
+
+    const spawnBlizzardCrystal = (x: number, y: number) => {
+      const angle = rand(0, Math.PI * 2);
+      state.blizzardCrystals.push({
+        x: x + Math.cos(angle) * rand(0, 180),
+        y: y + Math.sin(angle) * rand(0, 140),
+        vx: rand(-1.4, 1.4),
+        vy: rand(-0.6, 0.6),
+        sz: rand(1.2, 5.5),
+        rot: rand(0, Math.PI * 2),
+        vr: rand(-0.06, 0.06),
+        life: 1,
+        decay: rand(0.004, 0.012),
+        color: Math.random() < 0.5 ? 'rgba(186,230,253,' : 'rgba(147,197,253,',
+      });
+    };
+
+    const spawnBlizzardShockwave = (x: number, y: number, color: string, maxRadius: number, oval = false) => {
+      state.blizzardShockwaves.push({ x, y, radius: 4, maxRadius, life: 1, color, width: rand(2, 5), oval });
+    };
+
+    const applyBlizzardDamage = (multiplier: number, x: number, y: number, radius: number, label: string, color: string) => {
+      const now = performance.now();
+      const payload = createSpecialDamagePayload(multiplier, { ice: 72 });
+      let hitCount = 0;
+      state.enemies.forEach(enemy => {
+        if (enemy.hp <= 0) return;
+        if (Math.hypot(enemy.x - x, enemy.y - y) > radius + enemy.radius) return;
+        const baseDamage = payload.crit ? payload.damage * shipStats.critMultiplier : payload.damage;
+        enemy.hp -= baseDamage;
+        const elementalDamage = applyElementalDamage(enemy, payload.elemental, now, hitCount < 2 || isMonsterKind(enemy.kind));
+        enemy.status.slowUntil = now + 4200;
+        hitCount += 1;
+        if (hitCount <= 5 || isMonsterKind(enemy.kind)) {
+          spawnFloat(enemy.x + rand(-16, 16), enemy.y - 26, `${label} ${Math.round(baseDamage + elementalDamage)}`, color);
+        }
+        if (enemy.hp <= 0) spawnBlizzardBurst(enemy.x, enemy.y, 'rgba(147,197,253,0.88)', 28);
+      });
+      return hitCount;
+    };
+
+    const applyBlizzardTick = () => {
+      const now = performance.now();
+      const payload = createSpecialDamagePayload(1.35, { ice: 88 });
+      state.enemies.forEach(enemy => {
+        if (enemy.hp <= 0 || enemy.x <= WIDTH * 0.5) return;
+        const baseDamage = payload.crit ? payload.damage * shipStats.critMultiplier : payload.damage;
+        enemy.hp -= baseDamage;
+        const elementalDamage = applyElementalDamage(enemy, payload.elemental, now, false);
+        enemy.status.slowUntil = now + 4600;
+        spawnFloat(enemy.x + rand(-18, 18), enemy.y - 22, `-${Math.round(baseDamage + elementalDamage)} ICE`, '#bae6fd');
+        if (enemy.hp <= 0) spawnBlizzardBurst(enemy.x, enemy.y, 'rgba(147,197,253,0.88)', 28);
+      });
+    };
+
+    const spawnBlizzardIceBlock = () => {
+      const size = rand(44, 76);
+      state.blizzardIceBlocks.push({
+        x: rand(WIDTH * 0.54, WIDTH - 60),
+        y: -size,
+        sz: size,
+        vy: rand(2.2, 3.8),
+        exploded: false,
+        explodeY: rand(HEIGHT * 0.28, HEIGHT * 0.58),
+        life: 1,
+        rot: rand(-0.18, 0.18),
+        facets: Array.from({ length: 6 }, () => ({
+          ax: rand(-0.5, 0.5),
+          ay: rand(-0.5, 0.5),
+          bx: rand(-0.5, 0.5),
+          by: rand(-0.5, 0.5),
+          alpha: rand(0.18, 0.52),
+        })),
+      });
+    };
+
+    const explodeBlizzardIceBlock = (block: BlizzardIceBlock) => {
+      block.exploded = true;
+      const { x, y } = block;
+      playSound(pick(PLAYER_SOUNDS.blizzardIceExplosions), 0.82);
+      state.blizzard.shake = Math.max(state.blizzard.shake, 28);
+      state.blizzard.flashAlpha = Math.max(state.blizzard.flashAlpha, 0.52);
+      spawnBlizzardShockwave(x, y, 'rgba(147,197,253,1)', WIDTH * 0.5);
+      spawnBlizzardShockwave(x, y, 'rgba(186,230,253,1)', WIDTH * 0.38, true);
+      spawnBlizzardShards(x, y, 72);
+      spawnBlizzardBurst(x, y, 'rgba(147,197,253,0.88)', 48);
+      spawnBlizzardBurst(x, y, 'rgba(255,255,255,0.92)', 28);
+      for (let i = 0; i < 24; i++) spawnBlizzardCrystal(x, y);
+      applyBlizzardDamage(2.1, x, y, 90, 'GELO', '#bae6fd');
+      applyBlizzardDamage(1.05, x, y, WIDTH * 0.5, 'AREA', '#93c5fd');
+      spawnFloat(x, y - 40, 'BLIZZARD IMPACT', '#e0f2fe');
+    };
+
     const applyThorDamage = (multiplier: number, x: number, y: number, radius: number, label: string, color: string) => {
       const now = performance.now();
       const payload = createSpecialDamagePayload(multiplier, { electric: 44 });
@@ -918,7 +1160,8 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
       const endY = target ? target.y : rand(96, HEIGHT - 86);
       const startX = clamp(endX + rand(-180, 180), WIDTH * 0.5, WIDTH - 22);
       state.thorBolts.push({
-        paths: createThorBoltPaths(startX, -18, endX, endY),
+        anchors: { x1: startX, y1: -18, x2: endX, y2: endY },
+        branches: createThorBoltAnchors(startX, -18, endX, endY),
         life: isFinal ? 30 : empowered ? 21 : 14,
         maxLife: isFinal ? 30 : empowered ? 21 : 14,
         width: isFinal ? 7.8 : empowered ? 4.8 : 3,
@@ -935,8 +1178,11 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
 
     const spawnThorFarBolt = (now: number) => {
       const x1 = rand(WIDTH * 0.42, WIDTH);
+      const x2 = x1 + rand(-110, 110);
+      const y2 = rand(60, 200);
       state.thorFarBolts.push({
-        paths: createThorBoltPaths(x1, 0, x1 + rand(-110, 110), rand(60, 200)),
+        anchors: { x1, y1: 0, x2, y2 },
+        branches: [],
         life: 10,
         maxLife: 10,
         width: 1.5,
@@ -1727,12 +1973,13 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
 
     const triggerSpecial = (index: number) => {
       const specialId = specials[index];
-      if (!specialId || specialId.startsWith('special-slot')) return;
+      if (!specialId) return;
       const now = performance.now();
       const cooldown = Math.max(5500, 16000 * (1 - shipStats.specialCooldownReductionPercent / 100));
       if ((state.specialCooldowns[specialId] || 0) > now) return;
       if (specialId === 'apocalypse-laser' && state.laserState !== 'idle') return;
       if (specialId === 'thor-oath' && state.thorPhase !== 'idle') return;
+      if (specialId === 'special-slot-4' && state.blizzard.active) return;
       state.specialCooldowns[specialId] = now + cooldown;
 
       if (specialId === 'apocalypse-laser') {
@@ -1810,6 +2057,32 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
         spawnFloat(state.player.x + 78, state.player.y - 62, 'JURAMENTO DE THOR', '#fde68a');
         playSound(PLAYER_SOUNDS.thorSpecial, 0.88);
         playSound(PLAYER_SOUNDS.thorTornado, 0.78);
+      }
+
+      if (specialId === 'special-slot-4') {
+        state.blizzard = {
+          active: true,
+          start: now,
+          duration: 8000,
+          tickAccum: 0,
+          tickInterval: 250,
+          blockAccum: 0,
+          blockInterval: 2000,
+          coverAlpha: 0,
+          windPhase: 0,
+          flashAlpha: 0.22,
+          shake: 7,
+        };
+        state.blizzardIceBlocks = [];
+        state.blizzardShards = [];
+        state.blizzardCrystals = [];
+        state.blizzardSparks = [];
+        state.blizzardShockwaves = [];
+        state.enemies.forEach(enemy => {
+          if (enemy.x > WIDTH * 0.5) enemy.status.slowUntil = now + 4200;
+        });
+        spawnFloat(state.player.x + 78, state.player.y - 62, 'BLIZZARD', '#bae6fd');
+        playSound(PLAYER_SOUNDS.blizzardSpecial, 0.86);
       }
     };
 
@@ -2078,6 +2351,20 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
       state.thorBolts = state.thorBolts.filter(bolt => bolt.life > 0);
       state.thorFarBolts = state.thorFarBolts.filter(bolt => bolt.life > 0);
 
+      for (let i = state.thorShockwaves.length - 1; i >= 0; i--) {
+        const wave = state.thorShockwaves[i];
+        wave.life -= wave.decay ?? 0.035;
+        if (wave.life <= 0) state.thorShockwaves.splice(i, 1);
+      }
+
+      for (let i = state.thorRings.length - 1; i >= 0; i--) {
+        const ring = state.thorRings[i];
+        ring.life -= 0.028;
+        ring.radius += 0.9;
+        ring.angle += 0.008;
+        if (ring.life <= 0) state.thorRings.splice(i, 1);
+      }
+
       for (let i = state.thorDebris.length - 1; i >= 0; i--) {
         const d = state.thorDebris[i];
         if (d.target && d.target.alive) {
@@ -2113,6 +2400,113 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
       state.thorParticles = state.thorParticles.filter(p => p.life > 0).slice(-360);
     };
 
+    const updateBlizzardSpecial = (now: number, dt: number) => {
+      const blizzard = state.blizzard;
+      if (blizzard.active) {
+        const age = now - blizzard.start;
+        blizzard.windPhase += dt * 0.001;
+        if (age < 800) blizzard.coverAlpha = easeInOut(age / 800) * 0.72;
+        else if (age > blizzard.duration - 800) blizzard.coverAlpha = easeInOut(Math.max(0, 1 - (age - (blizzard.duration - 800)) / 800)) * 0.72;
+        else blizzard.coverAlpha = 0.72;
+
+        blizzard.tickAccum += dt;
+        while (blizzard.tickAccum >= blizzard.tickInterval) {
+          blizzard.tickAccum -= blizzard.tickInterval;
+          applyBlizzardTick();
+          for (let i = 0; i < 8; i++) {
+            state.blizzardSparks.push({
+              x: rand(WIDTH * 0.5, WIDTH),
+              y: rand(0, HEIGHT),
+              vx: rand(-2, -0.4),
+              vy: rand(0.2, 1.2),
+              life: 1,
+              decay: rand(0.08, 0.18),
+              color: 'rgba(186,230,253,0.88)',
+            });
+          }
+        }
+
+        blizzard.blockAccum += dt;
+        if (blizzard.blockAccum >= blizzard.blockInterval) {
+          blizzard.blockAccum -= blizzard.blockInterval;
+          if (age < blizzard.duration - 500) spawnBlizzardIceBlock();
+        }
+
+        if (age >= blizzard.duration) {
+          blizzard.active = false;
+          blizzard.coverAlpha = 0;
+          state.blizzardIceBlocks = [];
+        }
+      } else {
+        blizzard.coverAlpha = Math.max(0, blizzard.coverAlpha - 0.025);
+      }
+
+      if (blizzard.active || blizzard.coverAlpha > 0.01) {
+        for (const snow of state.blizzardSnowflakes) {
+          const speed = Math.max(0.25, blizzard.coverAlpha * 1.4);
+          snow.x += snow.wx * speed * dt / 16;
+          snow.y += snow.spd * speed * dt / 16;
+          snow.phase += dt * 0.003 * snow.drift;
+          if (snow.y > HEIGHT + 10) { snow.y = -10; snow.x = rand(WIDTH * 0.5, WIDTH + 60); }
+          if (snow.x < WIDTH * 0.5 - 20) { snow.x = WIDTH + rand(0, 60); snow.y = rand(0, HEIGHT); }
+        }
+      }
+
+      for (let i = state.blizzardIceBlocks.length - 1; i >= 0; i--) {
+        const block = state.blizzardIceBlocks[i];
+        if (block.exploded) {
+          block.life -= 0.06;
+          if (block.life <= 0) state.blizzardIceBlocks.splice(i, 1);
+          continue;
+        }
+        block.vy += 0.12;
+        block.y += block.vy;
+        if (block.y >= block.explodeY) explodeBlizzardIceBlock(block);
+        if (block.y > HEIGHT + 100) state.blizzardIceBlocks.splice(i, 1);
+      }
+
+      for (let i = state.blizzardShockwaves.length - 1; i >= 0; i--) {
+        const wave = state.blizzardShockwaves[i];
+        wave.radius += (wave.maxRadius - wave.radius) * 0.072 + 4.6;
+        wave.life -= 0.028;
+        if (wave.life <= 0 || wave.radius > wave.maxRadius) state.blizzardShockwaves.splice(i, 1);
+      }
+
+      for (let i = state.blizzardShards.length - 1; i >= 0; i--) {
+        const shard = state.blizzardShards[i];
+        shard.x += shard.vx;
+        shard.y += shard.vy;
+        shard.vy += 0.09;
+        shard.vx *= 0.982;
+        shard.vy *= 0.982;
+        shard.rot += shard.vr;
+        shard.life -= shard.decay;
+        if (shard.life <= 0) state.blizzardShards.splice(i, 1);
+      }
+
+      for (let i = state.blizzardCrystals.length - 1; i >= 0; i--) {
+        const crystal = state.blizzardCrystals[i];
+        crystal.x += crystal.vx;
+        crystal.y += crystal.vy;
+        crystal.rot += crystal.vr;
+        crystal.life -= crystal.decay;
+        if (crystal.life <= 0) state.blizzardCrystals.splice(i, 1);
+      }
+
+      for (let i = state.blizzardSparks.length - 1; i >= 0; i--) {
+        const spark = state.blizzardSparks[i];
+        spark.x += spark.vx;
+        spark.y += spark.vy;
+        spark.vx *= 0.93;
+        spark.vy *= 0.93;
+        spark.life -= spark.decay;
+        if (spark.life <= 0) state.blizzardSparks.splice(i, 1);
+      }
+
+      blizzard.shake *= 0.88;
+      blizzard.flashAlpha *= 0.84;
+    };
+
     const drawThorBoltPath = (ctx: CanvasRenderingContext2D, points: ThorPoint[]) => {
       if (points.length < 2) return;
       ctx.beginPath();
@@ -2129,6 +2523,22 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
       [...state.thorFarBolts, ...state.thorBolts].forEach(bolt => {
         const alpha = Math.pow(clamp(bolt.life / bolt.maxLife, 0, 1), 1.45);
         const isFar = state.thorFarBolts.includes(bolt);
+        const legacyBolt = bolt as ThorBolt & { paths?: ThorPoint[][]; anchors?: ThorBolt['anchors'] };
+        const livePaths: ThorPoint[][] = [];
+        if (legacyBolt.anchors) {
+          const { x1, y1, x2, y2 } = legacyBolt.anchors;
+          const mainPath = buildLightningPoints(x1, y1, x2, y2, 0);
+          livePaths.push(mainPath);
+          if (!isFar) {
+            bolt.branches.forEach(branch => {
+              const idx = Math.min(branch.fromIdx, mainPath.length - 1);
+              const origin = mainPath[idx];
+              livePaths.push(buildLightningPoints(origin.x, origin.y, branch.endX, branch.endY, 1));
+            });
+          }
+        } else if (legacyBolt.paths) {
+          livePaths.push(...legacyBolt.paths);
+        }
         const passes = isFar
           ? [{ color: `rgba(147,197,253,${0.34 * alpha})`, width: 1.5 }]
           : [
@@ -2140,7 +2550,7 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
         passes.forEach(pass => {
           ctx.strokeStyle = pass.color;
           ctx.lineWidth = pass.width;
-          bolt.paths.forEach(path => drawThorBoltPath(ctx, path));
+          livePaths.forEach(path => drawThorBoltPath(ctx, path));
         });
       });
       ctx.restore();
@@ -2148,49 +2558,122 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
 
     const drawThorTornado = (ctx: CanvasRenderingContext2D, tornado: ThorTornado, now: number) => {
       const scale = easeInOut(clamp(tornado.birthScale, 0, 1));
+      const isBig = tornado.kind === 'big';
+      const R = tornado.radius;
+      const H = tornado.height;
+      const ph = tornado.spin;
+
       ctx.save();
       ctx.translate(tornado.x, tornado.y);
       ctx.scale(scale, scale);
       ctx.globalCompositeOperation = 'lighter';
 
-      const halo = ctx.createRadialGradient(0, 0, tornado.radius * 0.08, 0, 0, tornado.radius * 2.1);
-      halo.addColorStop(0, tornado.kind === 'big' ? 'rgba(253,230,138,0.22)' : 'rgba(125,211,252,0.14)');
+      // 1. External halo.
+      const halo = ctx.createRadialGradient(0, 0, R * 0.08, 0, 0, R * 2.1);
+      halo.addColorStop(0, isBig ? 'rgba(253,230,138,0.22)' : 'rgba(125,211,252,0.14)');
       halo.addColorStop(0.44, 'rgba(56,189,248,0.08)');
       halo.addColorStop(1, 'rgba(2,6,23,0)');
       ctx.fillStyle = halo;
       ctx.beginPath();
-      ctx.ellipse(0, 0, tornado.radius * 2.1, tornado.height * 0.6, 0, 0, Math.PI * 2);
+      ctx.ellipse(0, 0, R * 2.1, H * 0.6, 0, 0, Math.PI * 2);
       ctx.fill();
 
-      for (let i = 0; i < 28; i++) {
-        const band = i / 27;
-        const y = -tornado.height * 0.46 + band * tornado.height * 0.92;
-        const spin = tornado.spin + i * 0.42 + now / (tornado.kind === 'big' ? 210 : 160);
-        const radius = tornado.radius * (0.18 + Math.sin(band * Math.PI) * 0.95);
-        const x = Math.cos(spin) * radius;
-        const nextX = Math.cos(spin + 1.15) * radius * 0.92;
-        const nextY = y + tornado.height / 34;
-        ctx.strokeStyle = tornado.kind === 'big'
-          ? `rgba(253,230,138,${0.12 + band * 0.24})`
-          : `rgba(103,232,249,${0.12 + band * 0.2})`;
-        ctx.lineWidth = tornado.kind === 'big' ? 5.2 : 3.2;
+      // 2. Inner core for the large tornado.
+      if (isBig) {
+        const core = ctx.createRadialGradient(0, -38, 0, 0, -38, R * 0.88);
+        core.addColorStop(0, 'rgba(255,255,255,0.24)');
+        core.addColorStop(0.3, 'rgba(253,230,138,0.22)');
+        core.addColorStop(0.7, 'rgba(167,139,250,0.10)');
+        core.addColorStop(1, 'rgba(253,230,138,0)');
+        ctx.fillStyle = core;
         ctx.beginPath();
-        ctx.moveTo(x, y);
-        ctx.quadraticCurveTo(0, y + 12, nextX, nextY);
-        ctx.stroke();
+        ctx.ellipse(0, -38, R * 0.88, H * 0.44, 0, 0, Math.PI * 2);
+        ctx.fill();
       }
 
-      const cone = ctx.createLinearGradient(0, 0, 0, tornado.height * 0.5);
+      // 3. Helicoidal layers with two interlaced spirals.
+      const LAYERS = isBig ? 36 : 18;
+      for (let i = 0; i < LAYERS; i++) {
+        const p = i / (LAYERS - 1);
+        const y = H * 0.48 - p * H;
+        const w = R * (0.22 + p * 1.12);
+        const h = 7 + p * (isBig ? 26 : 15);
+        const spinA = ph + p * 10 + Math.sin(now / 148 + i) * 0.52;
+        const xA = Math.sin(spinA) * w * 0.42;
+        const alpha = 0.10 + p * (isBig ? 0.36 : 0.28);
+
+        ctx.strokeStyle = isBig
+          ? `rgba(253,230,138,${alpha})`
+          : `rgba(125,211,252,${alpha})`;
+        ctx.lineWidth = isBig ? 4.4 : 2.4;
+        ctx.beginPath();
+        ctx.ellipse(xA, y, w, h, Math.sin(spinA) * 0.22, 0, Math.PI * 2);
+        ctx.stroke();
+
+        const spinB = ph + p * 10 + Math.PI + Math.sin(now / 148 + i) * 0.52;
+        const xB = Math.sin(spinB) * w * 0.42;
+        ctx.strokeStyle = isBig
+          ? `rgba(255,245,180,${alpha * 0.58})`
+          : `rgba(186,230,253,${alpha * 0.62})`;
+        ctx.lineWidth = isBig ? 2.8 : 1.6;
+        ctx.beginPath();
+        ctx.ellipse(xB, y, w * 0.74, h * 0.72, Math.sin(spinB) * 0.22, 0, Math.PI * 2);
+        ctx.stroke();
+
+        ctx.strokeStyle = `rgba(226,232,240,${alpha * 0.32})`;
+        ctx.lineWidth = 0.8;
+        ctx.beginPath();
+        ctx.arc(xA * 0.8, y, w * 0.7, Math.PI * 0.1, Math.PI * 1.22);
+        ctx.stroke();
+
+        if (isBig && i % 4 === 0) {
+          ctx.strokeStyle = `rgba(253,230,138,${alpha * 0.38})`;
+          ctx.lineWidth = 0.7;
+          ctx.beginPath();
+          ctx.moveTo(xA, y);
+          ctx.lineTo(xA * 0.3, y + H * 0.04 * (p < 0.5 ? 1 : -1));
+          ctx.stroke();
+        }
+      }
+
+      // 4. Orbital particles.
+      const ORB_N = isBig ? 68 : 36;
+      for (let i = 0; i < ORB_N; i++) {
+        const p = (i / ORB_N * 1.7 + now / (isBig ? 740 : 700) + tornado.seed) % 1;
+        const angle = ph * 1.9 + i * 1.88;
+        const orbR = R * (0.20 + p * 1.10);
+        const y = H * 0.48 - p * H;
+        const x = Math.cos(angle + p * 7.6) * orbR;
+        const sz = i % 3 === 0 ? 3.8 : i % 3 === 1 ? 2.2 : 1.2;
+        const col = i % 4 === 0 ? 'rgba(253,230,138,0.94)'
+          : i % 4 === 1 ? 'rgba(186,230,253,0.68)'
+            : i % 4 === 2 ? 'rgba(167,139,250,0.58)'
+              : 'rgba(226,232,240,0.46)';
+
+        ctx.fillStyle = col;
+        ctx.beginPath();
+        ctx.arc(x, y, sz * (isBig ? 1 : 0.72), 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = 'rgba(255,255,255,0.55)';
+        ctx.beginPath();
+        ctx.arc(x, y, sz * 0.35, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // 5. Base cone.
+      ctx.globalCompositeOperation = 'source-over';
+      const cone = ctx.createLinearGradient(0, 0, 0, H * 0.5);
       cone.addColorStop(0, 'rgba(2,6,23,0)');
       cone.addColorStop(0.7, 'rgba(0,0,8,0.28)');
       cone.addColorStop(1, 'rgba(0,0,8,0.58)');
-      ctx.globalCompositeOperation = 'source-over';
       ctx.fillStyle = cone;
       ctx.beginPath();
-      ctx.moveTo(-tornado.radius * 0.15, tornado.height * 0.48);
-      ctx.quadraticCurveTo(0, tornado.height * 0.6, tornado.radius * 0.15, tornado.height * 0.48);
+      ctx.moveTo(-R * 0.15, H * 0.48);
+      ctx.quadraticCurveTo(0, H * 0.60, R * 0.15, H * 0.48);
       ctx.closePath();
       ctx.fill();
+
       ctx.restore();
     };
 
@@ -2505,18 +2988,238 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
       }
     };
 
+    const drawBlizzardSpecial = (ctx: CanvasRenderingContext2D, now: number) => {
+      const blizzard = state.blizzard;
+      const active = blizzard.active || blizzard.coverAlpha > 0.01 || state.blizzardIceBlocks.length > 0 || state.blizzardShockwaves.length > 0;
+      if (!active) return;
+      const alpha = blizzard.coverAlpha;
+
+      ctx.save();
+      if (alpha > 0.01) {
+        const veil = ctx.createLinearGradient(WIDTH * 0.5, 0, WIDTH, 0);
+        veil.addColorStop(0, 'rgba(56,130,180,0)');
+        veil.addColorStop(0.08, `rgba(56,130,180,${alpha * 0.18})`);
+        veil.addColorStop(0.5, `rgba(30,100,160,${alpha * 0.28})`);
+        veil.addColorStop(1, `rgba(10,50,120,${alpha * 0.38})`);
+        ctx.globalCompositeOperation = 'screen';
+        ctx.fillStyle = veil;
+        ctx.fillRect(WIDTH * 0.5, 0, WIDTH * 0.5, HEIGHT);
+
+        for (let layer = 0; layer < 4; layer++) {
+          const phase = blizzard.windPhase * (1 + layer * 0.3) + layer * 1.1;
+          const yOff = Math.sin(phase * 0.7 + layer) * 28;
+          const layerAlpha = alpha * (0.06 + layer * 0.022);
+          const fog = ctx.createLinearGradient(WIDTH * 0.5, 0, WIDTH, 0);
+          fog.addColorStop(0, 'rgba(147,197,253,0)');
+          fog.addColorStop(0.12, `rgba(147,197,253,${layerAlpha})`);
+          fog.addColorStop(0.6 + Math.sin(phase) * 0.15, `rgba(186,230,253,${layerAlpha * 1.4})`);
+          fog.addColorStop(1, `rgba(147,197,253,${layerAlpha * 0.8})`);
+          ctx.globalCompositeOperation = 'lighter';
+          ctx.fillStyle = fog;
+          ctx.beginPath();
+          ctx.ellipse(WIDTH * 0.76, HEIGHT * 0.5 + yOff, WIDTH * 0.38, HEIGHT * (0.42 + layer * 0.06), 0, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        ctx.lineCap = 'round';
+        for (let i = 0; i < 22; i++) {
+          const progress = ((now * 0.0008 + i * 0.37 + Math.sin(i * 1.3) * 0.5) % 1);
+          const x = WIDTH * 0.5 + progress * WIDTH * 0.55;
+          const y = (i / 22) * HEIGHT + Math.sin(blizzard.windPhase + i * 0.8) * 28;
+          const len = 28 + ((i * 19) % 52);
+          const windAlpha = alpha * (0.08 + Math.sin(i * 0.7 + blizzard.windPhase) * 0.04) * (1 - Math.abs(progress - 0.5) * 1.6);
+          if (windAlpha <= 0) continue;
+          ctx.strokeStyle = `rgba(186,230,253,${windAlpha})`;
+          ctx.lineWidth = 0.6 + (i % 5) * 0.12;
+          ctx.beginPath();
+          ctx.moveTo(x, y);
+          ctx.lineTo(x - len * 0.9, y + len * 0.22);
+          ctx.stroke();
+        }
+
+        ctx.globalCompositeOperation = 'lighter';
+        state.blizzardSnowflakes.forEach(snow => {
+          const pulse = 0.78 + Math.sin(now * 0.002 + snow.phase) * 0.22;
+          const snowAlpha = snow.alpha * alpha * pulse;
+          if (snowAlpha < 0.01) return;
+          ctx.globalAlpha = snowAlpha;
+          ctx.fillStyle = 'rgba(186,230,253,1)';
+          ctx.beginPath();
+          ctx.arc(snow.x, snow.y, snow.sz, 0, Math.PI * 2);
+          ctx.fill();
+          if (snow.sz > 2.8) {
+            ctx.strokeStyle = `rgba(186,230,253,${snowAlpha * 0.6})`;
+            ctx.lineWidth = 0.7;
+            ctx.beginPath();
+            ctx.moveTo(snow.x - snow.sz * 1.6, snow.y);
+            ctx.lineTo(snow.x + snow.sz * 1.6, snow.y);
+            ctx.moveTo(snow.x, snow.y - snow.sz * 1.6);
+            ctx.lineTo(snow.x, snow.y + snow.sz * 1.6);
+            ctx.moveTo(snow.x - snow.sz, snow.y - snow.sz);
+            ctx.lineTo(snow.x + snow.sz, snow.y + snow.sz);
+            ctx.moveTo(snow.x + snow.sz, snow.y - snow.sz);
+            ctx.lineTo(snow.x - snow.sz, snow.y + snow.sz);
+            ctx.stroke();
+          }
+        });
+        ctx.globalAlpha = 1;
+      }
+
+      ctx.globalCompositeOperation = 'lighter';
+      state.blizzardShockwaves.forEach(wave => {
+        const waveAlpha = Math.max(0, wave.life);
+        ctx.globalAlpha = waveAlpha;
+        ctx.strokeStyle = wave.color.replace('1)', `${0.44 * waveAlpha})`);
+        ctx.lineWidth = wave.width + 1;
+        ctx.beginPath();
+        if (wave.oval) ctx.ellipse(wave.x, wave.y, wave.radius, wave.radius * 0.62, 0, 0, Math.PI * 2);
+        else ctx.arc(wave.x, wave.y, wave.radius, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.strokeStyle = `rgba(255,255,255,${0.22 * waveAlpha})`;
+        ctx.lineWidth = 0.9;
+        ctx.beginPath();
+        if (wave.oval) ctx.ellipse(wave.x, wave.y, wave.radius * 0.68, wave.radius * 0.42, 0, 0, Math.PI * 2);
+        else ctx.arc(wave.x, wave.y, wave.radius * 0.7, 0, Math.PI * 2);
+        ctx.stroke();
+      });
+      ctx.globalAlpha = 1;
+
+      state.blizzardIceBlocks.forEach(block => {
+        if (block.exploded) return;
+        ctx.save();
+        ctx.translate(block.x, block.y);
+        ctx.rotate(block.rot + block.vy * 0.01);
+        const size = block.sz;
+        const points = [
+          [-size * 0.52, -size * 0.44],
+          [size * 0.48, -size * 0.5],
+          [size * 0.54, size * 0.38],
+          [size * 0.18, size * 0.52],
+          [-size * 0.46, size * 0.46],
+          [-size * 0.58, size * 0.08],
+        ];
+        const face = ctx.createLinearGradient(-size * 0.5, -size * 0.5, size * 0.5, size * 0.5);
+        face.addColorStop(0, 'rgba(186,230,253,0.82)');
+        face.addColorStop(0.38, 'rgba(147,197,253,0.64)');
+        face.addColorStop(0.7, 'rgba(96,165,250,0.52)');
+        face.addColorStop(1, 'rgba(30,80,160,0.44)');
+        ctx.fillStyle = face;
+        ctx.beginPath();
+        ctx.moveTo(points[0][0], points[0][1]);
+        for (let i = 1; i < points.length; i++) ctx.lineTo(points[i][0], points[i][1]);
+        ctx.closePath();
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(186,230,253,0.72)';
+        ctx.lineWidth = 1.4;
+        ctx.stroke();
+        block.facets.forEach(facet => {
+          ctx.strokeStyle = `rgba(255,255,255,${facet.alpha})`;
+          ctx.lineWidth = 0.7;
+          ctx.beginPath();
+          ctx.moveTo(facet.ax * size, facet.ay * size);
+          ctx.lineTo(facet.bx * size, facet.by * size);
+          ctx.stroke();
+        });
+        ctx.restore();
+      });
+
+      state.blizzardShards.forEach(shard => {
+        ctx.save();
+        ctx.globalAlpha = Math.max(0, shard.life);
+        ctx.translate(shard.x, shard.y);
+        ctx.rotate(shard.rot);
+        const size = shard.sz;
+        ctx.fillStyle = shard.color;
+        ctx.beginPath();
+        ctx.moveTo(0, -size);
+        ctx.lineTo(size * 0.5, -size * 0.28);
+        ctx.lineTo(size * 0.5, size * 0.28);
+        ctx.lineTo(0, size);
+        ctx.lineTo(-size * 0.5, size * 0.28);
+        ctx.lineTo(-size * 0.5, -size * 0.28);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+      });
+
+      state.blizzardCrystals.forEach(crystal => {
+        ctx.save();
+        ctx.globalAlpha = Math.max(0, crystal.life * 0.88);
+        ctx.translate(crystal.x, crystal.y);
+        ctx.rotate(crystal.rot);
+        ctx.strokeStyle = `${crystal.color}0.82)`;
+        ctx.lineWidth = Math.max(0.4, crystal.sz * 0.28);
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        for (let arm = 0; arm < 6; arm++) {
+          const angle = (arm / 6) * Math.PI * 2;
+          ctx.moveTo(0, 0);
+          ctx.lineTo(Math.cos(angle) * crystal.sz * 1.4, Math.sin(angle) * crystal.sz * 1.4);
+        }
+        ctx.stroke();
+        ctx.fillStyle = 'rgba(255,255,255,0.88)';
+        ctx.beginPath();
+        ctx.arc(0, 0, crystal.sz * 0.32, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      });
+
+      ctx.lineCap = 'round';
+      state.blizzardSparks.forEach(spark => {
+        ctx.globalAlpha = Math.max(0, spark.life);
+        ctx.strokeStyle = spark.color;
+        ctx.lineWidth = 1.4;
+        ctx.beginPath();
+        ctx.moveTo(spark.x, spark.y);
+        ctx.lineTo(spark.x - spark.vx * 5, spark.y - spark.vy * 5);
+        ctx.stroke();
+        ctx.fillStyle = spark.color;
+        ctx.beginPath();
+        ctx.arc(spark.x, spark.y, 1.6, 0, Math.PI * 2);
+        ctx.fill();
+      });
+      ctx.globalAlpha = 1;
+
+      if (blizzard.flashAlpha > 0.01) {
+        ctx.globalCompositeOperation = 'screen';
+        ctx.fillStyle = `rgba(186,230,253,${blizzard.flashAlpha})`;
+        ctx.fillRect(0, 0, WIDTH, HEIGHT);
+      }
+
+      if (blizzard.active) {
+        const elapsed = Math.min(1, (now - blizzard.start) / blizzard.duration);
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.fillStyle = 'rgba(1,3,9,0.72)';
+        ctx.strokeStyle = 'rgba(125,211,252,0.28)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.roundRect(18, 118, 330, 46, 7);
+        ctx.fill();
+        ctx.stroke();
+        ctx.font = '900 14px Orbitron, sans-serif';
+        ctx.fillStyle = '#bae6fd';
+        ctx.fillText('BLIZZARD', 34, 147);
+        ctx.fillStyle = 'rgba(56,189,248,0.22)';
+        ctx.fillRect(160, 137, 154, 5);
+        ctx.fillStyle = '#67e8f9';
+        ctx.fillRect(160, 137, 154 * elapsed, 5);
+      }
+      ctx.restore();
+    };
+
     const draw = () => {
       const canvas = canvasRef.current;
       const ctx = canvas?.getContext('2d');
       if (!ctx) return;
       ctx.save();
-      if (state.laserShake > 0.1 || state.hellfireShake > 0.1 || state.trinityShake > 0.1 || state.thorShake > 0.1) {
-        const shake = Math.max(state.laserShake, state.hellfireShake, state.trinityShake, state.thorShake);
+      if (state.laserShake > 0.1 || state.hellfireShake > 0.1 || state.trinityShake > 0.1 || state.thorShake > 0.1 || state.blizzard.shake > 0.1) {
+        const shake = Math.max(state.laserShake, state.hellfireShake, state.trinityShake, state.thorShake, state.blizzard.shake);
         ctx.translate((Math.random() - 0.5) * shake, (Math.random() - 0.5) * shake);
         state.laserShake *= 0.88;
         state.hellfireShake *= 0.88;
         state.trinityShake *= 0.88;
         state.thorShake *= 0.88;
+        state.blizzard.shake *= 0.88;
       }
 
       const background = getImage(backgroundRef.current);
@@ -2529,13 +3232,16 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
 
       const laserActive = state.laserState !== 'idle';
       const thorActive = state.thorPhase !== 'idle';
+      const blizzardActive = state.blizzard.active || state.blizzard.coverAlpha > 0.01;
       ctx.fillStyle = laserActive
         ? 'rgba(29, 3, 39, 0.38)'
         : thorActive
           ? 'rgba(1, 3, 12, 0.36)'
-          : 'rgba(2, 6, 23, 0.42)';
+          : blizzardActive
+            ? 'rgba(3, 10, 24, 0.42)'
+            : 'rgba(2, 6, 23, 0.42)';
       ctx.fillRect(0, 0, WIDTH, HEIGHT);
-      ctx.strokeStyle = laserActive || thorActive ? 'rgba(34, 211, 238, 0.18)' : 'rgba(34, 211, 238, 0.08)';
+      ctx.strokeStyle = laserActive || thorActive || blizzardActive ? 'rgba(34, 211, 238, 0.18)' : 'rgba(34, 211, 238, 0.08)';
       ctx.lineWidth = 1;
       const now = performance.now();
       for (let x = 0; x < WIDTH; x += 48) {
@@ -2777,6 +3483,7 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
       });
 
       drawThorSpecial(ctx);
+      drawBlizzardSpecial(ctx, now);
       drawLaserSpecial(ctx);
       ctx.restore();
     };
@@ -2830,6 +3537,7 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
       }
       updateLaserSpecial(now);
       updateThorSpecial(now, thorDt);
+      updateBlizzardSpecial(now, thorDt);
       if (state.hellfireSequence.active && !state.hellfireSequence.waitingForImpact && state.hellfireSequence.remaining > 0) {
         launchHellfireOrb();
       }

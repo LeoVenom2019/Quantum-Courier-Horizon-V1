@@ -184,6 +184,11 @@ const route4ColonyAudio = [
   '/assets/rota4/SFX_new_land/special thor/thunder_a.ogg',
   '/assets/rota4/SFX_new_land/special thor/thunder_b.ogg',
   '/assets/rota4/SFX_new_land/special thor/thunder_c.ogg',
+  '/assets/rota4/SFX_new_land/special blizzard/blizard_special.ogg',
+  '/assets/rota4/SFX_new_land/special blizzard/ice_explosion_1.ogg',
+  '/assets/rota4/SFX_new_land/special blizzard/ice_explosion_2.ogg',
+  '/assets/rota4/SFX_new_land/special blizzard/ice_explosion_3.ogg',
+  '/assets/rota4/SFX_new_land/special blizzard/ice_explosion_4.ogg',
 ];
 
 const route4BobbyAccessDeniedAudio = Array.from({ length: 10 }, (_, index) => (

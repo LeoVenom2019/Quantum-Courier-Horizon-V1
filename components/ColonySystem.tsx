@@ -556,12 +556,12 @@ const DEFENSE_SPECIALS: DefenseSpecial[] = [
   },
   {
     id: 'special-slot-4',
-    name: { en: 'Special Slot 4', pt: 'Especial 4' },
+    name: { en: 'Blizzard', pt: 'Blizzard' },
     description: {
-      en: 'Reserved slot for a future aerial defense special.',
-      pt: 'Slot reservado para um futuro especial de defesa aérea.',
+      en: 'Route 4 special: an ice storm that freezes the right flank and drops explosive glacier blocks.',
+      pt: 'Especial da Rota 4: nevasca que congela o flanco direito e derruba blocos glaciais explosivos.',
     },
-    implemented: false,
+    implemented: true,
   },
 ];
 
@@ -3542,7 +3542,7 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
                           ? 'Horizon\nLaser'
                           : special.id === 'hellfire-barrage'
                             ? 'Horizon\nBarrage'
-                            : t('Special\n4', 'Especial\n4');
+                            : 'Blizzard';
                       return (
                         <PremiumCanvasButton
                           key={special.id}
