@@ -361,7 +361,7 @@ const SPECIAL_LABEL: Record<DefenseSpecialId, Record<'en' | 'pt', string>> = {
 const HORIZON_LASER_DAMAGE_INTERVAL = 1000 / 3;
 const HORIZON_LASER_DAMAGE_RADIUS = 72;
 const HORIZON_LASER_DAMAGE_MULTIPLIER = 1.85;
-const HORIZON_SPECIAL_BASE_COOLDOWN = 30000;
+const HORIZON_SPECIAL_BASE_COOLDOWN = 60000;
 const HORIZON_SPECIAL_MIN_COOLDOWN = 3000;
 
 const getHorizonSpecialCooldownDuration = (reductionPercent: number) => {
