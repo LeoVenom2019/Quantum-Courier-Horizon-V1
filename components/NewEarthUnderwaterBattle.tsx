@@ -2590,6 +2590,25 @@ export default function NewEarthUnderwaterBattle({
         }
         state.player.x += state.player.vx * step;
         state.player.y += state.player.vy * step;
+        // Player submarine bubble/foam trail
+        if (Math.random() > 0.3) {
+          const pSpeed = Math.hypot(state.player.vx, state.player.vy);
+          if (pSpeed > 0.05) {
+            const backAngle = Math.atan2(-state.player.vy, -state.player.vx);
+            for (let i = 0; i < 2; i++) {
+              state.combatParticles.push({
+                x: state.player.x + Math.cos(backAngle) * (18 + Math.random() * 12),
+                y: state.player.y + Math.sin(backAngle) * (18 + Math.random() * 12) + (Math.random() - 0.5) * 10,
+                vx: Math.cos(backAngle) * (0.4 + Math.random() * 0.6) * pSpeed,
+                vy: Math.sin(backAngle) * (0.4 + Math.random() * 0.6) * pSpeed + (Math.random() - 0.5) * 0.5,
+                life: 35 + Math.random() * 40,
+                maxLife: 75,
+                r: 2 + Math.random() * 3.5,
+                type: 'bubble',
+              });
+            }
+          }
+        }
         if (state.player.x < PLAYER_MIN_X || state.player.x > PLAYER_MAX_X) {
           state.player.x = clamp(state.player.x, PLAYER_MIN_X, PLAYER_MAX_X);
           state.player.vx *= -0.22;
@@ -2706,6 +2725,23 @@ export default function NewEarthUnderwaterBattle({
             enemy.vy = (enemy.vy / speed) * Math.min(maxSpeed, speed);
             enemy.x += enemy.vx * step;
             enemy.y += enemy.vy * step;
+            // Enemy submarine wake/bubble trail
+            if (Math.random() > 0.4) {
+              const eSpeed = Math.hypot(enemy.vx, enemy.vy);
+              const backAngle = Math.atan2(-enemy.vy, -enemy.vx);
+              for (let i = 0; i < 2; i++) {
+                state.combatParticles.push({
+                  x: enemy.x + Math.cos(backAngle) * (14 + Math.random() * 10),
+                  y: enemy.y + Math.sin(backAngle) * (14 + Math.random() * 10) + (Math.random() - 0.5) * 8,
+                  vx: Math.cos(backAngle) * (0.3 + Math.random() * 0.5) * eSpeed,
+                  vy: Math.sin(backAngle) * (0.3 + Math.random() * 0.5) * eSpeed + (Math.random() - 0.5) * 0.4,
+                  life: 30 + Math.random() * 30,
+                  maxLife: 60,
+                  r: 1.5 + Math.random() * 2.5,
+                  type: 'bubble',
+                });
+              }
+            }
             enemy.cooldown -= delta;
             if (enemy.cooldown <= 0 && !state.shots.some(shot => shot.ownerId === `enemy:${enemy.id}`)) {
               enemy.cooldown = 1350 + Math.random() * 900;
@@ -2837,6 +2873,22 @@ export default function NewEarthUnderwaterBattle({
           } else if (state.phase === 'combat' && Math.hypot(state.player.x - shot.x, state.player.y - shot.y) < 28 + shot.radius) {
             state.player.hp -= shot.damage;
             spawnImpact(shot.x, shot.y, '#f87171', false);
+            // Extra impact burst: sparks radiating out from player
+            for (let i = 0; i < 10; i++) {
+              const iAngle = Math.random() * Math.PI * 2;
+              const iSpeed = 2 + Math.random() * 4.5;
+              state.combatParticles.push({
+                x: state.player.x + (Math.random() - 0.5) * 10,
+                y: state.player.y + (Math.random() - 0.5) * 10,
+                vx: Math.cos(iAngle) * iSpeed,
+                vy: Math.sin(iAngle) * iSpeed,
+                life: 18 + Math.random() * 28,
+                maxLife: 46,
+                r: 1.5 + Math.random() * 3,
+                type: 'spark',
+                color: Math.random() > 0.5 ? '#f87171' : '#ffffff',
+              });
+            }
             setHull(Math.max(0, Math.round(state.player.hp)));
             return false;
           }

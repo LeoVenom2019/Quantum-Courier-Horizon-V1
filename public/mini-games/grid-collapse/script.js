@@ -133,6 +133,11 @@ function createGrid() {
 
 function getGhostPosition() {
     if (!currentPiece) return null;
+    if (currentPiece.bombPhasing) {
+        const phaseTargetY = findBombPhaseTargetY(currentPiece);
+        return Number.isFinite(phaseTargetY) ? { x: currentPiece.pos.x, y: phaseTargetY } : null;
+    }
+
     let ghost = {
         pos: { x: currentPiece.pos.x, y: currentPiece.pos.y },
         shape: currentPiece.shape
@@ -192,6 +197,25 @@ function collide(grid, piece) {
     return false;
 }
 
+function bombCanPhaseTo(piece, y) {
+    const x = piece.pos.x;
+    return x >= 0 &&
+        x < COLS &&
+        y >= 0 &&
+        y < ROWS &&
+        grid[y][x] === 0;
+}
+
+function findBombPhaseTargetY(piece) {
+    for (let y = ROWS - 1; y > piece.pos.y; y--) {
+        if (bombCanPhaseTo(piece, y)) {
+            return y;
+        }
+    }
+
+    return null;
+}
+
 function merge(grid, piece) {
     let createdHole = false;
     const pieceCells = new Set();
@@ -245,6 +269,11 @@ function rotate(matrix) {
 }
 
 function playerRotate() {
+    if (currentPiece.type === 'BOMB') {
+        toggleBombPhase();
+        return;
+    }
+
     const pos = currentPiece.pos.x;
     let offset = 1;
     const oldShape = currentPiece.shape;
@@ -261,35 +290,85 @@ function playerRotate() {
     playSfx(SFX.rotate, 0.55);
 }
 
-function playerDrop() {
-    currentPiece.pos.y++;
-    if (collide(grid, currentPiece)) {
-        currentPiece.pos.y--;
-        const fitData = merge(grid, currentPiece);
-        
-        // Impact visual
-        if (fitData.createdHole) {
-            // Error feedback
-            spawnFlashEffect(currentPiece.pos.x, currentPiece.pos.y, '#ff4b2b', 0.4);
-        } else {
-            spawnFlashEffect(currentPiece.pos.x, currentPiece.pos.y, COLORS[currentPiece.type], 0.3);
+function toggleBombPhase() {
+    if (currentPiece.bombPhasing) {
+        if (collide(grid, currentPiece)) {
+            playSfx(SFX.misfit, 0.55);
+            spawnTextEffect("BLOCKED", currentPiece.pos.x * BLOCK_SIZE + 15, currentPiece.pos.y * BLOCK_SIZE, '#ff3b30', {
+                size: 15,
+                shake: 2,
+            });
+            return;
         }
 
-        // Check for special piece effects upon landing
-        if (currentPiece.type === 'BOMB') {
-            triggerBomb(currentPiece.pos.x, currentPiece.pos.y);
-        }
-        
-        arenaSweep(currentPiece.type);
-        spawnPiece();
-        updateScore();
-    } else {
-        playSfx(SFX.drop, 0.5);
+        currentPiece.bombPhasing = false;
+        playSfx(SFX.rotate, 0.55);
+        return;
     }
+
+    const targetY = findBombPhaseTargetY(currentPiece);
+    if (targetY === null) {
+        playSfx(SFX.misfit, 0.55);
+        spawnTextEffect("BLOCKED", currentPiece.pos.x * BLOCK_SIZE + 15, currentPiece.pos.y * BLOCK_SIZE, '#ff3b30', {
+            size: 15,
+            shake: 2,
+        });
+        return;
+    }
+
+    currentPiece.bombPhasing = true;
+    currentPiece.phaseTargetY = targetY;
+    playSfx(SFX.rotate, 0.55);
+    spawnTextEffect("PHASE", currentPiece.pos.x * BLOCK_SIZE + 15, currentPiece.pos.y * BLOCK_SIZE, '#ffffff', {
+        size: 15,
+    });
+}
+
+function lockCurrentPiece() {
+    const fitData = merge(grid, currentPiece);
+    
+    // Impact visual
+    if (fitData.createdHole) {
+        // Error feedback
+        spawnFlashEffect(currentPiece.pos.x, currentPiece.pos.y, '#ff4b2b', 0.4);
+    } else {
+        spawnFlashEffect(currentPiece.pos.x, currentPiece.pos.y, COLORS[currentPiece.type], 0.3);
+    }
+
+    // Check for special piece effects upon landing
+    if (currentPiece.type === 'BOMB' && !currentPiece.bombPhasing) {
+        triggerBomb(currentPiece.pos.x, currentPiece.pos.y);
+    }
+    
+    arenaSweep(currentPiece.type);
+    spawnPiece();
+    updateScore();
+}
+
+function playerDrop() {
+    if (currentPiece.bombPhasing) {
+        currentPiece.pos.y++;
+
+        if (currentPiece.pos.y >= currentPiece.phaseTargetY) {
+            currentPiece.pos.y = currentPiece.phaseTargetY;
+            lockCurrentPiece();
+        }
+    } else {
+        currentPiece.pos.y++;
+        if (collide(grid, currentPiece)) {
+            currentPiece.pos.y--;
+            lockCurrentPiece();
+        } else {
+            playSfx(SFX.drop, 0.5);
+        }
+    }
+
     dropCounter = 0;
 }
 
 function playerMove(dir) {
+    if (currentPiece.bombPhasing) return;
+
     currentPiece.pos.x += dir;
     if (collide(grid, currentPiece)) {
         currentPiece.pos.x -= dir;
@@ -674,10 +753,11 @@ function draw() {
 
     // Current Piece
     if (currentPiece) {
+        const pieceAlpha = currentPiece.bombPhasing ? 0.35 : 1;
         currentPiece.shape.forEach((row, y) => {
             row.forEach((value, x) => {
                 if (value !== 0) {
-                    drawBlock(ctx, x + currentPiece.pos.x, y + currentPiece.pos.y, currentPiece.type);
+                    drawBlock(ctx, x + currentPiece.pos.x, y + currentPiece.pos.y, currentPiece.type, BLOCK_SIZE, pieceAlpha);
                 }
             });
         });
@@ -806,7 +886,7 @@ document.addEventListener('keydown', event => {
         playerMove(1);
     } else if (event.key.toUpperCase() === 'S') {
         playerDrop();
-    } else if (event.key.toUpperCase() === 'W') {
+    } else if (event.key.toUpperCase() === 'W' || event.key === 'ArrowUp') {
         playerRotate();
     }
 });

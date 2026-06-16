@@ -428,6 +428,10 @@ const dangerZoomZonesImages = [
   '/assets/games/danger_zoom_zones/danger_zoom_zones_bg2.webp',
 ];
 
+const gridCollapseImages = [
+  '/assets/games/grid_collapse/grid_collapse_bg.webp',
+];
+
 const route3VoidLocationKeys = ['zero', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 const route3VoidBossSpriteImages = route3VoidLocationKeys.flatMap(locationKey => (
   ['neutral', 'up', 'down', 'forward', 'backward'].map(direction => (
@@ -564,6 +568,7 @@ export const ASSET_GROUPS: Record<AssetGroupId, AssetPreloadEntry[]> = {
     ...asEntries([...MINI_GAMES_CONFIG.map(game => game.image), '/assets/games/fliper_intro.webm'], 'video'),
     ...asEntries(arcadeResultVideos, 'video'),
     ...asEntries(dangerZoomZonesImages, 'image'),
+    ...asEntries(gridCollapseImages, 'image'),
     ...asEntries(neoCatcherBackgrounds, 'image'),
     ...asEntries(rupturaEstelarEnemies, 'image'),
     ...asEntries(arcadeThemeAudio, 'audio'),

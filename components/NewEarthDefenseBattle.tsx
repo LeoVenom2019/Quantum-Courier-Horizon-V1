@@ -619,7 +619,7 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
       duration: 8000,
       blocksSpawned: 0,
       tickAccum: 0,
-      tickInterval: 250,
+      tickInterval: 1000,
       blockAccum: 0,
       blockInterval: 2000,
       coverAlpha: 0,
@@ -765,7 +765,7 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
       duration: 8000,
       blocksSpawned: 0,
       tickAccum: 0,
-      tickInterval: 250,
+      tickInterval: 1000,
       blockAccum: 0,
       blockInterval: 2000,
       coverAlpha: 0,
@@ -1099,7 +1099,7 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
 
     const applyBlizzardTick = () => {
       const now = performance.now();
-      const payload = createSpecialDamagePayload(0.675, { ice: 44 });
+      const payload = createSpecialDamagePayload(1.0, { ice: 44 });
       state.enemies.forEach(enemy => {
         if (enemy.hp <= 0 || enemy.x <= WIDTH * 0.5) return;
         const baseDamage = payload.crit ? payload.damage * shipStats.critMultiplier : payload.damage;
@@ -1144,8 +1144,8 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
       spawnBlizzardBurst(x, y, 'rgba(147,197,253,0.88)', 48);
       spawnBlizzardBurst(x, y, 'rgba(255,255,255,0.92)', 28);
       for (let i = 0; i < 24; i++) spawnBlizzardCrystal(x, y);
-      applyBlizzardDamage(1.05, x, y, 90, 'GELO', '#bae6fd');
-      applyBlizzardDamage(0.525, x, y, WIDTH * 0.5, 'AREA', '#93c5fd');
+      applyBlizzardDamage(0.525, x, y, 90, 'GELO', '#bae6fd');
+      applyBlizzardDamage(0.2625, x, y, WIDTH * 0.5, 'AREA', '#93c5fd');
       spawnFloat(x, y - 40, 'BLIZZARD IMPACT', '#e0f2fe');
     };
 
@@ -1882,6 +1882,9 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
       const dy = state.player.y - enemy.y;
       const length = Math.max(1, Math.sqrt(dx * dx + dy * dy));
       const speed = enemy.kind === 'boss-ship' ? 5.1 : enemy.kind.includes('monster') ? 4.5 : 4.8;
+      if (Math.random() > 0.3) {
+        spawnParticle(enemy.x - 30, enemy.y + (Math.random() * 12 - 6), 'rgba(180, 180, 180, 0.6)', 1.5, 0.5, 3.5, state.backgroundParticles);
+      }
       const slowed = enemy.status.slowUntil && enemy.status.slowUntil > now;
       const damage = enemy.damage * (slowed ? 1 - shipStats.conditionalBonuses.slowEnemyDamageReductionPercent / 100 : 1);
 
@@ -2045,7 +2048,7 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
 
       if (specialId === 'hellfire-barrage') {
         if (state.hellfireSequence.active) return;
-        state.hellfireSequence = { active: true, remaining: 5, waitingForImpact: false };
+        state.hellfireSequence = { active: true, remaining: 6, waitingForImpact: false };
         state.hellfireFlashAlpha = 0.24;
         state.hellfireBannerLife = 95;
         state.hellfireShake = Math.max(state.hellfireShake, 7);
@@ -2087,7 +2090,7 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
           duration: 8000,
           blocksSpawned: 1,
           tickAccum: 0,
-          tickInterval: 250,
+          tickInterval: 1000,
           blockAccum: 0,
           blockInterval: 2000,
           coverAlpha: 0,
@@ -2200,7 +2203,7 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
           state.thorSmallTornados.forEach(tornado => {
             const hit = state.enemies.some(enemy => enemy.hp > 0 && isEnemyInThorTornado(enemy, tornado));
             if (hit) {
-              applyThorDamage(1.35, tornado.x, tornado.y, tornado.radius * 1.25, 'TORNADO', '#7dd3fc');
+              applyThorDamage(0.675, tornado.x, tornado.y, tornado.radius * 1.25, 'TORNADO', '#7dd3fc');
               spawnThorShockwave(tornado.x, tornado.y, 'rgba(125,211,252,0.8)', 130);
             }
           });
@@ -2224,7 +2227,7 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
           if (state.thorBigTornado) {
             const hit = state.enemies.some(enemy => enemy.hp > 0 && isEnemyInThorTornado(enemy, state.thorBigTornado as ThorTornado));
             if (hit) {
-              applyThorDamage(1.9, state.thorBigTornado.x, state.thorBigTornado.y, state.thorBigTornado.radius * 1.45, 'MEGA', '#fde68a');
+              applyThorDamage(0.95, state.thorBigTornado.x, state.thorBigTornado.y, state.thorBigTornado.radius * 1.45, 'MEGA', '#fde68a');
               spawnThorShockwave(state.thorBigTornado.x, state.thorBigTornado.y, 'rgba(253,230,138,0.82)', 190);
             }
           }
@@ -3547,6 +3550,29 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
       p.x = clamp(p.x, 60, WIDTH * 0.45);
       p.y = clamp(p.y, 45, HEIGHT - 45);
 
+      // Player engine smoke trail
+      if (Math.random() > 0.35) {
+        const trailOffset = rand(-6, 6);
+        spawnSmokeParticle(
+          p.x - 36,
+          p.y + trailOffset,
+          rand(-1.8, -0.5),
+          rand(-0.3, 0.3),
+          rand(7, 16),
+          rand(55, 90)
+        );
+      }
+      if (Math.random() > 0.65) {
+        spawnEmberParticle(
+          p.x - 30,
+          p.y + rand(-4, 4),
+          rand(-2.5, -1.0),
+          rand(-0.5, 0.5),
+          rand(1.5, 3.5),
+          rand(18, 34)
+        );
+      }
+
       if (keys[' ']) fireShot();
       if (keys.q || keys.keyc) triggerSpecial(0);
       if (keys.e || keys.keyf) triggerSpecial(1);
@@ -3581,6 +3607,27 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
         }
         enemy.y += Math.sin(now / 420 + enemy.frameOffset) * (enemy.kind.includes('monster') ? 0.75 : 0.35);
         enemy.y = clamp(enemy.y, 52, HEIGHT - 52);
+        // Enemy engine smoke trail (non-bosses only)
+        if (!enemy.kind.includes('monster') && Math.random() > 0.45) {
+          spawnSmokeParticle(
+            enemy.x + 32,
+            enemy.y + rand(-6, 6),
+            rand(0.4, 1.8),
+            rand(-0.3, 0.3),
+            rand(5, 12),
+            rand(40, 70)
+          );
+        }
+        if (!enemy.kind.includes('monster') && Math.random() > 0.72) {
+          spawnEmberParticle(
+            enemy.x + 28,
+            enemy.y + rand(-4, 4),
+            rand(0.8, 2.8),
+            rand(-0.4, 0.4),
+            rand(1.2, 2.8),
+            rand(14, 28)
+          );
+        }
         fireEnemyShot(enemy);
 
         if (enemy.status.burningUntil && enemy.status.burningUntil > now && now - (enemy.status.lastBurnTick || 0) > 650) {
@@ -3659,6 +3706,18 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
               if (projectile.sequence === 'hellfire') {
                 state.hellfireSequence.remaining -= 1;
                 state.hellfireSequence.waitingForImpact = false;
+                const explosionRadius = 140;
+                const areaDamage = shipStats.damage;
+                state.enemies.forEach(otherEnemy => {
+                  if (otherEnemy !== enemy && otherEnemy.hp > 0) {
+                    const odx = otherEnemy.x - enemy.x;
+                    const ody = otherEnemy.y - enemy.y;
+                    if (Math.sqrt(odx * odx + ody * ody) < explosionRadius + otherEnemy.radius) {
+                      otherEnemy.hp -= areaDamage;
+                      spawnFloat(otherEnemy.x + (Math.random() * 20 - 10), otherEnemy.y - 20, `${Math.round(areaDamage)} AREA`, '#fb923c');
+                    }
+                  }
+                });
               }
               projectile.x = WIDTH + 999;
             }
@@ -3668,6 +3727,23 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
           const dy = p.y - projectile.y;
           if (Math.sqrt(dx * dx + dy * dy) < 34) {
             damagePlayer(projectile.damage);
+            // Player ship hit: impact sparks + smoke burst
+            const impactX = projectile.x;
+            const impactY = projectile.y;
+            for (let i = 0; i < 8; i++) {
+              spawnParticle(impactX, impactY, ['#fb923c', '#ef4444', '#facc15', '#ffffff', '#f97316'][Math.floor(Math.random() * 5)], 4.5 + Math.random() * 3, 0.5, 4.5, state.impactParticles);
+            }
+            for (let i = 0; i < 3; i++) {
+              spawnSmokeParticle(
+                impactX + rand(-8, 8),
+                impactY + rand(-8, 8),
+                rand(-2.5, 2.5),
+                rand(-2.5, 0.5),
+                rand(10, 22),
+                rand(45, 80)
+              );
+            }
+            state.laserFlashAlpha = Math.max(state.laserFlashAlpha || 0, 0.12);
             projectile.x = -999;
           }
         }

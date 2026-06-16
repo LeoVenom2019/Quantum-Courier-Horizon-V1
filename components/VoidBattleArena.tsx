@@ -2075,6 +2075,22 @@ const VoidBattleArena = memo(function VoidBattleArena({
               triggerShake(d > 100 ? 12 : 8);
               const impactAngle = Math.atan2(p.vy || 0, p.vx || 0);
               createImpactEffect(p.x, p.y, '#ef4444', impactAngle, 1.2, 'ship');
+              
+              // Player ship hit: smoke burst
+              for (let i = 0; i < 3; i++) {
+                s.particles.push({
+                  id: `player-hit-smoke-${now}-${Math.random()}`,
+                  x: p.x + (Math.random() * 4 - 2),
+                  y: p.y + (Math.random() * 4 - 2),
+                  vx: (Math.random() * 2 - 1),
+                  vy: (Math.random() * 2 - 1),
+                  life: 0.8 + Math.random() * 0.5,
+                  size: 8 + Math.random() * 6,
+                  color: 'rgba(180, 180, 180, 0.6)',
+                  type: 'smoke'
+                });
+              }
+              
               createDamageNumber(s.playerX, s.playerY - 10, p.damage, false, 'enemy');
               if (p.dotDamagePerSecond && p.dotDurationMs) {
                 s.playerDotEffects.push({
@@ -2226,6 +2242,49 @@ const VoidBattleArena = memo(function VoidBattleArena({
           // Calculate movement vectors for sprite selection
           enemy.vx = enemy.x - oldX;
           enemy.vy = enemy.y - oldY;
+
+          // Enemy engine smoke trail (non-bosses only)
+          if (enemy.type !== 'Boss' && Math.random() > 0.45) {
+            s.particles.push({
+              id: `enemy-smoke-${now}-${Math.random()}`,
+              x: enemy.x + 3,
+              y: enemy.y + (Math.random() * 2 - 1),
+              vx: 0.5 + Math.random() * 0.5,
+              vy: (Math.random() - 0.5) * 0.2,
+              life: 0.5 + Math.random() * 0.3,
+              size: 5 + Math.random() * 3,
+              color: 'rgba(180, 180, 180, 0.4)',
+              type: 'smoke'
+            });
+          }
+        }
+
+        // Player engine smoke trail
+        if (s.playerHp > 0 && Math.random() > 0.35) {
+          s.particles.push({
+            id: `player-smoke-${now}-${Math.random()}`,
+            x: s.playerX - 3,
+            y: s.playerY + (Math.random() * 2 - 1),
+            vx: - (0.5 + Math.random() * 0.5),
+            vy: (Math.random() - 0.5) * 0.2,
+            life: 0.5 + Math.random() * 0.4,
+            size: 6 + Math.random() * 4,
+            color: 'rgba(200, 200, 200, 0.5)',
+            type: 'smoke'
+          });
+          if (Math.random() > 0.65) {
+            s.particles.push({
+              id: `player-ember-${now}-${Math.random()}`,
+              x: s.playerX - 2.5,
+              y: s.playerY + (Math.random() * 1.5 - 0.75),
+              vx: - (1.0 + Math.random()),
+              vy: (Math.random() - 0.5) * 0.5,
+              life: 0.3 + Math.random() * 0.2,
+              size: 2 + Math.random() * 2,
+              color: 'rgba(255, 150, 50, 0.8)',
+              type: 'ember'
+            });
+          }
         }
 
         // Enemy Attack — Com IA de mira real e lastShot
