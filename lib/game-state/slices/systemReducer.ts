@@ -5,7 +5,6 @@ import { SystemState, GameAction } from '../types';
 export const initialSystemState: SystemState = {
   seenTutorials: {},
   arcadeScores: {},
-  localRecords: [],
   hasSeenRoute2UnlockMessage: false,
   playerName: '',
 };
@@ -31,13 +30,6 @@ export function systemReducer(state: SystemState = initialSystemState, action: G
           ...state.arcadeScores,
           [gameId]: Math.max(state.arcadeScores[gameId] || 0, score),
         },
-      };
-    }
-
-    case 'ADD_LOCAL_RECORD': {
-      return {
-        ...state,
-        localRecords: [action.payload.record, ...state.localRecords].slice(0, 50),
       };
     }
 

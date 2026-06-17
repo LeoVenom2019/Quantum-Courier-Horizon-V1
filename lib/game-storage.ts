@@ -132,7 +132,7 @@ export const GameStorage = {
    */
   save: async (data: any, key: string = 'time_travel_save'): Promise<void> => {
     try {
-      if ((key === 'time_travel_save' || key === 'speed_run_save') && GameStorage.isResetBlocked()) {
+      if (key === 'time_travel_save' && GameStorage.isResetBlocked()) {
         return;
       }
 
@@ -163,7 +163,7 @@ export const GameStorage = {
 
       // 2. Background Sync to Server API (Cloud Save)
       // Only for main gameplay saves
-      if (key === 'time_travel_save' || key === 'speed_run_save') {
+      if (key === 'time_travel_save') {
         fetch('/api/save', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -188,7 +188,7 @@ export const GameStorage = {
    */
   load: async (key: string = 'time_travel_save'): Promise<any | null> => {
     try {
-      if ((key === 'time_travel_save' || key === 'speed_run_save') && GameStorage.isResetBlocked()) {
+      if (key === 'time_travel_save' && GameStorage.isResetBlocked()) {
         return null;
       }
 
@@ -215,7 +215,7 @@ export const GameStorage = {
       }
 
       // 2. Fallback to AppData API if LocalStorage is empty (ONLY for main save)
-      if (key === 'time_travel_save' || key === 'speed_run_save') {
+      if (key === 'time_travel_save') {
         console.log(`GameStorage: LocalStorage empty for ${key}, checking AppData fallback...`);
         const response = await fetch(`/api/save?key=${key}&t=${Date.now()}`, { cache: 'no-store' });
         if (response.ok) {

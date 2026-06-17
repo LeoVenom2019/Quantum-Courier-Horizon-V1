@@ -701,7 +701,7 @@ const CardsTab = memo(function CardsTab() {
 
   const sectionTabs = [
     { id: 'owned' as const, label: tl(lang, 'Card Chest', 'Baú de Cartas'), icon: Boxes },
-    { id: 'codex' as const, label: tl(lang, 'Card Codex', 'Codex de Cartas'), icon: BookOpen },
+    { id: 'codex' as const, label: tl(lang, 'Card Archive', 'Arquivo de Cartas'), icon: BookOpen },
     { id: 'equipped' as const, label: tl(lang, 'Equipped Cards', 'Cartas Equipadas'), icon: BadgeCheck },
   ];
 

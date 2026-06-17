@@ -162,6 +162,13 @@ const route4LayoutImages = [
   '/assets/rota4/layout_cap4/bg_peixes.webp',
   '/assets/rota4/layout_cap4/bg_reliquias.webp',
   '/assets/rota4/layout_cap4/bg_aneis.webp',
+  '/assets/rota4/layout_cap4/bg_peixes_card.webp',
+  '/assets/rota4/layout_cap4/bg_reliquias_card.webp',
+  '/assets/rota4/layout_cap4/bg_aneis_card.webp',
+  '/assets/rota4/layout_cap4/bg_victory_battle_cap4_1.webp',
+  '/assets/rota4/layout_cap4/bg_victory_battle_cap4_2.webp',
+  '/assets/rota4/layout_cap4/bg_victory_battle_cap4_3.webp',
+  '/assets/rota4/layout_cap4/bg_lose_battle_cap4_.webp',
   '/assets/texturas/textura_ficsi_2400x240.webp',
 ];
 
@@ -173,6 +180,7 @@ const route4TextureImages = [
 
 const route4ColonyAudio = [
   '/assets/rota4/SFX_new_land/aba_colonys_click.ogg',
+  '/assets/rota4/SFX_new_land/achievment_unlocked.ogg',
   '/assets/rota4/SFX_new_land/50_robots.ogg',
   '/assets/rota4/SFX_new_land/250_robots.ogg',
   '/assets/rota4/SFX_new_land/hangar_open_door.ogg',
@@ -265,11 +273,24 @@ const route4SubmarineSpriteImages = [
 ];
 const route4TreasureRelicImages = NEW_EARTH_TREASURE_CATALOG.map(treasure => treasure.src);
 
-const route4BattleImages = [
+const route4BattleBackgroundImages = [
   `${route4BattleBase}/backgrounds/day/rt4_background_day.webp`,
   `${route4BattleBase}/backgrounds/night/rt4_background_night.webp`,
   `${route4BattleBase}/backgrounds/winter/rt4_background_winter.webp`,
+  `${route4BattleBase}/backgrounds/multiple/rt4_background_day_2.webp`,
+  `${route4BattleBase}/backgrounds/multiple/rt4_background_day_3.webp`,
+  `${route4BattleBase}/backgrounds/multiple/rt4_background_day_4.webp`,
+  `${route4BattleBase}/backgrounds/multiple/rt4_background_night_2.webp`,
+  `${route4BattleBase}/backgrounds/multiple/rt4_background_night_3.webp`,
+  `${route4BattleBase}/backgrounds/multiple/rt4_background_night_4.webp`,
+  `${route4BattleBase}/backgrounds/multiple/rt4_background_night_5.webp`,
+  `${route4BattleBase}/backgrounds/multiple/rt4_background_winter_2.webp`,
+];
+
+const route4BattleImages = [
+  ...route4BattleBackgroundImages,
   `${route4BattleBase}/player/horizon/horizon.webp`,
+  `${route4BattleBase}/player/horizon/horizon_12pos_spritesheet.webp`,
   `${route4BattleBase}/enemys/air_ships/enemy_rt4.webp`,
   `${route4BattleBase}/enemys/air_ships/enemy_rt4_2.webp`,
   `${route4BattleBase}/enemys/air_ships/enemy_rt4_3.webp`,
@@ -281,11 +302,14 @@ const route4BattleImages = [
   `${route4BattleBase}/enemys/monsters/monster 1/m1_up.webp`,
   `${route4BattleBase}/enemys/monsters/monster 1/m1_down.webp`,
   `${route4BattleBase}/enemys/monsters/monster 1/m1_backward.webp`,
+  `${route4BattleBase}/enemys/monsters/monster 1/m1_8pos_spritesheet.webp`,
+  `${route4BattleBase}/enemys/monsters/monster 1/m1_hover_spritesheet_30f_6x5.webp`,
   `${route4BattleBase}/enemys/monsters/monster 2/m3_neutral.webp`,
   `${route4BattleBase}/enemys/monsters/monster 2/m2_forward.webp`,
   `${route4BattleBase}/enemys/monsters/monster 2/m4_up.webp`,
   `${route4BattleBase}/enemys/monsters/monster 2/m2_down.webp`,
   `${route4BattleBase}/enemys/monsters/monster 2/m2_backward.webp`,
+  `${route4BattleBase}/enemys/monsters/monster 2/boss1_spritesheet_30fps_motion_6x6.png`,
   '/assets/rota4/new_land_assets/abyssal_ocean_new_land_system/abissal_01.webp',
   '/assets/rota4/new_land_assets/abyssal_ocean_new_land_system/abissal_02.webp',
   '/assets/rota4/new_land_assets/abyssal_ocean_new_land_system/abissal_03.webp',
@@ -315,6 +339,9 @@ const route4BattleAudio = [
   '/audio/sfx/shoot_player.ogg',
   '/assets/rota4/SFX_new_land/airplane_enemys_sounds.ogg',
   '/assets/rota4/SFX_new_land/airplane_player_sounds.ogg',
+  '/assets/rota4/SFX_new_land/enemy_explosion_cap_4.ogg',
+  '/assets/rota4/SFX_new_land/enemy_explosion_cap4_2.ogg',
+  '/assets/rota4/SFX_new_land/explosion_elite_cap4.ogg',
   `${route4BattleBase}/player/horizon/shoot_rt4.ogg`,
   `${route4BattleBase}/player/horizon/eletric_shoot.ogg`,
   `${route4BattleBase}/player/horizon/fire_shoot.ogg`,
@@ -349,6 +376,11 @@ const route4BattleAudio = [
   '/assets/rota4/SFX_new_land/submarine_explosion1.ogg',
   '/assets/rota4/SFX_new_land/submarine_explosion_2.ogg',
   '/assets/rota4/SFX_new_land/submarine_explosion_3.ogg',
+  '/assets/rota4/SFX_new_land/chest_rare_comum.ogg',
+  '/assets/rota4/SFX_new_land/chest_epic.ogg',
+  '/assets/rota4/SFX_new_land/chest_legendary.ogg',
+  '/assets/rota4/SFX_new_land/treasure_1_.ogg',
+  '/assets/rota4/SFX_new_land/treasure_2_.ogg',
   '/assets/rota4/SFX_new_land/submarine_motion_1.ogg',
   '/assets/rota4/SFX_new_land/submarine_motion_2.ogg',
   '/assets/rota4/SFX_new_land/submarine_player_constant.ogg',

@@ -267,6 +267,16 @@ const SUBMARINE_EXPLOSION_SFX = [
   `${UNDERWATER_SFX_BASE}/submarine_explosion_2.ogg`,
   `${UNDERWATER_SFX_BASE}/submarine_explosion_3.ogg`,
 ];
+const TREASURE_CHEST_SFX: Record<TreasureRarity, string> = {
+  normal: `${UNDERWATER_SFX_BASE}/chest_rare_comum.ogg`,
+  rare: `${UNDERWATER_SFX_BASE}/chest_rare_comum.ogg`,
+  epic: `${UNDERWATER_SFX_BASE}/chest_epic.ogg`,
+  legendary: `${UNDERWATER_SFX_BASE}/chest_legendary.ogg`,
+};
+const TREASURE_LOOT_SFX = [
+  `${UNDERWATER_SFX_BASE}/treasure_1_.ogg`,
+  `${UNDERWATER_SFX_BASE}/treasure_2_.ogg`,
+];
 const SUBMARINE_MOTION_SFX = [
   `${UNDERWATER_SFX_BASE}/submarine_motion_1.ogg`,
   `${UNDERWATER_SFX_BASE}/submarine_motion_2.ogg`,
@@ -2417,19 +2427,20 @@ export default function NewEarthUnderwaterBattle({
       state.combatParticles.push({ x, y, r: 4, maxR: 55, life: 20, maxLife: 20, type: 'launch_ring' });
     };
 
-    const spawnImpact = (x: number, y: number, color: '#7dd3fc' | '#f87171' | '#fcd34d', isKill: boolean) => {
+    const spawnImpact = (x: number, y: number, color: '#7dd3fc' | '#f87171' | '#fcd34d', isKill: boolean, scale = 1) => {
       const state = stateRef.current;
       const burstCount = isKill ? 3 : 1;
       for (let burst = 0; burst < burstCount; burst++) {
-        const bx = x + (isKill ? (Math.random() - 0.5) * 30 : 0);
-        const by = y + (isKill ? (Math.random() - 0.5) * 30 : 0);
+        const bx = x + (isKill ? (Math.random() - 0.5) * 30 * scale : 0);
+        const by = y + (isKill ? (Math.random() - 0.5) * 30 * scale : 0);
 
-        state.impacts.push({ x: bx, y: by, life: 32, maxLife: 32, maxR: isKill ? 90 : 65, color });
-        state.impacts.push({ x: bx, y: by, life: 22, maxLife: 22, maxR: isKill ? 50 : 36, color: '#ffffff', delay: burst * 4 });
+        state.impacts.push({ x: bx, y: by, life: 34, maxLife: 34, maxR: (isKill ? 96 : 72) * scale, color });
+        state.impacts.push({ x: bx, y: by, life: 24, maxLife: 24, maxR: (isKill ? 56 : 42) * scale, color: '#ffffff', delay: burst * 4 });
+        state.impacts.push({ x: bx, y: by, life: 42, maxLife: 42, maxR: (isKill ? 132 : 84) * scale, color: '#93c5fd', delay: burst * 3 });
 
-        for (let i = 0; i < (isKill ? 55 : 36); i++) {
+        for (let i = 0; i < Math.round((isKill ? 64 : 44) * scale); i++) {
           const particleAngle = Math.random() * Math.PI * 2;
-          const speed = (isKill ? 2.5 : 1.8) + Math.random() * 5.5;
+          const speed = ((isKill ? 2.8 : 2.0) + Math.random() * 6.2) * Math.min(1.45, scale);
           state.combatParticles.push({
             x: bx,
             y: by,
@@ -2443,9 +2454,9 @@ export default function NewEarthUnderwaterBattle({
           });
         }
 
-        for (let i = 0; i < (isKill ? 28 : 16); i++) {
+        for (let i = 0; i < Math.round((isKill ? 36 : 22) * scale); i++) {
           const particleAngle = Math.random() * Math.PI * 2;
-          const speed = 0.4 + Math.random() * 2.2;
+          const speed = (0.4 + Math.random() * 2.4) * Math.min(1.35, scale);
           state.combatParticles.push({
             x: bx,
             y: by,
@@ -2459,16 +2470,16 @@ export default function NewEarthUnderwaterBattle({
         }
 
         if (isKill) {
-          for (let i = 0; i < 8; i++) {
+          for (let i = 0; i < Math.round(12 * scale); i++) {
             const particleAngle = Math.random() * Math.PI * 2;
             state.combatParticles.push({
               x: bx,
               y: by,
-              vx: Math.cos(particleAngle) * 1.4,
-              vy: Math.sin(particleAngle) * 1.4,
+              vx: Math.cos(particleAngle) * 1.8 * scale,
+              vy: Math.sin(particleAngle) * 1.8 * scale,
               life: 55 + Math.random() * 55,
               maxLife: 110,
-              r: 3 + Math.random() * 7,
+              r: (3 + Math.random() * 7) * Math.min(1.4, scale),
               type: 'debris',
               angle: Math.random() * Math.PI * 2,
               rotVel: (Math.random() - 0.5) * 0.18,
@@ -2847,9 +2858,9 @@ export default function NewEarthUnderwaterBattle({
             const target = state.enemies.find(enemy => Math.hypot(enemy.x - shot.x, enemy.y - shot.y) < enemy.radius + shot.radius);
             if (target) {
               target.hp -= shot.damage;
-              spawnImpact(shot.x, shot.y, '#7dd3fc', false);
+              spawnImpact(shot.x, shot.y, '#7dd3fc', false, 1.12);
               if (target.hp <= 0) {
-                spawnImpact(target.x, target.y, '#f87171', true);
+                spawnImpact(target.x, target.y, '#f87171', true, 1.45);
               }
               stopUnderwaterSound(shot.launchAudio);
               if (shot.launchAudio) activeLaunchAudiosRef.current.delete(shot.launchAudio);
@@ -2864,6 +2875,7 @@ export default function NewEarthUnderwaterBattle({
               if (target.hits >= 1) {
                 target.open = true;
                 spawnImpact(target.x, target.y, '#fcd34d', true);
+                playUnderwaterSound(TREASURE_CHEST_SFX[target.rarity], 0.78);
               }
               stopUnderwaterSound(shot.launchAudio);
               if (shot.launchAudio) activeLaunchAudiosRef.current.delete(shot.launchAudio);
@@ -2872,7 +2884,7 @@ export default function NewEarthUnderwaterBattle({
             }
           } else if (state.phase === 'combat' && Math.hypot(state.player.x - shot.x, state.player.y - shot.y) < 28 + shot.radius) {
             state.player.hp -= shot.damage;
-            spawnImpact(shot.x, shot.y, '#f87171', false);
+            spawnImpact(shot.x, shot.y, '#f87171', false, 1.26);
             // Extra impact burst: sparks radiating out from player
             for (let i = 0; i < 10; i++) {
               const iAngle = Math.random() * Math.PI * 2;
@@ -2957,6 +2969,7 @@ export default function NewEarthUnderwaterBattle({
             if (!treasure.collected && treasure.open && distSq < (28 + treasure.radius + 20) ** 2) {
               treasure.collected = true;
               collected = true;
+              playRandomUnderwaterSound(TREASURE_LOOT_SFX, 0.78);
               if (onTreasureLoot) {
                 onTreasureLoot(treasure.rewardPayload);
               }

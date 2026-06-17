@@ -1,6 +1,6 @@
 export type CargoType = 'Tecnologia' | 'Artefatos' | 'Minerais' | 'Biológico' | 'Dados' | 'Energia';
 
-export type ThemeColor = 'cyan' | 'orange' | 'neila' | 'pink' | 'violet' | 'amber' | 'emerald' | 'rose' | 'blue';
+export type ThemeColor = 'cyan' | 'orange' | 'purple' | 'neila' | 'pink' | 'violet' | 'amber' | 'emerald' | 'rose' | 'blue';
 
 export interface GameTheme {
   id: string;

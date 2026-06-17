@@ -1,0 +1,43 @@
+{
+  "name": "qch-dev-tools",
+  "version": "0.1.0",
+  "description": "Project-specific guidance for developing, validating, balancing, and preparing the QCH game.",
+  "author": {
+    "name": "Leonardo Dias",
+    "email": "local@example.com",
+    "url": "https://example.com/qch"
+  },
+  "homepage": "https://example.com/qch-dev-tools",
+  "repository": "https://example.com/qch-dev-tools",
+  "license": "UNLICENSED",
+  "keywords": [
+    "qch",
+    "game-dev",
+    "nextjs",
+    "assets",
+    "qa"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "QCH Dev Tools",
+    "shortDescription": "QCH guidance for code, assets, QA, balance, and release work.",
+    "longDescription": "A local project plugin with guidance for navigating the QCH Next.js game, auditing media assets, verifying visual changes, reviewing gameplay balance, and preparing changes for GitHub.",
+    "developerName": "Leonardo Dias",
+    "category": "Productivity",
+    "capabilities": [
+      "Code",
+      "Review",
+      "QA",
+      "Game Design"
+    ],
+    "websiteURL": "https://example.com/qch-dev-tools",
+    "privacyPolicyURL": "https://example.com/privacy",
+    "termsOfServiceURL": "https://example.com/terms",
+    "defaultPrompt": [
+      "Use QCH Codebase to find where this feature belongs.",
+      "Use QCH Assets to audit the media library.",
+      "Use QCH Release before sending changes to GitHub."
+    ],
+    "brandColor": "#2563EB"
+  }
+}

@@ -1,0 +1,441 @@
+--- HORIZON_LASER_DAMAGE_MULTIPLIER ---
+const HORIZON_LASER_DAMAGE_MULTIPLIER = 1.85;
+          const payload = createSpecialDamagePayload(HORIZON_LASER_DAMAGE_MULTIPLIER);
+
+--- createSpecialDamagePayload ---
+      const payload = createSpecialDamagePayload(multiplier, { ice: 36 });
+      const payload = createSpecialDamagePayload(0.675, { ice: 44 });
+      const payload = createSpecialDamagePayload(multiplier, { electric: 44 });
+    const createSpecialDamagePayload = (baseMultiplier: number, extraElemental: Partial<Projectile['elemental']> = {}) => {
+          const payload = createSpecialDamagePayload(HORIZON_LASER_DAMAGE_MULTIPLIER);
+      const damagePayload = createSpecialDamagePayload(1.8, { fire: 25 });
+
+--- Laser ---
+    const updateLaserSpecial = (now: number) => {
+      if (state.laserState === 'idle') return;
+      const chargeDuration = 900;
+      const firingDuration = 3000;
+      const collapseDuration = 1700;
+      const elapsed = now - state.laserStateStart;
+
+      if (state.laserState === 'charge' && elapsed > chargeDuration) {
+        state.laserState = 'firing';
+        state.laserStateStart = now;
+        state.laserFlashAlpha = 0.28;
+        state.laserImpactPos = { x: 0, y: 0 };
+        state.laserLastDamageTick = now - HORIZON_LASER_DAMAGE_INTERVAL;
+        state.laserShake = 18;
+        return;
+      }
+
+      if (state.laserState === 'firing' && now - state.laserLastDamageTick >= HORIZON_LASER_DAMAGE_INTERVAL) {
+        state.laserLastDamageTick = now;
+        applyLaserDamageTick();
+      }
+
+      if (state.laserState === 'firing' && elapsed > firingDuration) {
+        state.laserState = 'collapse';
+        state.laserStateStart = now;
+        playSound(PLAYER_SOUNDS.apocalypseLaserLastExplosion, 0.82);
+        state.laserFlashAlpha = 0.38;
+        state.laserResidualBurnLife = 1;
+        const start = getLaserStart();
+        const end = getLaserEnd();
+        state.laserImpactPos = end;
+        state.laserShake = 26;
+        state.shockwaves.push({ x: end.x, y: end.y, life: 1, maxRadius: 720, color: 'rgba(210,240,255,0.58)' });
+        state.shockwaves.push({ x: end.x, y: end.y, life: 1, maxRadius: 520, color: 'rgba(34,211,238,0.72)' });
+        for (let i = 0; i < 72; i++) {
+          const color = i % 6 === 0
+            ? 'rgba(30,30,36,0.72)'
+            : ['#ff00ff', '#ff3355', '#00ffff', '#ffffff', '#fb923c'][Math.floor(Math.random() * 5)];
+          spawnParticle(end.x, end.y, color, 6 + Math.random() * 7, 1 + Math.random() * 0.9, 2 + Math.random() * 9, state.laserEmbers);
+        }
+        return;
+      }
+
+      if (state.laserState === 'collapse' && elapsed > collapseDuration) {
+        state.laserState = 'idle';
+        state.laserParticles = [];
+        state.laserEmbers = [];
+        state.shockwaves = [];
+        state.backgroundParticles = [];
+        state.laserShake = 0;
+      }
+    };
+
+--- Thor ---
+        const updateThorSpecial = (now: number, dt: number) => {
+      if (state.thorPhase === 'idle') return;
+      const age = now - state.thorPhaseStart;
+      state.thorFlashAlpha *= 0.86;
+
+      if (state.thorPhase === 'prelude') {
+        const progress = Math.min(1, age / 1200);
+        state.thorDarkness = easeInOut(progress) * 0.66;
+        state.thorColumn = clamp((age - 480) / 700, 0, 1);
+        state.thorShake = Math.max(state.thorShake, 3 + state.thorDarkness * 11);
+        if (now >= state.thorNextFarBolt) spawnThorFarBolt(now);
+        if (age >= 1200) {
+          state.thorPhase = 'small';
+          state.thorPhaseStart = now;
+          state.thorSmallTornados = [createThorTornado(0), createThorTornado(1), createThorTornado(2)];
+          state.thorNextBolt = now + 200;
+          state.thorShake = 20;
+          state.thorFlashAlpha = 0.48;
+          spawnThorRing(WIDTH * 0.71, HEIGHT * 0.5, 56, 'rgba(103,232,249,1)');
+          playSound(randomThorThunderSfx(), 0.72);
+        }
+      } else if (state.thorPhase === 'small') {
+        if (now >= state.thorNextBolt) spawnThorBolt(now, true);
+        state.thorTickSmall += dt;
+        while (state.thorTickSmall >= 650) {
+          state.thorTickSmall -= 650;
+          state.thorSmallTornados.forEach(tornado => {
+            const hit = state.enemies.some(enemy => enemy.hp > 0 && isEnemyInThorTornado(enemy, tornado));
+            if (hit) {
+              applyThorDamage(1.35, tornado.x, tornado.y, tornado.radius * 1.25, 'TORNADO', '#7dd3fc');
+              spawnThorShockwave(tornado.x, tornado.y, 'rgba(125,211,252,0.8)', 130);
+            }
+          });
+        }
+        if (age >= 4000) {
+          state.thorPhase = 'big';
+          state.thorPhaseStart = now;
+          state.thorSmallTornados.forEach(tornado => { tornado.alive = false; });
+          state.thorBigTornado = createThorTornado(0, 'big');
+          state.thorColumn = 0.58;
+          state.thorShake = 28;
+          state.thorFlashAlpha = 0.62;
+          spawnThorRing(WIDTH * 0.72, HEIGHT * 0.52, 96, 'rgba(253,230,138,1)');
+          playSound(randomThorThunderSfx(), 0.78);
+        }
+      } else if (state.thorPhase === 'big') {
+        if (now >= state.thorNextBolt) spawnThorBolt(now, true);
+        state.thorTickBig += dt;
+        while (state.thorTickBig >= 500) {
+          state.thorTickBig -= 500;
+          if (state.thorBigTornado) {
+            const hit = state.enemies.some(enemy => enemy.hp > 0 && isEnemyInThorTornado(enemy, state.thorBigTornado as ThorTornado));
+            if (hit) {
+              applyThorDamage(1.9, state.thorBigTornado.x, state.thorBigTornado.y, state.thorBigTornado.radius * 1.45, 'MEGA', '#fde68a');
+              spawnThorShockwave(state.thorBigTornado.x, state.thorBigTornado.y, 'rgba(253,230,138,0.82)', 190);
+            }
+          }
+        }
+        if (age >= 4000) {
+          state.thorPhase = 'ending';
+          state.thorPhaseStart = now;
+          if (state.thorBigTornado) state.thorBigTornado.alive = false;
+        }
+      } else if (state.thorPhase === 'ending') {
+        state.thorDarkness = Math.max(0, 0.52 * (1 - age / 1700));
+        if (!state.thorFinalDone && age > 240) {
+          state.thorFinalDone = true;
+          spawnThorBolt(now, true, true);
+        }
+        if (age >= 1800) {
+          state.thorPhase = 'idle';
+          state.thorSmallTornados = [];
+          state.thorBigTornado = null;
+          state.thorBolts = [];
+          state.thorFarBolts = [];
+          state.thorParticles = [];
+          state.thorDebris = [];
+          state.thorSparks = [];
+          state.thorEnergyArcs = [];
+          state.thorShockwaves = [];
+          state.thorRings = [];
+          state.thorDarkness = 0;
+          state.thorColumn = 0;
+          state.thorFlashAlpha = 0;
+          state.thorShake = 0;
+        }
+      }
+
+      const activeTornados = state.thorPhase === 'small'
+        ? state.thorSmallTornados.filter(t => t.alive)
+        : (state.thorBigTornado && state.thorBigTornado.alive ? [state.thorBigTornado] : []);
+
+      activeTornados.forEach((tornado, index) => {
+        tornado.spin += (tornado.kind === 'big' ? 0.0072 : 0.0092) * dt;
+        tornado.birthScale = clamp(tornado.birthScale + dt / 400, 0, 1);
+        tornado.lastDir = (tornado.lastDir || 0) + dt;
+
+        if (tornado.kind === 'small') {
+          if ((tornado.lastDir || 0) > 260 + rand(0, 240)) {
+             tornado.vx = (tornado.vx || 0) + rand(-120, 120);
+             tornado.vy = (tornado.vy || 0) + rand(-150, 150);
+             tornado.lastDir = 0;
+          }
+          tornado.vx = (tornado.vx || 0) + Math.sin(now / 205 + tornado.seed) * 4.6;
+          tornado.vy = (tornado.vy || 0) + Math.cos(now / 165 + tornado.seed) * 5.4;
+          tornado.vx *= 0.988;
+          tornado.vy *= 0.986;
+          tornado.x += tornado.vx * dt / 1000;
+          tornado.y += tornado.vy * dt / 1000;
+        } else {
+          tornado.x = WIDTH * 0.76 + Math.sin(now / 740) * 90 + Math.sin(now / 254) * 24;
+          tornado.y = HEIGHT * 0.5 + Math.sin(now / 510) * 132 + Math.cos(now / 305) * 22;
+        }
+        
+        tornado.x = clamp(tornado.x, WIDTH * 0.52 + tornado.radius * 0.25, WIDTH - 36 - tornado.radius * 0.12);
+        tornado.y = clamp(tornado.y, 72, HEIGHT - 40);
+
+        for (let i = 0; i < (tornado.kind === 'big' ? 2 : 1); i++) {
+          const side = Math.random() < 0.5 ? -1 : 1;
+          state.thorDebris.push({
+            x: tornado.x + side * rand(tornado.radius * 1.1, tornado.radius * 2.2),
+            y: tornado.y + rand(-tornado.height * 0.4, tornado.height * 0.42),
+            vx: rand(-1.2, 1.2),
+            vy: rand(-2.4, 0.6),
+            sz: rand(1.5, tornado.kind === 'big' ? 8 : 5),
+            rot: rand(0, Math.PI * 2),
+            vr: rand(-0.18, 0.18),
+            life: 1,
+            decay: rand(0.006, 0.018),
+            target: tornado,
+            color: Math.random() < 0.7 ? 'rgba(148,163,184,0.72)' : 'rgba(253,230,138,0.78)'
+          });
+        }
+
+        const pChance = tornado.kind === 'big' ? 0.97 : 0.72;
+        if (Math.random() < pChance) {
+          const n = tornado.kind === 'big' ? 5 : 2;
+          for (let i = 0; i < n; i++) {
+            const a = rand(0, Math.PI * 2);
+            const rim = tornado.radius * rand(0.4, 1.28);
+            state.thorParticles.push({
+              x: tornado.x + Math.cos(a) * rim,
+              y: tornado.y + rand(-tornado.height * 0.4, tornado.height * 0.4),
+              vx: Math.cos(a + Math.PI / 2) * rand(0.8, 3),
+              vy: rand(-3.2, -0.7),
+              sz: rand(0.8, tornado.kind === 'big' ? 5.2 : 3.2),
+              life: 0.82,
+              decay: rand(0.011, 0.028),
+              color: Math.random() < 0.55 ? 'rgba(186,230,253,0.78)' : 'rgba(253,230,138,0.78)'
+            });
+          }
+        }
+
+        if (tornado.kind === 'big' && Math.random() < 0.16) {
+          const a = rand(0, Math.PI * 2);
+          state.thorSparks.push({
+            x: tornado.x + Math.cos(a) * tornado.radius * rand(0.2, 1),
+            y: tornado.y + rand(-tornado.height * 0.4, tornado.height * 0.28),
+            vx: Math.cos(a) * rand(1, 5),
+            vy: Math.sin(a) * rand(1, 5),
+            life: 1,
+            decay: rand(0.04, 0.09),
+            color: 'rgba(253,230,138,1)'
+          });
+        }
+
+        if (Math.random() < (tornado.kind === 'big' ? 0.22 : 0.08)) {
+          const angle = rand(0, Math.PI * 2);
+          state.thorEnergyArcs.push({
+            x: tornado.x,
+            y: tornado.y,
+            ex: tornado.x + Math.cos(angle) * rand(30, 90),
+            ey: tornado.y + Math.sin(angle) * rand(20, 60),
+            life: 1,
+            decay: rand(0.06, 0.14),
+            color: tornado.kind === 'big' ? 'rgba(253,230,138,' : 'rgba(103,232,249,'
+          });
+        }
+      });
+      
+      const wind = state.thorPhase === 'prelude' ? 2.6 : state.thorPhase === 'big' ? 8.8 : 5.4;
+      for (const c of state.thorClouds) {
+        c.swirl += dt * 0.0006;
+        c.x -= (c.spd + wind * 4) * dt / 1000;
+        const cx = WIDTH * 0.72;
+        c.y += Math.sin(now / 560 + c.swirl) * 0.1 * wind;
+        c.x += (cx - c.x) * 0.0005 * wind;
+        if (c.x + c.w < -80) {
+          c.x = WIDTH + rand(0, 180);
+          c.y = 4 + rand(0, 180);
+        }
+      }
+      for (const r of state.thorRainDrops) {
+        r.y += r.spd; r.x -= r.spd * 0.18;
+        if (r.y > HEIGHT + 20) { r.y = -10; r.x = rand(0, WIDTH); }
+      }
+
+      const boltDecay = Math.max(0.55, dt / 16.67);
+      state.thorBolts.forEach(bolt => { bolt.life -= boltDecay; });
+      state.thorFarBolts.forEach(bolt => { bolt.life -= boltDecay * 0.9; });
+      state.thorBolts = state.thorBolts.filter(bolt => bolt.life > 0);
+      state.thorFarBolts = state.thorFarBolts.filter(bolt => bolt.life > 0);
+
+      for (let i = state.thorShockwaves.length - 1; i >= 0; i--) {
+        const wave = state.thorShockwaves[i];
+        wave.life -= wave.decay ?? 0.035;
+        if (wave.life <= 0) state.thorShockwaves.splice(i, 1);
+      }
+
+      for (let i = state.thorRings.length - 1; i >= 0; i--) {
+        const ring = state.thorRings[i];
+        ring.life -= 0.028;
+        ring.radius += 0.9;
+        ring.angle += 0.008;
+        if (ring.life <= 0) state.thorRings.splice(i, 1);
+      }
+
+      for (let i = state.thorDebris.length - 1; i >= 0; i--) {
+        const d = state.thorDebris[i];
+        if (d.target && d.target.alive) {
+          const dx = d.target.x - d.x;
+          const dy = d.target.y - d.y;
+          const dist = Math.max(14, Math.hypot(dx, dy));
+          const pull = d.target.kind === 'big' ? 0.30 : 0.19;
+          d.vx += (dx / dist) * pull;
+          d.vy += (dy / dist) * pull - 0.02;
+        }
+        d.x += d.vx; d.y += d.vy; d.rot += d.vr;
+        d.vx *= 0.982; d.vy *= 0.982; d.life -= d.decay;
+        if (d.life <= 0 || d.y < -80) state.thorDebris.splice(i, 1);
+      }
+      for (let i = state.thorSparks.length - 1; i >= 0; i--) {
+        const s = state.thorSparks[i];
+        s.x += s.vx; s.y += s.vy; s.vx *= 0.93; s.vy *= 0.93; s.life -= s.decay;
+        if (s.life <= 0) state.thorSparks.splice(i, 1);
+      }
+      for (let i = state.thorEnergyArcs.length - 1; i >= 0; i--) {
+        const e = state.thorEnergyArcs[i];
+        e.life -= e.decay;
+        if (e.life <= 0) state.thorEnergyArcs.splice(i, 1);
+      }
+
+      state.thorParticles.forEach(particle => {
+        particle.x += particle.vx;
+        particle.y += particle.vy;
+        particle.vx *= 0.984;
+        particle.vy *= 0.984;
+        particle.life -= particle.decay || 0.018;
+      });
+      state.thorParticles = state.thorParticles.filter(p => p.life > 0).slice(-360);
+    };
+
+--- Blizzard ---
+    const updateBlizzardSpecial = (now: number, dt: number) => {
+      const blizzard = state.blizzard;
+      if (blizzard.active) {
+        const age = now - blizzard.start;
+        blizzard.windPhase += dt * 0.001;
+        if (age < 800) blizzard.coverAlpha = easeInOut(age / 800) * 0.72;
+        else if (age > blizzard.duration - 800) blizzard.coverAlpha = easeInOut(Math.max(0, 1 - (age - (blizzard.duration - 800)) / 800)) * 0.72;
+        else blizzard.coverAlpha = 0.72;
+
+        blizzard.tickAccum += dt;
+        while (blizzard.tickAccum >= blizzard.tickInterval) {
+          blizzard.tickAccum -= blizzard.tickInterval;
+          applyBlizzardTick();
+          for (let i = 0; i < 8; i++) {
+            state.blizzardSparks.push({
+              x: rand(WIDTH * 0.5, WIDTH),
+              y: rand(0, HEIGHT),
+              vx: rand(-2, -0.4),
+              vy: rand(0.2, 1.2),
+              life: 1,
+              decay: rand(0.08, 0.18),
+              color: 'rgba(186,230,253,0.88)',
+            });
+          }
+        }
+
+        blizzard.blockAccum += dt;
+        while (blizzard.blockAccum >= blizzard.blockInterval && blizzard.blocksSpawned < 4) {
+          blizzard.blockAccum -= blizzard.blockInterval;
+          blizzard.blocksSpawned += 1;
+          spawnBlizzardIceBlock();
+        }
+
+        if (age >= blizzard.duration) {
+          blizzard.active = false;
+          blizzard.coverAlpha = 0;
+        }
+      } else {
+        blizzard.coverAlpha = Math.max(0, blizzard.coverAlpha - 0.025);
+      }
+
+      if (blizzard.active || blizzard.coverAlpha > 0.01) {
+        for (const snow of state.blizzardSnowflakes) {
+          const speed = Math.max(0.25, blizzard.coverAlpha * 1.4);
+          snow.x += snow.wx * speed * dt / 16;
+          snow.y += snow.spd * speed * dt / 16;
+          snow.phase += dt * 0.003 * snow.drift;
+          if (snow.y > HEIGHT + 10) { snow.y = -10; snow.x = rand(WIDTH * 0.5, WIDTH + 60); }
+          if (snow.x < WIDTH * 0.5 - 20) { snow.x = WIDTH + rand(0, 60); snow.y = rand(0, HEIGHT); }
+        }
+      }
+
+      for (let i = state.blizzardIceBlocks.length - 1; i >= 0; i--) {
+        const block = state.blizzardIceBlocks[i];
+        if (block.exploded) {
+          block.life -= 0.06;
+          if (block.life <= 0) state.blizzardIceBlocks.splice(i, 1);
+          continue;
+        }
+        block.vy += 0.12;
+        block.y += block.vy;
+        if (block.y >= block.explodeY) explodeBlizzardIceBlock(block);
+        if (block.y > HEIGHT + 100) state.blizzardIceBlocks.splice(i, 1);
+      }
+
+      for (let i = state.blizzardShockwaves.length - 1; i >= 0; i--) {
+        const wave = state.blizzardShockwaves[i];
+        wave.radius += (wave.maxRadius - wave.radius) * 0.072 + 4.6;
+        wave.life -= 0.028;
+        if (wave.life <= 0 || wave.radius > wave.maxRadius) state.blizzardShockwaves.splice(i, 1);
+      }
+
+      for (let i = state.blizzardShards.length - 1; i >= 0; i--) {
+        const shard = state.blizzardShards[i];
+        shard.x += shard.vx;
+        shard.y += shard.vy;
+        shard.vy += 0.09;
+        shard.vx *= 0.982;
+        shard.vy *= 0.982;
+        shard.rot += shard.vr;
+        shard.life -= shard.decay;
+        if (shard.life <= 0) state.blizzardShards.splice(i, 1);
+      }
+
+      for (let i = state.blizzardCrystals.length - 1; i >= 0; i--) {
+        const crystal = state.blizzardCrystals[i];
+        crystal.x += crystal.vx;
+        crystal.y += crystal.vy;
+        crystal.rot += crystal.vr;
+        crystal.life -= crystal.decay;
+        if (crystal.life <= 0) state.blizzardCrystals.splice(i, 1);
+      }
+
+      for (let i = state.blizzardSparks.length - 1; i >= 0; i--) {
+        const spark = state.blizzardSparks[i];
+        spark.x += spark.vx;
+        spark.y += spark.vy;
+        spark.vx *= 0.93;
+        spark.vy *= 0.93;
+        spark.life -= spark.decay;
+        if (spark.life <= 0) state.blizzardSparks.splice(i, 1);
+      }
+
+      blizzard.shake *= 0.88;
+      blizzard.flashAlpha *= 0.84;
+    };
+
+--- Hellfire Impact ---
+      if (projectile.special === 'hellfire') {
+      if (projectile.special === 'hellfire') {
+      const damagePayload = createSpecialDamagePayload(1.8, { fire: 25 });
+        damage: damagePayload.damage,
+        crit: damagePayload.crit,
+        elemental: damagePayload.elemental,
+        if (projectile.special === 'hellfire') {
+        if (projectile.special === 'hellfire') drawFireball(ctx, projectile, now);
+            const speed = projectile.special === 'hellfire' ? Math.max(7.5, Math.sqrt(projectile.vx * projectile.vx + projectile.vy * projectile.vy)) : Math.max(8.5, Math.sqrt(projectile.vx * projectile.vx + projectile.vy * projectile.vy));
+            projectile.vx = projectile.vx * (projectile.special === 'hellfire' ? 0.86 : 0.88) + desiredVx * (projectile.special === 'hellfire' ? 0.14 : 0.12);
+            projectile.vy = projectile.vy * (projectile.special === 'hellfire' ? 0.86 : 0.88) + desiredVy * (projectile.special === 'hellfire' ? 0.14 : 0.12);
+        if (projectile.special === 'hellfire') {
+            if (enemy.hp > 0 && Math.sqrt(dx * dx + dy * dy) < enemy.radius + (projectile.special === 'hellfire' ? 16 : 10)) {

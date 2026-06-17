@@ -1,0 +1,90 @@
+
+--- applyLaserDamageTick ---
+    const applyLaserDamageTick = () => {
+      const now = performance.now();
+      const start = getLaserStart();
+      const end = getLaserEnd();
+      let hitCount = 0;
+      let totalDamage = 0;
+      state.enemies.forEach(enemy => {
+        const distance = distanceToSegment(enemy.x, enemy.y, start.x, start.y, end.x, end.y);
+        const laserContactRadius = HORIZON_LASER_DAMAGE_RADIUS + enemy.radius;
+        if (enemy.hp > 0 && distance <= laserContactRadius) {
+          const payload = createSpecialDamagePayload(HORIZON_LASER_DAMAGE_MULTIPLIER);
+          const baseDamage = payload.crit ? payload.damage * shipStats.critMultiplier : payload.damage;
+          enemy.hp -= baseDamage;
+          const elementalDamage = applyElementalDamage(enemy, payload.elemental, now, hitCount < 2 || isMonsterKind(enemy.kind));
+          const laserDamage = baseDamage + elementalDamage;
+          hitCount += 1;
+          totalDamage += laserDamage;
+          for (let i = 0; i < 8; i++) {
+            spawnParticle(enemy.x, enemy.y, ['#f0abfc', '#22d3ee', '#ff3355', '#ffffff'][i % 4], 3.2, 0.62, 3.2);
+          }
+          if (hitCount <= 3 || isMonsterKind(enemy.kind)) {
+            spawnFloat(enemy.x, enemy.y - 34, `${payload.crit ? 'CRIT ' : ''}${Math.round(laserDamage)}`, payload.crit ? '#facc15' : '#f0abfc');
+          }
+        }
+      });
+      if (hitCount > 0) {
+        playSound(PLAYER_SOUNDS.apocalypseLaserImpact, Math.min(0.72, 0.42 + hitCount * 0.08));
+      }
+      if (hitCount > 3) {
+        spawnFloat(end.x - 120, end.y - 48, `${hitCount} HITS · ${Math.round(totalDamage)}`, '#ffffff');
+      }
+    };
+
+--- applyThorDamage ---
+    const applyThorDamage = (multiplier: number, x: number, y: number, radius: number, label: string, color: string) => {
+      const now = performance.now();
+      const payload = createSpecialDamagePayload(multiplier, { electric: 44 });
+      let hitCount = 0;
+      state.enemies.forEach(enemy => {
+        if (enemy.hp <= 0) return;
+        const distance = Math.hypot(enemy.x - x, enemy.y - y);
+        if (distance > radius + enemy.radius) return;
+        const baseDamage = payload.crit ? payload.damage * shipStats.critMultiplier : payload.damage;
+        enemy.hp -= baseDamage;
+        const elementalDamage = applyElementalDamage(enemy, payload.elemental, now, hitCount < 2 || isMonsterKind(enemy.kind));
+        hitCount += 1;
+        if (hitCount <= 4 || isMonsterKind(enemy.kind)) {
+          spawnFloat(enemy.x + rand(-12, 12), enemy.y - 30, `${label} ${Math.round(baseDamage + elementalDamage)}`, color);
+        }
+        spawnThorBurst(enemy.x, enemy.y, color, enemy.hp <= 0 ? 18 : 8);
+      });
+      return hitCount;
+    };
+
+--- applyBlizzardTick ---
+    const applyBlizzardTick = () => {
+      const now = performance.now();
+      const payload = createSpecialDamagePayload(0.675, { ice: 44 });
+      state.enemies.forEach(enemy => {
+        if (enemy.hp <= 0 || enemy.x <= WIDTH * 0.5) return;
+        const baseDamage = payload.crit ? payload.damage * shipStats.critMultiplier : payload.damage;
+        enemy.hp -= baseDamage;
+        const elementalDamage = applyElementalDamage(enemy, payload.elemental, now, false);
+        enemy.status.slowUntil = now + 4600;
+        spawnFloat(enemy.x + rand(-18, 18), enemy.y - 22, `-${Math.round(baseDamage + elementalDamage)} ICE`, '#bae6fd');
+        if (enemy.hp <= 0) spawnBlizzardBurst(enemy.x, enemy.y, 'rgba(147,197,253,0.88)', 28);
+      });
+    };
+
+--- explodeBlizzardIceBlock ---
+    const explodeBlizzardIceBlock = (block: BlizzardIceBlock) => {
+      block.exploded = true;
+      const { x, y } = block;
+      playBlizzardExplosionSfx();
+      state.blizzard.shake = Math.max(state.blizzard.shake, 28);
+      state.blizzard.flashAlpha = Math.max(state.blizzard.flashAlpha, 0.52);
+      spawnBlizzardShockwave(x, y, 'rgba(147,197,253,1)', WIDTH * 0.5);
+      spawnBlizzardShockwave(x, y, 'rgba(186,230,253,1)', WIDTH * 0.38, true);
+      spawnBlizzardShards(x, y, 72);
+      spawnBlizzardBurst(x, y, 'rgba(147,197,253,0.88)', 48);
+      spawnBlizzardBurst(x, y, 'rgba(255,255,255,0.92)', 28);
+      for (let i = 0; i < 24; i++) spawnBlizzardCrystal(x, y);
+      applyBlizzardDamage(1.05, x, y, 90, 'GELO', '#bae6fd');
+      applyBlizzardDamage(0.525, x, y, WIDTH * 0.5, 'AREA', '#93c5fd');
+      spawnFloat(x, y - 40, 'BLIZZARD IMPACT', '#e0f2fe');
+    };
+
+--- hellfire logic ---

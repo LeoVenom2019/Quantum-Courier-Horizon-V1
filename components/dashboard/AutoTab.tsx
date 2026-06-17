@@ -175,11 +175,9 @@ const AutoTab = memo(() => {
                     >
                       {t('buy').toUpperCase()} <Coins className="w-2 h-2" /> {formatValue([1000, 5000, 10000, 15000, 20000][slots] * getLocationMultiplier(route.id) * getEconomicMultipliers().cost * (route.tier === 'Interstellar' ? 2 : 1))}
                     </PremiumCanvasButton>
-                    {route.id !== 'speed_run' && (
-                      <div className={`text-[7px] font-mono ${aetherion < (slots + 1) * 200 ? 'text-red-500 font-bold' : 'text-pink-400/80'} uppercase tracking-tighter flex items-center gap-1 mt-0.5`}>
-                        <Zap className="w-1.5 h-1.5" /> {t('activationCost')}: {(slots + 1) * 200}
-                      </div>
-                    )}
+                    <div className={`text-[7px] font-mono ${aetherion < (slots + 1) * 200 ? 'text-red-500 font-bold' : 'text-pink-400/80'} uppercase tracking-tighter flex items-center gap-1 mt-0.5`}>
+                      <Zap className="w-1.5 h-1.5" /> {t('activationCost')}: {(slots + 1) * 200}
+                    </div>
                   </div>
                 ) : (
                   <div className="text-emerald-400 text-[7px] font-orbitron font-bold tracking-widest uppercase">{t('max')}</div>

@@ -1,0 +1,10 @@
+<Configuration>
+  <Add OfficeClientEdition="64" Channel="Current">
+    <Product ID="Home2024Retail">
+      <Language ID="pt-br" />
+    </Product>
+  </Add>
+  <Updates Enabled="TRUE" />
+  <Display Level="Full" AcceptEULA="TRUE" />
+  <Property Name="FORCEAPPSHUTDOWN" Value="TRUE" />
+</Configuration>

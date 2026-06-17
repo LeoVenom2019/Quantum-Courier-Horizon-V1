@@ -1,0 +1,19 @@
+
+--- Laser Interval ---
+const HORIZON_LASER_DAMAGE_INTERVAL = 1000 / 3;
+
+--- Hellfire Barrage ---
+if (specialId === 'hellfire-barrage') {
+        if (state.hellfireSequence.active) return;
+        state.hellfireSequence = { active: true, remaining: 5, waitingForImpact: false }
+
+--- Hellfire Logic ---
+if (state.hellfireSequence.active) return;
+        state.hellfireSequence = { active: true, remaining: 5, waitingForImpact: false }
+
+--- createSpecialDamagePayload ---
+createSpecialDamagePayload(multiplier, { ice: 36 })
+createSpecialDamagePayload(0.675, { ice: 44 })
+createSpecialDamagePayload(multiplier, { electric: 44 })
+createSpecialDamagePayload(HORIZON_LASER_DAMAGE_MULTIPLIER)
+createSpecialDamagePayload(1.8, { fire: 25 })

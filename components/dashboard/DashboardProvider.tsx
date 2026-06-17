@@ -597,7 +597,7 @@ export const DashboardProvider = ({
     }
 
     const aetherionRequired = (currentSlots + 1) * 200;
-    if (economy.aetherion < aetherionRequired && route.id !== 'speed_run') {
+    if (economy.aetherion < aetherionRequired) {
       playSfx('error');
       const msg = language === 'pt' 
         ? `Necessário ${aetherionRequired} Etérion para este slot (Possui: ${Math.floor(economy.aetherion)})` 
@@ -2188,7 +2188,6 @@ export const DashboardProvider = ({
       // Game
       seenTutorials: game.state.system.seenTutorials,
       arcadeScores: game.state.system.arcadeScores,
-      localRecords: game.state.system.localRecords,
       hasSeenRoute2UnlockMessage: game.state.system.hasSeenRoute2UnlockMessage
     };
 

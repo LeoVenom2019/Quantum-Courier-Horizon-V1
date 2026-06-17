@@ -3648,7 +3648,7 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
                   <div className="mt-4 min-h-0 flex-1 rounded-2xl border border-white/10 bg-black/35 p-3">
                     <div className="flex items-center justify-between gap-3">
                       <div>
-                        <p className="font-mono text-[9px] uppercase tracking-[0.26em] text-zinc-500">{t('Battle Cards Codex', 'Codex de Batalha')}</p>
+                        <p className="font-mono text-[9px] uppercase tracking-[0.26em] text-zinc-500">{t('Battle Cards Archive', 'Arquivo de Batalha')}</p>
                         <h5 className="mt-1 font-orbitron text-[12px] font-black uppercase tracking-tight text-white">{t('Owned Battle Cards', 'Cartas de Batalha Obtidas')}</h5>
                       </div>
                       {battleCardCodexPageCount > 1 && (

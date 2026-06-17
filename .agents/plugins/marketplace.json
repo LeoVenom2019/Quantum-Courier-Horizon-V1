@@ -5,10 +5,10 @@
   },
   "plugins": [
     {
-      "name": "qch-dev-assistant",
+      "name": "qch-dev-tools",
       "source": {
         "source": "local",
-        "path": "./plugins/qch-dev-assistant"
+        "path": "./plugins/qch-dev-tools"
       },
       "policy": {
         "installation": "AVAILABLE",

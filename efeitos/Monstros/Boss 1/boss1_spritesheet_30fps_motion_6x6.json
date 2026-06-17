@@ -1,0 +1,12 @@
+{
+  "image": "boss1_spritesheet_30fps_motion_6x6.png",
+  "frameWidth": 314,
+  "frameHeight": 314,
+  "columns": 6,
+  "rows": 6,
+  "frameCount": 36,
+  "fps": 30,
+  "source": "boss1_preview_12fps_clean.webp",
+  "method": "ffmpeg minterpolate optical-flow motion interpolation",
+  "notes": "Generated as a quick 30 fps preview. Some intermediate frames may show blur/artifacts around wings and body."
+}

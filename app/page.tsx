@@ -6,7 +6,6 @@ import { Rocket, Settings, Trophy, Play, Music, Volume2, Globe, X, Timer, Trash2
 import { IntroNarrative } from '@/components/IntroNarrative';
 import { GameDashboard } from '@/components/GameDashboard';
 import { AchievementsModal } from '@/components/AchievementsModal';
-import { ThemeInfoWindow } from '@/components/ThemeInfoWindow';
 import { Jukebox } from '@/components/Jukebox';
 import { useJukebox } from '@/hooks/useJukebox';
 import { useSFX } from '@/hooks/useSFX';
@@ -15,7 +14,7 @@ import { HorizonRadioModal } from '@/components/HorizonRadioModal';
 import { GameStorage } from '@/lib/game-storage';
 import { SaveManager } from '@/lib/save-manager';
 import { Language, t } from '@/lib/i18n';
-import { ThemeColor, GAME_THEMES } from '@/lib/game-data';
+import { ThemeColor } from '@/lib/game-data';
 import {
   areAssetGroupsReady,
   getAssetGroupsSummary,
@@ -42,6 +41,13 @@ const getAssetGroupsForSavedRoute = (saved: any): AssetGroupId[] => {
 
 const preloadAssetsForSavedRoute = (saved: any) => {
   preloadAssetGroupsPassive(getAssetGroupsForSavedRoute(saved));
+};
+
+const getLandingThemeForRouteTier = (routeTier: string): ThemeColor => {
+  if (routeTier === 'Earth') return 'emerald';
+  if (routeTier === 'Void') return 'purple';
+  if (routeTier === 'Interstellar') return 'orange';
+  return 'cyan';
 };
 
 const wait = (ms: number) => new Promise(resolve => window.setTimeout(resolve, ms));
@@ -203,6 +209,7 @@ const Meteor = ({ delay = 0, theme = 'cyan' }: { delay?: number; theme?: ThemeCo
   const trailColorMap: Record<ThemeColor, string> = {
     cyan: 'via-cyan-400',
     orange: 'via-orange-400',
+    purple: 'via-purple-400',
     neila: 'via-emerald-400',
     pink: 'via-pink-400',
     violet: 'via-violet-400',
@@ -271,6 +278,7 @@ const SpaceShip = ({
   const engineGlowMap: Record<string, string> = {
     cyan: 'shadow-[0_0_20px_#06b6d4,0_0_40px_#06b6d4]',
     orange: 'shadow-[0_0_20px_#f97316,0_0_40px_#f97316]',
+    purple: 'shadow-[0_0_20px_#a855f7,0_0_40px_#a855f7]',
     violet: 'shadow-[0_0_20px_#8b5cf6,0_0_40px_#8b5cf6]',
     emerald: 'shadow-[0_0_20px_#10b981,0_0_40px_#10b981]',
   };
@@ -278,6 +286,7 @@ const SpaceShip = ({
   const trailColorMap: Record<string, string> = {
     cyan: 'from-cyan-500/40',
     orange: 'from-orange-500/40',
+    purple: 'from-purple-500/40',
     violet: 'from-violet-500/40',
     emerald: 'from-emerald-500/40',
   };
@@ -770,42 +779,11 @@ const AlienVisual = () => (
   </motion.div>
 );
 
-const ThemeIconButton = ({ 
-  children, 
-  onClick, 
-  themeId, 
-  glowColor 
-}: { 
-  children: React.ReactNode; 
-  onClick: (id: string) => void; 
-  themeId: string;
-  glowColor: string;
-}) => {
-  return (
-    <motion.button
-      whileHover={{ 
-        scale: 1.08,
-      }}
-      whileTap={{ scale: 0.95 }}
-      onClick={() => onClick(themeId)}
-      className="relative cursor-pointer transition-all duration-300 pointer-events-auto group"
-    >
-      {/* Hover Glow Effect */}
-      <div 
-        className="absolute inset-0 rounded-full opacity-0 group-hover:opacity-40 blur-3xl transition-opacity duration-300"
-        style={{ backgroundColor: glowColor }}
-      />
-      <div className="relative z-10">
-        {children}
-      </div>
-    </motion.button>
-  );
-};
-
 const MenuButton = ({ label, icon: Icon, onClick, disabled = false, theme = 'cyan' }: { label: string; icon: any; onClick?: () => void; disabled?: boolean; theme?: ThemeColor }) => {
   const colorMap: Record<ThemeColor, string> = {
     cyan: '#06b6d4',
     orange: '#f97316',
+    purple: '#a855f7',
     neila: '#10b981',
     pink: '#ec4899',
     violet: '#8b5cf6',
@@ -820,6 +798,7 @@ const MenuButton = ({ label, icon: Icon, onClick, disabled = false, theme = 'cya
   const borderMap: Record<ThemeColor, string> = {
     cyan: 'border-cyan-500/10',
     orange: 'border-orange-500/10',
+    purple: 'border-purple-500/10',
     neila: 'border-emerald-500/10',
     pink: 'border-pink-500/10',
     violet: 'border-violet-500/10',
@@ -833,6 +812,7 @@ const MenuButton = ({ label, icon: Icon, onClick, disabled = false, theme = 'cya
   const textMap: Record<ThemeColor, string> = {
     cyan: 'text-cyan-400',
     orange: 'text-orange-400',
+    purple: 'text-purple-400',
     neila: 'text-emerald-400',
     pink: 'text-pink-400',
     violet: 'text-violet-400',
@@ -846,6 +826,7 @@ const MenuButton = ({ label, icon: Icon, onClick, disabled = false, theme = 'cya
   const hoverTextMap: Record<ThemeColor, string> = {
     cyan: 'text-cyan-300',
     orange: 'text-orange-300',
+    purple: 'text-purple-300',
     neila: 'text-emerald-300',
     pink: 'text-pink-300',
     violet: 'text-violet-300',
@@ -859,6 +840,7 @@ const MenuButton = ({ label, icon: Icon, onClick, disabled = false, theme = 'cya
   const hoverBgMap: Record<ThemeColor, string> = {
     cyan: 'rgba(6, 182, 212, 0.2)',
     orange: 'rgba(249, 115, 22, 0.2)',
+    purple: 'rgba(168, 85, 247, 0.2)',
     neila: 'rgba(16, 185, 129, 0.2)',
     pink: 'rgba(236, 72, 153, 0.2)',
     violet: 'rgba(139, 92, 246, 0.2)',
@@ -872,6 +854,7 @@ const MenuButton = ({ label, icon: Icon, onClick, disabled = false, theme = 'cya
   const glowMap: Record<ThemeColor, string> = {
     cyan: 'group-hover:text-cyan-100',
     orange: 'group-hover:text-orange-100',
+    purple: 'group-hover:text-purple-100',
     neila: 'group-hover:text-emerald-100',
     pink: 'group-hover:text-pink-100',
     violet: 'group-hover:text-violet-100',
@@ -885,6 +868,7 @@ const MenuButton = ({ label, icon: Icon, onClick, disabled = false, theme = 'cya
   const cornerMap: Record<ThemeColor, string> = {
     cyan: 'border-cyan-400/40',
     orange: 'border-orange-400/40',
+    purple: 'border-purple-400/40',
     neila: 'border-emerald-400/40',
     pink: 'border-pink-400/40',
     violet: 'border-violet-400/40',
@@ -898,6 +882,7 @@ const MenuButton = ({ label, icon: Icon, onClick, disabled = false, theme = 'cya
   const gradientMap: Record<ThemeColor, string> = {
     cyan: 'from-cyan-500/0 via-cyan-500/10 to-cyan-500/0',
     orange: 'from-orange-500/0 via-orange-500/10 to-orange-500/0',
+    purple: 'from-purple-500/0 via-purple-500/10 to-purple-500/0',
     neila: 'from-emerald-500/0 via-emerald-500/10 to-emerald-500/0',
     pink: 'from-pink-500/0 via-pink-500/10 to-pink-500/0',
     violet: 'from-violet-500/0 via-violet-500/10 to-violet-500/0',
@@ -932,7 +917,7 @@ const MenuButton = ({ label, icon: Icon, onClick, disabled = false, theme = 'cya
           : 'bg-black/40 backdrop-blur-md'
       }`}
     >
-      {/* Refined RGB Animated Border (Google AI Studio style) with Glassmorphism */}
+      {/* Refined RGB animated border with glassmorphism */}
       {!disabled && (
         <div 
           className="absolute inset-0 pointer-events-none rounded-xl p-[1px]"
@@ -1044,24 +1029,8 @@ export default function GameHome() {
   const [showHorizonRadio, setShowHorizonRadio] = useState(false);
   const [playerName, setPlayerName] = useState('');
   const [showNamePrompt, setShowNamePrompt] = useState(false);
-  const [isRoute2Unlocked, setIsRoute2Unlocked] = useState(false);
-  const [currentThemeIndex, setCurrentThemeIndex] = useState(0);
-  const theme = GAME_THEMES[currentThemeIndex].color;
-
-  const setTheme = (color: ThemeColor | ((prev: ThemeColor) => ThemeColor)) => {
-    const newColor = typeof color === 'function' ? color(theme) : color;
-    const index = GAME_THEMES.findIndex(t => t.color === newColor);
-    if (index !== -1) {
-      setCurrentThemeIndex(index);
-    }
-  };
-
-  useEffect(() => {
-    const saveTheme = async () => {
-      await GameStorage.save(currentThemeIndex, 'game_theme_index');
-    };
-    saveTheme().catch(() => {});
-  }, [currentThemeIndex]);
+  const [landingTheme, setLandingTheme] = useState<ThemeColor>('cyan');
+  const theme = landingTheme;
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [showNewCampaignConfirm, setShowNewCampaignConfirm] = useState(false);
   const [pendingNewCampaignReset, setPendingNewCampaignReset] = useState(false);
@@ -1072,7 +1041,6 @@ export default function GameHome() {
   const [achievementProgress, setAchievementProgress] = useState<{ [key: string]: number }>({});
   const [isShaking, setIsShaking] = useState(false);
 
-  const [localRecords, setLocalRecords] = useState<{ name: string; time: number; date: string }[]>([]);
   const [isMounted, setIsMounted] = useState(false);
   const [randomVisual, setRandomVisual] = useState<React.ReactNode | null>(null);
   const [continuePreload, setContinuePreload] = useState<AssetPreloadSummary | null>(null);
@@ -1176,21 +1144,6 @@ export default function GameHome() {
     };
   }, []);
 
-  const getThemeGlowColor = (themeColor: ThemeColor) => {
-    const colorMap: Record<ThemeColor, string> = {
-      cyan: '#06b6d4',
-      orange: '#f97316',
-      neila: '#10b981',
-      pink: '#ec4899',
-      violet: '#8b5cf6',
-      amber: '#f59e0b',
-      emerald: '#10b981',
-      rose: '#f43f5e',
-      blue: '#3b82f6',
-    };
-    return colorMap[themeColor] || '#06b6d4';
-  };
-
   // Hydration fix: Load from localStorage after mount
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -1221,9 +1174,7 @@ export default function GameHome() {
             // Improved Route 2 detection
             const routeTier = data.progression?.routeTier || data.routeTier || 'Solar';
             const techLevels = data.progression?.unlockedTechLevels || data.unlockedTechLevels || {};
-            const unlocked = routeTier !== 'Solar' || (techLevels.Solar >= 9);
-            
-            setIsRoute2Unlocked(unlocked);
+            setLandingTheme(getLandingThemeForRouteTier(routeTier));
             setHasSave(true);
             
             // Achievement states
@@ -1239,18 +1190,6 @@ export default function GameHome() {
               setAchievementProgress(data.achievementProgress);
             }
             
-            const savedThemeIndex = await GameStorage.load('game_theme_index');
-            if (typeof savedThemeIndex === 'number' && savedThemeIndex >= 0 && savedThemeIndex < GAME_THEMES.length) {
-              setCurrentThemeIndex(savedThemeIndex);
-            } else {
-              // Fallback to old theme system if exists
-              const savedTheme = await GameStorage.load('game_theme');
-              if (savedTheme === 'cyan') setCurrentThemeIndex(0);
-              else if (savedTheme === 'orange') setCurrentThemeIndex(3); // Saturn is orange
-              else if (savedTheme === 'neila') setCurrentThemeIndex(9); // Neila is emerald
-              else if (unlocked) setCurrentThemeIndex(3);
-            }
-
             if (data.unlockedAchievements) {
               setUnlockedAchievements(data.unlockedAchievements);
             }
@@ -1275,7 +1214,7 @@ export default function GameHome() {
   
 
 
-  const resetStorageKeys = ['time_travel_save', 'speed_run_save', 'colonies_data', 'history_data', 'game_theme_index', 'qch_settings', 'arcade_card_reward_milestones'];
+  const resetStorageKeys = ['time_travel_save', 'colonies_data', 'history_data', 'qch_settings', 'arcade_card_reward_milestones'];
 
   const clearProgressStorage = async (options?: { allowImmediateSave?: boolean }) => {
     GameStorage.markReset(10000);
@@ -1293,11 +1232,9 @@ export default function GameHome() {
     if (!options?.keepPlayerName) {
       setPlayerName('');
     }
-    setIsRoute2Unlocked(false);
     setUnlockedAchievements([]);
     setAchievementProgress({});
-    setLocalRecords([]);
-    setCurrentThemeIndex(0);
+    setLandingTheme('cyan');
     updateSettings({
       masterMusicOn: true,
       masterMusicVolume: 0.5,
@@ -1361,13 +1298,6 @@ export default function GameHome() {
     }
   };
 
-  const formatTime = (ms: number) => {
-    const minutes = Math.floor(ms / 60000);
-    const seconds = Math.floor((ms % 60000) / 1000);
-    const milliseconds = Math.floor(ms % 1000);
-    return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}:${milliseconds.toString().padStart(3, '0')}`;
-  };
-
   const confirmName = () => {
     if (playerName.trim()) {
       setShowNamePrompt(false);
@@ -1401,7 +1331,6 @@ export default function GameHome() {
   const handleExportSave = async () => {
     const data = {
       time_travel_save: await GameStorage.load('time_travel_save'),
-      game_theme_index: await GameStorage.load('game_theme_index'),
       colonies_data: await GameStorage.load('colonies_data'),
       colony_cards_data: await GameStorage.load('colony_cards_data'),
       colony_card_levels: await GameStorage.load('colony_card_levels'),
@@ -1441,7 +1370,6 @@ export default function GameHome() {
       try {
         const data = JSON.parse(e.target?.result as string);
         if (data.time_travel_save) await GameStorage.save(data.time_travel_save, 'time_travel_save');
-        if (data.game_theme_index !== undefined) await GameStorage.save(data.game_theme_index, 'game_theme_index');
         if (data.colonies_data) await GameStorage.save(data.colonies_data, 'colonies_data');
         if (data.colony_cards_data) await GameStorage.save(data.colony_cards_data, 'colony_cards_data');
         if (data.colony_card_levels) await GameStorage.save(data.colony_card_levels, 'colony_card_levels');
@@ -1467,6 +1395,138 @@ export default function GameHome() {
   };
 
   const tl = (en: string, pt: string) => t(language, en, pt);
+  const landingFrameBorder: Record<ThemeColor, string> = {
+    cyan: 'border-cyan-500/20',
+    orange: 'border-orange-500/20',
+    purple: 'border-purple-500/20',
+    neila: 'border-emerald-500/20',
+    pink: 'border-pink-500/20',
+    violet: 'border-violet-500/20',
+    amber: 'border-amber-500/20',
+    emerald: 'border-emerald-500/20',
+    rose: 'border-rose-500/20',
+    blue: 'border-blue-500/20',
+  };
+  const landingFrameCorner: Record<ThemeColor, string> = {
+    cyan: 'border-cyan-500/40',
+    orange: 'border-orange-500/40',
+    purple: 'border-purple-500/40',
+    neila: 'border-emerald-500/40',
+    pink: 'border-pink-500/40',
+    violet: 'border-violet-500/40',
+    amber: 'border-amber-500/40',
+    emerald: 'border-emerald-500/40',
+    rose: 'border-rose-500/40',
+    blue: 'border-blue-500/40',
+  };
+  const landingSoftBg: Record<ThemeColor, string> = {
+    cyan: 'bg-cyan-500/30',
+    orange: 'bg-orange-500/30',
+    purple: 'bg-purple-500/30',
+    neila: 'bg-emerald-500/30',
+    pink: 'bg-pink-500/30',
+    violet: 'bg-violet-500/30',
+    amber: 'bg-amber-500/30',
+    emerald: 'bg-emerald-500/30',
+    rose: 'bg-rose-500/30',
+    blue: 'bg-blue-500/30',
+  };
+  const landingDimBg: Record<ThemeColor, string> = {
+    cyan: 'bg-cyan-500/10',
+    orange: 'bg-orange-500/10',
+    purple: 'bg-purple-500/10',
+    neila: 'bg-emerald-500/10',
+    pink: 'bg-pink-500/10',
+    violet: 'bg-violet-500/10',
+    amber: 'bg-amber-500/10',
+    emerald: 'bg-emerald-500/10',
+    rose: 'bg-rose-500/10',
+    blue: 'bg-blue-500/10',
+  };
+  const landingTitleText: Record<ThemeColor, string> = {
+    cyan: 'text-cyan-500',
+    orange: 'text-orange-500',
+    purple: 'text-purple-500',
+    neila: 'text-emerald-500',
+    pink: 'text-pink-500',
+    violet: 'text-violet-500',
+    amber: 'text-amber-500',
+    emerald: 'text-emerald-500',
+    rose: 'text-rose-500',
+    blue: 'text-blue-500',
+  };
+  const landingTitleGradient: Record<ThemeColor, string> = {
+    cyan: 'via-cyan-200 to-cyan-500 drop-shadow-[0_0_30px_rgba(6,182,212,0.8)]',
+    orange: 'via-orange-200 to-orange-500 drop-shadow-[0_0_30px_rgba(249,115,22,0.8)]',
+    purple: 'via-purple-200 to-purple-500 drop-shadow-[0_0_30px_rgba(168,85,247,0.8)]',
+    neila: 'via-emerald-200 to-emerald-500 drop-shadow-[0_0_30px_rgba(16,185,129,0.8)]',
+    pink: 'via-pink-200 to-pink-500 drop-shadow-[0_0_30px_rgba(236,72,153,0.8)]',
+    violet: 'via-violet-200 to-violet-500 drop-shadow-[0_0_30px_rgba(139,92,246,0.8)]',
+    amber: 'via-amber-200 to-amber-500 drop-shadow-[0_0_30px_rgba(245,158,11,0.8)]',
+    emerald: 'via-emerald-200 to-emerald-500 drop-shadow-[0_0_30px_rgba(16,185,129,0.8)]',
+    rose: 'via-rose-200 to-rose-500 drop-shadow-[0_0_30px_rgba(244,63,94,0.8)]',
+    blue: 'via-blue-200 to-blue-500 drop-shadow-[0_0_30px_rgba(59,130,246,0.8)]',
+  };
+  const landingStrongBg: Record<ThemeColor, string> = {
+    cyan: 'bg-cyan-400 shadow-[0_0_40px_rgba(6,182,212,1)]',
+    orange: 'bg-orange-400 shadow-[0_0_40px_rgba(249,115,22,1)]',
+    purple: 'bg-purple-400 shadow-[0_0_40px_rgba(168,85,247,1)]',
+    neila: 'bg-emerald-400 shadow-[0_0_40px_rgba(16,185,129,1)]',
+    pink: 'bg-pink-400 shadow-[0_0_40px_rgba(236,72,153,1)]',
+    violet: 'bg-violet-400 shadow-[0_0_40px_rgba(139,92,246,1)]',
+    amber: 'bg-amber-400 shadow-[0_0_40px_rgba(245,158,11,1)]',
+    emerald: 'bg-emerald-400 shadow-[0_0_40px_rgba(16,185,129,1)]',
+    rose: 'bg-rose-400 shadow-[0_0_40px_rgba(244,63,94,1)]',
+    blue: 'bg-blue-400 shadow-[0_0_40px_rgba(59,130,246,1)]',
+  };
+  const landingLoaderBorder: Record<ThemeColor, string> = {
+    cyan: 'border-cyan-300/35 shadow-[0_0_30px_rgba(34,211,238,0.28)]',
+    orange: 'border-orange-300/35 shadow-[0_0_30px_rgba(249,115,22,0.24)]',
+    purple: 'border-purple-300/35 shadow-[0_0_30px_rgba(168,85,247,0.28)]',
+    neila: 'border-emerald-300/35 shadow-[0_0_30px_rgba(16,185,129,0.26)]',
+    pink: 'border-pink-300/35 shadow-[0_0_30px_rgba(236,72,153,0.26)]',
+    violet: 'border-violet-300/35 shadow-[0_0_30px_rgba(139,92,246,0.26)]',
+    amber: 'border-amber-300/35 shadow-[0_0_30px_rgba(245,158,11,0.26)]',
+    emerald: 'border-emerald-300/35 shadow-[0_0_30px_rgba(16,185,129,0.26)]',
+    rose: 'border-rose-300/35 shadow-[0_0_30px_rgba(244,63,94,0.26)]',
+    blue: 'border-blue-300/35 shadow-[0_0_30px_rgba(59,130,246,0.26)]',
+  };
+  const landingLoaderRing: Record<ThemeColor, string> = {
+    cyan: 'border-t-cyan-300 border-r-cyan-300/40',
+    orange: 'border-t-orange-300 border-r-orange-300/40',
+    purple: 'border-t-purple-300 border-r-purple-300/40',
+    neila: 'border-t-emerald-300 border-r-emerald-300/40',
+    pink: 'border-t-pink-300 border-r-pink-300/40',
+    violet: 'border-t-violet-300 border-r-violet-300/40',
+    amber: 'border-t-amber-300 border-r-amber-300/40',
+    emerald: 'border-t-emerald-300 border-r-emerald-300/40',
+    rose: 'border-t-rose-300 border-r-rose-300/40',
+    blue: 'border-t-blue-300 border-r-blue-300/40',
+  };
+  const landingLoaderText: Record<ThemeColor, string> = {
+    cyan: 'text-cyan-100',
+    orange: 'text-orange-100',
+    purple: 'text-purple-100',
+    neila: 'text-emerald-100',
+    pink: 'text-pink-100',
+    violet: 'text-violet-100',
+    amber: 'text-amber-100',
+    emerald: 'text-emerald-100',
+    rose: 'text-rose-100',
+    blue: 'text-blue-100',
+  };
+  const landingLoaderDot: Record<ThemeColor, string> = {
+    cyan: 'bg-cyan-300',
+    orange: 'bg-orange-300',
+    purple: 'bg-purple-300',
+    neila: 'bg-emerald-300',
+    pink: 'bg-pink-300',
+    violet: 'bg-violet-300',
+    amber: 'bg-amber-300',
+    emerald: 'bg-emerald-300',
+    rose: 'bg-rose-300',
+    blue: 'bg-blue-300',
+  };
 
   return (
     <motion.main 
@@ -1520,29 +1580,10 @@ export default function GameHome() {
                 const data = SaveManager.loadSave(saved);
                 const routeTier = data.progression?.routeTier || data.routeTier || 'Solar';
                 const techLevels = data.progression?.unlockedTechLevels || data.unlockedTechLevels || {};
-                const unlocked = routeTier !== 'Solar' || (techLevels.Solar >= 9);
-                
-                setIsRoute2Unlocked(unlocked);
-                if (unlocked) {
-                  const savedThemeIndex = await GameStorage.load('game_theme_index');
-                  if (savedThemeIndex === null || savedThemeIndex === undefined) {
-                    setCurrentThemeIndex(3); // Default to Saturn (orange) if unlocked
-                  }
-                }
+                setLandingTheme(getLandingThemeForRouteTier(routeTier));
               } catch (e) {}
             }
-
-            // Refresh local records when returning to menu
-            const savedRecords = await GameStorage.load('speed_run_records');
-            if (savedRecords) {
-              try {
-                setLocalRecords(savedRecords);
-              } catch (e) {
-                setLocalRecords([]);
-              }
-            }
           }}
-          currentThemeIndex={currentThemeIndex}
           jukebox={jukeboxState}
         />
       ) : (
@@ -1570,17 +1611,17 @@ export default function GameHome() {
 
 
           {/* Futuristic Frame */}
-          <div className={`absolute inset-4 border ${theme === 'cyan' ? 'border-cyan-500/20' : 'border-orange-500/20'} pointer-events-none z-50`}>
-            <div className={`absolute top-0 left-0 w-32 h-32 border-t-4 border-l-4 ${theme === 'cyan' ? 'border-cyan-500/40' : 'border-orange-500/40'} rounded-tl-3xl`} />
-            <div className={`absolute top-0 right-0 w-32 h-32 border-t-4 border-r-4 ${theme === 'cyan' ? 'border-cyan-500/40' : 'border-orange-500/40'} rounded-tr-3xl`} />
-            <div className={`absolute bottom-0 left-0 w-32 h-32 border-b-4 border-l-4 ${theme === 'cyan' ? 'border-cyan-500/40' : 'border-orange-500/40'} rounded-bl-3xl`} />
-            <div className={`absolute bottom-0 right-0 w-32 h-32 border-b-4 border-r-4 ${theme === 'cyan' ? 'border-cyan-500/40' : 'border-orange-500/40'} rounded-br-3xl`} />
+          <div className={`absolute inset-4 border ${landingFrameBorder[theme]} pointer-events-none z-50`}>
+            <div className={`absolute top-0 left-0 w-32 h-32 border-t-4 border-l-4 ${landingFrameCorner[theme]} rounded-tl-3xl`} />
+            <div className={`absolute top-0 right-0 w-32 h-32 border-t-4 border-r-4 ${landingFrameCorner[theme]} rounded-tr-3xl`} />
+            <div className={`absolute bottom-0 left-0 w-32 h-32 border-b-4 border-l-4 ${landingFrameCorner[theme]} rounded-bl-3xl`} />
+            <div className={`absolute bottom-0 right-0 w-32 h-32 border-b-4 border-r-4 ${landingFrameCorner[theme]} rounded-br-3xl`} />
             
             {/* HUD Elements */}
             <div className="absolute top-8 left-1/2 -translate-x-1/2 flex gap-8">
-              <div className={`h-1 w-24 ${theme === 'cyan' ? 'bg-cyan-500/30' : 'bg-orange-500/30'} rounded-full`} />
+              <div className={`h-1 w-24 ${landingSoftBg[theme]} rounded-full`} />
               <div className="h-1 w-48 bg-pink-500/30 rounded-full" />
-              <div className={`h-1 w-24 ${theme === 'cyan' ? 'bg-cyan-500/30' : 'bg-orange-500/30'} rounded-full`} />
+              <div className={`h-1 w-24 ${landingSoftBg[theme]} rounded-full`} />
             </div>
           </div>
 
@@ -1601,7 +1642,7 @@ export default function GameHome() {
                   <span className="text-[7.5rem] text-pink-500 block tracking-[0.5em]">
                     {tl('QUANTUM COURIER', 'QUANTUM COURIER')}
                   </span>
-                  <span className={`text-[6rem] ${theme === 'cyan' ? 'text-cyan-500' : 'text-orange-500'} block tracking-[0.8em] mt-4`}>
+                  <span className={`text-[6rem] ${landingTitleText[theme]} block tracking-[0.8em] mt-4`}>
                     {tl('HORIZON', 'HORIZON')}
                   </span>
                 </div>
@@ -1615,7 +1656,7 @@ export default function GameHome() {
                 </span>
 
                 <div className="relative inline-block mt-4">
-                  <span className={`text-[4rem] md:text-[6rem] text-transparent bg-clip-text bg-gradient-to-b from-white ${theme === 'cyan' ? 'via-cyan-200 to-cyan-500 drop-shadow-[0_0_30px_rgba(6,182,212,0.8)]' : 'via-orange-200 to-orange-500 drop-shadow-[0_0_30px_rgba(249,115,22,0.8)]'} tracking-[0.8em] relative z-10 uppercase`}>
+                  <span className={`text-[4rem] md:text-[6rem] text-transparent bg-clip-text bg-gradient-to-b from-white ${landingTitleGradient[theme]} tracking-[0.8em] relative z-10 uppercase`}>
                     <span className="absolute inset-0 shimmer-text opacity-50 pointer-events-none">
                       {tl('HORIZON', 'HORIZON')}
                     </span>
@@ -1627,7 +1668,7 @@ export default function GameHome() {
                     initial={{ width: 0, opacity: 0 }}
                     animate={{ width: '100%', opacity: 1 }}
                     transition={{ delay: 1.5, duration: 1.2, ease: "circOut" }}
-                    className={`h-1.5 mt-2 z-10 ${theme === 'cyan' ? 'bg-cyan-400 shadow-[0_0_40px_rgba(6,182,212,1)]' : 'bg-orange-400 shadow-[0_0_40px_rgba(249,115,22,1)]'}`}
+                    className={`h-1.5 mt-2 z-10 ${landingStrongBg[theme]}`}
                   />
                 </div>
               </motion.h1>
@@ -1638,11 +1679,11 @@ export default function GameHome() {
               initial={{ x: -30, opacity: 0 }}
               animate={{ x: 0, opacity: 1 }}
               transition={{ duration: 0.8, delay: 0.5 }}
-              className={`w-full max-w-md flex flex-col gap-4 p-8 bg-transparent backdrop-blur-sm border ${theme === 'cyan' ? 'border-cyan-500/5' : 'border-orange-500/5'} rounded-2xl relative`}
+              className={`w-full max-w-md flex flex-col gap-4 p-8 bg-transparent backdrop-blur-sm border ${landingFrameBorder[theme]} rounded-2xl relative`}
             >
               {/* Scanline Effect */}
               <div className="absolute inset-0 overflow-hidden pointer-events-none rounded-2xl">
-                <div className={`w-full h-1 ${theme === 'cyan' ? 'bg-cyan-500/10' : 'bg-orange-500/10'} absolute top-0 animate-[scan_4s_linear_infinite]`} />
+                <div className={`w-full h-1 ${landingDimBg[theme]} absolute top-0 animate-[scan_4s_linear_infinite]`} />
               </div>
 
               <MenuButton 
@@ -1679,11 +1720,11 @@ export default function GameHome() {
               exit={{ scale: 0.96, y: 14 }}
               className="flex flex-col items-center"
             >
-              <div className={`relative grid h-24 w-24 place-items-center rounded-full border ${theme === 'cyan' ? 'border-cyan-300/35 shadow-[0_0_30px_rgba(34,211,238,0.28)]' : 'border-orange-300/35 shadow-[0_0_30px_rgba(249,115,22,0.24)]'} bg-black/70`}>
+              <div className={`relative grid h-24 w-24 place-items-center rounded-full border ${landingLoaderBorder[theme]} bg-black/70`}>
                 <motion.div
                   animate={{ rotate: 360 }}
                   transition={{ duration: 1.4, repeat: Infinity, ease: 'linear' }}
-                  className={`absolute -inset-2 rounded-full border-2 border-transparent ${theme === 'cyan' ? 'border-t-cyan-300 border-r-cyan-300/40' : 'border-t-orange-300 border-r-orange-300/40'}`}
+                  className={`absolute -inset-2 rounded-full border-2 border-transparent ${landingLoaderRing[theme]}`}
                 />
                 <div className="h-20 w-20 overflow-hidden rounded-full bg-black">
                   <img
@@ -1695,7 +1736,7 @@ export default function GameHome() {
                 </div>
               </div>
               <div className="mt-4 text-center">
-                <p className={`font-orbitron text-sm font-black uppercase tracking-[0.42em] ${theme === 'cyan' ? 'text-cyan-100' : 'text-orange-100'}`}>
+                <p className={`font-orbitron text-sm font-black uppercase tracking-[0.42em] ${landingLoaderText[theme]}`}>
                   Loading
                 </p>
                 <div className="mt-2 flex justify-center gap-1">
@@ -1704,13 +1745,13 @@ export default function GameHome() {
                       key={dot}
                       animate={{ opacity: [0.25, 1, 0.25], y: [0, -2, 0] }}
                       transition={{ duration: 0.8, repeat: Infinity, delay: dot * 0.12 }}
-                      className={`h-1.5 w-1.5 rounded-full ${theme === 'cyan' ? 'bg-cyan-300' : 'bg-orange-300'}`}
+                      className={`h-1.5 w-1.5 rounded-full ${landingLoaderDot[theme]}`}
                     />
                   ))}
                 </div>
                 <div className="mt-3 h-1 w-32 overflow-hidden rounded-full bg-white/10">
                   <motion.div
-                    className={`h-full ${theme === 'cyan' ? 'bg-cyan-300' : 'bg-orange-300'}`}
+                    className={`h-full ${landingLoaderDot[theme]}`}
                     animate={{ width: `${Math.round(continuePreload.progress * 100)}%` }}
                     transition={{ duration: 0.2 }}
                   />

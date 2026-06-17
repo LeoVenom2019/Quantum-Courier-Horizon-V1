@@ -14,6 +14,7 @@ export type SFXType =
   | 'notification'    // Novos logs ou alertas
   | 'tech_success'    // Sucesso na pesquisa de tecnologia (Rota 1 e 2)
   | 'achievement'     // Conquista desbloqueada
+  | 'achievment_unlocked'
   | 'enemy_explosion' // Explosão de inimigo em batalha
   | 'level_up'        // Melhoria de nave ou nível
   | 'shoot_player'    // Tiro do jogador
@@ -70,6 +71,14 @@ export type SFXType =
   | 'equip_card'
   | 'unequip_card'
   | 'view_card'
+  | 'chest_rare_comum'
+  | 'chest_epic'
+  | 'chest_legendary'
+  | 'treasure_1_'
+  | 'treasure_2_'
+  | 'enemy_explosion_cap_4'
+  | 'enemy_explosion_cap4_2'
+  | 'explosion_elite_cap4'
   | 'radar_skip_victory'
   | 'radar_skip_defeat'
   | 'buy'
@@ -82,6 +91,8 @@ export type SFXType =
 const SFX_PATHS: Partial<Record<string, string>> = {
   tech_success: '/audio/sfx/tech.success.ogg',
   success: '/audio/sfx/cash_register.ogg',
+  achievement: '/assets/rota4/SFX_new_land/achievment_unlocked.ogg',
+  achievment_unlocked: '/assets/rota4/SFX_new_land/achievment_unlocked.ogg',
   enemy_explosion: '/audio/sfx/enemy_explosion.ogg',
   level_up: '/audio/sfx/level_up.ogg',
   shoot_player: '/audio/sfx/shoot_player.ogg',
@@ -206,6 +217,14 @@ const SFX_PATHS: Partial<Record<string, string>> = {
   equip_card: '/audio/sfx/equip_card.ogg',
   unequip_card: '/audio/sfx/unequip_card.ogg',
   view_card: '/audio/sfx/view_card.ogg',
+  chest_rare_comum: '/assets/rota4/SFX_new_land/chest_rare_comum.ogg',
+  chest_epic: '/assets/rota4/SFX_new_land/chest_epic.ogg',
+  chest_legendary: '/assets/rota4/SFX_new_land/chest_legendary.ogg',
+  treasure_1_: '/assets/rota4/SFX_new_land/treasure_1_.ogg',
+  treasure_2_: '/assets/rota4/SFX_new_land/treasure_2_.ogg',
+  enemy_explosion_cap_4: '/assets/rota4/SFX_new_land/enemy_explosion_cap_4.ogg',
+  enemy_explosion_cap4_2: '/assets/rota4/SFX_new_land/enemy_explosion_cap4_2.ogg',
+  explosion_elite_cap4: '/assets/rota4/SFX_new_land/explosion_elite_cap4.ogg',
   radar_skip_victory: '/audio/sfx/radar_skip_victory.ogg',
   radar_skip_defeat: '/audio/sfx/radar_skip_defeat.ogg',
   heal_ship_2: '/audio/sfx/heal_ship_2.ogg',

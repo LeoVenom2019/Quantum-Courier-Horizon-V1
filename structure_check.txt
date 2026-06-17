@@ -1,0 +1,99 @@
+--- spawnParticle ---
+Level && nextXp > 0 && currentXp >= nextXp) {
+        currentXp -= nextXp;
+        level += 1;
+        nextXp = level >= safeHorizonMaxLevel ? 0 : getHorizonXpForNextLevel(level);
+        leveledUp = true;
+      }
+
+      const nextProgress = { level, currentXp, nextXp };
+      horizonProgressRef.current = nextProgress;
+      setHorizonHud(nextProgress);
+
+      if (leveledUp) {
+        levelUpSfxHandledRef.current = true;
+        playSound(PLAYER_SOUNDS.horizonLevelUp, 0.78);
+      }
+    };
+
+    const spawnParticle = (
+      x: number,
+      y: number,
+      color: string,
+      speed = 2,
+      life = 0.8,
+      size = 3,
+      bucket: LaserEmber[] = state.impactParticles
+    ) => {
+      const angle = Math.random() * Math.PI * 2;
+      const velocity = speed * (0.35 + Math.random() * 0.9);
+      bucket.push({
+        x,
+        y,
+        vx: Math.cos(angle) * velocity,
+        vy: Math.sin(angle) * velocity,
+        life,
+        size: Math.max(0.8, size * (0.45 + Math.random() * 0.9)),
+        color,
+      });
+    };
+
+    const drawGlowCircle = (
+      ctx: CanvasRenderingContext2D,
+      x: number,
+      y: number,
+      radius: number,
+      color: string,
+      alpha = 1
+    ) => {
+      const glow = ctx.createRadialGradient(x, y, 0, x, y, radius);
+      glow.addColorStop(0, color);
+      glow.addColorStop(0.45, color.replace('1)', `${0.22 * alpha})`));
+      glow.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = glow;
+      ctx.beginPath();
+      ctx.arc(x, y, radius, 0, Math.PI * 2)
+
+--- update enemies ---
+Not found: state\.enemies\.forEach\(enemy => \{.*?enemy\.x \+=
+
+--- player take damage ---
+osionSound,
+        frameOffset: Math.random() * 10,
+        xp: Math.round(blueprint.xp * rewardScale),
+        qc: Math.round(blueprint.qc * rewardScale),
+      };
+      if (blueprint.screamSound) enemy.screamAudio = playSound(blueprint.screamSound, 0.72);
+      if (enemy.kind === 'common-ship' || enemy.kind === 'elite-ship') {
+        enemy.engineAudio = playLoopSound(AIRPLANE_ENEMY_ENGINE_SOUND, enemy.kind === 'elite-ship' ? 0.34 : 0.28);
+      }
+      state.enemies.push(enemy);
+    };
+
+    const damagePlayer = (damage: number) => {
+      const p = state.player;
+      if (p.shield > 0) {
+        const shieldDamage = Math.min(p.shield, damage);
+        p.shield -= shieldDamage;
+        p.hp -= Math.max(0, damage - shieldDamage);
+      } else {
+        p.hp -= damage;
+      }
+    };
+
+    const createSpecialDamagePayload = (baseMultiplier: number, extraElemental: Partial<Projectile['elemental']> = {}) => {
+      const crit = Math.random() * 100 < shipStats.critChance;
+      const damage = shipStats.damage * baseMultiplier;
+      return {
+        damage,
+        crit,
+        elemental: {
+          ice: Math.round((shipStats.elementalDamage.ice + (extraElemental.ice || 0)) * baseMultiplier),
+          electric: Math.round((shipStats.elementalDamage.electric + (extraElemental.electric || 0)) * baseMultiplier),
+          fire: Math.round((shipStats.elementalDamage.fire + (extraElemental.fire || 0)) * baseMultiplier),
+        },
+      };
+    };
+
+    const applyElementalDamage = (
+      enemy: Enemy

@@ -65,12 +65,25 @@ type Enemy = {
   attackCooldown: number;
   image: string;
   frames?: string[];
+  spriteSheet?: {
+    src: string;
+    columns: number;
+    rows: number;
+    frameCount: number;
+    fps: number;
+  };
   shootSound: string;
   screamSound?: string;
   screamAudio?: HTMLAudioElement | null;
   engineAudio?: HTMLAudioElement | null;
   explosionSound?: string;
   frameOffset: number;
+  visualDx?: number;
+  visualDy?: number;
+  actionFrame?: number;
+  actionFrameUntil?: number;
+  visualState?: string;
+  visualStateStart?: number;
   xp: number;
   qc: number;
 };
@@ -78,6 +91,7 @@ type Enemy = {
 type Projectile = {
   id: number;
   from: 'player' | 'enemy';
+  visualType?: 'common' | 'elite' | 'boss';
   targetId?: number;
   special?: 'hellfire';
   sequence?: 'hellfire';
@@ -143,6 +157,77 @@ type Shockwave = {
   radius?: number;
   decay?: number;
   width?: number;
+};
+
+type AaaFlash = {
+  color: string;
+  life: number;
+  maxLife: number;
+  intensity: number;
+};
+
+type AaaGlow = {
+  x: number;
+  y: number;
+  radius: number;
+  maxRadius: number;
+  life: number;
+  maxLife: number;
+  color1: string;
+  color2: string;
+  decay: number;
+};
+
+type AaaStreak = {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  life: number;
+  maxLife: number;
+  length: number;
+  width: number;
+  color: string;
+  drag: number;
+};
+
+type AaaSmokeRing = {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  radius: number;
+  life: number;
+  maxLife: number;
+  color: string;
+  grow: number;
+};
+
+type AaaDebris = {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  life: number;
+  maxLife: number;
+  size: number;
+  color: string;
+  rotation: number;
+  spin: number;
+  drag: number;
+  gravity: number;
+  bounces: number;
+  maxBounces: number;
+  trail: { x: number; y: number }[];
+};
+
+type BattleCinematic = {
+  active: boolean;
+  target: 'boss' | 'player' | '';
+  x: number;
+  y: number;
+  start: number;
+  duration: number;
 };
 
 type ThorPoint = { x: number; y: number };
@@ -258,6 +343,7 @@ type EnemyBlueprint = {
   kind: EnemyKind;
   image: string;
   frames?: string[];
+  spriteSheet?: Enemy['spriteSheet'];
   shootSound: string;
   screamSound?: string;
   explosionSound?: string;
@@ -276,6 +362,11 @@ const HEIGHT = 540;
 const ASSET_BASE = '/assets/rota4/battles';
 const AIRPLANE_ENEMY_ENGINE_SOUND = '/assets/rota4/SFX_new_land/airplane_enemys_sounds.ogg';
 const AIRPLANE_PLAYER_ENGINE_SOUND = '/assets/rota4/SFX_new_land/airplane_player_sounds.ogg';
+const ROUTE4_COMMON_ENEMY_EXPLOSION_SOUNDS = [
+  '/assets/rota4/SFX_new_land/enemy_explosion_cap_4.ogg',
+  '/assets/rota4/SFX_new_land/enemy_explosion_cap4_2.ogg',
+];
+const ROUTE4_ELITE_ENEMY_EXPLOSION_SOUND = '/assets/rota4/SFX_new_land/explosion_elite_cap4.ogg';
 const ROUTE4_ENEMY_VARIANT_SHOT_SOUNDS = [
   '/audio/sfx/shoot_enemy.ogg',
   '/audio/sfx/shoot_player.ogg',
@@ -285,9 +376,36 @@ const BATTLE_BACKGROUNDS = [
   `${ASSET_BASE}/backgrounds/day/rt4_background_day.webp`,
   `${ASSET_BASE}/backgrounds/night/rt4_background_night.webp`,
   `${ASSET_BASE}/backgrounds/winter/rt4_background_winter.webp`,
+  `${ASSET_BASE}/backgrounds/multiple/rt4_background_day_2.webp`,
+  `${ASSET_BASE}/backgrounds/multiple/rt4_background_day_3.webp`,
+  `${ASSET_BASE}/backgrounds/multiple/rt4_background_day_4.webp`,
+  `${ASSET_BASE}/backgrounds/multiple/rt4_background_night_2.webp`,
+  `${ASSET_BASE}/backgrounds/multiple/rt4_background_night_3.webp`,
+  `${ASSET_BASE}/backgrounds/multiple/rt4_background_night_4.webp`,
+  `${ASSET_BASE}/backgrounds/multiple/rt4_background_night_5.webp`,
+  `${ASSET_BASE}/backgrounds/multiple/rt4_background_winter_2.webp`,
 ];
+const RESULT_VICTORY_BACKGROUNDS = [
+  '/assets/rota4/layout_cap4/bg_victory_battle_cap4_1.webp',
+  '/assets/rota4/layout_cap4/bg_victory_battle_cap4_2.webp',
+  '/assets/rota4/layout_cap4/bg_victory_battle_cap4_3.webp',
+];
+const RESULT_DEFEAT_BACKGROUND = '/assets/rota4/layout_cap4/bg_lose_battle_cap4_.webp';
+const RESULT_MODAL_DELAY_MS = 1500;
 
 const PLAYER_IMAGE = `${ASSET_BASE}/player/horizon/horizon.webp`;
+const PLAYER_SPRITESHEET = `${ASSET_BASE}/player/horizon/horizon_12pos_spritesheet.webp`;
+const PLAYER_SPRITE_FRAME_WIDTH = 370;
+const PLAYER_SPRITE_FRAME_HEIGHT = 234;
+const PLAYER_DRAW_WIDTH = 118;
+const PLAYER_DRAW_HEIGHT = 75;
+const PLAYER_IDLE_FRAMES = [0, 3];
+const PLAYER_DESCEND_FRAMES = [11, 1, 2];
+const PLAYER_ASCEND_FRAMES = [4, 5, 6, 7];
+const PLAYER_ASCEND_RELEASE_FRAME = 8;
+const PLAYER_BACK_FRAMES = [9, 10];
+const PLAYER_FRAME_MS = 120;
+const PLAYER_ASCEND_RELEASE_MS = 220;
 const THOR_SPECIAL_SFX_BASE = '/assets/rota4/SFX_new_land/special thor';
 const BLIZZARD_SPECIAL_SFX_BASE = '/assets/rota4/SFX_new_land/special blizzard';
 const PLAYER_SOUNDS = {
@@ -328,6 +446,25 @@ const playBlizzardExplosionSfx = () => {
   window.setTimeout(() => playSound(sfx, 0.72), 18);
 };
 
+const playRoute4EnemyExplosionSfx = (enemy: Pick<Enemy, 'kind' | 'explosionSound'>) => {
+  if (enemy.explosionSound) {
+    playSound(enemy.explosionSound, isMonsterKind(enemy.kind) ? 1 : 0.82);
+    if (isMonsterKind(enemy.kind)) {
+      window.setTimeout(() => playSound(enemy.explosionSound!, 0.58), 85);
+    }
+    return;
+  }
+
+  if (enemy.kind === 'elite-ship') {
+    playSound(ROUTE4_ELITE_ENEMY_EXPLOSION_SOUND, 0.78);
+    return;
+  }
+
+  if (enemy.kind === 'common-ship') {
+    playSound(pick(ROUTE4_COMMON_ENEMY_EXPLOSION_SOUNDS), 0.74);
+  }
+};
+
 const COMMON_SHIP_IMAGES = [
   `${ASSET_BASE}/enemys/air_ships/enemy_rt4.webp`,
   `${ASSET_BASE}/enemys/air_ships/enemy_rt4_2.webp`,
@@ -343,6 +480,14 @@ const MONSTER_1_FRAMES = [
   `${ASSET_BASE}/enemys/monsters/monster 1/m1_backward.webp`,
 ];
 
+const MONSTER_1_MOTION_SPRITESHEET = `${ASSET_BASE}/enemys/monsters/monster 1/m1_8pos_spritesheet.webp`;
+const MONSTER_1_FRAME_MS = 115;
+const MONSTER_1_ASCEND_FRAMES = [3, 4, 5, 6];
+const MONSTER_1_DESCEND_FRAME = 7;
+const MONSTER_1_FORWARD_FRAME = 1;
+const MONSTER_1_SHOOT_FRAME = 2;
+const MONSTER_1_NEUTRAL_FRAME = 0;
+
 const MONSTER_2_FRAMES = [
   `${ASSET_BASE}/enemys/monsters/monster 2/m3_neutral.webp`,
   `${ASSET_BASE}/enemys/monsters/monster 2/m2_forward.webp`,
@@ -350,6 +495,8 @@ const MONSTER_2_FRAMES = [
   `${ASSET_BASE}/enemys/monsters/monster 2/m2_down.webp`,
   `${ASSET_BASE}/enemys/monsters/monster 2/m2_backward.webp`,
 ];
+
+const MONSTER_2_MOTION_SPRITESHEET = `${ASSET_BASE}/enemys/monsters/monster 2/boss1_spritesheet_30fps_motion_6x6.png`;
 
 const SPECIAL_LABEL: Record<DefenseSpecialId, Record<'en' | 'pt', string>> = {
   'apocalypse-laser': { en: 'Horizon Laser', pt: 'Horizon Laser' },
@@ -383,6 +530,83 @@ const getImage = (src: string) => {
     imageCache.set(src, image);
   }
   return image;
+};
+
+const getSequenceFrame = (frames: number[], startedAt: number, now: number, loop = true) => {
+  if (frames.length === 0) return 0;
+  const elapsedFrames = Math.max(0, Math.floor((now - startedAt) / PLAYER_FRAME_MS));
+  const index = loop ? elapsedFrames % frames.length : Math.min(frames.length - 1, elapsedFrames);
+  return frames[index];
+};
+
+const getPlayerFrameIndex = (
+  keys: Record<string, boolean>,
+  now: number,
+  spriteState: React.MutableRefObject<{
+    movement: string;
+    startedAt: number;
+    wasMovingUp: boolean;
+    ascendReleaseUntil: number;
+  }>
+) => {
+  const movingUp = Boolean(keys.w || keys.arrowup);
+  const movingDown = Boolean(keys.s || keys.arrowdown);
+  const movingBack = Boolean(keys.a || keys.arrowleft);
+  const state = spriteState.current;
+  let movement = 'idle';
+
+  if (movingBack) movement = 'back';
+  else if (movingUp) movement = 'ascend';
+  else if (movingDown) movement = 'descend';
+  else if (state.wasMovingUp) movement = 'ascend-release';
+
+  if (movement !== state.movement) {
+    state.movement = movement;
+    state.startedAt = now;
+    if (movement === 'ascend-release') {
+      state.ascendReleaseUntil = now + PLAYER_ASCEND_RELEASE_MS;
+    }
+  }
+
+  state.wasMovingUp = movingUp;
+
+  if (movement === 'ascend') return getSequenceFrame(PLAYER_ASCEND_FRAMES, state.startedAt, now, false);
+  if (movement === 'descend') return getSequenceFrame(PLAYER_DESCEND_FRAMES, state.startedAt, now);
+  if (movement === 'back') return getSequenceFrame(PLAYER_BACK_FRAMES, state.startedAt, now);
+  if (movement === 'ascend-release' && now < state.ascendReleaseUntil) return PLAYER_ASCEND_RELEASE_FRAME;
+  if (movement === 'ascend-release') {
+    state.movement = 'idle';
+    state.startedAt = now;
+  }
+
+  return getSequenceFrame(PLAYER_IDLE_FRAMES, state.startedAt, now);
+};
+
+const getMonster1FrameIndex = (enemy: Enemy, now: number) => {
+  if (enemy.actionFrame !== undefined && (enemy.actionFrameUntil || 0) > now) {
+    return enemy.actionFrame;
+  }
+
+  const visualDx = enemy.visualDx || 0;
+  const visualDy = enemy.visualDy || 0;
+  let state = 'neutral';
+
+  if (visualDy < -0.18) state = 'ascend';
+  else if (visualDy > 0.18) state = 'descend';
+  else if (visualDx < -0.08) state = 'forward';
+
+  if (enemy.visualState !== state) {
+    enemy.visualState = state;
+    enemy.visualStateStart = now;
+  }
+
+  if (state === 'ascend') {
+    return getSequenceFrame(MONSTER_1_ASCEND_FRAMES, enemy.visualStateStart || now, now, false);
+  }
+
+  if (state === 'descend') return MONSTER_1_DESCEND_FRAME;
+  if (state === 'forward') return MONSTER_1_FORWARD_FRAME;
+  return MONSTER_1_NEUTRAL_FRAME;
 };
 
 const playSound = (src: string, volume = 0.55) => {
@@ -432,6 +656,15 @@ const stopAllBattleSounds = () => {
   activeAudioInstances.clear();
 };
 
+const stopLoopingBattleSounds = () => {
+  activeAudioInstances.forEach(audio => {
+    if (!audio.loop) return;
+    audio.pause();
+    audio.currentTime = 0;
+    activeAudioInstances.delete(audio);
+  });
+};
+
 const pick = <T,>(items: T[]) => items[Math.floor(Math.random() * items.length)];
 
 const isMonsterKind = (kind: EnemyKind) => kind === 'monster-1' || kind === 'monster-2';
@@ -462,8 +695,14 @@ const buildEnemyBlueprint = (kills: number, forceMonsterBoss: boolean): EnemyBlu
     return monsterOne
       ? {
           kind: 'monster-1',
-          image: MONSTER_1_FRAMES[0],
-          frames: MONSTER_1_FRAMES,
+          image: MONSTER_1_MOTION_SPRITESHEET,
+          spriteSheet: {
+            src: MONSTER_1_MOTION_SPRITESHEET,
+            columns: 8,
+            rows: 1,
+            frameCount: 8,
+            fps: 10,
+          },
           shootSound: `${ASSET_BASE}/enemys/monsters/monster 1/shoot_m1.ogg`,
           screamSound: `${ASSET_BASE}/enemys/monsters/monster 1/scream_m1.ogg`,
           explosionSound: `${ASSET_BASE}/enemys/monsters/monster 1/explosion_m1.ogg`,
@@ -478,8 +717,14 @@ const buildEnemyBlueprint = (kills: number, forceMonsterBoss: boolean): EnemyBlu
         }
       : {
           kind: 'monster-2',
-          image: MONSTER_2_FRAMES[0],
-          frames: MONSTER_2_FRAMES,
+          image: MONSTER_2_MOTION_SPRITESHEET,
+          spriteSheet: {
+            src: MONSTER_2_MOTION_SPRITESHEET,
+            columns: 6,
+            rows: 6,
+            frameCount: 30,
+            fps: 30,
+          },
           shootSound: `${ASSET_BASE}/enemys/monsters/monster 2/shoot_m2.ogg`,
           screamSound: `${ASSET_BASE}/enemys/monsters/monster 2/scream_m2.ogg`,
           explosionSound: `${ASSET_BASE}/enemys/monsters/monster 2/explosion_m2.ogg`,
@@ -547,6 +792,12 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
   const controlsRef = useRef({ specialOne: 0, specialTwo: 0 });
   const horizonProgressRef = useRef({ level: horizonLevel, currentXp: horizonXp, nextXp: horizonNextXp });
   const levelUpSfxHandledRef = useRef(false);
+  const playerSpriteRef = useRef({
+    movement: 'idle',
+    startedAt: 0,
+    wasMovingUp: false,
+    ascendReleaseUntil: 0,
+  });
   const stateRef = useRef({
     player: { x: 120, y: HEIGHT / 2, hp: shipStats.health, shield: shipStats.shield },
     enemies: [] as Enemy[],
@@ -571,6 +822,12 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
     laserParticles: [] as LaserParticle[],
     laserEmbers: [] as LaserEmber[],
     impactParticles: [] as LaserEmber[],
+    aaaFlashes: [] as AaaFlash[],
+    aaaGlows: [] as AaaGlow[],
+    aaaStreaks: [] as AaaStreak[],
+    aaaSmokeRings: [] as AaaSmokeRing[],
+    aaaDebris: [] as AaaDebris[],
+    aaaShake: 0,
     backgroundParticles: [] as LaserEmber[],
     shockwaves: [] as Shockwave[],
     laserBeamWidth: 0,
@@ -633,6 +890,9 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
     blizzardCrystals: [] as BlizzardCrystal[],
     blizzardSparks: [] as BlizzardSpark[],
     blizzardShockwaves: [] as BlizzardShockwave[],
+    pendingResult: '' as 'victory' | 'defeat' | '',
+    pendingResultAt: 0,
+    cinematic: { active: false, target: '', x: WIDTH / 2, y: HEIGHT / 2, start: 0, duration: RESULT_MODAL_DELAY_MS } as BattleCinematic,
   });
   const currentDefenseBattleLevel = Math.max(1, Math.floor(defenseBattleLevel || 1));
   const [hud, setHud] = useState({
@@ -647,9 +907,22 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
   });
   const [horizonHud, setHorizonHud] = useState({ level: horizonLevel, currentXp: horizonXp, nextXp: horizonNextXp });
   const [result, setResult] = useState<'victory' | 'defeat' | ''>('');
+  const [resultVisible, setResultVisible] = useState(false);
+  const [resultBackground, setResultBackground] = useState('');
 
   const t = (en: string, pt: string) => language === 'pt' ? pt : en;
   const difficultyLabel = getDefenseDifficultyLabel(currentDefenseBattleLevel, language);
+
+  useEffect(() => {
+    setResultVisible(false);
+    if (!result) {
+      setResultBackground('');
+      return;
+    }
+
+    setResultBackground(result === 'victory' ? pick(RESULT_VICTORY_BACKGROUNDS) : RESULT_DEFEAT_BACKGROUND);
+    setResultVisible(true);
+  }, [result]);
 
   useEffect(() => {
     const down = (event: KeyboardEvent) => {
@@ -693,6 +966,12 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
     state.laserParticles = [];
     state.laserEmbers = [];
     state.impactParticles = [];
+    state.aaaFlashes = [];
+    state.aaaGlows = [];
+    state.aaaStreaks = [];
+    state.aaaSmokeRings = [];
+    state.aaaDebris = [];
+    state.aaaShake = 0;
     state.backgroundParticles = [];
     state.shockwaves = [];
     state.laserBeamWidth = 0;
@@ -791,6 +1070,9 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
     state.blizzardCrystals = [];
     state.blizzardSparks = [];
     state.blizzardShockwaves = [];
+    state.pendingResult = '';
+    state.pendingResultAt = 0;
+    state.cinematic = { active: false, target: '', x: WIDTH / 2, y: HEIGHT / 2, start: 0, duration: RESULT_MODAL_DELAY_MS };
     horizonProgressRef.current = { level: horizonLevel, currentXp: horizonXp, nextXp: horizonNextXp };
     levelUpSfxHandledRef.current = false;
     setHorizonHud({ level: horizonLevel, currentXp: horizonXp, nextXp: horizonNextXp });
@@ -903,6 +1185,150 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
       ctx.arc(wave.x, wave.y, radius, 0, Math.PI * 2);
       ctx.stroke();
       ctx.globalAlpha = 1;
+    };
+
+    const aaaPalettes = {
+      common: ['#67e8f9', '#22d3ee', '#e0f2fe', '#60a5fa', '#bae6fd'],
+      elite: ['#facc15', '#f97316', '#fff7ed', '#fb7185', '#fde68a'],
+      boss: ['#c084fc', '#a855f7', '#f0abfc', '#ffffff', '#fb7185', '#e879f9'],
+      fire: ['#fb7185', '#fb923c', '#facc15', '#ffffff', '#fcd34d'],
+      laser: ['#22d3ee', '#e879f9', '#ffffff', '#f0abfc', '#a5f3fc'],
+      spark: ['#ffffff', '#fef9c3', '#fde68a'],
+    };
+
+    const colorWithAlpha = (color: string, alpha: number) => {
+      const rgbaMatch = color.match(/rgba?\(([^)]+)\)/);
+      if (!rgbaMatch) return color;
+      const [r, g, b] = rgbaMatch[1].split(',').map(part => part.trim());
+      return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+    };
+
+    const addAaaTrauma = (amount: number) => {
+      state.aaaShake = Math.max(state.aaaShake, amount);
+    };
+
+    const addAaaFlash = (color: string, life = 0.18, intensity = 1) => {
+      state.aaaFlashes.push({ color, life, maxLife: life, intensity: clamp(intensity, 0, 1) });
+    };
+
+    const addAaaGlow = (
+      x: number,
+      y: number,
+      maxRadius: number,
+      color1: string,
+      color2 = 'rgba(255,80,40,0)',
+      life = 0.55,
+      decay = 1
+    ) => {
+      state.aaaGlows.push({ x, y, radius: 0, maxRadius, life, maxLife: life, color1, color2, decay });
+    };
+
+    const addAaaShockwave = (
+      x: number,
+      y: number,
+      maxRadius: number,
+      color: string,
+      width = 4,
+      decay = 0.05,
+      radius = 3
+    ) => {
+      state.hellfireShockwaves.push({ x, y, radius, maxRadius, life: 1, decay, color, width });
+    };
+
+    const addAaaStreak = (x: number, y: number, angle: number, speed: number, color: string, length = rand(18, 55), width = rand(1, 2.5)) => {
+      state.aaaStreaks.push({
+        x,
+        y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        life: rand(0.1, 0.28),
+        maxLife: 0.28,
+        length,
+        width,
+        color,
+        drag: 0.92,
+      });
+    };
+
+    const addAaaSmokeRing = (x: number, y: number, scale = 1) => {
+      const life = rand(1, 1.9);
+      state.aaaSmokeRings.push({
+        x,
+        y,
+        vx: rand(-0.8, 0.8) * scale,
+        vy: rand(-1.8, -0.35) * scale,
+        radius: rand(12, 34) * scale,
+        life,
+        maxLife: life,
+        color: 'rgba(80,90,100,0.26)',
+        grow: rand(7, 22) * scale,
+      });
+    };
+
+    const addAaaDebris = (x: number, y: number, scale = 1, palette: string[] = ['#94a3b8', '#cbd5e1', '#64748b', '#f97316']) => {
+      const life = rand(1.2, 2.8);
+      state.aaaDebris.push({
+        x,
+        y,
+        vx: rand(-13, 13) * scale,
+        vy: rand(-17, -3) * scale,
+        life,
+        maxLife: life,
+        size: rand(2, 7) * scale,
+        color: pick(palette),
+        rotation: rand(0, Math.PI * 2),
+        spin: rand(-0.32, 0.32),
+        drag: 0.985,
+        gravity: 0.38,
+        bounces: 0,
+        maxBounces: Math.floor(rand(0, 3)),
+        trail: [],
+      });
+    };
+
+    const addAaaBurst = (x: number, y: number, palette: string[], count: number, power: number, scale = 1, coneAngle?: number) => {
+      const finalCount = Math.round(count);
+      for (let i = 0; i < finalCount; i++) {
+        const spread = coneAngle === undefined ? Math.PI * 2 : 1.42;
+        const angle = coneAngle === undefined ? rand(0, Math.PI * 2) : coneAngle + rand(-spread, spread);
+        const speed = rand(power * 0.3, power) * scale;
+        state.impactParticles.push({
+          x: x + rand(-8, 8) * scale,
+          y: y + rand(-8, 8) * scale,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed,
+          life: rand(0.36, 1.1),
+          maxLife: 1.1,
+          size: rand(1.8, 7) * scale,
+          drag: rand(0.928, 0.972),
+          growth: rand(-0.01, 0.035),
+          rotation: rand(0, Math.PI),
+          spin: rand(-0.24, 0.24),
+          color: pick(palette),
+        });
+      }
+    };
+
+    const addAaaSmoke = (x: number, y: number, count: number, scale = 1) => {
+      for (let i = 0; i < count; i++) {
+        spawnSmokeParticle(
+          x + rand(-22, 22) * scale,
+          y + rand(-18, 18) * scale,
+          rand(-2.5, 2.5) * scale,
+          rand(-3.2, 0.8) * scale,
+          rand(18, 44) * scale,
+          rand(58, 122)
+        );
+        addAaaSmokeRing(x + rand(-12, 12) * scale, y + rand(-8, 8) * scale, scale);
+      }
+    };
+
+    const addAaaMetalSparks = (x: number, y: number, count: number, incomingAngle: number, power: number, scale = 1) => {
+      for (let i = 0; i < count; i++) {
+        const angle = incomingAngle + Math.PI + rand(-0.9, 0.9);
+        const speed = rand(power * 0.5, power * 1.4) * scale;
+        addAaaStreak(x, y, angle, speed, pick(aaaPalettes.spark), rand(20, 60) * scale, rand(0.8, 2) * scale);
+      }
     };
 
     const drawEnergyRing = (
@@ -1311,6 +1737,179 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
       }
     };
 
+    const spawnProjectileImpact = (x: number, y: number, color: string, scale = 1, incomingAngle?: number) => {
+      const isHellfire = color.includes('251,146,60') || color.includes('fb923c') || color.includes('f97316');
+      const isCritical = color.includes('facc15') || color.includes('250,204,21');
+      const palette = isHellfire ? aaaPalettes.fire : isCritical ? aaaPalettes.elite : aaaPalettes.common;
+      const impactScale = scale * (isHellfire ? 1.32 : isCritical ? 1.18 : 1);
+      const coneAngle = Number.isFinite(incomingAngle) ? incomingAngle! + Math.PI : Math.random() * Math.PI * 2;
+
+      addAaaTrauma(isHellfire ? 8.5 * scale : isCritical ? 6.4 * scale : 4.2 * scale);
+      addAaaFlash(isHellfire ? 'rgba(255,80,30,0.22)' : isCritical ? 'rgba(255,220,40,0.18)' : 'rgba(80,220,255,0.12)', 0.14, 0.8);
+      addAaaGlow(x, y, (isHellfire ? 170 : isCritical ? 130 : 90) * impactScale, isHellfire ? 'rgba(255,80,40,0.90)' : isCritical ? 'rgba(250,204,21,0.90)' : 'rgba(80,220,255,0.80)', 'rgba(255,80,40,0)', 0.32);
+      addAaaShockwave(x, y, 28 * impactScale, 'rgba(255,255,255,0.88)', 2.8 * impactScale, 0.102);
+      addAaaShockwave(x, y, 58 * impactScale, color, 5 * impactScale, 0.07, 4);
+      addAaaShockwave(x, y, 90 * impactScale, 'rgba(255,255,255,0.20)', 2 * impactScale, 0.042, 5);
+      addAaaBurst(x, y, palette, isHellfire ? 54 : isCritical ? 34 : 28, isHellfire ? 11 : 8, impactScale, coneAngle);
+      addAaaMetalSparks(x, y, isCritical ? 20 : isHellfire ? 16 : 10, incomingAngle ?? 0, 14, impactScale);
+
+      for (let i = 0; i < (isHellfire ? 12 : 6); i++) {
+        addAaaDebris(x, y, impactScale * 0.72, isHellfire ? aaaPalettes.fire : ['#94a3b8', '#64748b', '#e2e8f0']);
+      }
+      if (isHellfire) addAaaSmoke(x, y, 10, impactScale);
+
+      state.hellfireShockwaves.push(
+        { x, y, radius: 2, maxRadius: 42 * scale, life: 1, decay: 0.082, color: 'rgba(255,255,255,0.68)', width: 2.5 * scale },
+        { x, y, radius: 4, maxRadius: 72 * scale, life: 1, decay: 0.058, color, width: 4 * scale }
+      );
+
+      for (let i = 0; i < Math.round(16 * scale); i++) {
+        const angle = coneAngle + rand(-0.9, 0.9);
+        const speed = rand(2.2, 7.2) * scale;
+        state.impactParticles.push({
+          x: x + rand(-4, 4),
+          y: y + rand(-4, 4),
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed,
+          life: rand(0.42, 0.92),
+          size: rand(1.8, 4.8) * scale,
+          color: i % 5 === 0 ? '#ffffff' : color,
+        });
+      }
+
+      for (let i = 0; i < Math.round(5 * scale); i++) {
+        spawnSmokeParticle(
+          x + rand(-8, 8),
+          y + rand(-8, 8),
+          rand(-1.6, 1.6),
+          rand(-1.4, 0.8),
+          rand(8, 18) * scale,
+          rand(36, 76)
+        );
+      }
+    };
+
+    const spawnPlayerImpact = (x: number, y: number, projectile: Projectile) => {
+      const angle = Math.atan2(projectile.vy, projectile.vx);
+      const scale = projectile.color === '#f97316' ? 1.45 : 1.12;
+      spawnProjectileImpact(x, y, projectile.color || '#ef4444', scale, angle);
+      state.hellfireShake = Math.max(state.hellfireShake, 5 * scale);
+      addAaaTrauma(5.5 * scale);
+      state.laserFlashAlpha = Math.max(state.laserFlashAlpha || 0, 0.14 * scale);
+
+      for (let i = 0; i < Math.round(8 * scale); i++) {
+        spawnEmberParticle(
+          x + rand(-7, 7),
+          y + rand(-7, 7),
+          rand(-3.6, 3.6),
+          rand(-3.4, 2.2),
+          rand(1.8, 4.8),
+          rand(20, 42)
+        );
+      }
+    };
+
+    const spawnEnemyDeathExplosion = (enemy: Enemy) => {
+      const bossScale = enemy.kind === 'boss-ship' ? 2.15 : isMonsterKind(enemy.kind) ? 2.55 : enemy.kind === 'elite-ship' ? 1.45 : 1.05;
+      const color = enemy.kind === 'boss-ship' ? 'rgba(251,146,60,0.9)' : isMonsterKind(enemy.kind) ? 'rgba(168,85,247,0.86)' : 'rgba(34,211,238,0.72)';
+      const explosionType = enemy.kind === 'boss-ship' || isMonsterKind(enemy.kind) ? 'boss' : enemy.kind === 'elite-ship' ? 'elite' : 'common';
+      const palette = explosionType === 'boss' ? aaaPalettes.boss : explosionType === 'elite' ? aaaPalettes.elite : aaaPalettes.common;
+      const aaaScale = explosionType === 'boss' ? bossScale * 1.08 : bossScale;
+      addAaaTrauma(explosionType === 'boss' ? 18 : explosionType === 'elite' ? 11 : 6);
+      addAaaFlash(explosionType === 'boss' ? 'rgba(220,180,255,0.28)' : explosionType === 'elite' ? 'rgba(255,220,80,0.22)' : 'rgba(120,220,255,0.14)', 0.14, 0.95);
+      window.setTimeout(() => addAaaFlash('rgba(255,120,40,0.10)', 0.22, 0.6), 40);
+      addAaaGlow(enemy.x, enemy.y, (explosionType === 'boss' ? 320 : explosionType === 'elite' ? 200 : 130) * aaaScale, explosionType === 'boss' ? 'rgba(200,120,255,0.88)' : explosionType === 'elite' ? 'rgba(255,200,60,0.82)' : 'rgba(80,220,255,0.76)');
+      window.setTimeout(() => addAaaGlow(enemy.x, enemy.y, (explosionType === 'boss' ? 260 : explosionType === 'elite' ? 160 : 100) * aaaScale, 'rgba(255,120,40,0.55)', 'rgba(255,60,20,0)', 0.68), 55);
+      addAaaShockwave(enemy.x, enemy.y, 55 * aaaScale, 'rgba(255,255,255,0.95)', 3.8 * aaaScale, 0.07);
+      addAaaShockwave(enemy.x, enemy.y, 105 * aaaScale, explosionType === 'boss' ? 'rgba(192,132,252,0.80)' : explosionType === 'elite' ? 'rgba(251,191,36,0.80)' : 'rgba(34,211,238,0.78)', 5.5 * aaaScale, 0.044, 4);
+      addAaaShockwave(enemy.x, enemy.y, 168 * aaaScale, 'rgba(200,60,40,0.40)', 8.5 * aaaScale, 0.03, 8);
+      addAaaShockwave(enemy.x, enemy.y, 240 * aaaScale, 'rgba(255,255,255,0.18)', 2 * aaaScale, 0.022, 10);
+      addAaaBurst(enemy.x, enemy.y, palette, explosionType === 'boss' ? 110 : explosionType === 'elite' ? 72 : 44, explosionType === 'boss' ? 15 : explosionType === 'elite' ? 11 : 8, aaaScale);
+
+      const sparkCount = explosionType === 'boss' ? 32 : explosionType === 'elite' ? 20 : 12;
+      for (let i = 0; i < sparkCount; i++) {
+        addAaaStreak(enemy.x, enemy.y, (i / sparkCount) * Math.PI * 2, rand(8, 22) * aaaScale, pick(aaaPalettes.spark), rand(30, 80) * aaaScale, rand(1, 3) * aaaScale);
+      }
+
+      const debrisPalette = explosionType === 'boss'
+        ? ['#c084fc', '#64748b', '#94a3b8', '#f0abfc']
+        : explosionType === 'elite'
+          ? ['#f97316', '#94a3b8', '#64748b', '#facc15']
+          : ['#67e8f9', '#94a3b8', '#64748b'];
+      for (let i = 0; i < (explosionType === 'boss' ? 28 : explosionType === 'elite' ? 16 : 8); i++) {
+        addAaaDebris(enemy.x + rand(-enemy.width * 0.18, enemy.width * 0.18), enemy.y + rand(-enemy.height * 0.18, enemy.height * 0.18), aaaScale, debrisPalette);
+      }
+      addAaaSmoke(enemy.x, enemy.y, explosionType === 'boss' ? 30 : explosionType === 'elite' ? 18 : 10, aaaScale);
+
+      if (explosionType === 'boss') {
+        for (let i = 0; i < 10; i++) {
+          window.setTimeout(() => {
+            const dx = rand(-110, 110);
+            const dy = rand(-70, 70);
+            addAaaShockwave(enemy.x + dx, enemy.y + dy, rand(40, 85), 'rgba(251,113,133,0.62)', 3.2, 0.068);
+            addAaaGlow(enemy.x + dx, enemy.y + dy, 90, 'rgba(255,100,30,0.72)', 'rgba(255,60,0,0)', 0.28);
+            addAaaBurst(enemy.x + dx, enemy.y + dy, aaaPalettes.fire, 20, 8, 0.7);
+            addAaaTrauma(3.5);
+          }, i * 48 + 30);
+        }
+        window.setTimeout(() => addAaaShockwave(enemy.x, enemy.y, 380, 'rgba(192,132,252,0.28)', 14, 0.012), 120);
+      } else if (explosionType === 'elite') {
+        for (let i = 0; i < 5; i++) {
+          window.setTimeout(() => {
+            const dx = rand(-60, 60);
+            const dy = rand(-42, 42);
+            addAaaShockwave(enemy.x + dx, enemy.y + dy, rand(28, 58), 'rgba(251,191,36,0.58)', 2.5, 0.072);
+            addAaaBurst(enemy.x + dx, enemy.y + dy, aaaPalettes.fire, 10, 6, 0.6);
+          }, i * 60 + 20);
+        }
+      }
+
+      state.hellfireShockwaves.push(
+        { x: enemy.x, y: enemy.y, radius: 10, maxRadius: 88 * bossScale, life: 1, decay: 0.05, color: 'rgba(255,255,255,0.72)', width: 4 * bossScale },
+        { x: enemy.x, y: enemy.y, radius: 18, maxRadius: 132 * bossScale, life: 1, decay: 0.034, color, width: 6 * bossScale },
+        { x: enemy.x, y: enemy.y, radius: 24, maxRadius: 184 * bossScale, life: 1, decay: 0.026, color: 'rgba(127,29,29,0.42)', width: 9 * bossScale }
+      );
+
+      for (let i = 0; i < Math.round(34 * bossScale); i++) {
+        spawnParticle(
+          enemy.x + rand(-enemy.width * 0.2, enemy.width * 0.2),
+          enemy.y + rand(-enemy.height * 0.2, enemy.height * 0.2),
+          i % 7 === 0 ? '#ffffff' : i % 3 === 0 ? '#facc15' : enemy.kind.includes('monster') ? '#c084fc' : '#fb923c',
+          rand(2.5, 8.5) * Math.min(1.6, bossScale),
+          rand(0.55, 1.25),
+          rand(2.4, 6.6),
+          state.impactParticles
+        );
+      }
+
+      for (let i = 0; i < Math.round(10 * bossScale); i++) {
+        spawnSmokeParticle(
+          enemy.x + rand(-enemy.width * 0.36, enemy.width * 0.36),
+          enemy.y + rand(-enemy.height * 0.36, enemy.height * 0.36),
+          rand(-3.2, 3.2),
+          rand(-3.4, 1.4),
+          rand(18, 42) * Math.min(1.5, bossScale),
+          rand(72, 138)
+        );
+      }
+
+      if (enemy.kind === 'boss-ship' || isMonsterKind(enemy.kind)) {
+        state.hellfireShake = Math.max(state.hellfireShake, 18);
+        state.laserFlashAlpha = Math.max(state.laserFlashAlpha || 0, 0.26);
+      }
+    };
+
+    const startBattleCinematic = (target: BattleCinematic['target'], x: number, y: number, now: number) => {
+      state.cinematic = {
+        active: true,
+        target,
+        x: clamp(x, 80, WIDTH - 80),
+        y: clamp(y, 70, HEIGHT - 70),
+        start: now,
+        duration: RESULT_MODAL_DELAY_MS,
+      };
+    };
+
     const drawFireball = (ctx: CanvasRenderingContext2D, projectile: Projectile, now: number) => {
       const seed = projectile.seed || 0;
       const baseSize = projectile.size || 11;
@@ -1700,6 +2299,7 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
         attackCooldown: performance.now() + 900 + Math.random() * 900,
         image: blueprint.image,
         frames: blueprint.frames,
+        spriteSheet: blueprint.spriteSheet,
         shootSound: blueprint.shootSound,
         screamSound: blueprint.screamSound,
         explosionSound: blueprint.explosionSound,
@@ -1789,6 +2389,14 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
 
       applyElementalDamage(enemy, projectile.elemental, now);
 
+      spawnProjectileImpact(
+        enemy.x,
+        enemy.y,
+        projectile.special === 'hellfire' ? 'rgba(251,146,60,0.86)' : projectile.crit ? '#facc15' : projectile.color,
+        projectile.special === 'hellfire' ? 1.25 : projectile.crit ? 1.18 : 0.95,
+        Math.atan2(projectile.vy, projectile.vx)
+      );
+
       if (projectile.trinityShot) {
         spawnTrinityImpact(enemy.x, enemy.y, enemy.hp <= 0);
       }
@@ -1877,6 +2485,10 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
         spawnFloat(enemy.x - 14, enemy.y - 24, 'FAIL', '#7dd3fc');
         return;
       }
+      if (enemy.kind === 'monster-1') {
+        enemy.actionFrame = MONSTER_1_SHOOT_FRAME;
+        enemy.actionFrameUntil = now + 180;
+      }
       playSound(enemyShotSoundFor(enemy), enemy.kind === 'boss-ship' ? 0.62 : 0.46);
       const dx = state.player.x - enemy.x;
       const dy = state.player.y - enemy.y;
@@ -1891,6 +2503,7 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
       state.projectiles.push({
         id: state.nextId++,
         from: 'enemy',
+        visualType: enemy.kind === 'boss-ship' || enemy.kind.includes('monster') ? 'boss' : enemy.kind === 'elite-ship' ? 'elite' : 'common',
         targetId: undefined,
         x: enemy.x - enemy.width * 0.34,
         y: enemy.y,
@@ -1899,7 +2512,7 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
         damage,
         crit: false,
         elemental: { ice: 0, electric: 0, fire: 0 },
-        color: enemy.kind === 'boss-ship' ? '#f97316' : enemy.kind.includes('monster') ? '#a855f7' : '#ef4444',
+        color: enemy.kind === 'boss-ship' ? '#f97316' : enemy.kind.includes('monster') ? '#a855f7' : enemy.kind === 'elite-ship' ? '#facc15' : '#ef4444',
       });
     };
 
@@ -2119,6 +2732,46 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
         return;
       }
       fallback();
+    };
+
+    const drawSpriteSheetOrFallback = (
+      ctx: CanvasRenderingContext2D,
+      enemy: Enemy,
+      now: number,
+      fallback: () => void
+    ) => {
+      const sheet = enemy.spriteSheet;
+      if (!sheet) {
+        const frame = enemy.frames ? enemy.frames[Math.floor((now / 135 + enemy.frameOffset) % enemy.frames.length)] : enemy.image;
+        drawImageOrFallback(ctx, frame, enemy.x, enemy.y, enemy.width, enemy.height, fallback);
+        return;
+      }
+
+      const image = getImage(sheet.src);
+      if (!image?.complete || image.naturalWidth <= 0) {
+        fallback();
+        return;
+      }
+
+      const frameIndex = enemy.kind === 'monster-1'
+        ? getMonster1FrameIndex(enemy, now)
+        : Math.floor((now / (1000 / sheet.fps) + enemy.frameOffset) % sheet.frameCount);
+      const frameWidth = image.naturalWidth / sheet.columns;
+      const frameHeight = image.naturalHeight / sheet.rows;
+      const sx = (frameIndex % sheet.columns) * frameWidth;
+      const sy = Math.floor(frameIndex / sheet.columns) * frameHeight;
+
+      ctx.drawImage(
+        image,
+        sx,
+        sy,
+        frameWidth,
+        frameHeight,
+        enemy.x - enemy.width / 2,
+        enemy.y - enemy.height / 2,
+        enemy.width,
+        enemy.height
+      );
     };
 
     const updateLaserSpecial = (now: number) => {
@@ -3238,14 +3891,18 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
       const ctx = canvas?.getContext('2d');
       if (!ctx) return;
       ctx.save();
-      if (state.laserShake > 0.1 || state.hellfireShake > 0.1 || state.trinityShake > 0.1 || state.thorShake > 0.1 || state.blizzard.shake > 0.1) {
-        const shake = Math.max(state.laserShake, state.hellfireShake, state.trinityShake, state.thorShake, state.blizzard.shake);
+      const cinematic = state.cinematic;
+      const visualTimeScale = cinematic.active ? 0.32 : 1;
+
+      if (state.laserShake > 0.1 || state.hellfireShake > 0.1 || state.trinityShake > 0.1 || state.thorShake > 0.1 || state.blizzard.shake > 0.1 || state.aaaShake > 0.1) {
+        const shake = Math.max(state.laserShake, state.hellfireShake, state.trinityShake, state.thorShake, state.blizzard.shake, state.aaaShake);
         ctx.translate((Math.random() - 0.5) * shake, (Math.random() - 0.5) * shake);
         state.laserShake *= 0.88;
         state.hellfireShake *= 0.88;
         state.trinityShake *= 0.88;
         state.thorShake *= 0.88;
         state.blizzard.shake *= 0.88;
+        state.aaaShake *= 0.88;
       }
 
       const background = getImage(backgroundRef.current);
@@ -3318,44 +3975,129 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
         state.hellfireBannerLife -= 1;
       }
 
+      ctx.save();
+      state.aaaFlashes.forEach(flash => {
+        const alpha = Math.max(0, flash.life / flash.maxLife) * flash.intensity;
+        ctx.fillStyle = colorWithAlpha(flash.color, alpha);
+        ctx.fillRect(0, 0, WIDTH, HEIGHT);
+        flash.life -= 0.035 * visualTimeScale;
+      });
+      state.aaaFlashes = state.aaaFlashes.filter(flash => flash.life > 0).slice(-10);
+      ctx.restore();
+
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      state.aaaGlows.forEach(glow => {
+        const ease = 1 - Math.max(0, glow.life / glow.maxLife);
+        glow.radius += (glow.maxRadius - glow.radius) * 0.22;
+        const alpha = Math.max(0, glow.life / glow.maxLife);
+        const gradient = ctx.createRadialGradient(glow.x, glow.y, 0, glow.x, glow.y, Math.max(1, glow.radius));
+        gradient.addColorStop(0, colorWithAlpha(glow.color1, 0.82 * alpha));
+        gradient.addColorStop(0.42, colorWithAlpha(glow.color1, 0.26 * alpha));
+        gradient.addColorStop(1, glow.color2);
+        ctx.globalAlpha = 0.9 + ease * 0.08;
+        ctx.fillStyle = gradient;
+        ctx.beginPath();
+        ctx.arc(glow.x, glow.y, Math.max(1, glow.radius), 0, Math.PI * 2);
+        ctx.fill();
+        glow.life -= 0.032 * glow.decay * visualTimeScale;
+      });
+      state.aaaGlows = state.aaaGlows.filter(glow => glow.life > 0).slice(-26);
+      ctx.restore();
+
       const p = state.player;
+      const playerFrameIndex = getPlayerFrameIndex(keysRef.current, now, playerSpriteRef);
+      const playerSpritesheet = getImage(PLAYER_SPRITESHEET);
       ctx.save();
       ctx.shadowColor = '#22d3ee';
-      drawImageOrFallback(ctx, PLAYER_IMAGE, p.x, p.y, 104, 64, () => {
-        ctx.translate(p.x, p.y);
-        ctx.fillStyle = '#22d3ee';
-        ctx.beginPath();
-        ctx.moveTo(30, 0);
-        ctx.lineTo(-20, -20);
-        ctx.lineTo(-8, 0);
-        ctx.lineTo(-20, 20);
-        ctx.closePath();
-        ctx.fill();
-      });
+      if (playerSpritesheet?.complete && playerSpritesheet.naturalWidth > 0) {
+        ctx.drawImage(
+          playerSpritesheet,
+          playerFrameIndex * PLAYER_SPRITE_FRAME_WIDTH,
+          0,
+          PLAYER_SPRITE_FRAME_WIDTH,
+          PLAYER_SPRITE_FRAME_HEIGHT,
+          p.x - PLAYER_DRAW_WIDTH / 2,
+          p.y - PLAYER_DRAW_HEIGHT / 2,
+          PLAYER_DRAW_WIDTH,
+          PLAYER_DRAW_HEIGHT
+        );
+      } else {
+        drawImageOrFallback(ctx, PLAYER_IMAGE, p.x, p.y, 104, 64, () => {
+          ctx.translate(p.x, p.y);
+          ctx.fillStyle = '#22d3ee';
+          ctx.beginPath();
+          ctx.moveTo(30, 0);
+          ctx.lineTo(-20, -20);
+          ctx.lineTo(-8, 0);
+          ctx.lineTo(-20, 20);
+          ctx.closePath();
+          ctx.fill();
+        });
+      }
       ctx.restore();
 
       state.projectiles.forEach(projectile => {
-        ctx.shadowColor = projectile.color;
-        ctx.fillStyle = projectile.color;
-        ctx.beginPath();
         if (projectile.special === 'hellfire') {
           drawFireball(ctx, projectile, now);
           return;
         } else if (projectile.trinityShot && projectile.from === 'player') {
           return;
-        } else if (projectile.from === 'player') {
-          ctx.roundRect(projectile.x, projectile.y - 3, 26, 6, 3);
+        }
+
+        const angle = Math.atan2(projectile.vy, projectile.vx);
+        const isEnemy = projectile.from === 'enemy';
+        const isBossShot = projectile.visualType === 'boss';
+        const isEliteShot = projectile.visualType === 'elite';
+        const coreColor = isBossShot ? '#e879f9' : isEliteShot ? '#fde68a' : projectile.color;
+        const glowColor = isBossShot ? 'rgba(168,85,247,0.6)' : isEliteShot ? 'rgba(251,191,36,0.6)' : isEnemy ? 'rgba(239,68,68,0.52)' : 'rgba(34,211,238,0.48)';
+        const size = isBossShot ? 9 : isEliteShot ? 6.5 : isEnemy ? 5.4 : 4.8;
+        const pulse = 1 + Math.sin(now / 70 + projectile.id) * 0.12;
+
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.translate(projectile.x, projectile.y);
+        ctx.rotate(angle);
+
+        const trail = ctx.createLinearGradient(-42, 0, 8, 0);
+        trail.addColorStop(0, 'rgba(0,0,0,0)');
+        trail.addColorStop(0.42, glowColor);
+        trail.addColorStop(1, colorWithAlpha(glowColor, 0.08));
+        ctx.fillStyle = trail;
+        ctx.beginPath();
+        ctx.ellipse(-22, 0, isBossShot ? 42 : 28, size * 1.7, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.shadowColor = coreColor;
+        ctx.shadowBlur = isBossShot ? 24 : 16;
+        ctx.fillStyle = glowColor;
+        ctx.beginPath();
+        ctx.ellipse(0, 0, size * 2.1 * pulse, size * 1.08 * pulse, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.shadowBlur = isBossShot ? 30 : 18;
+        ctx.fillStyle = coreColor;
+        ctx.beginPath();
+        if (isEnemy) {
+          ctx.ellipse(0, 0, size * 1.25, size * 0.72, 0, 0, Math.PI * 2);
         } else {
-          ctx.arc(projectile.x, projectile.y, 6, 0, Math.PI * 2);
+          ctx.roundRect(-3, -3, 26, 6, 3);
         }
         ctx.fill();
+
+        ctx.strokeStyle = colorWithAlpha(coreColor.startsWith('#') ? 'rgba(255,255,255,0.9)' : coreColor, isBossShot ? 0.55 : 0.35);
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.arc(0, 0, size * 2.8 * pulse, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
       });
 
       ctx.save();
       state.hellfireShockwaves.forEach(wave => {
         ctx.globalCompositeOperation = 'lighter';
         drawShockwave(ctx, wave);
-        wave.life -= wave.decay || 0.035;
+        wave.life -= (wave.decay || 0.035) * visualTimeScale;
       });
       state.hellfireShockwaves = state.hellfireShockwaves.filter(wave => wave.life > 0);
       ctx.restore();
@@ -3369,7 +4111,7 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
         if (particle.type === 'smoke') particle.vy -= 0.018;
         if (particle.type === 'debris') particle.vy += 0.035;
         particle.size = Math.max(0.1, particle.size + (particle.growth || 0));
-        particle.life -= 1;
+        particle.life -= 1 * visualTimeScale;
         const alpha = Math.max(0, particle.life / (particle.maxLife || particle.life || 1));
         ctx.save();
         if (particle.type === 'smoke') {
@@ -3396,7 +4138,7 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
       state.trinityShockwaves.forEach(wave => {
         ctx.globalCompositeOperation = 'lighter';
         drawShockwave(ctx, wave);
-        wave.life -= wave.decay || 0.04;
+        wave.life -= (wave.decay || 0.04) * visualTimeScale;
       });
       state.trinityShockwaves = state.trinityShockwaves.filter(wave => wave.life > 0);
       ctx.restore();
@@ -3411,7 +4153,7 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
         if (particle.type === 'mist' || particle.type === 'smoke') particle.vy -= 0.01;
         particle.rotation = (particle.rotation || 0) + (particle.spin || 0);
         particle.size = Math.max(0.1, particle.size + (particle.growth || 0));
-        particle.life -= 0.032;
+        particle.life -= 0.032 * visualTimeScale;
         const alpha = Math.max(0, particle.life / (particle.maxLife || 1));
 
         ctx.save();
@@ -3463,28 +4205,117 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
       state.impactParticles.forEach(particle => {
         particle.x += particle.vx;
         particle.y += particle.vy;
-        particle.vx *= 0.95;
-        particle.vy *= 0.95;
-        particle.life -= 0.035;
-        ctx.globalAlpha = Math.max(0, particle.life);
+        particle.vx *= particle.drag || 0.95;
+        particle.vy = particle.vy * (particle.drag || 0.95) + (particle.type === 'debris' ? 0.035 : 0);
+        particle.size = Math.max(0.1, particle.size + (particle.growth || 0));
+        particle.rotation = (particle.rotation || 0) + (particle.spin || 0);
+        particle.life -= 0.035 * visualTimeScale;
+        const alpha = Math.max(0, particle.life / (particle.maxLife || 1));
+        ctx.globalAlpha = alpha;
         ctx.shadowColor = particle.color;
         ctx.fillStyle = particle.color;
-        ctx.beginPath();
-        ctx.arc(particle.x, particle.y, particle.size, 0, Math.PI * 2);
-        ctx.fill();
+        if (particle.rotation) {
+          ctx.save();
+          ctx.translate(particle.x, particle.y);
+          ctx.rotate(particle.rotation);
+          ctx.fillRect(-particle.size * 0.55, -particle.size * 0.22, particle.size * 1.1, particle.size * 0.44);
+          ctx.restore();
+        } else {
+          ctx.beginPath();
+          ctx.arc(particle.x, particle.y, particle.size, 0, Math.PI * 2);
+          ctx.fill();
+        }
       });
       state.impactParticles = state.impactParticles.filter(particle => particle.life > 0);
+      ctx.restore();
+
+      ctx.save();
+      state.aaaSmokeRings.forEach(ring => {
+        ring.x += ring.vx;
+        ring.y += ring.vy;
+        ring.radius += ring.grow * 0.06;
+        ring.life -= 0.022 * visualTimeScale;
+        const alpha = Math.max(0, ring.life / ring.maxLife);
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.globalAlpha = alpha * 0.42;
+        ctx.strokeStyle = colorWithAlpha(ring.color, 0.28 * alpha);
+        ctx.lineWidth = Math.max(1, 7 * alpha);
+        ctx.beginPath();
+        ctx.arc(ring.x, ring.y, ring.radius, 0, Math.PI * 2);
+        ctx.stroke();
+      });
+      state.aaaSmokeRings = state.aaaSmokeRings.filter(ring => ring.life > 0).slice(-80);
+      ctx.restore();
+
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      state.aaaStreaks.forEach(streak => {
+        streak.x += streak.vx;
+        streak.y += streak.vy;
+        streak.vx *= streak.drag;
+        streak.vy *= streak.drag;
+        streak.life -= 0.026 * visualTimeScale;
+        const alpha = Math.max(0, streak.life / streak.maxLife);
+        const angle = Math.atan2(streak.vy, streak.vx);
+        const tailX = streak.x - Math.cos(angle) * streak.length;
+        const tailY = streak.y - Math.sin(angle) * streak.length;
+        const gradient = ctx.createLinearGradient(streak.x, streak.y, tailX, tailY);
+        gradient.addColorStop(0, colorWithAlpha(streak.color.startsWith('#') ? 'rgba(255,255,255,0.95)' : streak.color, alpha));
+        gradient.addColorStop(1, 'rgba(255,255,255,0)');
+        ctx.strokeStyle = gradient;
+        ctx.lineWidth = Math.max(0.5, streak.width * alpha);
+        ctx.beginPath();
+        ctx.moveTo(streak.x, streak.y);
+        ctx.lineTo(tailX, tailY);
+        ctx.stroke();
+      });
+      state.aaaStreaks = state.aaaStreaks.filter(streak => streak.life > 0).slice(-140);
+      ctx.restore();
+
+      ctx.save();
+      state.aaaDebris.forEach(debris => {
+        debris.trail.push({ x: debris.x, y: debris.y });
+        if (debris.trail.length > 8) debris.trail.shift();
+        debris.x += debris.vx;
+        debris.y += debris.vy;
+        debris.vx *= debris.drag;
+        debris.vy = debris.vy * debris.drag + debris.gravity;
+        debris.rotation += debris.spin;
+        debris.life -= 0.018 * visualTimeScale;
+        if (debris.y > HEIGHT * 0.9 && debris.bounces < debris.maxBounces) {
+          debris.y = HEIGHT * 0.9;
+          debris.vy *= -0.42;
+          debris.vx *= 0.72;
+          debris.bounces += 1;
+        }
+        const alpha = Math.max(0, debris.life / debris.maxLife);
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.globalAlpha = alpha;
+        if (debris.trail.length > 1) {
+          ctx.strokeStyle = colorWithAlpha('rgba(251,146,60,0.34)', 0.24 * alpha);
+          ctx.lineWidth = Math.max(1, debris.size * 0.42);
+          ctx.beginPath();
+          ctx.moveTo(debris.trail[0].x, debris.trail[0].y);
+          debris.trail.slice(1).forEach(point => ctx.lineTo(point.x, point.y));
+          ctx.stroke();
+        }
+        ctx.translate(debris.x, debris.y);
+        ctx.rotate(debris.rotation);
+        ctx.fillStyle = debris.color;
+        ctx.fillRect(-debris.size / 2, -debris.size / 2, debris.size, debris.size * 0.62);
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+      });
+      state.aaaDebris = state.aaaDebris.filter(debris => debris.life > 0).slice(-120);
       ctx.restore();
 
       state.enemies.forEach(enemy => {
         const slowed = enemy.status.slowUntil && enemy.status.slowUntil > now;
         const shocked = enemy.status.shockedUntil && enemy.status.shockedUntil > now;
         const burning = enemy.status.burningUntil && enemy.status.burningUntil > now;
-        const frame = enemy.frames ? enemy.frames[Math.floor((now / 135 + enemy.frameOffset) % enemy.frames.length)] : enemy.image;
 
         ctx.save();
         ctx.shadowColor = burning ? '#f97316' : shocked ? '#38bdf8' : slowed ? '#a5f3fc' : '#ef4444';
-        drawImageOrFallback(ctx, frame, enemy.x, enemy.y, enemy.width, enemy.height, () => {
+        drawSpriteSheetOrFallback(ctx, enemy, now, () => {
           ctx.fillStyle = ctx.shadowColor;
           ctx.beginPath();
           ctx.arc(enemy.x, enemy.y, enemy.radius, 0, Math.PI * 2);
@@ -3538,15 +4369,27 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
     const loop = () => {
       if (state.ended) return;
       const now = performance.now();
+      if (state.pendingResult) {
+        draw();
+        if (now >= state.pendingResultAt) {
+          state.ended = true;
+          setResult(state.pendingResult);
+          return;
+        }
+        rafRef.current = requestAnimationFrame(loop);
+        return;
+      }
+
       const thorDt = state.thorLastUpdate > 0 ? Math.min(60, now - state.thorLastUpdate) : 16.67;
       state.thorLastUpdate = now;
       const keys = keysRef.current;
       const p = state.player;
+      const timeScale = state.cinematic.active ? 0.28 : 1;
 
-      if (keys.w || keys.arrowup) p.y -= 4.5;
-      if (keys.s || keys.arrowdown) p.y += 4.5;
-      if (keys.a || keys.arrowleft) p.x -= 4.5;
-      if (keys.d || keys.arrowright) p.x += 4.5;
+      if (keys.w || keys.arrowup) p.y -= 4.5 * timeScale;
+      if (keys.s || keys.arrowdown) p.y += 4.5 * timeScale;
+      if (keys.a || keys.arrowleft) p.x -= 4.5 * timeScale;
+      if (keys.d || keys.arrowright) p.x += 4.5 * timeScale;
       p.x = clamp(p.x, 60, WIDTH * 0.45);
       p.y = clamp(p.y, 45, HEIGHT - 45);
 
@@ -3602,11 +4445,15 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
       state.enemies.forEach(enemy => {
         const slowed = enemy.status.slowUntil && enemy.status.slowUntil > now;
         const minEnemyX = WIDTH * 0.5;
+        const previousX = enemy.x;
+        const previousY = enemy.y;
         if (enemy.x > minEnemyX) {
-          enemy.x = Math.max(minEnemyX, enemy.x - enemy.speed * (slowed ? 0.45 : 1));
+          enemy.x = Math.max(minEnemyX, enemy.x - enemy.speed * (slowed ? 0.45 : 1) * timeScale);
         }
-        enemy.y += Math.sin(now / 420 + enemy.frameOffset) * (enemy.kind.includes('monster') ? 0.75 : 0.35);
+        enemy.y += Math.sin(now / 420 + enemy.frameOffset) * (enemy.kind.includes('monster') ? 0.75 : 0.35) * timeScale;
         enemy.y = clamp(enemy.y, 52, HEIGHT - 52);
+        enemy.visualDx = enemy.x - previousX;
+        enemy.visualDy = enemy.y - previousY;
         // Enemy engine smoke trail (non-bosses only)
         if (!enemy.kind.includes('monster') && Math.random() > 0.45) {
           spawnSmokeParticle(
@@ -3665,8 +4512,8 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
             projectile.vy = projectile.vy * (projectile.special === 'hellfire' ? 0.86 : 0.88) + desiredVy * (projectile.special === 'hellfire' ? 0.14 : 0.12);
           }
         }
-        projectile.x += projectile.vx;
-        projectile.y += projectile.vy;
+        projectile.x += projectile.vx * timeScale;
+        projectile.y += projectile.vy * timeScale;
 
         if (projectile.trinityShot && projectile.from === 'player') {
           spawnTrinityTrail(projectile);
@@ -3695,6 +4542,21 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
               rand(20, 44)
             );
           }
+        } else if (projectile.from === 'enemy' && Math.random() > 0.38) {
+          const backAngle = Math.atan2(-projectile.vy, -projectile.vx);
+          const bossLike = projectile.visualType === 'boss';
+          const eliteLike = projectile.visualType === 'elite';
+          state.impactParticles.push({
+            x: projectile.x + Math.cos(backAngle) * rand(4, 12),
+            y: projectile.y + Math.sin(backAngle) * rand(4, 12),
+            vx: Math.cos(backAngle) * rand(0.4, 1.4) + rand(-0.45, 0.45),
+            vy: Math.sin(backAngle) * rand(0.4, 1.4) + rand(-0.45, 0.45),
+            life: 0.24,
+            maxLife: 0.32,
+            size: rand(1.2, bossLike ? 3.6 : 2.6),
+            drag: 0.88,
+            color: bossLike ? pick(['#c084fc', '#e879f9', '#fb923c']) : eliteLike ? pick(['#facc15', '#fde68a', '#fb923c']) : pick(['#ef4444', '#fb7185', '#fca5a5']),
+          });
         }
 
         if (projectile.from === 'player') {
@@ -3727,23 +4589,7 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
           const dy = p.y - projectile.y;
           if (Math.sqrt(dx * dx + dy * dy) < 34) {
             damagePlayer(projectile.damage);
-            // Player ship hit: impact sparks + smoke burst
-            const impactX = projectile.x;
-            const impactY = projectile.y;
-            for (let i = 0; i < 8; i++) {
-              spawnParticle(impactX, impactY, ['#fb923c', '#ef4444', '#facc15', '#ffffff', '#f97316'][Math.floor(Math.random() * 5)], 4.5 + Math.random() * 3, 0.5, 4.5, state.impactParticles);
-            }
-            for (let i = 0; i < 3; i++) {
-              spawnSmokeParticle(
-                impactX + rand(-8, 8),
-                impactY + rand(-8, 8),
-                rand(-2.5, 2.5),
-                rand(-2.5, 0.5),
-                rand(10, 22),
-                rand(45, 80)
-              );
-            }
-            state.laserFlashAlpha = Math.max(state.laserFlashAlpha || 0, 0.12);
+            spawnPlayerImpact(projectile.x, projectile.y, projectile);
             projectile.x = -999;
           }
         }
@@ -3757,12 +4603,14 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
           state.earnedXp += enemy.xp;
           awardHorizonXp(enemy.xp);
           state.earnedQc += enemy.qc;
+          spawnEnemyDeathExplosion(enemy);
           if (isMonsterKind(enemy.kind)) {
             state.monsterDefeated = true;
+            startBattleCinematic('boss', enemy.x, enemy.y, now);
             stopBattleSound(enemy.screamAudio);
           }
           stopBattleSound(enemy.engineAudio);
-          if (enemy.explosionSound) playSound(enemy.explosionSound, 0.68);
+          playRoute4EnemyExplosionSfx(enemy);
           return false;
         }
         const staysOnScreen = enemy.x > -90;
@@ -3779,16 +4627,40 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
         .filter(float => float.life > 0);
 
       if (p.hp <= 0) {
-        state.ended = true;
-        stopAllBattleSounds();
+        startBattleCinematic('player', p.x, p.y, now);
+        spawnEnemyDeathExplosion({
+          id: -1,
+          kind: 'boss-ship',
+          level: 1,
+          x: p.x,
+          y: p.y,
+          hp: 0,
+          maxHp: 1,
+          speed: 0,
+          radius: 34,
+          width: PLAYER_DRAW_WIDTH,
+          height: PLAYER_DRAW_HEIGHT,
+          damage: 0,
+          status: {},
+          attackCooldown: 0,
+          image: PLAYER_IMAGE,
+          shootSound: '',
+          frameOffset: 0,
+          xp: 0,
+          qc: 0,
+        });
+        playSound(pick(ROUTE4_COMMON_ENEMY_EXPLOSION_SOUNDS), 0.82);
+        stopLoopingBattleSounds();
         setHud({ hp: 0, shield: Math.max(0, p.shield), kills: state.regularEnemiesDefeated, earnedXp: state.earnedXp, earnedQc: state.earnedQc, enemies: state.enemies.length, ended: true, result: 'defeat' });
-        setResult('defeat');
+        state.pendingResult = 'defeat';
+        state.pendingResultAt = now + RESULT_MODAL_DELAY_MS;
+        draw();
+        rafRef.current = requestAnimationFrame(loop);
         return;
       }
 
       if (state.regularEnemiesDefeated >= REGULAR_ENEMIES_BEFORE_FINAL_BOSS && state.monsterDefeated) {
-        state.ended = true;
-        stopAllBattleSounds();
+        stopLoopingBattleSounds();
         const victoryRewardScale = 1 + Math.max(0, currentDefenseBattleLevel - 1) * 0.1;
         const victoryXp = Math.round(450 * victoryRewardScale);
         const victoryQc = Math.round(35000 * victoryRewardScale);
@@ -3796,7 +4668,10 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
         awardHorizonXp(victoryXp);
         state.earnedQc += victoryQc;
         setHud({ hp: p.hp, shield: p.shield, kills: state.regularEnemiesDefeated, earnedXp: state.earnedXp, earnedQc: state.earnedQc, enemies: state.enemies.length, ended: true, result: 'victory' });
-        setResult('victory');
+        state.pendingResult = 'victory';
+        state.pendingResultAt = now + RESULT_MODAL_DELAY_MS;
+        draw();
+        rafRef.current = requestAnimationFrame(loop);
         return;
       }
 
@@ -3943,51 +4818,62 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
               </div>
             )}
 
-            {result && (
+            {result && resultVisible && (
               <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/78 p-6 backdrop-blur-sm">
-                <div className={`w-full max-w-2xl rounded-[2rem] border p-8 text-center shadow-[0_0_70px_rgba(255,255,255,0.12)] ${
+                <div
+                  className={`relative flex aspect-video w-[min(92vw,1120px)] max-h-[88vh] flex-col justify-center overflow-hidden rounded-[2rem] border bg-cover bg-center p-10 text-center shadow-[0_0_90px_rgba(255,255,255,0.14)] ${
                   result === 'victory'
                     ? 'border-emerald-300/40 bg-emerald-950/35'
                     : 'border-rose-400/40 bg-rose-950/35'
-                }`}>
-                  <p className={`font-mono text-[10px] uppercase tracking-[0.45em] ${result === 'victory' ? 'text-emerald-200' : 'text-rose-200'}`}>
-                    {result === 'victory' ? t('Defense Complete', 'Defesa Concluída') : t('Defense Failed', 'Defesa Fracassou')}
-                  </p>
-                  <h2 className={`mt-3 font-orbitron text-5xl font-black uppercase tracking-tight ${result === 'victory' ? 'text-emerald-300' : 'text-rose-400'}`}>
-                    {result === 'victory' ? t('Victory', 'Vitória') : t('Defeat', 'Derrota')}
-                  </h2>
-                  <p className="mx-auto mt-4 max-w-lg text-sm leading-relaxed text-zinc-300">
-                    {result === 'victory'
-                      ? t('The threat was neutralized and the expedition corridor is safe again.', 'A ameaça foi neutralizada e o corredor da expedição está seguro novamente.')
-                      : t('The Horizon was forced to retreat. The threat remains registered for another defense attempt.', 'A Horizon foi forçada a recuar. A ameaça permanece registrada para outra tentativa de defesa.')}
-                  </p>
-                  <div className="mt-6 grid grid-cols-2 gap-3">
-                    <div className="rounded-2xl border border-white/10 bg-black/35 p-4">
-                      <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-zinc-500">{t('Targets', 'Alvos')}</p>
-                      <p className="mt-1 font-orbitron text-2xl font-black text-white">{hud.kills} / 20</p>
+                }`}
+                  style={{ backgroundImage: resultBackground ? `url(${resultBackground})` : undefined }}
+                >
+                  <div className="absolute inset-0 bg-black/50" />
+                  <div className={`absolute inset-0 ${
+                    result === 'victory'
+                      ? 'bg-gradient-to-b from-emerald-950/30 via-black/10 to-emerald-950/55'
+                      : 'bg-gradient-to-b from-rose-950/35 via-black/15 to-rose-950/60'
+                  }`} />
+                  <div className="relative z-10 mx-auto flex w-full max-w-[940px] flex-col">
+                    <p className={`font-mono text-[10px] uppercase tracking-[0.45em] ${result === 'victory' ? 'text-emerald-200' : 'text-rose-200'}`}>
+                      {result === 'victory' ? t('Defense Complete', 'Defesa Concluída') : t('Defense Failed', 'Defesa Fracassou')}
+                    </p>
+                    <h2 className={`mt-3 font-orbitron text-6xl font-black uppercase tracking-tight ${result === 'victory' ? 'text-emerald-300' : 'text-rose-400'}`}>
+                      {result === 'victory' ? t('Victory', 'Vitória') : t('Defeat', 'Derrota')}
+                    </h2>
+                    <p className="mx-auto mt-5 max-w-2xl text-base font-semibold leading-relaxed text-zinc-100 drop-shadow-[0_2px_8px_rgba(0,0,0,0.75)]">
+                      {result === 'victory'
+                        ? t('The threat was neutralized and the expedition corridor is safe again.', 'A ameaça foi neutralizada e o corredor da expedição está seguro novamente.')
+                        : t('The Horizon was forced to retreat. The threat remains registered for another defense attempt.', 'A Horizon foi forçada a recuar. A ameaça permanece registrada para outra tentativa de defesa.')}
+                    </p>
+                    <div className="mt-8 grid grid-cols-2 gap-4">
+                      <div className="rounded-2xl border border-white/10 bg-black/45 p-5 backdrop-blur-sm">
+                        <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-zinc-400">{t('Targets', 'Alvos')}</p>
+                        <p className="mt-2 font-orbitron text-3xl font-black text-white">{hud.kills} / 20</p>
+                      </div>
+                      <div className="rounded-2xl border border-amber-300/25 bg-amber-300/15 p-5 backdrop-blur-sm">
+                        <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-amber-200">XP</p>
+                        <p className="mt-2 font-orbitron text-3xl font-black text-white">+{hud.earnedXp}</p>
+                      </div>
+                      <div className="rounded-2xl border border-yellow-300/25 bg-yellow-300/15 p-5 backdrop-blur-sm">
+                        <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-yellow-200">QC</p>
+                        <p className="mt-2 font-orbitron text-3xl font-black text-white">+{hud.earnedQc.toLocaleString()}</p>
+                      </div>
+                      <div className="rounded-2xl border border-white/10 bg-black/45 p-5 backdrop-blur-sm">
+                        <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-zinc-400">{t('Hull', 'Vida')}</p>
+                        <p className="mt-2 font-orbitron text-3xl font-black text-white">{Math.ceil(hud.hp)}</p>
+                      </div>
                     </div>
-                    <div className="rounded-2xl border border-amber-300/20 bg-amber-300/10 p-4">
-                      <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-amber-200">XP</p>
-                      <p className="mt-1 font-orbitron text-2xl font-black text-white">+{hud.earnedXp}</p>
-                    </div>
-                    <div className="rounded-2xl border border-yellow-300/20 bg-yellow-300/10 p-4">
-                      <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-yellow-200">QC</p>
-                      <p className="mt-1 font-orbitron text-2xl font-black text-white">+{hud.earnedQc.toLocaleString()}</p>
-                    </div>
-                    <div className="rounded-2xl border border-white/10 bg-black/35 p-4">
-                      <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-zinc-500">{t('Hull', 'Vida')}</p>
-                      <p className="mt-1 font-orbitron text-2xl font-black text-white">{Math.ceil(hud.hp)}</p>
-                    </div>
+                    <PremiumCanvasButton
+                      type="button"
+                      onClick={finishResult}
+                      tone={result === 'victory' ? 'green' : 'red'}
+                      className="mx-auto mt-8 h-16 w-full max-w-[760px] rounded-2xl"
+                      contentClassName="px-5 text-sm font-black uppercase tracking-[0.25em] text-white"
+                    >
+                      {t('Continue', 'Continuar')}
+                    </PremiumCanvasButton>
                   </div>
-                  <PremiumCanvasButton
-                    type="button"
-                    onClick={finishResult}
-                    tone={result === 'victory' ? 'green' : 'red'}
-                    className="mt-7 h-14 w-full rounded-2xl"
-                    contentClassName="px-5 text-sm font-black uppercase tracking-[0.25em] text-white"
-                  >
-                    {t('Continue', 'Continuar')}
-                  </PremiumCanvasButton>
                 </div>
               </div>
             )}

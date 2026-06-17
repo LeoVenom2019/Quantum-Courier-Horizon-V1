@@ -91,7 +91,6 @@ import {
   ExtractionPoint,
   VoidAircraft,
   VoidPOI,
-  GAME_THEMES,
   ThemeColor
 } from '@/lib/game-data';
 import { useSFX } from '@/hooks/useSFX';
@@ -308,6 +307,7 @@ const NEW_EARTH_MUSEUM_CATEGORIES: {
   treasures: NewEarthTreasure[];
   tone: string;
   background: string;
+  cardBackground: string;
 }[] = [
   {
     id: 'rare_fish',
@@ -315,6 +315,7 @@ const NEW_EARTH_MUSEUM_CATEGORIES: {
     treasures: NEW_EARTH_RARE_FISH_TREASURES,
     tone: 'cyan',
     background: '/assets/rota4/layout_cap4/bg_peixes.webp',
+    cardBackground: '/assets/rota4/layout_cap4/bg_peixes_card.webp',
   },
   {
     id: 'relic',
@@ -322,6 +323,7 @@ const NEW_EARTH_MUSEUM_CATEGORIES: {
     treasures: NEW_EARTH_RELIC_TREASURES,
     tone: 'amber',
     background: '/assets/rota4/layout_cap4/bg_reliquias.webp',
+    cardBackground: '/assets/rota4/layout_cap4/bg_reliquias_card.webp',
   },
   {
     id: 'rare_ring',
@@ -329,6 +331,7 @@ const NEW_EARTH_MUSEUM_CATEGORIES: {
     treasures: NEW_EARTH_RARE_RING_TREASURES,
     tone: 'violet',
     background: '/assets/rota4/layout_cap4/bg_aneis.webp',
+    cardBackground: '/assets/rota4/layout_cap4/bg_aneis_card.webp',
   },
 ];
 
@@ -337,6 +340,11 @@ const NEW_EARTH_MUSEUM_ITEMS_PER_PAGE = 4;
 const NEW_EARTH_SUBMARINE_NAMES: Record<NewEarthSubmarineColonyId, string> = {
   'colony-4': 'NEPTUNE',
   'colony-2': 'POSEIDON',
+};
+
+const NEW_EARTH_SUBMARINE_PREVIEW_BACKGROUNDS: Record<NewEarthSubmarineColonyId, string> = {
+  'colony-4': '/assets/rota4/colonys/gaia/neptune_explor_prev.webp',
+  'colony-2': '/assets/rota4/colonys/eden/poseidon_explor_prev.webp',
 };
 
 const NEW_EARTH_SECTOR_ORDER: ColonySectorId[] = ['culture', 'economy', 'health', 'happiness', 'security', 'technology'];
@@ -608,10 +616,7 @@ interface GameDashboardProps {
   setMusicOn: (on: boolean) => void;
   setSfxOn: (on: boolean) => void;
   playerName: string;
-  localRecords?: { name: string; time: number; date: string }[];
-  setLocalRecords?: (records: { name: string; time: number; date: string }[]) => void;
   onReturnToMenu: () => void;
-  currentThemeIndex?: number;
   jukebox: any;
 }
 
@@ -646,13 +651,9 @@ const DashboardContent = memo(({
   setMusicOn,
   setSfxOn,
   playerName,
-  localRecords = [],
-  setLocalRecords,
   onReturnToMenu,
-  currentThemeIndex,
   jukebox
 }: GameDashboardProps) => {
-  const isSpeedRun = false;
   const dispatch = useDispatch();
   const progressionState = useProgression();
   const {
@@ -860,7 +861,6 @@ const DashboardContent = memo(({
   const [isJumping, setIsJumping] = useState(false);
   const [showRoute2Info, setShowRoute2Info] = useState(false);
   const [showRoute3Info, setShowRoute3Info] = useState(false);
-  const [showSpeedRunWinModal, setShowSpeedRunWinModal] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [showDoomProtocolInfo, setShowDoomProtocolInfo] = useState(false);
@@ -1001,7 +1001,6 @@ const DashboardContent = memo(({
   const researchingTechRef = React.useRef(researchingTech);
   const route4UnlockedRef = React.useRef(route4Unlocked);
   const routeTierRef = React.useRef(routeTier);
-  const isSpeedRunRef = React.useRef(isSpeedRun);
   const historyStatsRef = React.useRef(historyStats);
   const gameTimeSecondsRef = React.useRef(gameTimeSeconds);
   const earthPopulationRef = React.useRef(earthPopulation);
@@ -1310,7 +1309,6 @@ const DashboardContent = memo(({
   ]);
 
   useEffect(() => {
-    isSpeedRunRef.current = isSpeedRun;
     autoTravelActiveRef.current = autoTravelActive;
     autoTravelProgressRef.current = autoTravelProgress;
     autoTravelDesiredRef.current = autoTravelDesired;
@@ -1320,7 +1318,7 @@ const DashboardContent = memo(({
     showVoidLoreRef.current = showVoidLore;
     voidBattleStatusRef.current = voidBattleStatus;
     activeTabRef.current = activeTab;
-  }, [isSpeedRun, autoTravelActive, autoTravelProgress, autoTravelDesired, language, isTransitioning, showRoute2Lore, showVoidLore, voidBattleStatus, activeTab]);
+  }, [autoTravelActive, autoTravelProgress, autoTravelDesired, language, isTransitioning, showRoute2Lore, showVoidLore, voidBattleStatus, activeTab]);
 
 
   useEffect(() => {
@@ -1355,9 +1353,15 @@ const DashboardContent = memo(({
   const isArcadeUnlocked = routeTier === 'Earth';
   const isNeon = false;
 
-  const currentTheme = typeof currentThemeIndex === 'number' ? GAME_THEMES[currentThemeIndex] : null;
+  const getDashboardThemeColor = (): ThemeColor => {
+    if (isNeon) return 'pink';
+    if (isEarth) return 'emerald';
+    if (isVoid) return 'purple';
+    if (isInterstellar) return 'orange';
+    return 'cyan';
+  };
 
-  const themeColor = isNeon ? 'pink' : (currentTheme ? currentTheme.color : (isEarth ? 'emerald' : (isVoid ? 'purple' : (isInterstellar ? 'orange' : 'cyan'))));
+  const themeColor = getDashboardThemeColor();
 
   const themeText = themeColor === 'pink' ? 'text-pink-500' :
     themeColor === 'purple' ? 'text-purple-300' :
@@ -1751,7 +1755,7 @@ const DashboardContent = memo(({
     if (nextProgress >= achievement.target && !unlockedAchievementsRef.current.includes(id)) {
       dispatch({ type: 'UNLOCK_ACHIEVEMENT', payload: { id } });
       setAchievementNotification(achievement);
-      playSfx('success');
+      playSfx('achievment_unlocked');
 
       // Update ref immediately to prevent multiple unlocks before state update
       unlockedAchievementsRef.current = [...unlockedAchievementsRef.current, id];
@@ -3539,7 +3543,7 @@ const DashboardContent = memo(({
 
   // Centralized Save Function
   const performSave = useCallback(async () => {
-    if (isSpeedRun || !isLoaded || isResettingRef.current) return;
+    if (!isLoaded || isResettingRef.current) return;
 
     const saveData = {
       qc: qcRef.current,
@@ -3647,7 +3651,7 @@ const DashboardContent = memo(({
 
     const modularSave = SaveManager.createSave(saveData);
     await GameStorage.save(modularSave, 'time_travel_save');
-  }, [isSpeedRun, isLoaded, playerName, seenTutorials, autoClaimMissions, isVoidWarActive, voidWarProgress, voidCompactedResources, voidDonationModes, route4Unlocked, unlockedAchievements, achievementProgress]);
+  }, [isLoaded, playerName, seenTutorials, autoClaimMissions, isVoidWarActive, voidWarProgress, voidCompactedResources, voidDonationModes, route4Unlocked, unlockedAchievements, achievementProgress]);
 
   // --- AUTOMATED SAVING ---
 
@@ -4311,7 +4315,6 @@ const DashboardContent = memo(({
 
   const generateMissions = useCallback(() => {
     const currentTier = routeTierRef.current;
-    if (isSpeedRunRef.current) return;
 
     let currentMissions = [...missionsRef.current];
 
@@ -4326,7 +4329,7 @@ const DashboardContent = memo(({
 
 
     // Initial Missions for Route 1 Campaign only - Prioritized
-    if (currentTier === 'Solar' && !isSpeedRunRef.current) {
+    if (currentTier === 'Solar') {
       const initialMissions = [
         { id: 'init_1', titleKey: 'mission1Title', descKey: 'mission1Desc', type: 'initial' as const },
         { id: 'init_2', titleKey: 'mission2Title', descKey: 'mission2Desc', type: 'initial' as const },
@@ -4443,8 +4446,8 @@ const DashboardContent = memo(({
 
 
             // Reduced targets by 50% for faster progression
-            const baseTarget = isSpeedRunRef.current ? (10 + Math.floor(Math.random() * 10)) : (currentTier === 'Interstellar' ? 20 : 20);
-            const reduction = isSpeedRunRef.current ? 0 : skillTempoDinheiroLevelRef.current[routeTier];
+            const baseTarget = currentTier === 'Interstellar' ? 20 : 20;
+            const reduction = skillTempoDinheiroLevelRef.current[routeTier];
             const target = Math.max(5, baseTarget - reduction);
 
             let rewardAetherion = 0;
@@ -4494,10 +4497,10 @@ const DashboardContent = memo(({
             const rewardXP = rarity === 'mythic' ? (Math.floor(Math.random() * (40 - 20 + 1)) + 20) : 0;
 
             // Reduced targets by 50% for faster progression
-            let baseTarget = isSpeedRunRef.current ? (10 + Math.floor(Math.random() * 5)) : (currentTier === 'Interstellar' ? 15 : 10);
+            let baseTarget = currentTier === 'Interstellar' ? 15 : 10;
             if (isExtraction) baseTarget = 500; // Extraction points sell in chunks of 100
 
-            const reduction = isSpeedRunRef.current ? 0 : skillRobosOlimpicosLevelRef.current[routeTier];
+            const reduction = skillRobosOlimpicosLevelRef.current[routeTier];
             const target = Math.max(isExtraction ? 100 : 5, baseTarget - (isExtraction ? reduction * 20 : reduction));
 
             let rewardAetherion = 0;
@@ -4663,103 +4666,6 @@ const DashboardContent = memo(({
     return () => clearInterval(interval);
   }, [isLoaded, generateMissions]);
   const [coffeePhraseIndex, setCoffeePhraseIndex] = useState(0);
-  const [startTime] = useState(() => Date.now());
-  const [speedRunTime, setSpeedRunTime] = useState(0);
-  const [isSpeedRunFinished, setIsSpeedRunFinished] = useState(false);
-
-
-  // Speed Run Timer
-  useEffect(() => {
-    if (isSpeedRun && !isSpeedRunFinished) {
-      const interval = setInterval(() => {
-        setSpeedRunTime(Date.now() - startTime);
-      }, 10);
-      return () => clearInterval(interval);
-    }
-  }, [isSpeedRun, isSpeedRunFinished, startTime]);
-
-  // Speed Run Win Condition Check
-  useEffect(() => {
-    if (isSpeedRun && !isSpeedRunFinished) {
-      const checkWin = () => {
-        // 1. All Technologies (Solar 9)
-        if ((unlockedTechLevels['Solar'] || 0) < 9) return false;
-
-        // 2. All Ships (5 of each level 1-9)
-        const allShips = [1, 2, 3, 4, 5, 6, 7, 8, 9].every(level => (ownedShips[`Solar-${level}`] || 0) >= 5);
-        if (!allShips) return false;
-
-        // 3. All Upgrades (4 categories maxed for all Solar routes)
-        const solarRoutes = ROUTES.filter(r => r.tier === 'Solar');
-        const allUpgrades = solarRoutes.every(route => {
-          const routeTech = techLevels[route.id] || { engine: 0, ai: 0, value: 0, rare: 0 };
-          return UPGRADES.every(upgrade => {
-            const currentLevel = routeTech[upgrade.id.toLowerCase()] || 0;
-            return currentLevel >= upgrade.tiers.length;
-          });
-        });
-        if (!allUpgrades) return false;
-
-        // 4. All Auto-travel Slots (5 per Solar route) AND Active
-        const allSlots = solarRoutes.every(route => {
-          const slots = autoTravelSlots[route.id] || 0;
-          const isActive = autoTravelActive[route.id] === true;
-          return slots >= 5 && isActive;
-        });
-        if (!allSlots) return false;
-
-        // 5. All Mining Robots (All Solar ores, level 5, auto-sell active)
-        const solarOres = ORES.filter(o => o.tier === 'Solar');
-        const allMining = solarOres.every(ore => {
-          const robots = miningRobots[ore.id] || 0;
-          const level = miningRobotLevels[ore.id] || 0;
-          const autoSell = autoSellByOre[ore.id] === true;
-          return robots > 0 && level >= 5 && autoSell;
-        });
-        if (!allMining) return false;
-
-        return true;
-      };
-
-      if (checkWin()) {
-        setIsSpeedRunFinished(true);
-        setShowSpeedRunWinModal(true);
-
-        // Save record
-        const newRecord = {
-          name: playerName || 'Unknown Pilot',
-          time: Date.now() - startTime,
-          date: new Date().toLocaleDateString()
-        };
-
-        const saveRecord = async () => {
-          try {
-            const saved = await GameStorage.load('speed_run_records');
-            let records = saved || [];
-            if (!Array.isArray(records)) records = [];
-
-            records.push(newRecord);
-            records.sort((a: any, b: any) => a.time - b.time);
-            records = records.slice(0, 10);
-            await GameStorage.save(records, 'speed_run_records');
-            addLog('Speed Run record saved!', 'success');
-          } catch (e) {
-            console.error("Failed to save speed run record", e);
-            // Fallback: just save this one if everything else failed
-            await GameStorage.save([newRecord], 'speed_run_records');
-          }
-        };
-        saveRecord();
-      }
-    }
-  }, [isSpeedRun, isSpeedRunFinished, ownedShips, unlockedTechLevels, techLevels, autoTravelSlots, autoTravelActive, miningRobots, miningRobotLevels, autoSellByOre, playerName, startTime, addLog]);
-
-  const formatTime = (ms: number) => {
-    const minutes = Math.floor(ms / 60000);
-    const seconds = Math.floor((ms % 60000) / 1000);
-    const milliseconds = Math.floor(ms % 1000);
-    return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}:${milliseconds.toString().padStart(3, '0')}`;
-  };
 
   const translateData = useCallback((text: string) => {
     return text;
@@ -4771,40 +4677,10 @@ const DashboardContent = memo(({
 
   const [exportOptions, setExportOptions] = useState({
     campaign: true,
-    speedRun: true,
     secretCodes: true,
     achievements: true,
     everything: true
   });
-
-  const getSpeedRunProgress = () => {
-    if (!isSpeedRun) return null;
-
-    const ships = [1, 2, 3, 4, 5, 6, 7, 8, 9].filter(level => (ownedShips[`Solar-${level}`] || 0) >= 5).length;
-    const tech = (unlockedTechLevels['Solar'] || 0);
-
-    const solarRoutes = ROUTES.filter(r => r.tier === 'Solar');
-    const upgrades = solarRoutes.filter(route => {
-      const routeTech = techLevels[route.id] || { engine: 0, ai: 0, value: 0, rare: 0 };
-      return UPGRADES.every(upgrade => {
-        const currentLevel = routeTech[upgrade.id.toLowerCase()] || 0;
-        return currentLevel >= upgrade.tiers.length;
-      });
-    }).length;
-
-    const slots = solarRoutes.filter(route => (autoTravelSlots[route.id] || 0) >= 5 && autoTravelActive[route.id]).length;
-
-    const solarOres = ORES.filter(o => o.tier === 'Solar');
-    const robots = solarOres.filter(ore => (miningRobots[ore.id] || 0) > 0 && (miningRobotLevels[ore.id] || 0) >= 5 && autoSellByOre[ore.id]).length;
-
-    return {
-      ships: { current: ships, total: 9 },
-      tech: { current: tech, total: 9 },
-      upgrades: { current: upgrades, total: solarRoutes.length },
-      slots: { current: slots, total: solarRoutes.length },
-      robots: { current: robots, total: solarOres.length }
-    };
-  };
 
   const currentRoutes = ROUTES.filter(r => r.tier === routeTier);
   const currentShips = SHIPS.filter(s => s.tier === routeTier);
@@ -4848,7 +4724,6 @@ const DashboardContent = memo(({
   }, [miningWaste, solarEnergy, routeTier, isInterstellar]);
 
   const isRoute2Unlocked = useCallback(() => {
-    if (isSpeedRun) return false;
     if (routeTier === 'Interstellar' || routeTier === 'Void') return true;
 
     const solarRoutes = ROUTES.filter(r => r.tier === 'Solar');
@@ -4899,10 +4774,9 @@ const DashboardContent = memo(({
     if ((historyStats['Solar']?.missionsCompleted || 0) < 100) return false;
 
     return true;
-  }, [isSpeedRun, routeTier, unlockedTechLevels, ownedShips, techLevels, miningRobots, miningRobotLevels, autoTravelSlots, autoTravelActive, historyStats, miningCompressionLevels, totalDeliveries]);
+  }, [routeTier, unlockedTechLevels, ownedShips, techLevels, miningRobots, miningRobotLevels, autoTravelSlots, autoTravelActive, historyStats, miningCompressionLevels, totalDeliveries]);
 
   const isRoute3Unlocked = useCallback(() => {
-    if (isSpeedRun) return false;
     if (routeTier === 'Void') return true;
     if (routeTier === 'Solar') return false;
     // If we are in Interstellar, we need to check if we met the requirements to unlock Void
@@ -4957,7 +4831,7 @@ const DashboardContent = memo(({
     if (aggregatedMissions < 1000) return false;
 
     return true;
-  }, [isSpeedRun, routeTier, unlockedTechLevels, ownedShips, techLevels, miningRobots, miningRobotLevels, autoTravelSlots, autoTravelActive, historyStats, miningCompressionLevels, totalDeliveries]);
+  }, [routeTier, unlockedTechLevels, ownedShips, techLevels, miningRobots, miningRobotLevels, autoTravelSlots, autoTravelActive, historyStats, miningCompressionLevels, totalDeliveries]);
 
   const syncAchievements = useCallback(() => {
     // 1. First Delivery
@@ -5045,8 +4919,6 @@ const DashboardContent = memo(({
   }, [isLoaded, totalDeliveries, historyStats, battleLevel, earthReconstructionProgress]);
 
   const startVoidTransition = () => {
-    if (isSpeedRun) return;
-
     // Reset progress for Route 3
     setQc(0);
     setAetherion(0);
@@ -5133,8 +5005,6 @@ const DashboardContent = memo(({
   };
 
   const startRoute2Transition = () => {
-    if (isSpeedRun) return;
-
     setIsTransitioning(true);
     playSfx('charging');
     addLog(t('route2TransitionMessage'), 'warning');
@@ -5177,7 +5047,7 @@ const DashboardContent = memo(({
   };
 
   const boostResearch = () => {
-    if (!researchingTech || isSpeedRun) return;
+    if (!researchingTech) return;
 
     const tech = TECHNOLOGIES_MAP.get(`${researchingTech.tier}-${researchingTech.level}`);
     if (!tech) return;
@@ -5207,10 +5077,6 @@ const DashboardContent = memo(({
     dispatch({ type: 'SPEND_QC', payload: { amount: boostCost } });
     updateHistoryStats('spent', boostCost, routeTier);
     dispatch({ type: 'UNLOCK_TECH_LEVEL', payload: { tier: researchingTech.tier, level: researchingTech.level } });
-
-    if (isSpeedRun) {
-      dispatch({ type: 'BUY_SHIP', payload: { shipKey: `${tech.tier}-${tech.unlocksShipLevel}` } });
-    }
 
     setResearchingTech(null);
     playSfx('ask_window');
@@ -5246,23 +5112,18 @@ const DashboardContent = memo(({
 
   // Auto-save logic
   useEffect(() => {
-    if (isSpeedRun || !isLoaded) return;
+    if (!isLoaded) return;
 
     const saveInterval = setInterval(() => {
       performSave().catch(e => console.error("[Save] Failed:", e));
     }, 10000); // Auto-save every 10 seconds
 
     return () => clearInterval(saveInterval);
-  }, [isSpeedRun, isLoaded, performSave]);
+  }, [isLoaded, performSave]);
 
   // Load save logic
   useEffect(() => {
     if (isLoaded) return;
-
-    if (isSpeedRun) {
-      setIsLoaded(true);
-      return;
-    }
 
     const loadFromStorage = async () => {
       // GUARD: se estamos em processo de reset, não carregar nada
@@ -5308,9 +5169,6 @@ const DashboardContent = memo(({
             });
           }
 
-          if (data.speedRunRecords && setLocalRecords) {
-            setLocalRecords(data.speedRunRecords);
-          }
         } catch (e) {
           console.error('Failed to load save', e);
         }
@@ -5321,7 +5179,7 @@ const DashboardContent = memo(({
     };
 
     loadFromStorage();
-  }, [isLoaded, isSpeedRun, dispatch, setLocalRecords]);
+  }, [isLoaded, dispatch]);
 
   // Auto-Save and Load Colonies
   useEffect(() => {
@@ -5522,8 +5380,6 @@ const DashboardContent = memo(({
       voidWarProgress: voidWarProgressRef.current,
       lastScanTime: lastScanTimeRef.current,
       hasSeenRoute2UnlockMessage,
-      speedRunTime,
-      isSpeedRunFinished,
       resolution,
       displayMode,
       missionRewardLevel: missionRewardLevelRef.current,
@@ -5705,7 +5561,7 @@ const DashboardContent = memo(({
         ? Math.min(0.0015, (0.00002 + averageRisk * 0.0025) * battleFreqMultiplier)
         : 0;
 
-      if (routeTierRef.current !== 'Void' && !activeBattleRef.current && !isSpeedRunRef.current && (Math.random() < randomBattleChance || (forcedBattle && candidateRisks.length > 0))) {
+      if (routeTierRef.current !== 'Void' && !activeBattleRef.current && (Math.random() < randomBattleChance || (forcedBattle && candidateRisks.length > 0))) {
         const manualShips = nextManual.filter(d => {
           const r = ROUTES_MAP.get(d.routeId);
           return d.status === 'delivering' && r?.tier === routeTierRef.current;
@@ -6089,7 +5945,6 @@ const DashboardContent = memo(({
             playSfx('tech_success');
             dispatch({ type: 'UNLOCK_TECH_LEVEL', payload: { tier: researching.tier, level: researching.level } });
             setResearchingTech(null);
-            if (isSpeedRunRef.current) dispatch({ type: 'BUY_SHIP', payload: { shipKey: `${tech.tier}-${tech.unlocksShipLevel}` } });
             if (researching.tier === 'Solar' && researching.level === 1) {
               completeInitialMission('init_1');
             }
@@ -6294,7 +6149,7 @@ const DashboardContent = memo(({
     }
 
     const aetherionRequired = (currentSlots + 1) * 2;
-    if (aetherion < aetherionRequired && route.id !== 'speed_run') {
+    if (aetherion < aetherionRequired) {
       playSfx('error');
       addLog(`Need ${aetherionRequired} Aetherion for this slot`, 'error');
       return;
@@ -8229,7 +8084,7 @@ const DashboardContent = memo(({
               {/* Transition Buttons Area */}
               <div className="flex items-center">
                 {/* Route 2 Alert Button */}
-                {routeTier === 'Solar' && isRoute2Unlocked() && !isSpeedRun && (
+                {routeTier === 'Solar' && isRoute2Unlocked() && (
                   <motion.button
                     initial={{ scale: 0, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
@@ -8250,7 +8105,7 @@ const DashboardContent = memo(({
                 )}
 
                 {/* Route 3 Alert Button */}
-                {routeTier === 'Interstellar' && isRoute3Unlocked() && !isSpeedRun && (
+                {routeTier === 'Interstellar' && isRoute3Unlocked() && (
                   <motion.button
                     initial={{ scale: 0, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
@@ -8295,51 +8150,9 @@ const DashboardContent = memo(({
             </AnimatePresence>
           </div>
 
-          {isSpeedRun && (
-            <div className="relative z-10 flex-1 max-w-md mx-8 hidden md:block">
-              <div className="relative h-4 bg-slate-900/80 rounded-full border border-cyan-500/30 overflow-hidden shadow-[0_0_15px_rgba(6,182,212,0.1)]">
-                {(() => {
-                  const p = getSpeedRunProgress();
-                  if (!p) return null;
-                  const total = p.ships.total + p.tech.total + p.upgrades.total + p.slots.total + p.robots.total;
-                  const current = p.ships.current + p.tech.current + p.upgrades.current + p.slots.current + p.robots.current;
-                  const percent = Math.floor((current / total) * 100);
-                  return (
-                    <>
-                      <motion.div
-                        initial={{ width: 0 }}
-                        animate={{ width: `${percent}%` }}
-                        className="absolute inset-y-0 left-0 bg-gradient-to-r from-cyan-600 via-cyan-400 to-white shadow-[0_0_20px_rgba(6,182,212,0.8)]"
-                      />
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <span className="text-base font-orbitron font-bold text-white drop-shadow-md tracking-widest">
-                          {percent}% {t('complete').toUpperCase()}
-                        </span>
-                      </div>
-                      {/* Shiny effect */}
-                      <motion.div
-                        animate={{ x: ['-100%', '200%'] }}
-                        transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
-                        className="absolute inset-y-0 w-20 bg-gradient-to-r from-transparent via-white/30 to-transparent skew-x-12"
-                      />
-                    </>
-                  );
-                })()}
-              </div>
-            </div>
-          )}
-
           <div className="relative z-10 flex items-center gap-6">
             <div className="flex flex-col items-end">
               <div className="flex items-center gap-3">
-                {isSpeedRun && (
-                  <div className="flex items-center gap-2 px-3 py-1 bg-slate-900/80 border border-emerald-500/30 rounded-full shadow-[0_0_15px_rgba(16,185,129,0.1)]">
-                    <Clock className="w-3 h-3 text-emerald-400 animate-pulse" />
-                    <span className="text-[14px] font-mono font-bold text-emerald-400 tracking-wider">
-                      {formatTime(speedRunTime)}
-                    </span>
-                  </div>
-                )}
                 <PremiumCanvasButton
                   onClick={() => {
                     jukebox.togglePlay();
@@ -8682,10 +8495,6 @@ const DashboardContent = memo(({
                 return baseTabs.map(tab => {
                   if (tab === 'routes' && isInterstellar) return null;
                   if (tab === 'routes2' && !isInterstellar) return null;
-
-                  if (tab === 'routes2' && isSpeedRun) return null;
-                  if (tab === 'missions' && isSpeedRun) return null;
-                  if (tab === 'history' && isSpeedRun) return null;
 
                   // Route 4 (Earth) specific restrictions
                   if (isEarth && !['colonies', 'cards', 'void_earth', 'mini_games', 'history', 'exit'].includes(tab)) return null;
@@ -9331,15 +9140,29 @@ const DashboardContent = memo(({
                                           key={treasure.id}
                                           className={`relative h-full min-h-0 overflow-hidden rounded-xl border bg-slate-950/76 p-3 ${recovered ? 'border-cyan-200/24 shadow-[0_0_22px_rgba(34,211,238,0.14)]' : 'border-white/10'}`}
                                         >
-                                          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_28%,rgba(34,211,238,0.14),transparent_58%)]" />
-                                          <div className="relative z-10 grid h-full min-h-0 grid-rows-[96px_58px_1fr] justify-items-center text-center">
-                                            <div className={`relative h-24 w-24 overflow-hidden rounded-lg border ${recovered ? 'border-cyan-200/22 bg-cyan-950/16' : 'border-white/10 bg-black/48'}`}>
-                                              <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_45%,rgba(125,211,252,0.2),transparent_62%)]" />
+                                          <img
+                                            src={activeCategory.cardBackground}
+                                            alt=""
+                                            aria-hidden="true"
+                                            className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-52"
+                                          />
+                                          <div className="pointer-events-none absolute inset-0 bg-slate-950/34" />
+                                          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_30%_50%,rgba(34,211,238,0.14),transparent_58%)]" />
+                                          <div className="relative z-10 grid h-full min-h-0 grid-cols-[minmax(112px,42%)_minmax(0,1fr)] items-center gap-3">
+                                            <div className={`relative h-full min-h-0 w-full overflow-hidden rounded-lg border ${recovered ? 'border-cyan-200/22 bg-cyan-950/16' : 'border-white/10 bg-black/48'}`}>
+                                              <img
+                                                src={activeCategory.background}
+                                                alt=""
+                                                aria-hidden="true"
+                                                className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-58"
+                                              />
+                                              <div className="absolute inset-0 bg-black/28" />
+                                              <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_45%,rgba(125,211,252,0.22),transparent_64%)]" />
                                               {recovered ? (
                                                 <img
                                                   src={treasure.src}
                                                   alt={treasure.name}
-                                                  className="absolute inset-0 h-full w-full object-contain p-2.5 drop-shadow-[0_0_20px_rgba(125,211,252,0.26)]"
+                                                  className="absolute inset-0 h-full w-full object-contain p-2 drop-shadow-[0_0_20px_rgba(125,211,252,0.26)]"
                                                 />
                                               ) : (
                                                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/36 text-slate-300/72">
@@ -9350,17 +9173,17 @@ const DashboardContent = memo(({
                                                 </div>
                                               )}
                                             </div>
-                                            <div className="flex min-h-0 min-w-0 flex-col items-center justify-center px-1">
+                                            <div className="flex h-full min-h-0 min-w-0 flex-col items-start justify-center text-left">
                                               <p className={`line-clamp-2 font-orbitron text-[15px] font-black uppercase leading-tight ${recovered ? 'text-white' : 'text-slate-300'}`}>
                                                 {treasure.name}
                                               </p>
                                               <p className="mt-1 font-mono text-[8px] font-black uppercase tracking-[0.18em] text-cyan-100/50">
                                                 {recovered ? (language === 'pt' ? 'Recuperado' : 'Recovered') : (language === 'pt' ? 'Ainda não recuperado' : 'Not recovered yet')}
                                               </p>
+                                              <p className="mt-3 line-clamp-4 min-h-0 overflow-hidden text-[12px] font-semibold leading-snug text-slate-100/84">
+                                                {treasure.lore[language as 'pt' | 'en']}
+                                              </p>
                                             </div>
-                                            <p className="line-clamp-3 min-h-0 max-w-[94%] overflow-hidden text-[12px] font-semibold leading-snug text-slate-100/84">
-                                              {treasure.lore[language as 'pt' | 'en']}
-                                            </p>
                                           </div>
                                         </div>
                                       );
@@ -9464,11 +9287,24 @@ const DashboardContent = memo(({
                                       <div className="pointer-events-none absolute inset-0 bg-black/64" />
                                       <div className="relative z-10 grid min-h-0 flex-1 grid-cols-[minmax(220px,0.78fr)_minmax(320px,1.22fr)] gap-3 overflow-hidden rounded-xl border border-cyan-200/12 bg-black/42 p-3">
                                         <div className="relative flex min-h-0 items-center justify-center overflow-hidden rounded-xl border border-cyan-300/18 bg-cyan-950/18">
-                                          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_55%,rgba(34,211,238,0.34),transparent_58%)]" />
                                           <img
+                                            src={NEW_EARTH_SUBMARINE_PREVIEW_BACKGROUNDS[selectedNewEarthSubmarineColonyId]}
+                                            alt=""
+                                            aria-hidden="true"
+                                            className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-80"
+                                          />
+                                          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_55%,rgba(34,211,238,0.22),transparent_58%),linear-gradient(180deg,rgba(2,6,23,0.12),rgba(2,6,23,0.34))]" />
+                                          <motion.img
+                                            key={selectedNewEarthSubmarineColonyId}
                                             src={NEW_EARTH_SUBMARINE_IMAGE_PATHS[selectedNewEarthSubmarineColonyId] || ''}
                                             alt=""
                                             aria-hidden="true"
+                                            animate={{ y: [0, -8, 0, 6, 0] }}
+                                            transition={{
+                                              duration: selectedNewEarthSubmarineColonyId === 'colony-4' ? 4.8 : 5.4,
+                                              repeat: Infinity,
+                                              ease: 'easeInOut',
+                                            }}
                                             className="relative z-10 h-full max-h-[205px] w-full object-contain px-3 py-3 drop-shadow-[0_0_22px_rgba(34,211,238,0.34)]"
                                           />
                                         </div>
@@ -9644,7 +9480,7 @@ const DashboardContent = memo(({
                   { id: 'cards', icon: Package, label: t('cards') },
                   { id: 'void_earth', icon: Globe, label: language === 'pt' ? 'Nova Terra' : 'New Earth' },
                   { id: 'mini_games', icon: Gamepad2, label: t('mini_games'), hide: !isArcadeUnlocked },
-                  { id: 'history', icon: HistoryIcon, label: t('history'), hide: isSpeedRun },
+                  { id: 'history', icon: HistoryIcon, label: t('history') },
                   { id: 'exit', icon: LogOut, label: t('exit') }
                 ]
                 : isVoid
@@ -9654,24 +9490,24 @@ const DashboardContent = memo(({
                     { id: 'void_map', icon: MapIcon, label: t('void_map') },
                     { id: 'void_war', icon: Home, label: t('void_war') },
                     { id: 'void_earth', icon: Globe, label: t('void_earth') },
-                    { id: 'history', icon: HistoryIcon, label: t('history'), hide: isSpeedRun },
+                    { id: 'history', icon: HistoryIcon, label: t('history') },
                     { id: 'exit', icon: LogOut, label: t('exit') }
                   ]
                   : [
                     { id: 'routes', icon: MapIcon, label: t('routes1' as any), hide: isInterstellar },
-                    { id: 'routes2', icon: Globe, label: t('routes2' as any), hide: !isInterstellar || isSpeedRun },
+                    { id: 'routes2', icon: Globe, label: t('routes2' as any), hide: !isInterstellar },
 
-                    { id: 'missions', icon: Trophy, label: t('missions' as any), hide: isSpeedRun },
+                    { id: 'missions', icon: Trophy, label: t('missions' as any) },
                     { id: 'aircraft', icon: Rocket, label: t('aircraft' as any) },
                     { id: 'technology', icon: Cpu, label: t('technology' as any) },
                     { id: 'upgrades', icon: TrendingUp, label: t('upgrades' as any) },
                     { id: 'auto', icon: Cpu, label: t('autoTravel' as any) },
                     { id: 'mining', icon: Pickaxe, label: t('mining' as any) },
                     { id: 'mini_games', icon: Gamepad2, label: t('mini_games'), hide: !isArcadeUnlocked },
-                    { id: 'history', icon: HistoryIcon, label: t('history' as any), hide: isSpeedRun },
+                    { id: 'history', icon: HistoryIcon, label: t('history' as any) },
                     { id: 'exit', icon: LogOut, label: t('exit' as any) }
                   ]
-              ).map(item => {
+              ).map((item: { id: string; icon: any; label: string; hide?: boolean; alert?: boolean }) => {
                 if (item.hide) return null;
                 const Icon = item.icon;
                 const isActive = activeTab === item.id;
@@ -10120,45 +9956,6 @@ const DashboardContent = memo(({
           )}
         </AnimatePresence>
 
-        {/* Speed Run Win Modal */}
-        <AnimatePresence>
-          {showSpeedRunWinModal && (
-            <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md">
-              <motion.div
-                initial={{ scale: 0.9, opacity: 0, y: 20 }}
-                animate={{ scale: 1, opacity: 1, y: 0 }}
-                className="bg-slate-900 border-2 border-emerald-500/50 p-8 rounded-2xl max-w-md w-full text-center shadow-[0_0_50px_rgba(16,185,129,0.2)]"
-              >
-                <div className="w-20 h-20 bg-emerald-500/20 rounded-full flex items-center justify-center mx-auto mb-6 border-2 border-emerald-500/30">
-                  <Trophy className="w-10 h-10 text-emerald-400" />
-                </div>
-
-                <h2 className="text-3xl font-orbitron font-bold text-white mb-2 uppercase tracking-tighter">
-                  SPEED RUN COMPLETE!
-                </h2>
-
-                <p className="text-slate-400 mb-8 font-medium">
-                  Congratulations, {playerName}! You&apos;ve mastered the galaxy in record time.
-                </p>
-
-                <div className="bg-black/40 rounded-xl p-6 mb-8 border border-white/5">
-                  <div className="text-[14px] text-slate-500 uppercase tracking-widest mb-1">Final Time</div>
-                  <div className="text-4xl font-orbitron font-bold text-emerald-400 tabular-nums">
-                    {formatTime(speedRunTime)}
-                  </div>
-                </div>
-
-                <button
-                  onClick={() => onReturnToMenu()}
-                  className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white font-orbitron font-bold rounded-xl transition-all shadow-[0_4px_15px_rgba(16,185,129,0.3)] hover:shadow-[0_6px_20px_rgba(16,185,129,0.4)] uppercase tracking-widest"
-                >
-                  RETURN TO MENU
-                </button>
-              </motion.div>
-            </div>
-          )}
-        </AnimatePresence>
-
         {/* Export Modal */}
         <AnimatePresence>
           {showExportModal && (
@@ -10183,7 +9980,6 @@ const DashboardContent = memo(({
                 <div className="space-y-4">
                   {[
                     { id: 'campaign', label: t('campaign'), desc: t('campaignDesc') },
-                    { id: 'speedRun', label: t('exportSpeedRun'), desc: t('exportSpeedRunDesc') },
                     { id: 'secretCodes', label: t('secretCodes'), desc: t('secretCodesDesc') },
                     { id: 'achievements', label: t('achievements'), desc: t('achievementsDesc') },
                     { id: 'everything', label: t('everything'), desc: t('everythingDesc') }
@@ -10195,7 +9991,6 @@ const DashboardContent = memo(({
                           const newValue = !exportOptions.everything;
                           setExportOptions({
                             campaign: newValue,
-                            speedRun: newValue,
                             secretCodes: newValue,
                             achievements: newValue,
                             everything: newValue
@@ -10705,7 +10500,6 @@ const DashboardContent = memo(({
                       // 3. Apagar O SERVIDOR também é um procedimento padrão, não só o localStorage
                       try {
                         await fetch('/api/save?key=time_travel_save', { method: 'DELETE' });
-                        await fetch('/api/save?key=speed_run_save', { method: 'DELETE' });
                         await fetch('/api/save?key=colonies_data', { method: 'DELETE' });
                       } catch (e) {
                         console.warn('Server delete failed, continuing reset', e);

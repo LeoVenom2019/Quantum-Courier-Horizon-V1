@@ -328,7 +328,6 @@ export interface ModularSaveData {
   };
   colony_system: ColonySystemSaveData;
   arcadeScores: Record<string, number>;
-  localRecords: any[];
   unlockedCodes: string[];
 }
 
@@ -460,7 +459,6 @@ export const SaveManager = {
       },
       colony_system: createColonySystemSave(flatData),
       arcadeScores: flatData.arcadeScores || {},
-      localRecords: flatData.localRecords || [],
       unlockedCodes: flatData.unlockedCodes || []
     };
   },
@@ -576,7 +574,6 @@ export const SaveManager = {
         system: {
           seenTutorials: rawData.seenTutorials || {},
           arcadeScores: rawData.arcadeScores || {},
-          localRecords: rawData.localRecords || [],
           hasSeenRoute2UnlockMessage: rawData.hasSeenRoute2UnlockMessage || false,
           playerName: rawData.playerName || '',
         }
@@ -741,7 +738,6 @@ export const SaveManager = {
       system: {
         seenTutorials: g.seenTutorials || {},
         arcadeScores: rawData.arcadeScores || {},
-        localRecords: rawData.localRecords || [],
         hasSeenRoute2UnlockMessage: g.hasSeenRoute2UnlockMessage || false,
         playerName: g.playerName || '',
       }

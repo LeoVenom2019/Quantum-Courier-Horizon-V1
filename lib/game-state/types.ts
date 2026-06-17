@@ -272,7 +272,6 @@ export interface EarthState {
 export interface SystemState {
   seenTutorials: Record<string, boolean>;
   arcadeScores: Record<string, number>;
-  localRecords: any[];
   hasSeenRoute2UnlockMessage: boolean;
   playerName: string;
 }
@@ -445,6 +444,5 @@ export type GameAction =
   | { type: 'SAVE_SNAPSHOT' }
   | { type: 'COMPLETE_TUTORIAL'; payload: { tutorialId: string } }
   | { type: 'SET_ARCADE_SCORE';  payload: { gameId: string; score: number } }
-  | { type: 'ADD_LOCAL_RECORD';  payload: { record: any } }
   | { type: 'SET_HAS_SEEN_ROUTE2_MESSAGE'; payload: { hasSeen: boolean } }
   | { type: 'SET_SYSTEM_DATA';    payload: Partial<SystemState> }
