@@ -16,6 +16,8 @@ type HellfireSequence = {
 };
 
 const REGULAR_ENEMIES_BEFORE_FINAL_BOSS = 20;
+const BOSS_BASE_HP_MULTIPLIER = 8;
+const BOSS_ABSORB_SHIELD_MULTIPLIER = 5;
 
 interface NewEarthDefenseBattleProps {
   language: 'en' | 'pt';
@@ -56,6 +58,8 @@ type Enemy = {
   y: number;
   hp: number;
   maxHp: number;
+  shield: number;
+  maxShield: number;
   speed: number;
   radius: number;
   width: number;
@@ -117,6 +121,9 @@ type FloatText = {
   text: string;
   color: string;
   life: number;
+  maxLife: number;
+  size: number;
+  shadowColor?: string;
 };
 
 type LaserParticle = {
@@ -706,7 +713,7 @@ const buildEnemyBlueprint = (kills: number, forceMonsterBoss: boolean): EnemyBlu
           shootSound: `${ASSET_BASE}/enemys/monsters/monster 1/shoot_m1.ogg`,
           screamSound: `${ASSET_BASE}/enemys/monsters/monster 1/scream_m1.ogg`,
           explosionSound: `${ASSET_BASE}/enemys/monsters/monster 1/explosion_m1.ogg`,
-          hp: 2500 + kills * 52,
+          hp: Math.round((2500 + kills * 52) * BOSS_BASE_HP_MULTIPLIER),
           damage: 126,
           speed: 0.48,
           radius: 58,
@@ -728,7 +735,7 @@ const buildEnemyBlueprint = (kills: number, forceMonsterBoss: boolean): EnemyBlu
           shootSound: `${ASSET_BASE}/enemys/monsters/monster 2/shoot_m2.ogg`,
           screamSound: `${ASSET_BASE}/enemys/monsters/monster 2/scream_m2.ogg`,
           explosionSound: `${ASSET_BASE}/enemys/monsters/monster 2/explosion_m2.ogg`,
-          hp: 2700 + kills * 54,
+          hp: Math.round((2700 + kills * 54) * BOSS_BASE_HP_MULTIPLIER),
           damage: 134,
           speed: 0.44,
           radius: 62,
@@ -1078,19 +1085,36 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
     setHorizonHud({ level: horizonLevel, currentXp: horizonXp, nextXp: horizonNextXp });
     playLoopSound(AIRPLANE_PLAYER_ENGINE_SOUND, 0.42);
 
-    const spawnFloat = (x: number, y: number, text: string, color: string) => {
-      state.floats.push({ id: state.nextId++, x, y, text, color, life: 45 });
+    const spawnFloat = (x: number, y: number, text: string, color: string, options?: { life?: number; size?: number; shadowColor?: string }) => {
+      const life = (options?.life ?? 45) + 6;
+      state.floats.push({
+        id: state.nextId++,
+        x,
+        y,
+        text,
+        color,
+        life,
+        maxLife: life,
+        size: options?.size ?? (text.includes('CRIT') ? 18 : 14),
+        shadowColor: options?.shadowColor,
+      });
     };
 
     const awardHorizonXp = (amount: number) => {
       const safeAmount = Math.max(0, Math.floor(amount));
       if (safeAmount <= 0) return;
 
+      const safeHorizonMaxLevel = Math.max(1, Math.min(MAX_HORIZON_LEVEL, Math.floor(Number(horizonMaxLevel) || MAX_HORIZON_LEVEL)));
       let { level, currentXp, nextXp } = horizonProgressRef.current;
+      if (level >= safeHorizonMaxLevel) {
+        horizonProgressRef.current = { level: safeHorizonMaxLevel, currentXp: 0, nextXp: 0 };
+        setHorizonHud(horizonProgressRef.current);
+        return;
+      }
+
       currentXp += safeAmount;
       let leveledUp = false;
 
-      const safeHorizonMaxLevel = Math.max(1, Math.min(MAX_HORIZON_LEVEL, Math.floor(Number(horizonMaxLevel) || MAX_HORIZON_LEVEL)));
       while (level < safeHorizonMaxLevel && nextXp > 0 && currentXp >= nextXp) {
         currentXp -= nextXp;
         level += 1;
@@ -1511,7 +1535,7 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
         if (enemy.hp <= 0) return;
         if (Math.hypot(enemy.x - x, enemy.y - y) > radius + enemy.radius) return;
         const baseDamage = payload.crit ? payload.damage * shipStats.critMultiplier : payload.damage;
-        enemy.hp -= baseDamage;
+        damageEnemyHull(enemy, baseDamage);
         const elementalDamage = applyElementalDamage(enemy, payload.elemental, now, hitCount < 2 || isMonsterKind(enemy.kind));
         enemy.status.slowUntil = now + 4200;
         hitCount += 1;
@@ -1529,7 +1553,7 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
       state.enemies.forEach(enemy => {
         if (enemy.hp <= 0 || enemy.x <= WIDTH * 0.5) return;
         const baseDamage = payload.crit ? payload.damage * shipStats.critMultiplier : payload.damage;
-        enemy.hp -= baseDamage;
+        damageEnemyHull(enemy, baseDamage);
         const elementalDamage = applyElementalDamage(enemy, payload.elemental, now, false);
         enemy.status.slowUntil = now + 4600;
         spawnFloat(enemy.x + rand(-18, 18), enemy.y - 22, `-${Math.round(baseDamage + elementalDamage)} ICE`, '#bae6fd');
@@ -1572,7 +1596,6 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
       for (let i = 0; i < 24; i++) spawnBlizzardCrystal(x, y);
       applyBlizzardDamage(0.525, x, y, 90, 'GELO', '#bae6fd');
       applyBlizzardDamage(0.2625, x, y, WIDTH * 0.5, 'AREA', '#93c5fd');
-      spawnFloat(x, y - 40, 'BLIZZARD IMPACT', '#e0f2fe');
     };
 
     const applyThorDamage = (multiplier: number, x: number, y: number, radius: number, label: string, color: string) => {
@@ -1584,7 +1607,7 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
         const distance = Math.hypot(enemy.x - x, enemy.y - y);
         if (distance > radius + enemy.radius) return;
         const baseDamage = payload.crit ? payload.damage * shipStats.critMultiplier : payload.damage;
-        enemy.hp -= baseDamage;
+        damageEnemyHull(enemy, baseDamage);
         const elementalDamage = applyElementalDamage(enemy, payload.elemental, now, hitCount < 2 || isMonsterKind(enemy.kind));
         hitCount += 1;
         if (hitCount <= 4 || isMonsterKind(enemy.kind)) {
@@ -2282,6 +2305,8 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
       const rewardScale = battleLevelScale;
       const scaledHp = Math.round(blueprint.hp * levelScale * bossScale * battleLevelScale);
       const scaledDamage = Math.round(blueprint.damage * levelScale * bossScale * battleLevelScale);
+      const isBossLike = blueprint.kind === 'boss-ship' || isMonsterKind(blueprint.kind);
+      const absorbShield = isBossLike ? Math.round(scaledHp * BOSS_ABSORB_SHIELD_MULTIPLIER) : 0;
       const enemy: Enemy = {
         id: state.nextId++,
         kind: blueprint.kind,
@@ -2290,6 +2315,8 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
         y: 80 + Math.random() * (HEIGHT - 160),
         hp: scaledHp,
         maxHp: scaledHp,
+        shield: absorbShield,
+        maxShield: absorbShield,
         speed: blueprint.speed,
         radius: blueprint.radius,
         width: blueprint.width,
@@ -2325,6 +2352,18 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
       }
     };
 
+    const damageEnemyHull = (enemy: Enemy, damage: number) => {
+      if (damage <= 0) return 0;
+      let remainingDamage = damage;
+      if (enemy.shield > 0) {
+        const shieldDamage = Math.min(enemy.shield, remainingDamage);
+        enemy.shield -= shieldDamage;
+        remainingDamage -= shieldDamage;
+      }
+      if (remainingDamage > 0) enemy.hp -= remainingDamage;
+      return remainingDamage;
+    };
+
     const createSpecialDamagePayload = (baseMultiplier: number, extraElemental: Partial<Projectile['elemental']> = {}) => {
       const crit = Math.random() * 100 < shipStats.critChance;
       const damage = shipStats.damage * baseMultiplier;
@@ -2349,7 +2388,7 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
 
       if (elementalDamage.ice > 0) {
         const elemental = elementalDamage.ice * (enemy.status.slowUntil && enemy.status.slowUntil > now ? 1 + shipStats.conditionalBonuses.bonusDamageVsSlowPercent / 100 : 1);
-        enemy.hp -= elemental;
+        damageEnemyHull(enemy, elemental);
         total += elemental;
         enemy.status.slowUntil = now + 2600;
         if (showFloats) spawnFloat(enemy.x + 16, enemy.y, `${Math.round(elemental)}`, '#67e8f9');
@@ -2357,7 +2396,7 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
 
       if (elementalDamage.electric > 0) {
         const elemental = elementalDamage.electric * (enemy.status.shockedUntil && enemy.status.shockedUntil > now ? 1 + shipStats.conditionalBonuses.bonusDamageVsShockedPercent / 100 : 1);
-        enemy.hp -= elemental;
+        damageEnemyHull(enemy, elemental);
         total += elemental;
         enemy.status.shockedUntil = now + 2300;
         if (showFloats) spawnFloat(enemy.x + 16, enemy.y + 16, `${Math.round(elemental)}`, '#facc15');
@@ -2365,7 +2404,7 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
 
       if (elementalDamage.fire > 0) {
         const elemental = elementalDamage.fire * (enemy.status.burningUntil && enemy.status.burningUntil > now ? 1 + shipStats.conditionalBonuses.bonusDamageVsBurningPercent / 100 : 1);
-        enemy.hp -= elemental;
+        damageEnemyHull(enemy, elemental);
         total += elemental;
         enemy.status.burningUntil = now + 3200;
         enemy.status.lastBurnTick = now;
@@ -2375,16 +2414,77 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
       return total;
     };
 
+    const rollPlayerDamageVariant = (baseDamage: number, crit: boolean) => {
+      if (!crit) {
+        if (Math.random() < 0.15) {
+          const multiplier = 1.05 + Math.random() * 0.1;
+          return {
+            damage: baseDamage * multiplier,
+            color: '#9ca3af',
+            size: 15.4,
+            life: 45,
+            shadowColor: 'rgba(156,163,175,0.5)',
+          };
+        }
+        return {
+          damage: baseDamage,
+          color: '#ffffff',
+          size: 14,
+          life: 45,
+          shadowColor: 'transparent',
+        };
+      }
+
+      const roll = Math.random();
+      if (roll < 0.1) {
+        const multiplier = 1.2 + Math.random() * 0.2;
+        return {
+          damage: baseDamage * multiplier,
+          color: '#38bdf8',
+          size: 24.3,
+          life: 75,
+          shadowColor: 'rgba(56,189,248,0.8)',
+        };
+      }
+      if (roll < 0.25) {
+        const multiplier = 1.05 + Math.random() * 0.15;
+        return {
+          damage: baseDamage * multiplier,
+          color: '#ef4444',
+          size: 21.6,
+          life: 63,
+          shadowColor: 'rgba(239,68,68,0.8)',
+        };
+      }
+      return {
+        damage: baseDamage,
+        color: '#fb923c',
+        size: 20.7,
+        life: 45,
+        shadowColor: 'rgba(251,146,60,0.7)',
+      };
+    };
+
     const damageEnemy = (enemy: Enemy, projectile: Projectile) => {
       const now = performance.now();
       let baseDamage = projectile.damage;
       if (projectile.crit) baseDamage *= shipStats.critMultiplier;
+      const damageVariant = rollPlayerDamageVariant(baseDamage, projectile.crit);
+      baseDamage = damageVariant.damage;
 
-      enemy.hp -= baseDamage;
+      damageEnemyHull(enemy, baseDamage);
       if (projectile.special === 'hellfire') {
-        spawnFloat(enemy.x - 28, enemy.y - 30, `CRIT ${Math.round(baseDamage)}`, '#ffcc66');
+        spawnFloat(enemy.x - 28, enemy.y - 30, `${Math.round(baseDamage)}`, damageVariant.color, {
+          life: damageVariant.life,
+          size: damageVariant.size,
+          shadowColor: damageVariant.shadowColor,
+        });
       } else {
-        spawnFloat(enemy.x, enemy.y - 22, `${Math.round(baseDamage)}`, projectile.crit ? '#facc15' : '#ffffff');
+        spawnFloat(enemy.x, enemy.y - 22, `${Math.round(baseDamage)}`, damageVariant.color, {
+          life: damageVariant.life,
+          size: damageVariant.size,
+          shadowColor: damageVariant.shadowColor,
+        });
       }
 
       applyElementalDamage(enemy, projectile.elemental, now);
@@ -2546,7 +2646,7 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
         if (enemy.hp > 0 && distance <= laserContactRadius) {
           const payload = createSpecialDamagePayload(HORIZON_LASER_DAMAGE_MULTIPLIER);
           const baseDamage = payload.crit ? payload.damage * shipStats.critMultiplier : payload.damage;
-          enemy.hp -= baseDamage;
+          damageEnemyHull(enemy, baseDamage);
           const elementalDamage = applyElementalDamage(enemy, payload.elemental, now, hitCount < 2 || isMonsterKind(enemy.kind));
           const laserDamage = baseDamage + elementalDamage;
           hitCount += 1;
@@ -4323,6 +4423,12 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
         });
         ctx.restore();
 
+        if (enemy.maxShield > 0 && enemy.shield > 0) {
+          ctx.fillStyle = 'rgba(15,23,42,0.9)';
+          ctx.fillRect(enemy.x - 34, enemy.y - enemy.height / 2 - 22, 68, 4);
+          ctx.fillStyle = isMonsterKind(enemy.kind) ? '#c084fc' : '#38bdf8';
+          ctx.fillRect(enemy.x - 34, enemy.y - enemy.height / 2 - 22, 68 * Math.max(0, enemy.shield / enemy.maxShield), 4);
+        }
         ctx.fillStyle = '#111827';
         ctx.fillRect(enemy.x - 34, enemy.y - enemy.height / 2 - 14, 68, 4);
         ctx.fillStyle = enemy.kind === 'boss-ship' ? '#f97316' : enemy.kind === 'elite-ship' ? '#eab308' : '#22c55e';
@@ -4331,11 +4437,13 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
       });
 
       state.floats.forEach(float => {
-        ctx.globalAlpha = Math.max(0, float.life / 45);
+        ctx.globalAlpha = Math.max(0, float.life / float.maxLife);
         ctx.fillStyle = float.color;
-        ctx.shadowColor = float.text.includes('CRIT') ? '#fb923c' : 'transparent';
-        ctx.font = float.text.includes('CRIT') ? '900 18px Orbitron, sans-serif' : 'bold 14px monospace';
+        ctx.shadowColor = float.shadowColor || 'transparent';
+        ctx.shadowBlur = float.shadowColor && float.shadowColor !== 'transparent' ? 12 : 0;
+        ctx.font = float.size > 16 ? `900 ${float.size}px Orbitron, sans-serif` : `bold ${float.size}px monospace`;
         ctx.fillText(float.text, float.x, float.y);
+        ctx.shadowBlur = 0;
         ctx.globalAlpha = 1;
       });
 
@@ -4479,7 +4587,7 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
 
         if (enemy.status.burningUntil && enemy.status.burningUntil > now && now - (enemy.status.lastBurnTick || 0) > 650) {
           const burn = shipStats.damage * (shipStats.conditionalBonuses.burningDamageOverTimePercent / 100);
-          enemy.hp -= burn;
+          damageEnemyHull(enemy, burn);
           enemy.status.lastBurnTick = now;
           if (burn > 0) spawnFloat(enemy.x, enemy.y - 8, `${Math.round(burn)}`, '#fb923c');
         }
@@ -4575,7 +4683,7 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
                     const odx = otherEnemy.x - enemy.x;
                     const ody = otherEnemy.y - enemy.y;
                     if (Math.sqrt(odx * odx + ody * ody) < explosionRadius + otherEnemy.radius) {
-                      otherEnemy.hp -= areaDamage;
+                      damageEnemyHull(otherEnemy, areaDamage);
                       spawnFloat(otherEnemy.x + (Math.random() * 20 - 10), otherEnemy.y - 20, `${Math.round(areaDamage)} AREA`, '#fb923c');
                     }
                   }
@@ -4600,7 +4708,8 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
           state.kills += 1;
           if (isMonsterKind(enemy.kind)) state.bossesDefeated += 1;
           else state.regularEnemiesDefeated += 1;
-          state.earnedXp += enemy.xp;
+          const canGainHorizonXp = horizonProgressRef.current.level < Math.max(1, Math.min(MAX_HORIZON_LEVEL, Math.floor(Number(horizonMaxLevel) || MAX_HORIZON_LEVEL)));
+          if (canGainHorizonXp) state.earnedXp += enemy.xp;
           awardHorizonXp(enemy.xp);
           state.earnedQc += enemy.qc;
           spawnEnemyDeathExplosion(enemy);
@@ -4636,6 +4745,8 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
           y: p.y,
           hp: 0,
           maxHp: 1,
+          shield: 0,
+          maxShield: 0,
           speed: 0,
           radius: 34,
           width: PLAYER_DRAW_WIDTH,
@@ -4664,7 +4775,8 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
         const victoryRewardScale = 1 + Math.max(0, currentDefenseBattleLevel - 1) * 0.1;
         const victoryXp = Math.round(450 * victoryRewardScale);
         const victoryQc = Math.round(35000 * victoryRewardScale);
-        state.earnedXp += victoryXp;
+        const canGainHorizonXp = horizonProgressRef.current.level < Math.max(1, Math.min(MAX_HORIZON_LEVEL, Math.floor(Number(horizonMaxLevel) || MAX_HORIZON_LEVEL)));
+        if (canGainHorizonXp) state.earnedXp += victoryXp;
         awardHorizonXp(victoryXp);
         state.earnedQc += victoryQc;
         setHud({ hp: p.hp, shield: p.shield, kills: state.regularEnemiesDefeated, earnedXp: state.earnedXp, earnedQc: state.earnedQc, enemies: state.enemies.length, ended: true, result: 'victory' });
@@ -4707,7 +4819,9 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
     }
   };
 
-  const xpPercent = horizonHud.nextXp > 0 ? Math.min(100, (horizonHud.currentXp / horizonHud.nextXp) * 100) : 100;
+  const safeHorizonMaxLevel = Math.max(1, Math.min(MAX_HORIZON_LEVEL, Math.floor(Number(horizonMaxLevel) || MAX_HORIZON_LEVEL)));
+  const isHorizonAtMaxLevel = horizonHud.level >= safeHorizonMaxLevel || horizonHud.nextXp <= 0;
+  const xpPercent = isHorizonAtMaxLevel ? 100 : Math.min(100, (horizonHud.currentXp / horizonHud.nextXp) * 100);
   const specialHudNow = typeof performance !== 'undefined' ? performance.now() : Date.now();
   const specialHudState = stateRef.current;
   const specialEffectActive = specialHudState.laserState !== 'idle'
@@ -4753,7 +4867,9 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
               </div>
               <div className="text-right">
                 <p className="font-mono text-[9px] uppercase tracking-[0.24em] text-amber-200">HORIZON LVL {horizonHud.level}</p>
-                <p className="font-mono text-[9px] uppercase tracking-widest text-amber-100">+{hud.earnedXp} XP</p>
+                {!isHorizonAtMaxLevel && (
+                  <p className="font-mono text-[9px] uppercase tracking-widest text-amber-100">+{hud.earnedXp} XP</p>
+                )}
               </div>
             </div>
             <div className="mt-2 h-2 overflow-hidden rounded-full bg-black/55">
@@ -4851,10 +4967,12 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
                         <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-zinc-400">{t('Targets', 'Alvos')}</p>
                         <p className="mt-2 font-orbitron text-3xl font-black text-white">{hud.kills} / 20</p>
                       </div>
-                      <div className="rounded-2xl border border-amber-300/25 bg-amber-300/15 p-5 backdrop-blur-sm">
-                        <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-amber-200">XP</p>
-                        <p className="mt-2 font-orbitron text-3xl font-black text-white">+{hud.earnedXp}</p>
-                      </div>
+                      {!isHorizonAtMaxLevel && (
+                        <div className="rounded-2xl border border-amber-300/25 bg-amber-300/15 p-5 backdrop-blur-sm">
+                          <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-amber-200">XP</p>
+                          <p className="mt-2 font-orbitron text-3xl font-black text-white">+{hud.earnedXp}</p>
+                        </div>
+                      )}
                       <div className="rounded-2xl border border-yellow-300/25 bg-yellow-300/15 p-5 backdrop-blur-sm">
                         <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-yellow-200">QC</p>
                         <p className="mt-2 font-orbitron text-3xl font-black text-white">+{hud.earnedQc.toLocaleString()}</p>
@@ -4901,7 +5019,9 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
                 <div className="mt-2 h-2 overflow-hidden rounded-full bg-black/55">
                   <div className="h-full rounded-full bg-gradient-to-r from-amber-400 via-cyan-300 to-emerald-300" style={{ width: `${xpPercent}%` }} />
                 </div>
-                <p className="mt-2 font-mono text-[10px] uppercase tracking-widest text-zinc-300">+{hud.earnedXp} XP · +{hud.earnedQc.toLocaleString()} QC</p>
+                <p className="mt-2 font-mono text-[10px] uppercase tracking-widest text-zinc-300">
+                  {isHorizonAtMaxLevel ? `+${hud.earnedQc.toLocaleString()} QC` : `+${hud.earnedXp} XP · +${hud.earnedQc.toLocaleString()} QC`}
+                </p>
               </div>
               <div className="rounded-xl border border-white/10 bg-white/5 p-3">
                 <p className="font-mono text-[9px] uppercase tracking-widest text-zinc-500">{t('Controls', 'Controles')}</p>

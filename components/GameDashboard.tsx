@@ -112,12 +112,14 @@ import { MINI_GAMES_CONFIG } from '@/lib/mini-games-config';
 import { MiniGames } from './MiniGames';
 import { ColonySystem, Colony, cleanColoniesData } from './ColonySystem';
 import NewEarthUnderwaterBattle from './NewEarthUnderwaterBattle';
+import NewEarthSurfaceBattle, { type NewEarthSurfaceBattleKind, type NewEarthSurfaceBattleSiteId } from './NewEarthSurfaceBattle';
 import {
   ARCADE_CARD_REWARD_CHANCE,
   ARCADE_CARD_REWARD_RULES,
   ColonyCard,
   ColonyCardLevels,
   ColonySectorId,
+  DEFAULT_COLONY_SECTORS,
   POLITICAL_CARD_SLOTS,
   SECTOR_CONFIG,
   getBattleEffects,
@@ -152,6 +154,18 @@ import {
   type NewEarthSubmarineUpgradeId,
   type NewEarthSubmarineState,
 } from '@/lib/new-earth-submarines';
+import {
+  NEW_EARTH_HELICOPTERS_STORAGE_KEY,
+  MAX_NEW_EARTH_HELICOPTER_UPGRADE_LEVEL,
+  NEW_EARTH_HELICOPTER_UPGRADES,
+  createDefaultNewEarthHelicopterState,
+  getNewEarthHelicopterStats,
+  getNewEarthHelicopterUpgradeCost,
+  normalizeNewEarthHelicopterState,
+  type NewEarthHelicopterColonyId,
+  type NewEarthHelicopterState,
+  type NewEarthHelicopterUpgradeId,
+} from '@/lib/new-earth-helicopters';
 import {
   NEW_EARTH_MUSEUM_STORAGE_KEY,
   NEW_EARTH_RARE_FISH_TREASURES,
@@ -250,14 +264,20 @@ const NEW_EARTH_COLONY_MARKERS = [
 ] as const;
 
 const NEW_EARTH_DANGER_MARKERS = [
-  { id: 'zona-glacial', label: 'ZONA GLACIAL', left: '45.3%', top: '10.5%' },
+  { id: 'zona-glacial', label: 'ZONA GLACIAL', left: '45.3%', top: '10.5%', surfaceBattleColonyId: 'colony-3', surfaceBattleKind: 'helicopter' },
   { id: 'oceano-abissal', label: 'OCEANO ABISSAL', left: '13.8%', top: '42.1%', submarineColonyId: 'colony-4' },
-  { id: 'ruinas-europeias', label: 'RUÍNAS EUROPÉIAS', left: '51.3%', top: '38.0%' },
+  { id: 'ruinas-europeias', label: 'RUÍNAS EUROPÉIAS', left: '51.3%', top: '38.0%', surfaceBattleColonyId: 'colony-1', surfaceBattleKind: 'tank' },
   { id: 'cemiterio-navios', label: 'CEMITÉRIO DE NAVIOS', left: '45.3%', top: '69.3%', submarineColonyId: 'colony-2' },
-  { id: 'continente-esquecido', label: 'CONTINENTE ESQUECIDO', left: '80.5%', top: '77.0%' },
+  { id: 'continente-esquecido', label: 'CONTINENTE ESQUECIDO', left: '80.5%', top: '77.0%', surfaceBattleColonyId: 'colony-3', surfaceBattleKind: 'helicopter' },
 ] as const;
 
 type NewEarthUnderwaterSiteId = Extract<typeof NEW_EARTH_DANGER_MARKERS[number]['id'], 'oceano-abissal' | 'cemiterio-navios'>;
+type NewEarthSurfaceBattleBriefing = {
+  siteId: NewEarthSurfaceBattleSiteId;
+  colonyId: 'colony-1' | 'colony-3';
+  battleKind: NewEarthSurfaceBattleKind;
+  background: string;
+};
 
 const NEW_EARTH_UNDERWATER_SITE_BRIEFINGS: Record<NewEarthUnderwaterSiteId, {
   title: Record<'pt' | 'en', string>;
@@ -294,12 +314,119 @@ const NEW_EARTH_UNDERWATER_SITE_BRIEFINGS: Record<NewEarthUnderwaterSiteId, {
   },
 };
 
+const NEW_EARTH_FORGOTTEN_CONTINENT_BACKGROUNDS = Array.from({ length: 6 }, (_, index) => (
+  `/assets/rota4/new_land_assets/forgotten_continent_new_land_system/forgotten_continent_background_${index + 1}.webp`
+));
+
+const NEW_EARTH_GLACIAL_ZONE_BACKGROUNDS = Array.from({ length: 4 }, (_, index) => (
+  `/assets/rota4/new_land_assets/glacial_zone_new_land_system/glacial_zone_background_${index + 1}.webp`
+));
+
+const pickNewEarthBackground = (backgrounds: readonly string[]) => (
+  backgrounds[Math.floor(Math.random() * backgrounds.length)] || backgrounds[0] || ''
+);
+
+const NEW_EARTH_SURFACE_SITE_BRIEFINGS: Record<NewEarthSurfaceBattleSiteId, {
+  title: Record<'pt' | 'en', string>;
+  subtitle: Record<'pt' | 'en', string>;
+  lore: Record<'pt' | 'en', string>;
+  objective: Record<'pt' | 'en', string>;
+  backgrounds: readonly string[];
+}> = {
+  'ruinas-europeias': {
+    title: { pt: 'Ruínas Européias', en: 'European Ruins' },
+    subtitle: { pt: 'Genesis - campanha terrestre', en: 'Genesis - ground campaign' },
+    lore: {
+      pt: 'As ruínas guardam corredores industriais, estradas quebradas e forças blindadas antigas. Genesis é a única colônia posicionada para avançar por terra.',
+      en: 'The ruins hold industrial corridors, broken roads, and old armored forces. Genesis is the only colony positioned for a ground advance.',
+    },
+    objective: {
+      pt: 'Controle o tanque, avance pelo cenário e elimine os blindados hostis antes que a linha de suprimentos seja cortada.',
+      en: 'Control the tank, move through the field, and eliminate hostile armor before the supply line is cut.',
+    },
+    backgrounds: ['/assets/rota4/new_land_assets/forgotten_continent_new_land_system/genesis_background_3.webp'],
+  },
+  'zona-glacial': {
+    title: { pt: 'Zona Glacial', en: 'Glacial Zone' },
+    subtitle: { pt: 'Elysium - ataque aéreo', en: 'Elysium - air assault' },
+    lore: {
+      pt: 'Frentes congeladas escondem baterias hostis e patrulhas aéreas. Elysium deve manter a metade inferior do espaço de combate e derrubar os alvos acima.',
+      en: 'Frozen fronts hide hostile batteries and air patrols. Elysium must hold the lower half of the combat zone and shoot down targets above.',
+    },
+    objective: {
+      pt: 'Pilote o helicóptero, permaneça no setor aliado e destrua as aeronaves inimigas sem cruzar a linha de contenção.',
+      en: 'Pilot the helicopter, stay in allied airspace, and destroy enemy aircraft without crossing the containment line.',
+    },
+    backgrounds: NEW_EARTH_GLACIAL_ZONE_BACKGROUNDS,
+  },
+  'continente-esquecido': {
+    title: { pt: 'Continente Esquecido', en: 'Forgotten Continent' },
+    subtitle: { pt: 'Elysium - reconhecimento armado', en: 'Elysium - armed reconnaissance' },
+    lore: {
+      pt: 'O continente guarda cidades soterradas e sinais militares intermitentes. Só Elysium tem alcance aéreo para atacar e recuar com segurança.',
+      en: 'The continent holds buried cities and intermittent military signals. Only Elysium has the air reach to strike and withdraw safely.',
+    },
+    objective: {
+      pt: 'Use o helicóptero para limpar o espaço superior enquanto mantém a formação de Elysium na metade inferior da arena.',
+      en: 'Use the helicopter to clear the upper airspace while keeping Elysium formation in the lower half of the arena.',
+    },
+    backgrounds: NEW_EARTH_FORGOTTEN_CONTINENT_BACKGROUNDS,
+  },
+};
+
 const NEW_EARTH_MUSEUM_MARKER = {
   id: 'new-earth-museum',
   label: 'MUSEU',
   left: '59.6%',
   top: '44.7%',
 } as const;
+
+const NEW_EARTH_DISTRIBUTION_MARKER = {
+  id: 'new-earth-distribution',
+  label: 'CENTRO DE DISTRIBUIÇÃO',
+  left: '66.5%',
+  top: '48.5%',
+} as const;
+
+type NewEarthSupplyId = 'materials' | 'biomass' | 'tech' | 'defense' | 'food' | 'meds';
+type NewEarthSupplies = Record<NewEarthSupplyId, number>;
+type DistributionNeedMap = Record<string, Record<ColonySectorId, NewEarthSupplyId>>;
+
+const NEW_EARTH_DEFAULT_SUPPLIES: NewEarthSupplies = {
+  materials: 0,
+  biomass: 0,
+  tech: 0,
+  defense: 0,
+  food: 0,
+  meds: 0,
+};
+
+const NEW_EARTH_SUPPLY_CONFIG: Record<NewEarthSupplyId, {
+  label: Record<'pt' | 'en', string>;
+  short: Record<'pt' | 'en', string>;
+  color: string;
+  border: string;
+}> = {
+  materials: { label: { pt: 'Materiais', en: 'Materials' }, short: { pt: 'MAT', en: 'MAT' }, color: 'text-slate-100', border: 'border-slate-300/30 bg-slate-300/10' },
+  biomass: { label: { pt: 'Biomassa', en: 'Biomass' }, short: { pt: 'BIO', en: 'BIO' }, color: 'text-emerald-100', border: 'border-emerald-300/30 bg-emerald-300/10' },
+  tech: { label: { pt: 'Peças tecnológicas', en: 'Tech parts' }, short: { pt: 'TEC', en: 'TEC' }, color: 'text-cyan-100', border: 'border-cyan-300/30 bg-cyan-300/10' },
+  defense: { label: { pt: 'Núcleos de defesa', en: 'Defense cores' }, short: { pt: 'DEF', en: 'DEF' }, color: 'text-red-100', border: 'border-red-300/30 bg-red-300/10' },
+  food: { label: { pt: 'Comida', en: 'Food' }, short: { pt: 'COM', en: 'FOO' }, color: 'text-amber-100', border: 'border-amber-300/30 bg-amber-300/10' },
+  meds: { label: { pt: 'Insumos médicos', en: 'Medical supplies' }, short: { pt: 'MED', en: 'MED' }, color: 'text-fuchsia-100', border: 'border-fuchsia-300/30 bg-fuchsia-300/10' },
+};
+
+const NEW_EARTH_DISTRIBUTION_DONATION_COST = 1000;
+const NEW_EARTH_DISTRIBUTION_SECTOR_GAIN = 5;
+const NEW_EARTH_DISTRIBUTION_SECTOR_MAX = 105;
+
+const NEW_EARTH_SECTOR_SUPPLY_POOL: Record<ColonySectorId, NewEarthSupplyId[]> = {
+  culture: ['materials', 'tech', 'food'],
+  economy: ['materials', 'tech', 'biomass'],
+  health: ['meds', 'food', 'biomass'],
+  happiness: ['food', 'meds', 'materials'],
+  security: ['defense', 'tech', 'materials'],
+  technology: ['tech', 'materials', 'defense'],
+};
 
 const NEW_EARTH_MUSEUM_CATEGORIES: {
   id: NewEarthTreasureCategory;
@@ -347,7 +474,62 @@ const NEW_EARTH_SUBMARINE_PREVIEW_BACKGROUNDS: Record<NewEarthSubmarineColonyId,
   'colony-2': '/assets/rota4/colonys/eden/poseidon_explor_prev.webp',
 };
 
+const NEW_EARTH_HELICOPTER_NAME = 'AETHER';
+const NEW_EARTH_HELICOPTER_PREVIEW_BACKGROUND = '/assets/rota4/colonys/elysium/1elysium_colony.webp';
+
 const NEW_EARTH_SECTOR_ORDER: ColonySectorId[] = ['culture', 'economy', 'health', 'happiness', 'security', 'technology'];
+
+const getDistributionSectorStatus = (value: number, language: 'pt' | 'en') => {
+  if (value > 100) return {
+    label: language === 'pt' ? 'Excelente' : 'Excellent',
+    className: 'border-emerald-200/55 bg-emerald-300/18 text-emerald-100 shadow-[0_0_18px_rgba(74,222,128,0.16)]',
+    star: true,
+  };
+  if (value >= 90) return { label: language === 'pt' ? 'Ótimo' : 'Great', className: 'border-emerald-300/36 bg-emerald-300/12 text-emerald-100', star: false };
+  if (value >= 80) return { label: language === 'pt' ? 'Bom' : 'Good', className: 'border-sky-300/36 bg-sky-300/12 text-sky-100', star: false };
+  if (value >= 70) return { label: language === 'pt' ? 'Médio' : 'Medium', className: 'border-yellow-300/36 bg-yellow-300/12 text-yellow-100', star: false };
+  if (value >= 60) return { label: language === 'pt' ? 'Médio' : 'Medium', className: 'border-orange-300/36 bg-orange-300/12 text-orange-100', star: false };
+  if (value >= 50) return { label: language === 'pt' ? 'Baixo' : 'Low', className: 'border-red-300/36 bg-red-300/12 text-red-100', star: false };
+  return { label: language === 'pt' ? 'Ruim' : 'Bad', className: 'border-zinc-700 bg-black/62 text-zinc-300', star: false };
+};
+
+const getDistributionSectorToneClass = (value: number) => {
+  if (value > 100) return 'border-emerald-200/60 bg-emerald-300/28 text-white shadow-[0_0_18px_rgba(74,222,128,0.14)]';
+  if (value >= 90) return 'border-emerald-300/42 bg-emerald-300/24 text-white';
+  if (value >= 80) return 'border-sky-300/42 bg-sky-300/22 text-white';
+  if (value >= 70) return 'border-yellow-300/45 bg-yellow-300/24 text-white';
+  if (value >= 60) return 'border-orange-300/42 bg-orange-300/24 text-white';
+  if (value >= 50) return 'border-red-300/42 bg-red-300/22 text-white';
+  return 'border-zinc-700/80 bg-black/58 text-white';
+};
+
+const getDistributionSectorFillClass = (value: number) => {
+  if (value > 100) return 'bg-emerald-300';
+  if (value >= 90) return 'bg-emerald-300';
+  if (value >= 80) return 'bg-sky-300';
+  if (value >= 70) return 'bg-yellow-300';
+  if (value >= 60) return 'bg-orange-300';
+  if (value >= 50) return 'bg-red-300';
+  return 'bg-zinc-500';
+};
+
+const buildDistributionNeedMap = (colonies: Colony[], seed: number): DistributionNeedMap => {
+  const needs: DistributionNeedMap = {};
+  colonies.forEach((colony, colonyIndex) => {
+    needs[colony.id] = {} as Record<ColonySectorId, NewEarthSupplyId>;
+    NEW_EARTH_SECTOR_ORDER.forEach((sector, sectorIndex) => {
+      const pool = NEW_EARTH_SECTOR_SUPPLY_POOL[sector];
+      const index = Math.abs(Math.floor(Math.sin(seed * 0.017 + colonyIndex * 2.37 + sectorIndex * 4.11) * 10000)) % pool.length;
+      needs[colony.id][sector] = pool[index];
+    });
+  });
+  return needs;
+};
+
+const normalizeDistributionSupplies = (saved: any): NewEarthSupplies => ({
+  ...NEW_EARTH_DEFAULT_SUPPLIES,
+  ...(saved && typeof saved === 'object' ? saved : {}),
+});
 
 const NEW_EARTH_WAR_MISSION_POOL = [
   { id: 'land-search-5', title: { pt: 'Faça 5 buscas por suprimentos', en: 'Complete 5 supply searches' }, meta: { pt: 'Buscas por terra', en: 'Land searches' }, progress: '0 / 5', reward: 'QC + recursos diversos + Peças Tec' },
@@ -877,10 +1059,15 @@ const DashboardContent = memo(({
   const [selectedNewEarthCardIndex, setSelectedNewEarthCardIndex] = useState<number | null>(null);
   const [newEarthMapFeedback, setNewEarthMapFeedback] = useState<string | null>(null);
   const [newEarthSubmarines, setNewEarthSubmarines] = useState<NewEarthSubmarineState>(() => createDefaultNewEarthSubmarineState());
+  const [newEarthHelicopters, setNewEarthHelicopters] = useState<NewEarthHelicopterState>(() => createDefaultNewEarthHelicopterState());
   const [newEarthMuseumOpen, setNewEarthMuseumOpen] = useState(false);
   const [newEarthMuseumCategory, setNewEarthMuseumCategory] = useState<NewEarthTreasureCategory>('rare_fish');
   const [newEarthMuseumPage, setNewEarthMuseumPage] = useState(0);
   const [newEarthMuseumTreasures, setNewEarthMuseumTreasures] = useState<NewEarthMuseumTreasures>({});
+  const [newEarthDistributionOpen, setNewEarthDistributionOpen] = useState(false);
+  const [newEarthDistributionColonyId, setNewEarthDistributionColonyId] = useState<string | null>(null);
+  const [newEarthDistributionSupplies, setNewEarthDistributionSupplies] = useState<NewEarthSupplies>(NEW_EARTH_DEFAULT_SUPPLIES);
+  const [newEarthDistributionNeedSeed, setNewEarthDistributionNeedSeed] = useState(() => Date.now());
   const [selectedUnderwaterBriefing, setSelectedUnderwaterBriefing] = useState<{
     siteId: NewEarthUnderwaterSiteId;
     colonyId: NewEarthSubmarineColonyId;
@@ -889,6 +1076,8 @@ const DashboardContent = memo(({
     siteId: NewEarthUnderwaterSiteId;
     colonyId: NewEarthSubmarineColonyId;
   } | null>(null);
+  const [selectedSurfaceBattleBriefing, setSelectedSurfaceBattleBriefing] = useState<NewEarthSurfaceBattleBriefing | null>(null);
+  const [activeSurfaceBattle, setActiveSurfaceBattle] = useState<NewEarthSurfaceBattleBriefing | null>(null);
 
   const isInterstellar = useMemo(() => routeTier === 'Interstellar', [routeTier]);
   const isVoid = useMemo(() => routeTier === 'Void', [routeTier]);
@@ -917,6 +1106,27 @@ const DashboardContent = memo(({
       })
       .catch(error => {
         console.warn('Unable to load New Earth submarine save data', error);
+      });
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+    GameStorage.load(NEW_EARTH_HELICOPTERS_STORAGE_KEY)
+      .then(saved => {
+        if (!mounted) return;
+        const normalized = normalizeNewEarthHelicopterState(saved);
+        setNewEarthHelicopters(normalized);
+        if (!saved || typeof saved !== 'object') {
+          GameStorage.save(normalized, NEW_EARTH_HELICOPTERS_STORAGE_KEY).catch(error => {
+            console.warn('Unable to initialize New Earth helicopter save data', error);
+          });
+        }
+      })
+      .catch(error => {
+        console.warn('Unable to load New Earth helicopter save data', error);
       });
     return () => {
       mounted = false;
@@ -971,6 +1181,36 @@ const DashboardContent = memo(({
       mounted = false;
     };
   }, []);
+
+  useEffect(() => {
+    GameStorage.load('colony_supplies_data')
+      .then(saved => setNewEarthDistributionSupplies(normalizeDistributionSupplies(saved)))
+      .catch(error => console.warn('Unable to load distribution center supplies', error));
+
+    const handleSuppliesUpdate = (event: Event) => {
+      const customEvent = event as CustomEvent<NewEarthSupplies>;
+      setNewEarthDistributionSupplies(normalizeDistributionSupplies(customEvent.detail));
+    };
+
+    window.addEventListener('qch-colony-supplies-updated', handleSuppliesUpdate);
+    return () => window.removeEventListener('qch-colony-supplies-updated', handleSuppliesUpdate);
+  }, []);
+
+  useEffect(() => {
+    if (!newEarthDistributionOpen) return;
+    const interval = window.setInterval(() => setNewEarthDistributionNeedSeed(Date.now()), 90000);
+    return () => window.clearInterval(interval);
+  }, [newEarthDistributionOpen]);
+
+  useEffect(() => {
+    if (!newEarthDistributionOpen) return;
+    const interval = window.setInterval(() => {
+      GameStorage.load('colony_supplies_data')
+        .then(saved => setNewEarthDistributionSupplies(normalizeDistributionSupplies(saved)))
+        .catch(error => console.warn('Unable to refresh distribution center supplies', error));
+    }, 2000);
+    return () => window.clearInterval(interval);
+  }, [newEarthDistributionOpen]);
 
   const [selectedReward, setSelectedReward] = useState<{
     level: number;
@@ -1539,6 +1779,11 @@ const DashboardContent = memo(({
     [newEarthCardLevels, selectedNewEarthColony]
   );
 
+  const newEarthDistributionNeeds = useMemo(
+    () => buildDistributionNeedMap(colonies, newEarthDistributionNeedSeed),
+    [colonies, newEarthDistributionNeedSeed]
+  );
+
   const selectedNewEarthWarMissions = useMemo(
     () => getNewEarthWarMissions(selectedNewEarthColony?.id),
     [selectedNewEarthColony?.id]
@@ -1556,6 +1801,20 @@ const DashboardContent = memo(({
 
   const selectedNewEarthSubmarineStats = selectedNewEarthSubmarineLevels
     ? getNewEarthSubmarineStats(selectedNewEarthSubmarineLevels)
+    : null;
+
+  const selectedNewEarthHelicopterColonyId = (
+    selectedNewEarthColony?.id === 'colony-3'
+      ? selectedNewEarthColony.id
+      : null
+  ) as NewEarthHelicopterColonyId | null;
+
+  const selectedNewEarthHelicopterLevels = selectedNewEarthHelicopterColonyId
+    ? newEarthHelicopters[selectedNewEarthHelicopterColonyId]
+    : null;
+
+  const selectedNewEarthHelicopterStats = selectedNewEarthHelicopterLevels
+    ? getNewEarthHelicopterStats(selectedNewEarthHelicopterLevels)
     : null;
 
   const selectedNewEarthCard = selectedNewEarthCardIndex !== null
@@ -1586,7 +1845,9 @@ const DashboardContent = memo(({
     setSelectedNewEarthCardIndex(null);
     setNewEarthMapFeedback(null);
     setSelectedUnderwaterBriefing(null);
+    setSelectedSurfaceBattleBriefing(null);
     setNewEarthMuseumOpen(false);
+    setNewEarthDistributionOpen(false);
     playSfx('aba_click');
   }, [colonies, language, playRandomNewEarthAccessDenied, playSfx]);
 
@@ -1632,6 +1893,40 @@ const DashboardContent = memo(({
     setNewEarthMapFeedback(null);
     playSfx('level_up');
   }, [dispatch, language, newEarthSubmarines, playSfx]);
+
+  const upgradeNewEarthHelicopter = useCallback((colonyId: NewEarthHelicopterColonyId, upgradeId: NewEarthHelicopterUpgradeId) => {
+    const currentLevel = newEarthHelicopters[colonyId][upgradeId] || 0;
+    if (currentLevel >= MAX_NEW_EARTH_HELICOPTER_UPGRADE_LEVEL) {
+      playSfx('error');
+      return;
+    }
+
+    const cost = getNewEarthHelicopterUpgradeCost(currentLevel);
+    if (qcRef.current < cost) {
+      setNewEarthMapFeedback(
+        language === 'pt'
+          ? `QC insuficiente para melhorar o helicóptero. Necessário ${cost.toLocaleString()} QC.`
+          : `Not enough QC to upgrade the helicopter. Need ${cost.toLocaleString()} QC.`
+      );
+      playRandomNewEarthAccessDenied();
+      return;
+    }
+
+    const nextState = normalizeNewEarthHelicopterState({
+      ...newEarthHelicopters,
+      [colonyId]: {
+        ...newEarthHelicopters[colonyId],
+        [upgradeId]: currentLevel + 1,
+      },
+    });
+    setNewEarthHelicopters(nextState);
+    dispatch({ type: 'SPEND_QC', payload: { amount: cost } });
+    GameStorage.save(nextState, NEW_EARTH_HELICOPTERS_STORAGE_KEY).catch(error => {
+      console.warn('Unable to save New Earth helicopter upgrade', error);
+    });
+    setNewEarthMapFeedback(null);
+    playSfx('level_up');
+  }, [dispatch, language, newEarthHelicopters, playRandomNewEarthAccessDenied, playSfx]);
 
 
   const setQc = useCallback((val: number | ((prev: number) => number)) => {
@@ -2933,7 +3228,8 @@ const DashboardContent = memo(({
     const rate = minRate + Math.random() * (maxRate - minRate);
     const colonyPop = (colonies || []).reduce((sum, c) => sum + (c.population || 0), 0);
     const totalPop = earthPopulationRef.current + colonyPop;
-    const baseGrowth = totalPop * rate;
+    const populationGrowthPenalty = totalPop >= 100000000000 ? 0.05 : 1;
+    const baseGrowth = totalPop * rate * populationGrowthPenalty;
 
     // 2. Random Demographic Events
     let eventBonus = 0;
@@ -2950,14 +3246,28 @@ const DashboardContent = memo(({
     }
 
     // 3. Update Population (Must be Integer, Round UP)
-    setEarthPopulation(prev => Math.ceil(prev + baseGrowth + eventBonus - migrationPenalty));
+    const populationDelta = Math.max(0, baseGrowth + eventBonus - migrationPenalty);
+    setEarthPopulation(prev => Math.ceil(prev + populationDelta));
 
     // Log the annual summary
     if (baseGrowth > 0) {
       addLog(`${language === 'pt' ? 'Ano' : 'Year'} ${gameTime.years}: +${Math.ceil(baseGrowth)} ${language === 'pt' ? 'novos habitantes' : 'new inhabitants'} (${(rate * 100).toFixed(1)}%)`, 'info');
     }
 
-  }, [gameTime.years, isLoaded, language, colonies]);
+    setColonies(prevColonies => prevColonies.map((colony: Colony) => {
+      const randomSector = NEW_EARTH_SECTOR_ORDER[Math.floor(Math.random() * NEW_EARTH_SECTOR_ORDER.length)];
+      const currentSectorValue = Number(colony.sectors?.[randomSector] ?? DEFAULT_COLONY_SECTORS[randomSector]);
+      return {
+        ...colony,
+        sectors: {
+          ...DEFAULT_COLONY_SECTORS,
+          ...(colony.sectors || {}),
+          [randomSector]: Math.max(0, currentSectorValue - 1),
+        },
+      };
+    }));
+
+  }, [gameTime.years, isLoaded, language, colonies, setColonies]);
 
   const [selectedUpgradePoint, setSelectedUpgradePoint] = useState<number | null>(null);
 
@@ -3207,23 +3517,146 @@ const DashboardContent = memo(({
     setSelectedNewEarthCardIndex(null);
     setNewEarthMapFeedback(null);
     setSelectedUnderwaterBriefing(null);
+    setSelectedSurfaceBattleBriefing(null);
+    setNewEarthDistributionOpen(false);
     setNewEarthMuseumOpen(true);
     playSfx('aba_click');
   }, [playSfx]);
 
-  const handleNewEarthDangerMarkerClick = useCallback((marker: typeof NEW_EARTH_DANGER_MARKERS[number]) => {
-    if (!('submarineColonyId' in marker)) {
-      setNewEarthMapFeedback(language === 'pt' ? 'Zona hostil. Operação ainda indisponível.' : 'Hostile zone. Operation unavailable.');
+  const handleNewEarthDistributionMarkerClick = useCallback(() => {
+    const allColoniesComplete = colonies.length > 0 && colonies.every((colony: Colony) => isNewEarthColonyUnlocked(colony));
+    if (!allColoniesComplete) {
+      setNewEarthMapFeedback(
+        language === 'pt'
+          ? 'Centro de Distribuição bloqueado: conclua todas as construções de todas as colônias.'
+          : 'Distribution Center locked: complete every construction in every colony.'
+      );
       playRandomNewEarthAccessDenied();
       return;
     }
 
-    const colony = colonies.find((item: Colony) => item.id === marker.submarineColonyId);
-    if (!colony || !isNewEarthColonyUnlocked(colony)) {
+    setSelectedNewEarthColonyId(null);
+    setSelectedNewEarthCardIndex(null);
+    setNewEarthMapFeedback(null);
+    setSelectedUnderwaterBriefing(null);
+    setSelectedSurfaceBattleBriefing(null);
+    setNewEarthMuseumOpen(false);
+    setNewEarthDistributionColonyId(current => {
+      if (current && colonies.some((colony: Colony) => colony.id === current)) return current;
+      return colonies.find((colony: Colony) => colony.name.toLowerCase() === 'eden')?.id || colonies[0]?.id || null;
+    });
+    setNewEarthDistributionNeedSeed(Date.now());
+    GameStorage.load('colony_supplies_data')
+      .then(saved => setNewEarthDistributionSupplies(normalizeDistributionSupplies(saved)))
+      .catch(error => console.warn('Unable to refresh distribution center supplies', error));
+    setNewEarthDistributionOpen(true);
+    playSfx('aba_click');
+  }, [colonies, language, playRandomNewEarthAccessDenied, playSfx]);
+
+  const donateNewEarthDistributionSupply = useCallback((colonyId: string, sector: ColonySectorId) => {
+    const neededSupply = newEarthDistributionNeeds[colonyId]?.[sector];
+    if (!neededSupply) return;
+
+    const currentAmount = Math.max(0, Math.floor(Number(newEarthDistributionSupplies[neededSupply]) || 0));
+    const supplyLabel = NEW_EARTH_SUPPLY_CONFIG[neededSupply].label[language as 'pt' | 'en'];
+    const colony = colonies.find((item: Colony) => item.id === colonyId);
+    const sectorLabel = SECTOR_CONFIG[sector].label[language as 'pt' | 'en'];
+    const currentSectorValue = Number(colony?.sectors?.[sector] ?? DEFAULT_COLONY_SECTORS[sector]);
+
+    if (currentSectorValue >= NEW_EARTH_DISTRIBUTION_SECTOR_MAX) {
       setNewEarthMapFeedback(
         language === 'pt'
-          ? `Exploração submarina bloqueada: conclua todas as construções de ${marker.submarineColonyId === 'colony-4' ? 'Gaia' : 'Eden'}.`
-          : `Submarine exploration blocked: complete every construction in ${marker.submarineColonyId === 'colony-4' ? 'Gaia' : 'Eden'}.`
+          ? `${sectorLabel} já está no limite máximo de ${NEW_EARTH_DISTRIBUTION_SECTOR_MAX}.`
+          : `${sectorLabel} is already at the ${NEW_EARTH_DISTRIBUTION_SECTOR_MAX} maximum.`
+      );
+      return;
+    }
+
+    if (currentAmount < NEW_EARTH_DISTRIBUTION_DONATION_COST) {
+      setNewEarthMapFeedback(
+        language === 'pt'
+          ? `${supplyLabel} insuficiente para estabilizar ${sectorLabel}.`
+          : `Not enough ${supplyLabel} to stabilize ${sectorLabel}.`
+      );
+      playRandomNewEarthAccessDenied();
+      return;
+    }
+
+    const nextSupplies = {
+      ...newEarthDistributionSupplies,
+      [neededSupply]: currentAmount - NEW_EARTH_DISTRIBUTION_DONATION_COST,
+    };
+
+    setNewEarthDistributionSupplies(nextSupplies);
+    GameStorage.save(nextSupplies, 'colony_supplies_data').catch(error => {
+      console.warn('Unable to save distribution center supplies', error);
+    });
+    window.dispatchEvent(new CustomEvent('qch-colony-supplies-updated', { detail: nextSupplies }));
+
+    setColonies(prevColonies => prevColonies.map((item: Colony) => {
+      if (item.id !== colonyId) return item;
+      const currentSectorValue = Number(item.sectors?.[sector] ?? DEFAULT_COLONY_SECTORS[sector]);
+      return {
+        ...item,
+        sectors: {
+          ...item.sectors,
+          [sector]: Math.min(NEW_EARTH_DISTRIBUTION_SECTOR_MAX, currentSectorValue + NEW_EARTH_DISTRIBUTION_SECTOR_GAIN),
+        },
+      };
+    }));
+
+    const successFeedback = language === 'pt'
+      ? `${colony?.name || 'Colônia'} recebeu ${NEW_EARTH_DISTRIBUTION_DONATION_COST.toLocaleString('pt-BR')} ${supplyLabel}: ${sectorLabel} +${NEW_EARTH_DISTRIBUTION_SECTOR_GAIN}.`
+      : `${colony?.name || 'Colony'} received ${NEW_EARTH_DISTRIBUTION_DONATION_COST.toLocaleString('en-US')} ${supplyLabel}: ${sectorLabel} +${NEW_EARTH_DISTRIBUTION_SECTOR_GAIN}.`;
+    setNewEarthMapFeedback(successFeedback);
+    window.setTimeout(() => {
+      setNewEarthMapFeedback(current => current === successFeedback ? null : current);
+    }, 1500);
+    playSfx('level_up');
+  }, [
+    colonies,
+    language,
+    newEarthDistributionNeeds,
+    newEarthDistributionSupplies,
+    playRandomNewEarthAccessDenied,
+    playSfx,
+    setColonies,
+  ]);
+
+  const handleNewEarthDangerMarkerClick = useCallback((marker: typeof NEW_EARTH_DANGER_MARKERS[number]) => {
+    if ('submarineColonyId' in marker) {
+      const colony = colonies.find((item: Colony) => item.id === marker.submarineColonyId);
+      if (!colony || !isNewEarthColonyUnlocked(colony)) {
+        setNewEarthMapFeedback(
+          language === 'pt'
+            ? `Exploração submarina bloqueada: conclua todas as construções de ${marker.submarineColonyId === 'colony-4' ? 'Gaia' : 'Eden'}.`
+            : `Submarine exploration blocked: complete every construction in ${marker.submarineColonyId === 'colony-4' ? 'Gaia' : 'Eden'}.`
+        );
+        playRandomNewEarthAccessDenied();
+        return;
+      }
+
+      setSelectedNewEarthColonyId(null);
+      setSelectedNewEarthCardIndex(null);
+      setNewEarthMapFeedback(null);
+      setNewEarthMuseumOpen(false);
+      setNewEarthDistributionOpen(false);
+      setSelectedSurfaceBattleBriefing(null);
+      setSelectedUnderwaterBriefing({
+        siteId: marker.id as NewEarthUnderwaterSiteId,
+        colonyId: marker.submarineColonyId as NewEarthSubmarineColonyId,
+      });
+      playSfx('aba_click');
+      return;
+    }
+
+    const colony = colonies.find((item: Colony) => item.id === marker.surfaceBattleColonyId);
+    if (!colony || !isNewEarthColonyUnlocked(colony)) {
+      const colonyName = marker.surfaceBattleColonyId === 'colony-1' ? 'Genesis' : 'Elysium';
+      setNewEarthMapFeedback(
+        language === 'pt'
+          ? `Ataque bloqueado: conclua todas as construções de ${colonyName}.`
+          : `Attack blocked: complete every construction in ${colonyName}.`
       );
       playRandomNewEarthAccessDenied();
       return;
@@ -3233,9 +3666,15 @@ const DashboardContent = memo(({
     setSelectedNewEarthCardIndex(null);
     setNewEarthMapFeedback(null);
     setNewEarthMuseumOpen(false);
-    setSelectedUnderwaterBriefing({
-      siteId: marker.id as NewEarthUnderwaterSiteId,
-      colonyId: marker.submarineColonyId as NewEarthSubmarineColonyId,
+    setNewEarthDistributionOpen(false);
+    setSelectedUnderwaterBriefing(null);
+    setSelectedSurfaceBattleBriefing({
+      siteId: marker.id as NewEarthSurfaceBattleSiteId,
+      colonyId: marker.surfaceBattleColonyId,
+      battleKind: marker.surfaceBattleKind,
+      background: pickNewEarthBackground(
+        NEW_EARTH_SURFACE_SITE_BRIEFINGS[marker.id as NewEarthSurfaceBattleSiteId].backgrounds
+      ),
     });
     playSfx('aba_click');
   }, [colonies, language, playRandomNewEarthAccessDenied, playSfx]);
@@ -3247,6 +3686,14 @@ const DashboardContent = memo(({
     setNewEarthMapFeedback(null);
     playSfx('battle_click');
   }, [playSfx, selectedUnderwaterBriefing]);
+
+  const startNewEarthSurfaceBattle = useCallback(() => {
+    if (!selectedSurfaceBattleBriefing) return;
+    setActiveSurfaceBattle(selectedSurfaceBattleBriefing);
+    setSelectedSurfaceBattleBriefing(null);
+    setNewEarthMapFeedback(null);
+    playSfx('battle_click');
+  }, [playSfx, selectedSurfaceBattleBriefing]);
 
   const handleUnderwaterTreasureLoot = useCallback((payload: any) => {
     recordSubmarineMissionProgress({ type: 'submarine-treasure', amount: 1 });
@@ -3314,6 +3761,12 @@ const DashboardContent = memo(({
       ? colonies.find((colony: Colony) => colony.id === activeUnderwaterBattle.colonyId) || null
       : null
   ), [activeUnderwaterBattle, colonies]);
+
+  const activeSurfaceBattleColony = useMemo(() => (
+    activeSurfaceBattle
+      ? colonies.find((colony: Colony) => colony.id === activeSurfaceBattle.colonyId) || null
+      : null
+  ), [activeSurfaceBattle, colonies]);
 
   useEffect(() => {
     // Load arcade scores from localStorage initially
@@ -7945,6 +8398,41 @@ const DashboardContent = memo(({
         />
       )}
 
+      {activeSurfaceBattle && activeSurfaceBattleColony && (
+        <NewEarthSurfaceBattle
+          language={language as 'en' | 'pt'}
+          siteId={activeSurfaceBattle.siteId}
+          battleKind={activeSurfaceBattle.battleKind}
+          colonyName={activeSurfaceBattleColony.name}
+          defenseBattleLevel={Math.max(1, battleLevel || 1)}
+          background={activeSurfaceBattle.background}
+          helicopterStats={activeSurfaceBattle.battleKind === 'helicopter'
+            ? getNewEarthHelicopterStats(newEarthHelicopters['colony-3'])
+            : undefined}
+          onClose={() => setActiveSurfaceBattle(null)}
+          onVictory={() => {
+            const siteTitle = NEW_EARTH_SURFACE_SITE_BRIEFINGS[activeSurfaceBattle.siteId].title[language as 'pt' | 'en'];
+            dispatch({ type: 'EARN_QC', payload: { amount: 25000 + Math.max(0, battleLevel - 1) * 2500, source: 'battle' } });
+            addLog(
+              language === 'pt'
+                ? `Vitória em ${siteTitle}.`
+                : `Victory at ${siteTitle}.`,
+              'success'
+            );
+            setActiveSurfaceBattle(null);
+          }}
+          onDefeat={() => {
+            addLog(
+              language === 'pt'
+                ? 'A força de ataque recuou para reorganização.'
+                : 'The attack force retreated to regroup.',
+              'error'
+            );
+            setActiveSurfaceBattle(null);
+          }}
+        />
+      )}
+
       <SpaceAmbience isPlaying={musicOn} volume={0.2} />
 
       {/* Background Grid & Stars */}
@@ -8786,6 +9274,10 @@ const DashboardContent = memo(({
                           0%, 100% { box-shadow: 0 0 10px rgba(251,191,36,0.9), 0 0 22px rgba(245,158,11,0.35); }
                           50% { box-shadow: 0 0 18px rgba(254,240,138,0.98), 0 0 38px rgba(245,158,11,0.5); }
                         }
+                        @keyframes newEarthDistributionDot {
+                          0%, 100% { box-shadow: 0 0 10px rgba(56,189,248,0.9), 0 0 22px rgba(14,165,233,0.38); }
+                          50% { box-shadow: 0 0 18px rgba(186,230,253,0.98), 0 0 38px rgba(14,165,233,0.54); }
+                        }
                       `}</style>
                       <div className="absolute inset-0 bg-gradient-to-b from-black/25 via-black/10 to-black/55" />
                       <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_38%,transparent_0%,rgba(0,0,0,0.28)_72%)]" />
@@ -8826,7 +9318,7 @@ const DashboardContent = memo(({
                             type="button"
                             key={marker.id}
                             onClick={() => handleNewEarthDangerMarkerClick(marker)}
-                            className={`absolute text-left transition hover:scale-105 ${'submarineColonyId' in marker ? 'cursor-pointer' : 'cursor-not-allowed'}`}
+                            className="absolute cursor-pointer text-left transition hover:scale-105"
                             style={{ left: marker.left, top: marker.top }}
                           >
                             <span
@@ -8862,6 +9354,26 @@ const DashboardContent = memo(({
                             {NEW_EARTH_MUSEUM_MARKER.label}
                           </span>
                         </button>
+
+                        <button
+                          type="button"
+                          key={NEW_EARTH_DISTRIBUTION_MARKER.id}
+                          onClick={handleNewEarthDistributionMarkerClick}
+                          className="absolute h-8 w-8 text-left transition hover:scale-110"
+                          style={{ left: NEW_EARTH_DISTRIBUTION_MARKER.left, top: NEW_EARTH_DISTRIBUTION_MARKER.top }}
+                        >
+                          <span
+                            className="absolute left-0 top-0 h-8 w-8 rounded-full border border-sky-200/75"
+                            style={{ animation: 'newEarthRadarPulse 2.2s ease-out infinite' }}
+                          />
+                          <span
+                            className="absolute left-0 top-0 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full border border-sky-50/85 bg-sky-300/90"
+                            style={{ animation: 'newEarthDistributionDot 2.2s ease-in-out infinite' }}
+                          />
+                          <span className="absolute left-4 top-[-1.15rem] whitespace-nowrap rounded-full border border-sky-200/25 bg-black/50 px-2 py-0.5 font-mono text-[8px] font-bold uppercase tracking-[0.22em] text-sky-50 shadow-[0_0_14px_rgba(56,189,248,0.22)]">
+                            {NEW_EARTH_DISTRIBUTION_MARKER.label}
+                          </span>
+                        </button>
                       </div>
                       <AnimatePresence>
                         {newEarthMapFeedback && (
@@ -8874,6 +9386,206 @@ const DashboardContent = memo(({
                             {newEarthMapFeedback}
                           </motion.div>
                         )}
+                      </AnimatePresence>
+                      <AnimatePresence>
+                        {newEarthDistributionOpen && (() => {
+                          const supplyIds = Object.keys(NEW_EARTH_SUPPLY_CONFIG) as NewEarthSupplyId[];
+                          const distributionColonies = [...colonies].sort((a: Colony, b: Colony) => {
+                            const order = ['eden', 'gaia', 'elysium', 'genesis'];
+                            const aIndex = order.indexOf(a.name.toLowerCase());
+                            const bIndex = order.indexOf(b.name.toLowerCase());
+                            return (aIndex === -1 ? 99 : aIndex) - (bIndex === -1 ? 99 : bIndex);
+                          });
+                          const selectedDistributionColony = distributionColonies.find((colony: Colony) => colony.id === newEarthDistributionColonyId) || distributionColonies[0] || null;
+                          const selectedDistributionSectorRows = selectedDistributionColony
+                            ? NEW_EARTH_SECTOR_ORDER.map((sector) => {
+                              const value = Number(selectedDistributionColony.sectors?.[sector] ?? DEFAULT_COLONY_SECTORS[sector]);
+                              const neededSupply = newEarthDistributionNeeds[selectedDistributionColony.id]?.[sector] || 'materials';
+                              return { sector, value, neededSupply };
+                            })
+                            : [];
+                          const selectedDistributionAverage = selectedDistributionSectorRows.reduce((sum, row) => sum + row.value, 0) / Math.max(1, selectedDistributionSectorRows.length);
+
+                          return (
+                            <motion.div
+                              initial={{ opacity: 0, scale: 0.97, y: 18 }}
+                              animate={{ opacity: 1, scale: 1, y: 0 }}
+                              exit={{ opacity: 0, scale: 0.97, y: 18 }}
+                              className="absolute inset-4 z-30 overflow-hidden rounded-3xl border border-sky-200/30 bg-slate-950/98 shadow-[0_0_54px_rgba(56,189,248,0.18)] backdrop-blur-md"
+                            >
+                              <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_12%,rgba(56,189,248,0.12),transparent_34%),radial-gradient(circle_at_82%_18%,rgba(34,197,94,0.07),transparent_28%),linear-gradient(135deg,rgba(2,6,23,0.99),rgba(8,13,31,0.95)_52%,rgba(3,7,18,0.99))]" />
+                              <div
+                                className="relative z-10 grid h-full min-h-0 gap-3 p-4"
+                                style={{ gridTemplateRows: '56px 48px minmax(0, 1fr)' }}
+                              >
+                                <div className="flex items-center justify-between gap-3 border-b border-sky-200/12 pb-2">
+                                  <div>
+                                    <h2 className="font-orbitron text-2xl font-black uppercase leading-tight tracking-[0.06em] text-white drop-shadow-[0_0_14px_rgba(56,189,248,0.18)]">
+                                      {language === 'pt' ? 'Centro de Distribuição' : 'Distribution Center'}
+                                    </h2>
+                                  </div>
+                                  <div className="flex shrink-0 items-center gap-2">
+                                    <div className="rounded-xl border border-emerald-200/22 bg-emerald-300/9 px-3 py-1.5 text-right">
+                                      <p className="font-mono text-[8px] font-bold uppercase tracking-[0.2em] text-emerald-100/65">QC</p>
+                                      <p className="font-orbitron text-base font-black text-emerald-100">{formatValue(qc)}</p>
+                                    </div>
+                                    <PremiumCanvasButton
+                                      onClick={() => {
+                                        setNewEarthDistributionOpen(false);
+                                        setNewEarthMapFeedback(null);
+                                        playSfx('aba_click');
+                                      }}
+                                      tone="steel"
+                                      className="h-10 w-10 !px-0"
+                                      contentClassName="text-slate-100"
+                                    >
+                                      <X className="h-5 w-5" />
+                                    </PremiumCanvasButton>
+                                  </div>
+                                </div>
+
+                                <div
+                                  className="grid h-full min-h-0 gap-2 overflow-hidden"
+                                  style={{ gridTemplateColumns: 'repeat(6, minmax(0, 1fr))' }}
+                                >
+                                  {supplyIds.map((supplyId) => {
+                                    const supply = NEW_EARTH_SUPPLY_CONFIG[supplyId];
+                                    const amount = Math.max(0, Math.floor(Number(newEarthDistributionSupplies[supplyId]) || 0));
+                                    return (
+                                      <div key={supplyId} className={`flex h-full min-w-0 flex-col justify-center rounded-lg border px-2.5 py-1.5 ${supply.border}`}>
+                                        <div className="flex items-center justify-between gap-2">
+                                          <p className="font-mono text-[7px] font-bold uppercase tracking-[0.14em] text-white/45">{supply.short[language as 'pt' | 'en']}</p>
+                                          <p className="truncate font-mono text-[7px] font-bold uppercase tracking-[0.08em] text-white/42">{supply.label[language as 'pt' | 'en']}</p>
+                                        </div>
+                                        <p className={`mt-0.5 truncate font-orbitron text-xs font-black ${supply.color}`}>{amount.toLocaleString(language === 'pt' ? 'pt-BR' : 'en-US')}</p>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+
+                                <div
+                                  className="grid min-h-0 gap-3"
+                                  style={{ gridTemplateColumns: '184px minmax(0, 1fr)' }}
+                                >
+                                  <div
+                                    className="grid min-h-0 gap-2 rounded-2xl border border-white/10 bg-black/30 p-2"
+                                    style={{ gridTemplateRows: `repeat(${Math.max(1, distributionColonies.length)}, minmax(0, 1fr))` }}
+                                  >
+                                    {distributionColonies.map((colony: Colony) => {
+                                      const colonyRows = NEW_EARTH_SECTOR_ORDER.map((sector) => Number(colony.sectors?.[sector] ?? DEFAULT_COLONY_SECTORS[sector]));
+                                      const average = colonyRows.reduce((sum, value) => sum + value, 0) / Math.max(1, colonyRows.length);
+                                      const isSelected = selectedDistributionColony?.id === colony.id;
+
+                                      return (
+                                        <PremiumCanvasButton
+                                          key={colony.id}
+                                          onClick={() => {
+                                            setNewEarthDistributionColonyId(colony.id);
+                                            playSfx('aba_click');
+                                          }}
+                                          tone={isSelected ? 'purple' : 'steel'}
+                                          className={`h-full min-h-0 w-full px-3 ${isSelected ? 'shadow-[0_0_22px_rgba(168,85,247,0.45)]' : ''}`}
+                                          contentClassName="justify-start gap-3"
+                                        >
+                                          <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border ${isSelected ? 'border-purple-300/70 bg-purple-950/50 text-purple-100' : 'border-sky-300/20 bg-black/45 text-sky-200'}`}>
+                                            <Building2 className="h-4 w-4" />
+                                          </div>
+                                          <div className="min-w-0 flex-1 text-left">
+                                            <p className={`truncate font-orbitron text-[11px] font-black uppercase tracking-[0.08em] ${isSelected ? 'text-purple-50' : 'text-slate-300'}`}>{colony.name}</p>
+                                            <p className={`mt-0.5 font-mono text-[8px] font-bold uppercase tracking-[0.1em] ${isSelected ? 'text-purple-200/80' : 'text-slate-500'}`}>
+                                              {language === 'pt' ? 'Média' : 'Avg'} {Math.round(average)}
+                                            </p>
+                                          </div>
+                                        </PremiumCanvasButton>
+                                      );
+                                    })}
+                                  </div>
+
+                                  <AnimatePresence mode="wait">
+                                    <motion.div
+                                      key={selectedDistributionColony?.id || 'distribution-empty'}
+                                      initial={{ opacity: 0, scale: 0.98, x: 18 }}
+                                      animate={{ opacity: 1, scale: 1, x: 0 }}
+                                      exit={{ opacity: 0, scale: 1.02, x: -18 }}
+                                      className="grid min-h-0 grid-rows-[72px_minmax(0,1fr)] gap-3 rounded-2xl border border-sky-200/16 bg-black/36 p-3"
+                                    >
+                                      <div className="rounded-2xl border border-sky-200/16 bg-black/40 px-4 py-3">
+                                        <div className="flex h-full items-end justify-between gap-3">
+                                          <div>
+                                          <p className="font-mono text-[9px] font-bold uppercase tracking-[0.26em] text-sky-100/56">
+                                            {language === 'pt' ? 'Colônia selecionada' : 'Selected colony'}
+                                          </p>
+                                            <h3 className="font-orbitron text-xl font-black uppercase leading-none tracking-[0.06em] text-white">
+                                              {selectedDistributionColony?.name || '-'}
+                                            </h3>
+                                          </div>
+                                          <div className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-right">
+                                            <p className="font-mono text-[8px] font-bold uppercase tracking-[0.16em] text-white/42">{language === 'pt' ? 'Média' : 'Avg'}</p>
+                                            <p className="font-orbitron text-xl font-black text-sky-100">{Math.round(selectedDistributionAverage)}</p>
+                                          </div>
+                                        </div>
+                                      </div>
+
+                                      <div
+                                        className="grid min-h-0 gap-3 overflow-hidden"
+                                        style={{
+                                          gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+                                          gridTemplateRows: 'repeat(3, minmax(0, 1fr))',
+                                        }}
+                                      >
+                                        {selectedDistributionColony && selectedDistributionSectorRows.map(({ sector, value, neededSupply }) => {
+                                          const supply = NEW_EARTH_SUPPLY_CONFIG[neededSupply];
+                                          const canDonate = value < NEW_EARTH_DISTRIBUTION_SECTOR_MAX
+                                            && Math.max(0, Number(newEarthDistributionSupplies[neededSupply]) || 0) >= NEW_EARTH_DISTRIBUTION_DONATION_COST;
+                                          const sectorToneClass = getDistributionSectorToneClass(value);
+                                          const sectorFillClass = getDistributionSectorFillClass(value);
+                                          return (
+                                            <div key={sector} className={`grid min-h-0 grid-rows-[auto_auto_auto] rounded-2xl border p-2.5 ${sectorToneClass}`}>
+                                              <div className="flex items-start justify-between gap-2">
+                                                <div className="min-w-0">
+                                                  <p className="truncate font-orbitron text-[12px] font-black uppercase tracking-[0.1em]">
+                                                    {SECTOR_CONFIG[sector].label[language as 'pt' | 'en']} {Math.round(value)}
+                                                  </p>
+                                                </div>
+                                              </div>
+                                              <div className="mt-1.5 grid grid-cols-[minmax(0,1fr)_112px] items-center gap-2">
+                                                <div className="min-w-0 rounded-xl border border-black/20 bg-black/20 px-2 py-1.5">
+                                                  <p className="truncate font-mono text-[7px] font-black uppercase tracking-[0.12em] opacity-70">
+                                                    {language === 'pt' ? 'Precisa' : 'Needs'}
+                                                  </p>
+                                                  <p className="truncate font-orbitron text-[10px] font-black uppercase">
+                                                    {supply.label[language as 'pt' | 'en']}
+                                                  </p>
+                                                </div>
+                                                <PremiumCanvasButton
+                                                  onClick={() => donateNewEarthDistributionSupply(selectedDistributionColony.id, sector)}
+                                                  tone={canDonate ? 'cyan' : 'steel'}
+                                                  disabled={!canDonate}
+                                                  className="h-8 !px-2"
+                                                  contentClassName={`text-[7px] font-orbitron font-black uppercase tracking-[0.08em] ${canDonate ? 'text-cyan-50' : 'text-slate-400'}`}
+                                                >
+                                                  {value >= NEW_EARTH_DISTRIBUTION_SECTOR_MAX ? 'MAX' : (language === 'pt' ? 'Enviar 1.000' : 'Send 1,000')}
+                                                </PremiumCanvasButton>
+                                              </div>
+                                              <div className="mt-1.5 flex items-center">
+                                                <div className="h-2 w-full overflow-hidden rounded-full border border-black/20 bg-black/35">
+                                                  <div
+                                                    className={`h-full rounded-full ${sectorFillClass}`}
+                                                    style={{ width: `${Math.min(100, Math.max(0, value))}%` }}
+                                                  />
+                                                </div>
+                                              </div>
+                                            </div>
+                                          );
+                                        })}
+                                      </div>
+                                    </motion.div>
+                                  </AnimatePresence>
+                                </div>
+                              </div>
+                            </motion.div>
+                          );
+                        })()}
                       </AnimatePresence>
                       <AnimatePresence>
                         {selectedUnderwaterBriefing && (() => {
@@ -8982,6 +9694,127 @@ const DashboardContent = memo(({
                                   >
                                     <Radar size={18} />
                                     {language === 'pt' ? 'Explorar' : 'Explore'}
+                                  </PremiumCanvasButton>
+                                </div>
+                              </div>
+                            </motion.div>
+                          );
+                        })()}
+                      </AnimatePresence>
+                      <AnimatePresence>
+                        {selectedSurfaceBattleBriefing && (() => {
+                          const briefing = NEW_EARTH_SURFACE_SITE_BRIEFINGS[selectedSurfaceBattleBriefing.siteId];
+                          const colonyName = selectedSurfaceBattleBriefing.colonyId === 'colony-1' ? 'Genesis' : 'Elysium';
+                          const isTankBattle = selectedSurfaceBattleBriefing.battleKind === 'tank';
+
+                          return (
+                            <motion.div
+                              initial={{ opacity: 0, scale: 0.97, y: 18 }}
+                              animate={{ opacity: 1, scale: 1, y: 0 }}
+                              exit={{ opacity: 0, scale: 0.97, y: 18 }}
+                              className="absolute inset-6 z-30 overflow-hidden rounded-3xl border border-red-200/30 bg-slate-950/96 p-5 shadow-[0_0_58px_rgba(248,113,113,0.18)] backdrop-blur-md"
+                            >
+                              <img
+                                src={selectedSurfaceBattleBriefing.background}
+                                alt=""
+                                aria-hidden="true"
+                                className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-32"
+                              />
+                              <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_34%_26%,rgba(248,113,113,0.18),transparent_38%),linear-gradient(90deg,rgba(2,6,23,0.94),rgba(2,6,23,0.74)_48%,rgba(2,6,23,0.91))]" />
+                              <PremiumCanvasButton
+                                type="button"
+                                onClick={() => {
+                                  setSelectedSurfaceBattleBriefing(null);
+                                  playSfx('close_window');
+                                }}
+                                tone="steel"
+                                className="absolute right-5 top-5 z-20 h-10 w-10 rounded-full"
+                                contentClassName="text-red-100"
+                              >
+                                <X size={18} />
+                              </PremiumCanvasButton>
+
+                              <div className="relative z-10 flex h-full min-h-0 flex-col justify-between gap-5 pr-14">
+                                <div className="max-w-4xl">
+                                  <p className="font-mono text-[10px] font-black uppercase tracking-[0.42em] text-red-100/74">
+                                    {language === 'pt' ? 'Mapa tático da Nova Terra' : 'New Earth tactical map'}
+                                  </p>
+                                  <h2 className="mt-3 font-orbitron text-5xl font-black uppercase leading-none text-white drop-shadow-[0_0_22px_rgba(248,113,113,0.2)]">
+                                    {briefing.title[language]}
+                                  </h2>
+                                  <p className="mt-3 font-orbitron text-sm font-black uppercase tracking-[0.24em] text-red-200/78">
+                                    {briefing.subtitle[language]}
+                                  </p>
+                                  <p className="mt-6 max-w-3xl text-lg font-semibold leading-relaxed text-slate-100/88">
+                                    {briefing.lore[language]}
+                                  </p>
+                                </div>
+
+                                <div className="grid min-h-0 grid-cols-[1.1fr_0.9fr] gap-4">
+                                  <div className="rounded-2xl border border-red-200/18 bg-black/46 p-5 shadow-[inset_0_0_28px_rgba(220,38,38,0.12)]">
+                                    <p className="font-mono text-[10px] font-black uppercase tracking-[0.34em] text-red-100/65">
+                                      {language === 'pt' ? 'Objetivo' : 'Objective'}
+                                    </p>
+                                    <p className="mt-3 text-base font-semibold leading-relaxed text-slate-100/86">
+                                      {briefing.objective[language]}
+                                    </p>
+                                  </div>
+                                  <div className="grid grid-cols-2 gap-3">
+                                    <div className="rounded-2xl border border-red-200/18 bg-black/50 p-4">
+                                      <p className="font-mono text-[9px] font-black uppercase tracking-[0.26em] text-red-100/60">
+                                        {language === 'pt' ? 'Colônia' : 'Colony'}
+                                      </p>
+                                      <p className="mt-2 font-orbitron text-2xl font-black uppercase text-white">{colonyName}</p>
+                                    </div>
+                                    <div className="rounded-2xl border border-red-200/18 bg-black/50 p-4">
+                                      <p className="font-mono text-[9px] font-black uppercase tracking-[0.26em] text-red-100/60">
+                                        {language === 'pt' ? 'Veículo' : 'Vehicle'}
+                                      </p>
+                                      <p className="mt-2 font-orbitron text-2xl font-black uppercase text-white">
+                                        {isTankBattle
+                                          ? (language === 'pt' ? 'Tanque' : 'Tank')
+                                          : (language === 'pt' ? 'Helicóptero' : 'Helicopter')}
+                                      </p>
+                                    </div>
+                                    <div className="rounded-2xl border border-red-200/18 bg-black/50 p-4">
+                                      <p className="font-mono text-[9px] font-black uppercase tracking-[0.26em] text-red-100/60">
+                                        {language === 'pt' ? 'Arena' : 'Arena'}
+                                      </p>
+                                      <p className="mt-2 font-orbitron text-lg font-black uppercase text-white">
+                                        {isTankBattle
+                                          ? (language === 'pt' ? 'Movimento livre' : 'Free movement')
+                                          : (language === 'pt' ? 'Tela dividida' : 'Split airspace')}
+                                      </p>
+                                    </div>
+                                    <div className="rounded-2xl border border-red-200/18 bg-black/50 p-4">
+                                      <p className="font-mono text-[9px] font-black uppercase tracking-[0.26em] text-red-100/60">
+                                        {language === 'pt' ? 'Controles' : 'Controls'}
+                                      </p>
+                                      <p className="mt-2 font-orbitron text-lg font-black uppercase text-white">WASD + Mouse</p>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div className="flex items-end justify-between gap-4">
+                                  <div className="rounded-2xl border border-emerald-200/16 bg-emerald-950/28 px-4 py-3">
+                                    <p className="font-mono text-[9px] font-black uppercase tracking-[0.26em] text-emerald-100/60">
+                                      {language === 'pt' ? 'Protótipo operacional' : 'Operational prototype'}
+                                    </p>
+                                    <p className="mt-1 text-sm font-bold text-emerald-50/82">
+                                      {language === 'pt'
+                                        ? 'Veículos desenhados no canvas agora; sprites animados entram na próxima etapa.'
+                                        : 'Vehicles are canvas-drawn for now; animated sprites come in the next pass.'}
+                                    </p>
+                                  </div>
+                                  <PremiumCanvasButton
+                                    type="button"
+                                    tone="red"
+                                    onClick={startNewEarthSurfaceBattle}
+                                    className="h-14 w-64"
+                                    contentClassName="gap-3 text-sm tracking-[0.24em]"
+                                  >
+                                    <Target size={18} />
+                                    {language === 'pt' ? 'Atacar' : 'Attack'}
                                   </PremiumCanvasButton>
                                 </div>
                               </div>
@@ -9363,6 +10196,107 @@ const DashboardContent = memo(({
                                                   <div
                                                     className={`h-full rounded-full ${isMax ? 'bg-zinc-500' : 'bg-cyan-300'}`}
                                                     style={{ width: `${(level / MAX_NEW_EARTH_SUBMARINE_UPGRADE_LEVEL) * 100}%` }}
+                                                  />
+                                                </div>
+                                              </div>
+                                            </PremiumCanvasButton>
+                                          );
+                                        })}
+                                      </div>
+                                    </div>
+                                  ) : selectedNewEarthHelicopterColonyId && selectedNewEarthHelicopterLevels && selectedNewEarthHelicopterStats ? (
+                                    <div className="relative flex h-full min-h-0 flex-col overflow-hidden rounded-xl border border-sky-300/14 bg-slate-950/72 p-3">
+                                      <img
+                                        src="/assets/rota4/colonys/elysium/elysium_police.webp"
+                                        alt=""
+                                        aria-hidden="true"
+                                        className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-20"
+                                      />
+                                      <div className="pointer-events-none absolute inset-0 bg-black/64" />
+                                      <div className="relative z-10 grid min-h-0 flex-1 grid-cols-[minmax(220px,0.78fr)_minmax(320px,1.22fr)] gap-3 overflow-hidden rounded-xl border border-sky-200/12 bg-black/42 p-3">
+                                        <div className="relative flex min-h-0 items-center justify-center overflow-hidden rounded-xl border border-sky-300/18 bg-sky-950/18">
+                                          <img
+                                            src={NEW_EARTH_HELICOPTER_PREVIEW_BACKGROUND}
+                                            alt=""
+                                            aria-hidden="true"
+                                            className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-80"
+                                          />
+                                          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_48%,rgba(125,211,252,0.22),transparent_58%),linear-gradient(180deg,rgba(2,6,23,0.12),rgba(2,6,23,0.38))]" />
+                                          <motion.div
+                                            key="elysium-helicopter-preview"
+                                            animate={{ y: [0, -8, 0, 6, 0], rotate: [0, -1.5, 0, 1.5, 0] }}
+                                            transition={{
+                                              duration: 4.6,
+                                              repeat: Infinity,
+                                              ease: 'easeInOut',
+                                            }}
+                                            className="relative z-10 flex h-full max-h-[205px] w-full items-center justify-center px-3 py-3 drop-shadow-[0_0_22px_rgba(125,211,252,0.34)]"
+                                          >
+                                            <div className="relative h-24 w-48">
+                                              <div className="absolute left-1/2 top-1/2 h-8 w-28 -translate-x-1/2 -translate-y-1/2 rounded-full border border-sky-100/40 bg-sky-300/80 shadow-[0_0_28px_rgba(125,211,252,0.42)]" />
+                                              <div className="absolute left-1/2 top-[45%] h-4 w-48 -translate-x-1/2 rounded-full bg-white/70 blur-[1px]" />
+                                              <div className="absolute left-1/2 top-[42%] h-2 w-44 -translate-x-1/2 rounded-full bg-sky-100/90" />
+                                              <div className="absolute left-[16%] top-1/2 h-3 w-12 -translate-y-1/2 rounded-full bg-slate-300/80" />
+                                              <div className="absolute right-[18%] top-1/2 h-3 w-10 -translate-y-1/2 rounded-full bg-slate-300/80" />
+                                              <div className="absolute left-1/2 top-[62%] h-10 w-2 -translate-x-1/2 rounded-full bg-sky-100/75" />
+                                            </div>
+                                          </motion.div>
+                                        </div>
+                                        <div className="grid min-h-0 grid-rows-[70px_1fr] gap-2">
+                                          <div className="flex items-center rounded-xl border border-sky-200/16 bg-black/58 px-4">
+                                            <p className="font-orbitron text-4xl font-black uppercase leading-none text-white">
+                                              {NEW_EARTH_HELICOPTER_NAME}
+                                            </p>
+                                          </div>
+                                          <div className="grid min-h-0 grid-cols-2 gap-2">
+                                            {[
+                                              { label: language === 'pt' ? 'Velocidade' : 'Speed', value: `+${selectedNewEarthHelicopterStats.speedBonus}%` },
+                                              { label: language === 'pt' ? 'Metralhadora' : 'Machine Gun', value: `+${selectedNewEarthHelicopterStats.gunDamageBonus}%` },
+                                              { label: language === 'pt' ? 'Míssil' : 'Missile', value: `+${selectedNewEarthHelicopterStats.missileDamageBonus}%` },
+                                              { label: language === 'pt' ? 'Mísseis' : 'Missiles', value: selectedNewEarthHelicopterStats.startingMissiles },
+                                              { label: language === 'pt' ? 'Armadura' : 'Armor', value: `-${selectedNewEarthHelicopterStats.armorReduction}%` },
+                                              { label: language === 'pt' ? 'Drones' : 'Drones', value: selectedNewEarthHelicopterStats.initialDrones },
+                                            ].map(attribute => (
+                                              <div key={attribute.label} className="flex min-h-0 min-w-0 flex-col justify-center rounded-xl border border-sky-200/16 bg-black/58 px-3 py-2">
+                                                <p className="truncate font-mono text-[8px] uppercase tracking-[0.16em] text-sky-100/58">{attribute.label}</p>
+                                                <p className="mt-1 truncate font-orbitron text-xl font-black leading-none text-white">{attribute.value}</p>
+                                              </div>
+                                            ))}
+                                          </div>
+                                        </div>
+                                      </div>
+
+                                      <div className="relative z-10 mt-3 grid h-[142px] shrink-0 grid-cols-3 grid-rows-2 gap-2">
+                                        {NEW_EARTH_HELICOPTER_UPGRADES.map(upgrade => {
+                                          const level = selectedNewEarthHelicopterLevels[upgrade.id] || 0;
+                                          const isMax = level >= MAX_NEW_EARTH_HELICOPTER_UPGRADE_LEVEL;
+                                          const cost = getNewEarthHelicopterUpgradeCost(level);
+                                          return (
+                                            <PremiumCanvasButton
+                                              key={upgrade.id}
+                                              type="button"
+                                              onClick={() => upgradeNewEarthHelicopter(selectedNewEarthHelicopterColonyId, upgrade.id)}
+                                              disabled={isMax}
+                                              tone={isMax ? 'steel' : 'cyan'}
+                                              className="min-h-0 rounded-xl"
+                                              contentClassName={`flex h-full flex-col items-stretch justify-center px-2.5 py-2 text-left ${isMax ? 'text-zinc-500' : 'text-sky-50'}`}
+                                            >
+                                              <div className="flex items-start justify-between gap-2">
+                                                <span className="min-w-0 truncate font-mono text-[8px] font-black uppercase tracking-[0.12em]">
+                                                  {upgrade.label[language as 'pt' | 'en']}
+                                                </span>
+                                                <span className="shrink-0 rounded-full border border-white/10 bg-black/42 px-1.5 py-0.5 font-mono text-[7px] font-black uppercase tracking-[0.08em]">
+                                                  {isMax ? 'MAX' : `${formatValue(cost)} QC`}
+                                                </span>
+                                              </div>
+                                              <div className="mt-1.5 flex items-center gap-2">
+                                                <span className="shrink-0 font-orbitron text-[11px] font-black uppercase leading-none">
+                                                  LVL {level}/{MAX_NEW_EARTH_HELICOPTER_UPGRADE_LEVEL}
+                                                </span>
+                                                <div className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full border border-sky-100/10 bg-black/50">
+                                                  <div
+                                                    className={`h-full rounded-full ${isMax ? 'bg-zinc-500' : 'bg-sky-300'}`}
+                                                    style={{ width: `${(level / MAX_NEW_EARTH_HELICOPTER_UPGRADE_LEVEL) * 100}%` }}
                                                   />
                                                 </div>
                                               </div>

@@ -287,8 +287,18 @@ const route4BattleBackgroundImages = [
   `${route4BattleBase}/backgrounds/multiple/rt4_background_winter_2.webp`,
 ];
 
+const route4NewEarthSurfaceBattleBackgroundImages = [
+  ...Array.from({ length: 6 }, (_, index) => (
+    `/assets/rota4/new_land_assets/forgotten_continent_new_land_system/forgotten_continent_background_${index + 1}.webp`
+  )),
+  ...Array.from({ length: 4 }, (_, index) => (
+    `/assets/rota4/new_land_assets/glacial_zone_new_land_system/glacial_zone_background_${index + 1}.webp`
+  )),
+];
+
 const route4BattleImages = [
   ...route4BattleBackgroundImages,
+  ...route4NewEarthSurfaceBattleBackgroundImages,
   `${route4BattleBase}/player/horizon/horizon.webp`,
   `${route4BattleBase}/player/horizon/horizon_12pos_spritesheet.webp`,
   `${route4BattleBase}/enemys/air_ships/enemy_rt4.webp`,

@@ -103,15 +103,31 @@ type ActiveSearchBattle = {
   searchId: ColonyExpeditionId;
   slotIndex: number;
   title: string;
+  battleLevel: number;
+};
+type DirectBattleBriefing = {
+  battleIndex: number;
+  searchId: ColonyExpeditionId;
+  slotIndex: number;
+  title: string;
+  boost: number;
 };
 
 const BATTLE_CARD_CODEX_PAGE_SIZE = 6;
 const MAX_SEARCH_UPGRADE_LEVEL = 5;
 const MAX_PARALLEL_SEARCHES_PER_TYPE = 3;
 const SEARCH_BATTLE_TOTAL = 6;
-const SEARCH_BATTLE_QC_REWARDS = [250000, 320000, 390000, 470000, 540000, 600000];
 const SEARCH_BATTLE_FINAL_QC_REWARD = 5000000;
 const SEARCH_BATTLE_CARD_CHANCE = 0.3;
+const DIRECT_BATTLE_MAX_MANUAL_DIFFICULTY_BOOST = 3;
+const DIRECT_BATTLE_REQUIRED_ENEMIES = 21;
+const getDirectBattleRewardScale = (battleLevel: number) => 1 + Math.max(0, Math.floor(battleLevel) - 1) * 0.1;
+const estimateDirectBattleArenaQc = (battleLevel: number) => {
+  const expectedRegularEnemiesQc = 20 * (4200 * 0.82 + 9500 * 0.18);
+  const expectedBossQc = (72000 + 78000) / 2;
+  const victoryBonusQc = 35000;
+  return Math.round((expectedRegularEnemiesQc + expectedBossQc + victoryBonusQc) * getDirectBattleRewardScale(battleLevel));
+};
 const SEARCH_BATTLE_SENTIMENT_SECTORS: ColonySectorId[] = ['happiness', 'health', 'economy', 'security', 'technology', 'culture'];
 const DEFAULT_SEARCH_BATTLE_CYCLE: SearchBattleCycleState = { nextBattleIndex: 0, cycle: 0 };
 const SEARCH_THREAT_TRIGGER_MIN_PROGRESS = 0.2;
@@ -1295,6 +1311,7 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
   const [searchBattleCycle, setSearchBattleCycle] = useState<SearchBattleCycleState>(DEFAULT_SEARCH_BATTLE_CYCLE);
   const [isSearchBattleCycleLoaded, setIsSearchBattleCycleLoaded] = useState(false);
   const [activeSearchBattle, setActiveSearchBattle] = useState<ActiveSearchBattle | null>(null);
+  const [directBattleBriefing, setDirectBattleBriefing] = useState<DirectBattleBriefing | null>(null);
   const [legendaryBattleCardPity, setLegendaryBattleCardPity] = useState(0);
   const [isBattlePityLoaded, setIsBattlePityLoaded] = useState(false);
   const [cardLevels, setCardLevels] = useState<ColonyCardLevels>({});
@@ -1456,14 +1473,32 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
     GameStorage.load('colony_supplies_data').then(saved => {
       if (!mounted) return;
       if (saved && typeof saved === 'object') {
-        setColonySupplies({
+        const normalizedSupplies = {
           ...DEFAULT_COLONY_SUPPLIES,
           ...saved,
-        });
+        };
+        colonySuppliesRef.current = normalizedSupplies;
+        setColonySupplies(normalizedSupplies);
       }
       setIsSuppliesLoaded(true);
     });
     return () => { mounted = false; };
+  }, []);
+
+  useEffect(() => {
+    const handleSuppliesUpdate = (event: Event) => {
+      const detail = (event as CustomEvent<Partial<ColonySupplies>>).detail;
+      if (!detail || typeof detail !== 'object') return;
+      const nextSupplies = {
+        ...DEFAULT_COLONY_SUPPLIES,
+        ...detail,
+      };
+      colonySuppliesRef.current = nextSupplies;
+      setColonySupplies(nextSupplies);
+    };
+
+    window.addEventListener('qch-colony-supplies-updated', handleSuppliesUpdate);
+    return () => window.removeEventListener('qch-colony-supplies-updated', handleSuppliesUpdate);
   }, []);
 
   useEffect(() => {
@@ -2946,7 +2981,8 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
     if (!activeDefenseThreat) return;
     const reward = rollAnyMissingColonyCardReward(ownedCardIds);
     const kills = summary?.kills || 18;
-    const battleXp = summary?.xp || (kills * 45 + 450);
+    const summaryXp = Number(summary?.xp);
+    const battleXp = Number.isFinite(summaryXp) ? Math.max(0, Math.floor(summaryXp)) : (kills * 45 + 450);
     const battleQc = summary?.qc || (kills * 4200 + 35000);
     const supplyReward: Partial<ColonySupplies> = {
       materials: 10 + kills,
@@ -3005,17 +3041,21 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
       ));
       setCardEvent(reward);
       playSfx?.('claim_card');
+      const xpTextEn = battleXp > 0 ? `+${battleXp} XP, ` : '';
+      const xpTextPt = battleXp > 0 ? `+${battleXp} XP, ` : '';
       setCardFeedback(t(
-        `Battle won: +${battleXp} XP, +${formatValue(battleQc)} QC and card acquired`,
-        `Batalha vencida: +${battleXp} XP, +${formatValue(battleQc)} QC e carta adquirida`
+        `Battle won: ${xpTextEn}+${formatValue(battleQc)} QC and card acquired`,
+        `Batalha vencida: ${xpTextPt}+${formatValue(battleQc)} QC e carta adquirida`
       ));
       return;
     }
 
     setLegendaryBattleCardPity(prev => prev + LEGENDARY_BATTLE_CARD_PITY_STEP);
+    const xpTextEn = battleXp > 0 ? `+${battleXp} XP and ` : '';
+    const xpTextPt = battleXp > 0 ? `+${battleXp} XP e ` : '';
     setCardFeedback(t(
-      `Threat neutralized: +${battleXp} XP and +${formatValue(battleQc)} QC`,
-      `Ameaça neutralizada: +${battleXp} XP e +${formatValue(battleQc)} QC`
+      `Threat neutralized: ${xpTextEn}+${formatValue(battleQc)} QC`,
+      `Ameaça neutralizada: ${xpTextPt}+${formatValue(battleQc)} QC`
     ));
   }, [activeDefenseThreat, ownedCardIds, playSfx, onEarnQC, formatValue, horizonMaxLevel, recordNewEarthMissionProgress]);
 
@@ -3036,8 +3076,10 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
     const battleIndex = activeSearchBattle.battleIndex;
     const battleNumber = battleIndex + 1;
     const kills = summary?.kills || 20;
-    const battleXp = summary?.xp || (kills * 45 + 550 + battleIndex * 80);
-    const battleQc = SEARCH_BATTLE_QC_REWARDS[battleIndex] || SEARCH_BATTLE_QC_REWARDS[0];
+    const summaryXp = Number(summary?.xp);
+    const battleXp = Number.isFinite(summaryXp) ? Math.max(0, Math.floor(summaryXp)) : (kills * 45 + 550 + battleIndex * 80);
+    const completedBattleLevel = Math.max(1, Math.floor(activeSearchBattle.battleLevel || defenseBattleLevel));
+    const battleQc = Math.max(0, Math.round(summary?.qc || estimateDirectBattleArenaQc(completedBattleLevel)));
     const targetColonyId = effectiveActiveColonyId || colonies[0]?.id || null;
     const targetColony = colonies.find(colony => colony.id === targetColonyId) || null;
     const availableSentimentSectors = SEARCH_BATTLE_SENTIMENT_SECTORS.filter(sector => (
@@ -3102,7 +3144,7 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
       playSfx?.('claim_card');
     }
 
-    setDefenseBattleLevel(prev => Math.max(1, Math.floor(prev)) + 1);
+    setDefenseBattleLevel(completedBattleLevel + 1);
     setSearchBattleCycle(prev => (
       completesCycle
         ? { nextBattleIndex: 0, cycle: prev.cycle + 1 }
@@ -3137,6 +3179,7 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
     recordNewEarthMissionProgress,
     setColonies,
     t,
+    defenseBattleLevel,
   ]);
 
   const resolveSearchBattleDefeat = useCallback(() => {
@@ -3190,16 +3233,31 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
       return;
     }
 
-    playRandomBobbyBluePrepareForBattleSfx();
     setLastSearchReport(null);
-    setActiveSearchBattle({
+    setDirectBattleBriefing({
       battleIndex,
       searchId: option.id,
       slotIndex,
       title: t(`Battle ${battleIndex + 1}`, `Batalha ${battleIndex + 1}`),
+      boost: 0,
     });
-    setCardFeedback(t(`Battle ${battleIndex + 1} started`, `Batalha ${battleIndex + 1} iniciada`));
+    setCardFeedback(null);
   }, [activeSearchBattle, allColoniesFullyBuilt, handleRunSearch, searchBattleCycle.nextBattleIndex, t]);
+
+  const startDirectBattleFromBriefing = useCallback(() => {
+    if (!directBattleBriefing) return;
+    playRandomBobbyBluePrepareForBattleSfx();
+    setLastSearchReport(null);
+    setActiveSearchBattle({
+      battleIndex: directBattleBriefing.battleIndex,
+      searchId: directBattleBriefing.searchId,
+      slotIndex: directBattleBriefing.slotIndex,
+      title: directBattleBriefing.title,
+      battleLevel: Math.max(1, Math.floor(defenseBattleLevel)) + directBattleBriefing.boost,
+    });
+    setDirectBattleBriefing(null);
+    setCardFeedback(t(`${directBattleBriefing.title} started`, `${directBattleBriefing.title} iniciada`));
+  }, [defenseBattleLevel, directBattleBriefing, playRandomBobbyBluePrepareForBattleSfx, t]);
 
   const upgradeSearch = useCallback((id: ColonyExpeditionId) => {
     const currentLevel = searchUpgradeLevels[id] || 0;
@@ -3392,6 +3450,127 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
       </AnimatePresence>
 
       <AnimatePresence>
+        {directBattleBriefing && (() => {
+          const baseBattleLevel = Math.max(1, Math.floor(defenseBattleLevel));
+          const effectiveBattleLevel = baseBattleLevel + directBattleBriefing.boost;
+          const difficultyScale = getDirectBattleRewardScale(effectiveBattleLevel);
+          const projectedReward = estimateDirectBattleArenaQc(effectiveBattleLevel);
+          const nextVictoryLevel = effectiveBattleLevel + 1;
+          const canBoost = directBattleBriefing.boost < DIRECT_BATTLE_MAX_MANUAL_DIFFICULTY_BOOST;
+
+          return (
+            <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/82 p-4 backdrop-blur-xl">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.94, y: 18 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.96, y: 10 }}
+                className="relative w-full max-w-2xl overflow-hidden rounded-3xl border border-cyan-300/28 bg-slate-950 shadow-[0_0_70px_rgba(34,211,238,0.18)]"
+              >
+                <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_12%,rgba(34,211,238,0.2),transparent_34%),radial-gradient(circle_at_82%_72%,rgba(244,114,182,0.14),transparent_38%)]" />
+                <div className="relative z-10 border-b border-white/10 bg-black/44 px-6 py-5">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <p className="font-mono text-[10px] font-black uppercase tracking-[0.36em] text-cyan-100/70">
+                        {t('Direct battle briefing', 'Briefing de batalha direta')}
+                      </p>
+                      <h3 className="mt-2 font-orbitron text-3xl font-black uppercase leading-none text-white">
+                        {directBattleBriefing.title}
+                      </h3>
+                    </div>
+                    <PremiumCanvasButton
+                      type="button"
+                      tone="steel"
+                      onClick={() => setDirectBattleBriefing(null)}
+                      className="h-10 w-10 rounded-full"
+                      contentClassName="text-slate-100"
+                    >
+                      <X size={18} />
+                    </PremiumCanvasButton>
+                  </div>
+                </div>
+
+                <div className="relative z-10 grid gap-3 p-6">
+                  <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+                    {[
+                      { label: t('Current phase', 'Fase atual'), value: baseBattleLevel },
+                      { label: t('Next phase', 'Próxima fase'), value: effectiveBattleLevel },
+                      { label: t('Enemies to win', 'Inimigos para vitória'), value: DIRECT_BATTLE_REQUIRED_ENEMIES },
+                      { label: t('Horizon level', 'Nível da Horizon'), value: `${horizonProgress.level}/${horizonMaxLevel}` },
+                    ].map(item => (
+                      <div key={item.label} className="rounded-2xl border border-white/10 bg-black/38 p-4">
+                        <p className="font-mono text-[9px] font-black uppercase tracking-[0.2em] text-slate-400">{item.label}</p>
+                        <p className="mt-2 font-orbitron text-2xl font-black uppercase text-white">{item.value}</p>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="rounded-2xl border border-emerald-300/16 bg-emerald-300/[0.06] p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <p className="font-mono text-[9px] font-black uppercase tracking-[0.28em] text-emerald-100/70">
+                          {t('Estimated arena reward', 'Recompensa estimada da arena')}
+                        </p>
+                        <p className="mt-2 font-orbitron text-3xl font-black uppercase text-emerald-100">
+                          {formatValue(projectedReward)} QC
+                        </p>
+                      </div>
+                      <div className="rounded-xl border border-cyan-200/20 bg-black/35 px-4 py-3 text-right">
+                        <p className="font-mono text-[9px] font-black uppercase tracking-[0.22em] text-cyan-100/70">
+                          {t('If victorious', 'Em caso de vitória')}
+                        </p>
+                        <p className="mt-1 font-orbitron text-xl font-black text-white">
+                          {t(`Phase ${nextVictoryLevel} unlocked`, `Fase ${nextVictoryLevel} liberada`)}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col gap-3 rounded-2xl border border-white/10 bg-black/32 p-4 md:flex-row md:items-center md:justify-between">
+                    <div>
+                      <p className="font-mono text-[9px] font-black uppercase tracking-[0.28em] text-amber-100/70">
+                        {t('Manual difficulty boost', 'Aumento manual de dificuldade')}
+                      </p>
+                      <p className="mt-1 text-sm font-semibold text-slate-200">
+                        {t(
+                          `Boost used ${directBattleBriefing.boost}/${DIRECT_BATTLE_MAX_MANUAL_DIFFICULTY_BOOST}. Enemy HP/damage x${difficultyScale.toFixed(1)}. Defeat returns to phase ${baseBattleLevel}.`,
+                          `Aumento usado ${directBattleBriefing.boost}/${DIRECT_BATTLE_MAX_MANUAL_DIFFICULTY_BOOST}. Vida/dano inimigos x${difficultyScale.toFixed(1)}. Derrota volta para a fase ${baseBattleLevel}.`
+                        )}
+                      </p>
+                    </div>
+                    <PremiumCanvasButton
+                      type="button"
+                      tone={canBoost ? 'green' : 'steel'}
+                      disabled={!canBoost}
+                      onClick={() => setDirectBattleBriefing(prev => (
+                        prev
+                          ? { ...prev, boost: Math.min(DIRECT_BATTLE_MAX_MANUAL_DIFFICULTY_BOOST, prev.boost + 1) }
+                          : prev
+                      ))}
+                      className="h-12 min-w-48 rounded-2xl"
+                      contentClassName="gap-2 px-4 text-[10px] font-black uppercase tracking-[0.2em]"
+                    >
+                      <Plus size={16} />
+                      {canBoost ? t('+1 Difficulty', '+1 Dificuldade') : 'MAX'}
+                    </PremiumCanvasButton>
+                  </div>
+
+                  <PremiumCanvasButton
+                    type="button"
+                    tone="cyan"
+                    onClick={startDirectBattleFromBriefing}
+                    className="h-14 rounded-2xl"
+                    contentClassName="text-sm font-black uppercase tracking-[0.26em]"
+                  >
+                    {t('Start Battle', 'Iniciar Batalha')}
+                  </PremiumCanvasButton>
+                </div>
+              </motion.div>
+            </div>
+          );
+        })()}
+      </AnimatePresence>
+
+      <AnimatePresence>
         {activeDefenseThreat && !activeSearchBattle && (
           <NewEarthDefenseBattle
             language={language}
@@ -3418,7 +3597,7 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
             shipStats={battleShipStats}
             horizonLevel={horizonProgress.level}
             horizonMaxLevel={horizonMaxLevel}
-            defenseBattleLevel={defenseBattleLevel}
+            defenseBattleLevel={activeSearchBattle.battleLevel}
             horizonXp={horizonProgress.currentXp}
             horizonNextXp={horizonProgress.nextXp}
             specials={selectedSpecialIds}
@@ -4219,9 +4398,7 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
           <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 lg:grid-cols-3">
             {searchOptions.map(option => {
               const directBattleMode = allColoniesFullyBuilt;
-              const battleRewardRange = option.id === 'land'
-                ? `${formatValue(SEARCH_BATTLE_QC_REWARDS[0])}-${formatValue(SEARCH_BATTLE_QC_REWARDS[2])}`
-                : `${formatValue(SEARCH_BATTLE_QC_REWARDS[3])}-${formatValue(SEARCH_BATTLE_QC_REWARDS[5])}`;
+              const battleRewardRange = `~${formatValue(estimateDirectBattleArenaQc(defenseBattleLevel))}`;
               const optionTitle = directBattleMode
                 ? option.id === 'land'
                   ? t('Land Battlefront', 'Frente de Batalha Terrestre')
@@ -4397,7 +4574,7 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
                       type="button"
                       onClick={() => handleSearchSlotAction(option, slot.slotIndex)}
                       disabled={allColoniesFullyBuilt
-                        ? Boolean(activeSearchBattle) || slot.battleIndex !== searchBattleCycle.nextBattleIndex
+                        ? Boolean(activeSearchBattle) || Boolean(directBattleBriefing) || slot.battleIndex !== searchBattleCycle.nextBattleIndex
                         : Boolean(slot.activeSearch)}
                       tone={option.id === 'sea' ? 'cyan' : 'green'}
                       className="h-12 rounded-2xl"

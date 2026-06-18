@@ -1,0 +1,828 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>QCH - Batalha de Helicopteros</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #020617;
+      color: #e5e7eb;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at 20% 18%, rgba(56, 189, 248, 0.18), transparent 30%),
+        radial-gradient(circle at 80% 80%, rgba(244, 63, 94, 0.16), transparent 34%),
+        #020617;
+    }
+
+    body {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 18px;
+    }
+
+    .shell {
+      width: min(1280px, 100%);
+      height: min(94vh, 780px);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      border-radius: 24px;
+      background: rgba(3, 7, 18, 0.94);
+      box-shadow: 0 0 80px rgba(0, 0, 0, 0.62);
+    }
+
+    header {
+      min-height: 68px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+      padding: 14px 18px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      background: rgba(0, 0, 0, 0.48);
+    }
+
+    .eyebrow {
+      margin: 0 0 4px;
+      color: rgba(207, 250, 254, 0.75);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 10px;
+      font-weight: 900;
+      letter-spacing: 0.34em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 0;
+      color: #fff;
+      font-size: clamp(18px, 2vw, 28px);
+      font-weight: 950;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .hud {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      gap: 8px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    .pill {
+      min-width: 94px;
+      padding: 9px 11px;
+      border: 1px solid rgba(255, 255, 255, 0.11);
+      border-radius: 12px;
+      background: rgba(0, 0, 0, 0.36);
+      text-align: center;
+    }
+
+    .arena-wrap {
+      position: relative;
+      min-height: 0;
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #000;
+    }
+
+    canvas {
+      display: block;
+      width: auto;
+      height: 100%;
+      max-width: 100%;
+      max-height: 100%;
+      cursor: crosshair;
+    }
+
+    .help {
+      pointer-events: none;
+      position: absolute;
+      left: 16px;
+      bottom: 16px;
+      max-width: min(460px, calc(100% - 32px));
+      padding: 12px 14px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 16px;
+      background: rgba(0, 0, 0, 0.56);
+      color: rgba(226, 232, 240, 0.88);
+      font-size: 12px;
+      font-weight: 700;
+      line-height: 1.45;
+    }
+
+    .help strong {
+      display: block;
+      margin-bottom: 4px;
+      color: rgba(207, 250, 254, 0.92);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 11px;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+    }
+
+    .overlay {
+      position: absolute;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      background: rgba(0, 0, 0, 0.72);
+    }
+
+    .overlay.show {
+      display: flex;
+    }
+
+    .modal {
+      width: min(560px, 100%);
+      padding: 28px;
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      border-radius: 20px;
+      background: rgba(3, 7, 18, 0.94);
+      text-align: center;
+      box-shadow: 0 0 50px rgba(255, 255, 255, 0.12);
+    }
+
+    .modal h2 {
+      margin: 0;
+      font-size: 44px;
+      font-weight: 950;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .modal p {
+      margin: 12px auto 0;
+      max-width: 420px;
+      color: rgba(203, 213, 225, 0.88);
+      font-size: 14px;
+      font-weight: 700;
+      line-height: 1.55;
+    }
+
+    button {
+      margin-top: 22px;
+      width: 100%;
+      height: 48px;
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      border-radius: 14px;
+      background: linear-gradient(180deg, #0891b2, #155e75);
+      color: #fff;
+      cursor: pointer;
+      font-weight: 950;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header>
+      <div>
+        <p class="eyebrow">QCH / Nova Terra / Protótipo isolado</p>
+        <h1>Batalha de Helicópteros</h1>
+      </div>
+      <div class="hud">
+        <div class="pill">HP <span id="playerHp">500</span></div>
+        <div class="pill">Alvos <span id="targetsLeft">10</span></div>
+        <div class="pill">Onda <span id="waveLabel">1/10</span></div>
+        <div class="pill">Tipo <span id="enemyKind">COMUM</span></div>
+      </div>
+    </header>
+
+    <section class="arena-wrap">
+      <canvas id="battle" width="960" height="540"></canvas>
+      <div class="help">
+        <strong>Controles</strong>
+        WASD ou setas para mover na metade inferior. Clique no helicóptero inimigo para disparar o tiro básico. Comum: 200 HP, Elite: 400 HP, Boss: 1000 HP.
+      </div>
+      <div class="overlay" id="overlay">
+        <div class="modal">
+          <h2 id="resultTitle">Vitória</h2>
+          <p id="resultText">Operação concluída.</p>
+          <button type="button" id="restart">Reiniciar</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const WIDTH = 960;
+    const HEIGHT = 540;
+    const PLAYER_HALF_MIN_Y = HEIGHT / 2 + 28;
+    const ENEMY_HALF_MAX_Y = HEIGHT / 2 - 28;
+    const HELICOPTER_PLAYER_HP = 500;
+    const HELICOPTER_PLAYER_DAMAGE = 100;
+    const HELICOPTER_TOTAL_WAVES = 10;
+
+    const HELICOPTER_ENEMY_STATS = {
+      common: { hp: 200, shotDamage: 100, cooldown: 1250, radius: 28, colorScale: 1, label: 'COMUM' },
+      elite: { hp: 400, shotDamage: 150, cooldown: 950, radius: 34, colorScale: 1.16, label: 'ELITE' },
+      boss: { hp: 1000, shotDamage: 200, cooldown: 720, radius: 46, colorScale: 1.36, label: 'BOSS' },
+    };
+
+    const SURFACE_SFX = {
+      playerShot: '/assets/rota4/battles/player/horizon/shoot_rt4.ogg',
+      enemyCommonShot: '/audio/sfx/shoot_enemy.ogg',
+      enemyEliteShot: '/audio/sfx/shoot_player.ogg',
+      enemyBossShot: '/assets/rota4/battles/player/horizon/apocalipse_laser_impact.ogg',
+      commonExplosionA: '/assets/rota4/SFX_new_land/enemy_explosion_cap_4.ogg',
+      commonExplosionB: '/assets/rota4/SFX_new_land/enemy_explosion_cap4_2.ogg',
+      eliteExplosion: '/assets/rota4/SFX_new_land/explosion_elite_cap4.ogg',
+    };
+
+    const AAA_PALETTES = {
+      common: ['#67e8f9', '#22d3ee', '#e0f2fe', '#60a5fa', '#bae6fd'],
+      elite: ['#facc15', '#f97316', '#fff7ed', '#fb7185', '#fde68a'],
+      boss: ['#c084fc', '#a855f7', '#f0abfc', '#ffffff', '#fb7185', '#e879f9'],
+      fire: ['#fb7185', '#fb923c', '#facc15', '#ffffff', '#fcd34d'],
+      spark: ['#ffffff', '#fef9c3', '#fde68a'],
+    };
+
+    const canvas = document.getElementById('battle');
+    const ctx = canvas.getContext('2d');
+    const hpEl = document.getElementById('playerHp');
+    const targetsEl = document.getElementById('targetsLeft');
+    const waveEl = document.getElementById('waveLabel');
+    const kindEl = document.getElementById('enemyKind');
+    const overlay = document.getElementById('overlay');
+    const resultTitle = document.getElementById('resultTitle');
+    const resultText = document.getElementById('resultText');
+    const restart = document.getElementById('restart');
+
+    const keys = {};
+    const mouse = { x: WIDTH / 2, y: HEIGHT / 2 };
+    let shotRequested = false;
+    let raf = 0;
+
+    const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+    const rand = (min, max) => min + Math.random() * (max - min);
+    const pick = items => items[Math.floor(Math.random() * items.length)];
+
+    const colorWithAlpha = (color, alpha) => {
+      if (color.startsWith('#')) {
+        const hex = color.slice(1);
+        const value = Number.parseInt(hex.length === 3 ? hex.split('').map(char => char + char).join('') : hex, 16);
+        const r = (value >> 16) & 255;
+        const g = (value >> 8) & 255;
+        const b = value & 255;
+        return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+      }
+      const match = color.match(/rgba?\(([^)]+)\)/);
+      if (!match) return color;
+      const [r, g, b] = match[1].split(',').map(part => part.trim());
+      return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+    };
+
+    const playSfx = (src, volume = 0.55) => {
+      const audio = new Audio(src);
+      audio.volume = volume;
+      audio.play().catch(() => undefined);
+    };
+
+    const waveKind = waveIndex => {
+      if (waveIndex >= 9) return 'boss';
+      if (waveIndex >= 8) return 'elite';
+      return 'common';
+    };
+
+    let player;
+    let enemies;
+    let shots;
+    let particles;
+    let shockwaves;
+    let glows;
+    let streaks;
+    let smokeRings;
+    let flashes;
+    let screenShake;
+    let nextId;
+    let helicopterWaveIndex;
+    let ended;
+    let pendingResult;
+    let pendingResultAt;
+    let last;
+
+    const reset = () => {
+      cancelAnimationFrame(raf);
+      player = { id: 0, x: WIDTH / 2, y: HEIGHT - 96, angle: -Math.PI / 2, hp: HELICOPTER_PLAYER_HP, maxHp: HELICOPTER_PLAYER_HP, cooldown: 0, radius: 22 };
+      helicopterWaveIndex = 0;
+      enemies = [createEnemy(0)];
+      shots = [];
+      particles = [];
+      shockwaves = [];
+      glows = [];
+      streaks = [];
+      smokeRings = [];
+      flashes = [];
+      screenShake = 0;
+      nextId = 1;
+      ended = false;
+      pendingResult = '';
+      pendingResultAt = 0;
+      last = performance.now();
+      overlay.classList.remove('show');
+      raf = requestAnimationFrame(loop);
+    };
+
+    const createEnemy = waveIndex => {
+      const kind = waveKind(waveIndex);
+      const stats = HELICOPTER_ENEMY_STATS[kind];
+      return { id: waveIndex + 1, kind, x: WIDTH / 2, y: kind === 'boss' ? 92 : 76, angle: Math.PI / 2, hp: stats.hp, maxHp: stats.hp, cooldown: 650, radius: stats.radius };
+    };
+
+    const addGlow = (x, y, maxRadius, color1, color2 = 'rgba(255,80,40,0)', life = 0.55) => glows.push({ x, y, radius: 0, maxRadius, life, maxLife: life, color1, color2 });
+    const addShockwave = (x, y, maxRadius, color, width = 4, decay = 0.05, radius = 3) => shockwaves.push({ x, y, radius, maxRadius, life: 1, decay, color, width });
+    const addFlash = (color, life = 0.16, intensity = 0.85) => flashes.push({ color, life, maxLife: life, intensity: clamp(intensity, 0, 1) });
+    const addStreak = (x, y, angle, speed, color, length = rand(18, 55), width = rand(1, 2.5)) => streaks.push({ x, y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, life: rand(0.1, 0.28), maxLife: 0.28, length, width, color, drag: 0.92 });
+    const addSmokeRing = (x, y, scale = 1) => {
+      const life = rand(1, 1.9);
+      smokeRings.push({ x, y, vx: rand(-0.8, 0.8) * scale, vy: rand(-1.8, -0.35) * scale, radius: rand(12, 34) * scale, life, maxLife: life, color: 'rgba(80,90,100,0.26)', grow: rand(7, 22) * scale });
+    };
+
+    const addBurst = (x, y, palette, count, power, scale = 1, coneAngle) => {
+      for (let i = 0; i < Math.round(count); i++) {
+        const spread = coneAngle === undefined ? Math.PI * 2 : 1.42;
+        const angle = coneAngle === undefined ? rand(0, Math.PI * 2) : coneAngle + rand(-spread, spread);
+        const speed = rand(power * 0.3, power) * scale;
+        particles.push({ x: x + rand(-8, 8) * scale, y: y + rand(-8, 8) * scale, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, life: rand(0.36, 1.1), maxLife: 1.1, size: rand(1.8, 7) * scale, drag: rand(0.928, 0.972), growth: rand(-0.01, 0.035), rotation: rand(0, Math.PI), spin: rand(-0.24, 0.24), color: pick(palette), type: 'spark' });
+      }
+    };
+
+    const addSmoke = (x, y, count, scale = 1) => {
+      for (let i = 0; i < count; i++) {
+        particles.push({ x: x + rand(-22, 22) * scale, y: y + rand(-18, 18) * scale, vx: rand(-2.5, 2.5) * scale, vy: rand(-3.2, 0.8) * scale, life: rand(0.8, 1.8), maxLife: 1.8, size: rand(12, 34) * scale, color: 'rgba(90,95,105,0.42)', drag: 0.975, growth: rand(0.12, 0.36), type: 'smoke' });
+        addSmokeRing(x + rand(-12, 12) * scale, y + rand(-8, 8) * scale, scale);
+      }
+    };
+
+    const addDebris = (x, y, scale = 1, palette = ['#94a3b8', '#cbd5e1', '#64748b', '#f97316']) => {
+      const life = rand(1.2, 2.8);
+      particles.push({ x, y, vx: rand(-13, 13) * scale, vy: rand(-17, -3) * scale, life, maxLife: life, size: rand(2, 7) * scale, color: pick(palette), drag: 0.985, rotation: rand(0, Math.PI * 2), spin: rand(-0.32, 0.32), type: 'debris' });
+    };
+
+    const addShot = (x, y, angle, from, damage, speed, visualType = 'common') => {
+      shots.push({ id: nextId++, x: x + Math.cos(angle) * 28, y: y + Math.sin(angle) * 28, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, from, visualType, damage, life: 1200 });
+    };
+
+    const spawnProjectileImpact = (x, y, color, scale = 1, incomingAngle = -Math.PI / 2) => {
+      addGlow(x, y, 76 * scale, colorWithAlpha(color, 0.72), 'rgba(255,90,40,0)', 0.32);
+      addShockwave(x, y, 42 * scale, colorWithAlpha(color, 0.72), 3.2 * scale, 0.07);
+      addBurst(x, y, [color, '#ffffff', '#facc15', '#fb923c'], 18 * scale, 7, scale, incomingAngle + Math.PI);
+      for (let i = 0; i < Math.round(9 * scale); i++) addStreak(x, y, incomingAngle + Math.PI + rand(-0.9, 0.9), rand(5, 15) * scale, pick(AAA_PALETTES.spark), rand(18, 52) * scale, rand(0.8, 2) * scale);
+      screenShake = Math.max(screenShake, 3.5 * scale);
+    };
+
+    const spawnEnemyExplosion = enemy => {
+      const explosionType = enemy.kind || 'common';
+      const scale = explosionType === 'boss' ? 2.15 : explosionType === 'elite' ? 1.45 : 1.05;
+      const palette = explosionType === 'boss' ? AAA_PALETTES.boss : explosionType === 'elite' ? AAA_PALETTES.elite : AAA_PALETTES.common;
+      const glow = explosionType === 'boss' ? 'rgba(200,120,255,0.88)' : explosionType === 'elite' ? 'rgba(255,200,60,0.82)' : 'rgba(80,220,255,0.76)';
+      screenShake = Math.max(screenShake, explosionType === 'boss' ? 18 : explosionType === 'elite' ? 11 : 6);
+      addFlash(explosionType === 'boss' ? 'rgba(220,180,255,0.28)' : explosionType === 'elite' ? 'rgba(255,220,80,0.22)' : 'rgba(120,220,255,0.14)', 0.16, 0.95);
+      addGlow(enemy.x, enemy.y, (explosionType === 'boss' ? 320 : explosionType === 'elite' ? 200 : 130) * scale, glow);
+      addShockwave(enemy.x, enemy.y, 55 * scale, 'rgba(255,255,255,0.95)', 3.8 * scale, 0.07);
+      addShockwave(enemy.x, enemy.y, 105 * scale, explosionType === 'boss' ? 'rgba(192,132,252,0.80)' : explosionType === 'elite' ? 'rgba(251,191,36,0.80)' : 'rgba(34,211,238,0.78)', 5.5 * scale, 0.044, 4);
+      addShockwave(enemy.x, enemy.y, 168 * scale, 'rgba(200,60,40,0.40)', 8.5 * scale, 0.03, 8);
+      addBurst(enemy.x, enemy.y, palette, explosionType === 'boss' ? 110 : explosionType === 'elite' ? 72 : 44, explosionType === 'boss' ? 15 : explosionType === 'elite' ? 11 : 8, scale);
+      for (let i = 0; i < (explosionType === 'boss' ? 32 : explosionType === 'elite' ? 20 : 12); i++) addStreak(enemy.x, enemy.y, (i / 32) * Math.PI * 2, rand(8, 22) * scale, pick(AAA_PALETTES.spark), rand(30, 80) * scale, rand(1, 3) * scale);
+      for (let i = 0; i < (explosionType === 'boss' ? 28 : explosionType === 'elite' ? 16 : 8); i++) addDebris(enemy.x + rand(-28, 28), enemy.y + rand(-22, 22), scale, explosionType === 'boss' ? ['#c084fc', '#64748b', '#94a3b8', '#f0abfc'] : explosionType === 'elite' ? ['#f97316', '#94a3b8', '#64748b', '#facc15'] : ['#67e8f9', '#94a3b8', '#64748b']);
+      addSmoke(enemy.x, enemy.y, explosionType === 'boss' ? 30 : explosionType === 'elite' ? 18 : 10, scale);
+      playSfx(explosionType === 'boss' ? SURFACE_SFX.eliteExplosion : explosionType === 'elite' ? SURFACE_SFX.eliteExplosion : pick([SURFACE_SFX.commonExplosionA, SURFACE_SFX.commonExplosionB]), explosionType === 'boss' ? 0.9 : 0.74);
+    };
+
+    const drawArena = now => {
+      ctx.fillStyle = '#122232';
+      ctx.fillRect(0, 0, WIDTH, HEIGHT);
+      ctx.strokeStyle = 'rgba(186, 230, 253, 0.16)';
+      ctx.lineWidth = 1;
+      for (let x = 0; x < WIDTH; x += 48) {
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, HEIGHT);
+        ctx.stroke();
+      }
+      for (let y = 0; y < HEIGHT; y += 48) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(WIDTH, y);
+        ctx.stroke();
+      }
+      ctx.fillStyle = 'rgba(0,0,0,0.24)';
+      ctx.fillRect(0, HEIGHT / 2 - 2, WIDTH, 4);
+      ctx.fillStyle = 'rgba(255,255,255,0.08)';
+      ctx.fillRect(0, HEIGHT / 2 - 1, WIDTH, 1);
+      ctx.font = '700 12px monospace';
+      ctx.fillStyle = 'rgba(255,255,255,0.42)';
+      ctx.fillText('ESPAÇO INIMIGO', 24, 30);
+      ctx.fillText('ESPAÇO DE ELYSIUM', 24, HEIGHT - 24);
+      ctx.strokeStyle = '#e0f2fe';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(mouse.x, mouse.y, 12 + Math.sin(now / 110) * 2, 0, Math.PI * 2);
+      ctx.stroke();
+    };
+
+    const drawHelicopter = (unit, color, dark, isPlayer, spin) => {
+      ctx.save();
+      ctx.translate(unit.x, unit.y);
+      ctx.rotate(unit.angle);
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.ellipse(0, 0, 24, 13, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = dark;
+      ctx.fillRect(-8, -7, 22, 14);
+      ctx.fillStyle = color;
+      ctx.fillRect(-35, -4, 19, 8);
+      ctx.fillStyle = isPlayer ? '#e0f2fe' : '#ffe4e6';
+      ctx.fillRect(15, -3, 20, 6);
+      ctx.rotate(spin);
+      ctx.strokeStyle = 'rgba(255,255,255,0.72)';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(-38, 0);
+      ctx.lineTo(38, 0);
+      ctx.moveTo(0, -38);
+      ctx.lineTo(0, 38);
+      ctx.stroke();
+      ctx.restore();
+    };
+
+    const drawShot = (shot, now) => {
+      if (shot.from === 'player' && shot.damage === 0) {
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.strokeStyle = '#e0f2fe';
+        ctx.lineWidth = 3;
+        ctx.globalAlpha = Math.max(0.18, shot.life / 120);
+        ctx.beginPath();
+        ctx.moveTo(player.x, player.y - 28);
+        ctx.lineTo(shot.x, shot.y);
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = '#e0f2fe';
+        ctx.beginPath();
+        ctx.arc(shot.x, shot.y, 12 * Math.max(0.25, shot.life / 120), 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+        return;
+      }
+
+      const angle = Math.atan2(shot.vy, shot.vx);
+      const isEnemy = shot.from === 'enemy';
+      const isBossShot = shot.visualType === 'boss';
+      const isEliteShot = shot.visualType === 'elite';
+      const coreColor = isBossShot ? '#e879f9' : isEliteShot ? '#fde68a' : isEnemy ? '#ef4444' : '#22d3ee';
+      const glowColor = isBossShot ? 'rgba(168,85,247,0.6)' : isEliteShot ? 'rgba(251,191,36,0.6)' : isEnemy ? 'rgba(239,68,68,0.52)' : 'rgba(34,211,238,0.48)';
+      const size = isBossShot ? 9 : isEliteShot ? 6.5 : isEnemy ? 5.4 : 4.8;
+      const pulse = 1 + Math.sin(now / 70 + shot.id) * 0.12;
+
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.translate(shot.x, shot.y);
+      ctx.rotate(angle);
+      const trail = ctx.createLinearGradient(-42, 0, 8, 0);
+      trail.addColorStop(0, 'rgba(0,0,0,0)');
+      trail.addColorStop(0.42, glowColor);
+      trail.addColorStop(1, colorWithAlpha(glowColor, 0.08));
+      ctx.fillStyle = trail;
+      ctx.beginPath();
+      ctx.ellipse(-22, 0, isBossShot ? 42 : 28, size * 1.7, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowColor = coreColor;
+      ctx.shadowBlur = isBossShot ? 24 : 16;
+      ctx.fillStyle = glowColor;
+      ctx.beginPath();
+      ctx.ellipse(0, 0, size * 2.1 * pulse, size * 1.08 * pulse, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowBlur = isBossShot ? 30 : 18;
+      ctx.fillStyle = coreColor;
+      ctx.beginPath();
+      if (isEnemy) ctx.ellipse(0, 0, size * 1.25, size * 0.72, 0, 0, Math.PI * 2);
+      else ctx.roundRect(-3, -3, 26, 6, 3);
+      ctx.fill();
+      ctx.strokeStyle = colorWithAlpha('#ffffff', isBossShot ? 0.55 : 0.35);
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.arc(0, 0, size * 2.8 * pulse, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    };
+
+    const updateEffects = dtScale => {
+      glows.forEach(glow => {
+        glow.radius = Math.min(glow.maxRadius, glow.radius + glow.maxRadius * 0.13);
+        glow.life -= 0.026 * dtScale;
+        const alpha = Math.max(0, glow.life / glow.maxLife);
+        const gradient = ctx.createRadialGradient(glow.x, glow.y, 0, glow.x, glow.y, glow.radius);
+        gradient.addColorStop(0, colorWithAlpha(glow.color1, 0.55 * alpha));
+        gradient.addColorStop(0.42, colorWithAlpha(glow.color1, 0.22 * alpha));
+        gradient.addColorStop(1, glow.color2);
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.fillStyle = gradient;
+        ctx.beginPath();
+        ctx.arc(glow.x, glow.y, glow.radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      });
+      for (let i = glows.length - 1; i >= 0; i--) if (glows[i].life <= 0) glows.splice(i, 1);
+
+      shockwaves.forEach(wave => {
+        const progress = 1 - wave.life;
+        const radius = wave.radius + (wave.maxRadius - wave.radius) * progress;
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.globalAlpha = Math.max(0, wave.life);
+        ctx.strokeStyle = wave.color;
+        ctx.shadowColor = wave.color;
+        ctx.shadowBlur = 18;
+        ctx.lineWidth = Math.max(1, wave.width * wave.life);
+        ctx.beginPath();
+        ctx.arc(wave.x, wave.y, radius, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+        wave.life -= wave.decay * dtScale;
+      });
+      for (let i = shockwaves.length - 1; i >= 0; i--) if (shockwaves[i].life <= 0) shockwaves.splice(i, 1);
+
+      particles.forEach(particle => {
+        particle.x += particle.vx * dtScale;
+        particle.y += particle.vy * dtScale;
+        particle.vx *= particle.drag || 0.95;
+        particle.vy = particle.vy * (particle.drag || 0.95) + (particle.type === 'debris' ? 0.035 : particle.type === 'smoke' ? -0.018 : 0);
+        particle.size = Math.max(0.1, particle.size + (particle.growth || 0));
+        particle.rotation = (particle.rotation || 0) + (particle.spin || 0);
+        particle.life -= (particle.type === 'smoke' ? 0.018 : 0.035) * dtScale;
+        const alpha = Math.max(0, particle.life / particle.maxLife);
+        ctx.save();
+        ctx.globalCompositeOperation = particle.type === 'smoke' || particle.type === 'debris' ? 'source-over' : 'lighter';
+        ctx.globalAlpha = particle.type === 'smoke' ? alpha * 0.18 : alpha;
+        ctx.shadowColor = particle.color;
+        ctx.fillStyle = particle.color;
+        if (particle.rotation && particle.type !== 'smoke') {
+          ctx.translate(particle.x, particle.y);
+          ctx.rotate(particle.rotation);
+          ctx.fillRect(-particle.size * 0.55, -particle.size * 0.22, particle.size * 1.1, particle.size * 0.44);
+        } else {
+          ctx.beginPath();
+          ctx.arc(particle.x, particle.y, particle.size, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.restore();
+      });
+      for (let i = particles.length - 1; i >= 0; i--) if (particles[i].life <= 0) particles.splice(i, 1);
+
+      smokeRings.forEach(ring => {
+        ring.x += ring.vx * dtScale;
+        ring.y += ring.vy * dtScale;
+        ring.radius += ring.grow * 0.06 * dtScale;
+        ring.life -= 0.022 * dtScale;
+        const alpha = Math.max(0, ring.life / ring.maxLife);
+        ctx.save();
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.globalAlpha = alpha * 0.42;
+        ctx.strokeStyle = colorWithAlpha(ring.color, 0.28 * alpha);
+        ctx.lineWidth = Math.max(1, 7 * alpha);
+        ctx.beginPath();
+        ctx.arc(ring.x, ring.y, ring.radius, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+      });
+      for (let i = smokeRings.length - 1; i >= 0; i--) if (smokeRings[i].life <= 0) smokeRings.splice(i, 1);
+
+      streaks.forEach(streak => {
+        streak.x += streak.vx * dtScale;
+        streak.y += streak.vy * dtScale;
+        streak.vx *= streak.drag;
+        streak.vy *= streak.drag;
+        streak.life -= 0.026 * dtScale;
+        const alpha = Math.max(0, streak.life / streak.maxLife);
+        const angle = Math.atan2(streak.vy, streak.vx);
+        const tailX = streak.x - Math.cos(angle) * streak.length;
+        const tailY = streak.y - Math.sin(angle) * streak.length;
+        const gradient = ctx.createLinearGradient(streak.x, streak.y, tailX, tailY);
+        gradient.addColorStop(0, colorWithAlpha(streak.color, alpha));
+        gradient.addColorStop(1, 'rgba(255,255,255,0)');
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.strokeStyle = gradient;
+        ctx.lineWidth = Math.max(0.5, streak.width * alpha);
+        ctx.beginPath();
+        ctx.moveTo(streak.x, streak.y);
+        ctx.lineTo(tailX, tailY);
+        ctx.stroke();
+        ctx.restore();
+      });
+      for (let i = streaks.length - 1; i >= 0; i--) if (streaks[i].life <= 0) streaks.splice(i, 1);
+    };
+
+    const showResult = result => {
+      resultTitle.textContent = result === 'victory' ? 'Vitória' : 'Derrota';
+      resultTitle.style.color = result === 'victory' ? '#6ee7b7' : '#fda4af';
+      resultText.textContent = result === 'victory' ? 'Operação concluída. Use este HTML para polir a batalha antes de atualizar o jogo oficial.' : 'A força aérea de Elysium recuou para reorganização.';
+      overlay.classList.add('show');
+    };
+
+    const loop = now => {
+      const dt = Math.min(32, now - last);
+      last = now;
+      const dtScale = dt / 16.67;
+      const moveSpeed = 3.2 * dtScale;
+      let mx = 0;
+      let my = 0;
+      if (keys.a || keys.arrowleft) mx -= 1;
+      if (keys.d || keys.arrowright) mx += 1;
+      if (keys.w || keys.arrowup) my -= 1;
+      if (keys.s || keys.arrowdown) my += 1;
+      const mag = Math.hypot(mx, my) || 1;
+      player.x += (mx / mag) * moveSpeed;
+      player.y += (my / mag) * moveSpeed;
+      player.x = clamp(player.x, 32, WIDTH - 32);
+      player.y = clamp(player.y, PLAYER_HALF_MIN_Y, HEIGHT - 32);
+      player.angle = -Math.PI / 2;
+      player.cooldown = Math.max(0, player.cooldown - dt);
+
+      if (shotRequested && player.cooldown <= 0) {
+        const enemy = enemies[0];
+        if (enemy && Math.hypot(enemy.x - mouse.x, enemy.y - mouse.y) <= enemy.radius + 18) {
+          enemy.hp -= HELICOPTER_PLAYER_DAMAGE;
+          playSfx(SURFACE_SFX.playerShot, 0.52);
+          spawnProjectileImpact(enemy.x, enemy.y, '#22d3ee', 1.08, -Math.PI / 2);
+          shots.push({ id: nextId++, x: enemy.x, y: enemy.y, vx: 0, vy: 0, from: 'player', visualType: 'common', damage: 0, life: 120 });
+          player.cooldown = 240;
+        }
+      }
+      shotRequested = false;
+
+      enemies.forEach(enemy => {
+        const stats = HELICOPTER_ENEMY_STATS[enemy.kind];
+        const desiredY = (enemy.kind === 'boss' ? 96 : enemy.kind === 'elite' ? 82 : 70) + Math.sin(now / 850 + enemy.id) * 18;
+        enemy.x += Math.sin(now / (enemy.kind === 'boss' ? 760 : 520) + enemy.id * 1.7) * stats.colorScale * 2.2 * dtScale;
+        enemy.y += (desiredY - enemy.y) * 0.026 * dtScale;
+        enemy.x = clamp(enemy.x, 34, WIDTH - 34);
+        enemy.y = clamp(enemy.y, 32, ENEMY_HALF_MAX_Y);
+        enemy.angle = Math.PI / 2;
+        enemy.cooldown -= dt;
+        if (enemy.cooldown <= 0) {
+          playSfx(enemy.kind === 'boss' ? SURFACE_SFX.enemyBossShot : enemy.kind === 'elite' ? SURFACE_SFX.enemyEliteShot : SURFACE_SFX.enemyCommonShot, enemy.kind === 'boss' ? 0.64 : 0.5);
+          addShot(enemy.x, enemy.y, Math.PI / 2, 'enemy', stats.shotDamage, enemy.kind === 'boss' ? 8.8 : 7.6, enemy.kind);
+          if (enemy.kind !== 'common') {
+            addShot(enemy.x - 20, enemy.y + 4, Math.PI / 2 + 0.16, 'enemy', stats.shotDamage, 7.2, enemy.kind);
+            addShot(enemy.x + 20, enemy.y + 4, Math.PI / 2 - 0.16, 'enemy', stats.shotDamage, 7.2, enemy.kind);
+          }
+          enemy.cooldown = stats.cooldown;
+        }
+      });
+
+      for (let i = shots.length - 1; i >= 0; i--) {
+        const shot = shots[i];
+        shot.x += shot.vx * dtScale;
+        shot.y += shot.vy * dtScale;
+        shot.life -= dt;
+        if (shot.life <= 0 || shot.x < -20 || shot.x > WIDTH + 20 || shot.y < -20 || shot.y > HEIGHT + 20) {
+          shots.splice(i, 1);
+          continue;
+        }
+        if (shot.damage <= 0) continue;
+        if (shot.from === 'enemy' && Math.hypot(player.x - shot.x, player.y - shot.y) < player.radius) {
+          player.hp -= shot.damage;
+          spawnProjectileImpact(shot.x, shot.y, shot.visualType === 'boss' ? '#e879f9' : shot.visualType === 'elite' ? '#fde68a' : '#ef4444', shot.visualType === 'boss' ? 1.55 : shot.visualType === 'elite' ? 1.25 : 1, Math.atan2(shot.vy, shot.vx));
+          shots.splice(i, 1);
+        }
+      }
+
+      for (let i = enemies.length - 1; i >= 0; i--) {
+        if (enemies[i].hp <= 0) {
+          const defeatedKind = enemies[i].kind;
+          spawnEnemyExplosion(enemies[i]);
+          enemies.splice(i, 1);
+          helicopterWaveIndex += 1;
+          shots.length = 0;
+          if (helicopterWaveIndex < HELICOPTER_TOTAL_WAVES) {
+            enemies.push(createEnemy(helicopterWaveIndex));
+          } else if (!ended && defeatedKind === 'boss') {
+            ended = true;
+            pendingResult = 'victory';
+            pendingResultAt = now + 1050;
+          }
+        }
+      }
+
+      ctx.save();
+      if (screenShake > 0.1) {
+        ctx.translate(rand(-screenShake, screenShake), rand(-screenShake, screenShake));
+        screenShake *= 0.88;
+      }
+      drawArena(now);
+      const spin = now / 58;
+      enemies.forEach(enemy => {
+        const scale = HELICOPTER_ENEMY_STATS[enemy.kind].colorScale;
+        ctx.save();
+        ctx.translate(enemy.x, enemy.y);
+        ctx.scale(scale, scale);
+        ctx.translate(-enemy.x, -enemy.y);
+        drawHelicopter(enemy, '#f43f5e', '#881337', false, spin);
+        ctx.restore();
+        ctx.fillStyle = 'rgba(0,0,0,0.58)';
+        ctx.fillRect(enemy.x - 32, enemy.y - 42, 64, 5);
+        ctx.fillStyle = '#f43f5e';
+        ctx.fillRect(enemy.x - 32, enemy.y - 42, 64 * Math.max(0, enemy.hp / enemy.maxHp), 5);
+        ctx.font = '700 10px monospace';
+        ctx.fillStyle = 'rgba(255,255,255,0.72)';
+        ctx.textAlign = 'center';
+        ctx.fillText(enemy.kind.toUpperCase(), enemy.x, enemy.y - 48);
+        ctx.textAlign = 'left';
+      });
+      drawHelicopter(player, '#38bdf8', '#075985', true, -spin);
+      shots.forEach(shot => drawShot(shot, now));
+      ctx.fillStyle = 'rgba(0,0,0,0.58)';
+      ctx.fillRect(player.x - 26, player.y + 34, 52, 5);
+      ctx.fillStyle = '#38bdf8';
+      ctx.fillRect(player.x - 26, player.y + 34, 52 * Math.max(0, player.hp / player.maxHp), 5);
+      updateEffects(dtScale);
+      ctx.restore();
+
+      flashes.forEach(flash => {
+        flash.life -= 0.035 * dtScale;
+        const alpha = Math.max(0, flash.life / flash.maxLife) * flash.intensity;
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.fillStyle = colorWithAlpha(flash.color, alpha);
+        ctx.fillRect(0, 0, WIDTH, HEIGHT);
+        ctx.restore();
+      });
+      for (let i = flashes.length - 1; i >= 0; i--) if (flashes[i].life <= 0) flashes.splice(i, 1);
+
+      hpEl.textContent = Math.max(0, Math.ceil(player.hp));
+      targetsEl.textContent = Math.max(0, HELICOPTER_TOTAL_WAVES - helicopterWaveIndex);
+      waveEl.textContent = `${Math.min(HELICOPTER_TOTAL_WAVES, helicopterWaveIndex + 1)}/10`;
+      kindEl.textContent = enemies[0] ? HELICOPTER_ENEMY_STATS[enemies[0].kind].label : '-';
+
+      if (!ended && player.hp <= 0) {
+        ended = true;
+        spawnEnemyExplosion({ ...player, kind: 'boss', radius: 42, hp: 0, maxHp: HELICOPTER_PLAYER_HP });
+        pendingResult = 'defeat';
+        pendingResultAt = now + 900;
+      }
+      if (pendingResult && now >= pendingResultAt) {
+        showResult(pendingResult);
+        return;
+      }
+
+      raf = requestAnimationFrame(loop);
+    };
+
+    const updateMouse = event => {
+      const rect = canvas.getBoundingClientRect();
+      mouse.x = ((event.clientX - rect.left) / rect.width) * WIDTH;
+      mouse.y = ((event.clientY - rect.top) / rect.height) * HEIGHT;
+    };
+
+    const movementKeys = new Set(['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright']);
+    window.addEventListener('keydown', event => {
+      const key = event.key.toLowerCase();
+      if (movementKeys.has(key)) event.preventDefault();
+      keys[key] = true;
+    });
+    window.addEventListener('keyup', event => {
+      const key = event.key.toLowerCase();
+      if (movementKeys.has(key)) event.preventDefault();
+      keys[key] = false;
+    });
+    canvas.addEventListener('mousemove', updateMouse);
+    canvas.addEventListener('mousedown', event => {
+      event.preventDefault();
+      updateMouse(event);
+      shotRequested = true;
+    });
+    restart.addEventListener('click', reset);
+
+    reset();
+  </script>
+</body>
+</html>
