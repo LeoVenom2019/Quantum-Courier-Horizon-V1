@@ -294,11 +294,44 @@ const route4NewEarthSurfaceBattleBackgroundImages = [
   ...Array.from({ length: 4 }, (_, index) => (
     `/assets/rota4/new_land_assets/glacial_zone_new_land_system/glacial_zone_background_${index + 1}.webp`
   )),
+  ...Array.from({ length: 5 }, (_, index) => (
+    `/assets/rota4/new_land_assets/european_ruins_new_land_system/european_background_${index + 1}.webp`
+  )),
+];
+
+const route4NewEarthTankSpriteImages = [
+  '/assets/rota4/colonys/genesis/aether_tank/1tank_player_body.webp',
+  '/assets/rota4/colonys/genesis/aether_tank/1tank_player_turret.webp',
+  '/assets/rota4/colonys/enemy_tank/tank_enemy_comum_body.webp',
+  '/assets/rota4/colonys/enemy_tank/tank_enemy_comum_turret.webp',
+  '/assets/rota4/colonys/enemy_tank/tank_enemy_elite_body.webp',
+  '/assets/rota4/colonys/enemy_tank/tank_enemy_elite_turret.webp',
+  '/assets/rota4/colonys/enemy_tank/tank_enemy_boss_body.webp',
+  '/assets/rota4/colonys/enemy_tank/tank_enemy_boss_turret.webp',
+];
+
+const route4NewEarthAetherHelicopterImages = [
+  '/assets/rota4/colonys/elysium/aether/aether_helicopter_body.webp',
+  '/assets/rota4/colonys/elysium/aether/helice.webp',
+  '/assets/rota4/colonys/elysium/aether/drone_player.webp',
+  '/assets/rota4/colonys/elysium/aether/drone_helice.webp',
+];
+
+const route4NewEarthEnemyChopterImages = [
+  '/assets/rota4/colonys/enemy_chopter/enemy_common_helice.webp',
+  '/assets/rota4/colonys/enemy_chopter/enemy_common_black_body.webp',
+  '/assets/rota4/colonys/enemy_chopter/enemy_common_red_body.webp',
+  '/assets/rota4/colonys/enemy_chopter/enemy_common_purple_body.webp',
+  '/assets/rota4/colonys/enemy_chopter/enemy_elite_body.webp',
+  '/assets/rota4/colonys/enemy_chopter/enemy_boss_body.webp',
 ];
 
 const route4BattleImages = [
   ...route4BattleBackgroundImages,
   ...route4NewEarthSurfaceBattleBackgroundImages,
+  ...route4NewEarthTankSpriteImages,
+  ...route4NewEarthAetherHelicopterImages,
+  ...route4NewEarthEnemyChopterImages,
   `${route4BattleBase}/player/horizon/horizon.webp`,
   `${route4BattleBase}/player/horizon/horizon_12pos_spritesheet.webp`,
   `${route4BattleBase}/enemys/air_ships/enemy_rt4.webp`,
@@ -352,6 +385,16 @@ const route4BattleAudio = [
   '/assets/rota4/SFX_new_land/enemy_explosion_cap_4.ogg',
   '/assets/rota4/SFX_new_land/enemy_explosion_cap4_2.ogg',
   '/assets/rota4/SFX_new_land/explosion_elite_cap4.ogg',
+  '/assets/rota4/SFX_new_land/helicopters/enemy_comum_sound.ogg',
+  '/assets/rota4/SFX_new_land/helicopters/enemy_elite_sound.ogg',
+  '/assets/rota4/SFX_new_land/helicopters/enemy_boss_sound.ogg',
+  '/assets/rota4/SFX_new_land/helicopters/helicopter_aether_sound.ogg',
+  '/assets/rota4/SFX_new_land/helicopters/get_drone_sound.ogg',
+  '/assets/rota4/SFX_new_land/helicopters/drone_explosion.ogg',
+  '/assets/rota4/SFX_new_land/helicopters/enemy_comum_before_exploding.ogg',
+  '/assets/rota4/SFX_new_land/helicopters/enemy_elite_before_exploding.ogg',
+  '/assets/rota4/SFX_new_land/helicopters/enemy_boss_before_exploding.ogg',
+  '/assets/rota4/SFX_new_land/helicopters/aether_player_before_exploding.ogg',
   `${route4BattleBase}/player/horizon/shoot_rt4.ogg`,
   `${route4BattleBase}/player/horizon/eletric_shoot.ogg`,
   `${route4BattleBase}/player/horizon/fire_shoot.ogg`,

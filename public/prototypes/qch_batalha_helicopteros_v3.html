@@ -13,10 +13,10 @@
     }
     * { box-sizing: border-box; }
     html, body { height: 100%; margin: 0; overflow: hidden; background: #020617; }
-    body { display: flex; align-items: center; justify-content: center; padding: 18px; }
+    body { display: flex; align-items: stretch; justify-content: stretch; padding: 0; }
     .shell {
-      width: min(1280px, 100%);
-      height: min(94vh, 780px);
+      width: 100%;
+      height: 100vh;
       display: flex; flex-direction: column; overflow: hidden;
       border: 1px solid rgba(255,255,255,0.14);
       border-radius: 24px;
@@ -116,7 +116,7 @@
     </header>
 
     <section class="arena-wrap">
-      <canvas id="battle" width="960" height="540"></canvas>
+      <canvas id="battle" width="1280" height="720"></canvas>
       <div class="overlay" id="overlay">
         <div class="modal">
           <h2 id="resultTitle">Vitória</h2>
@@ -137,8 +137,7 @@
   </main>
 
   <script>
-    const WIDTH = 960, HEIGHT = 540;
-    const PLAYER_HALF_MIN_Y = HEIGHT / 2 + 18;
+    const WIDTH = 1280, HEIGHT = 720;
     const ENEMY_HALF_MAX_Y = HEIGHT / 2 - 22;
     const PLAYER_MAX_HP = 500;
     const TOTAL_WAVES = 10;
@@ -178,6 +177,16 @@
       explosionA:   '/assets/rota4/SFX_new_land/enemy_explosion_cap_4.ogg',
       explosionB:   '/assets/rota4/SFX_new_land/enemy_explosion_cap4_2.ogg',
       explosionElite:'/assets/rota4/SFX_new_land/explosion_elite_cap4.ogg',
+      enemyCommonLoop: '/assets/rota4/SFX_new_land/helicopters/enemy_comum_sound.ogg',
+      enemyEliteLoop: '/assets/rota4/SFX_new_land/helicopters/enemy_elite_sound.ogg',
+      enemyBossLoop: '/assets/rota4/SFX_new_land/helicopters/enemy_boss_sound.ogg',
+      aetherLoop: '/assets/rota4/SFX_new_land/helicopters/helicopter_aether_sound.ogg',
+      getDrone: '/assets/rota4/SFX_new_land/helicopters/get_drone_sound.ogg',
+      droneExplosion: '/assets/rota4/SFX_new_land/helicopters/drone_explosion.ogg',
+      enemyCommonFalling: '/assets/rota4/SFX_new_land/helicopters/enemy_comum_before_exploding.ogg',
+      enemyEliteFalling: '/assets/rota4/SFX_new_land/helicopters/enemy_elite_before_exploding.ogg',
+      enemyBossFalling: '/assets/rota4/SFX_new_land/helicopters/enemy_boss_before_exploding.ogg',
+      aetherFalling: '/assets/rota4/SFX_new_land/helicopters/aether_player_before_exploding.ogg',
     };
 
     // ─── canvas & DOM ─────────────────────────────────────────────────────────
@@ -210,6 +219,46 @@
     const mouse = { x: WIDTH / 2, y: HEIGHT / 2, down: false };
     const bg = new Image(); let hasBg = false;
     if (BACKGROUND_WEBP_SRC) { bg.onload = () => { hasBg = true; }; bg.src = BACKGROUND_WEBP_SRC; }
+    const aetherBody = new Image(); let hasAetherBody = false;
+    aetherBody.onload = () => { hasAetherBody = true; };
+    aetherBody.src = '/assets/rota4/colonys/elysium/aether/aether_helicopter_body.webp';
+    const aetherRotor = new Image(); let hasAetherRotor = false;
+    aetherRotor.onload = () => { hasAetherRotor = true; };
+    aetherRotor.src = '/assets/rota4/colonys/elysium/aether/helice.webp';
+    const droneBody = new Image(); let hasDroneBody = false;
+    droneBody.onload = () => { hasDroneBody = true; };
+    droneBody.src = '/assets/rota4/colonys/elysium/aether/drone_player.webp';
+    const droneRotor = new Image(); let hasDroneRotor = false;
+    droneRotor.onload = () => { hasDroneRotor = true; };
+    droneRotor.src = '/assets/rota4/colonys/elysium/aether/drone_helice.webp';
+    const enemyCommonBodies = [
+      '/assets/rota4/colonys/enemy_chopter/enemy_common_black_body.webp',
+      '/assets/rota4/colonys/enemy_chopter/enemy_common_red_body.webp',
+      '/assets/rota4/colonys/enemy_chopter/enemy_common_purple_body.webp',
+    ].map(src => {
+      const image = new Image();
+      image.loaded = false;
+      image.onload = () => { image.loaded = true; };
+      image.src = src;
+      return image;
+    });
+    const enemyCommonRotor = new Image(); let hasEnemyCommonRotor = false;
+    enemyCommonRotor.onload = () => { hasEnemyCommonRotor = true; };
+    enemyCommonRotor.src = '/assets/rota4/colonys/enemy_chopter/enemy_common_helice.webp';
+    const enemyEliteBody = new Image(); let hasEnemyEliteBody = false;
+    enemyEliteBody.onload = () => {
+      hasEnemyEliteBody = true;
+      enemyEliteBody.loaded = true;
+    };
+    enemyEliteBody.loaded = false;
+    enemyEliteBody.src = '/assets/rota4/colonys/enemy_chopter/enemy_elite_body.webp';
+    const enemyBossBody = new Image(); let hasEnemyBossBody = false;
+    enemyBossBody.onload = () => {
+      hasEnemyBossBody = true;
+      enemyBossBody.loaded = true;
+    };
+    enemyBossBody.loaded = false;
+    enemyBossBody.src = '/assets/rota4/colonys/enemy_chopter/enemy_boss_body.webp';
 
     // ─── utils ────────────────────────────────────────────────────────────────
     const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
@@ -219,11 +268,43 @@
     const angleTo = (a, b) => Math.atan2(b.y - a.y, b.x - a.x);
     const lerp = (a, b, t) => a + (b - a) * t;
     const playSfx = (src, vol = 0.45) => { try { const a = new Audio(src); a.volume = vol; a.play().catch(()=>{}); } catch(_){} };
+    const createLoop = (src, vol = 0.32) => {
+      try {
+        const audio = new Audio(src);
+        audio.loop = true;
+        audio.volume = 0;
+        audio.dataset.targetVolume = String(vol);
+        return audio;
+      } catch (_) {
+        return null;
+      }
+    };
+    const soundLoops = {
+      aether: createLoop(SFX.aetherLoop, 0.28),
+      common: createLoop(SFX.enemyCommonLoop, 0.18),
+      elite: createLoop(SFX.enemyEliteLoop, 0.2),
+      boss: createLoop(SFX.enemyBossLoop, 0.26),
+    };
+    const setLoop = (audio, active) => {
+      if (!audio) return;
+      const target = Number(audio.dataset.targetVolume || 0.25);
+      audio.volume = lerp(audio.volume || 0, active ? target : 0, 0.08);
+      if (active && audio.paused) audio.play().catch(()=>{});
+      if (!active && audio.volume < 0.01 && !audio.paused) audio.pause();
+    };
+    const stopAllLoops = () => Object.values(soundLoops).forEach(audio => {
+      if (!audio) return;
+      audio.pause();
+      audio.currentTime = 0;
+      audio.volume = 0;
+    });
 
     // ─── state ────────────────────────────────────────────────────────────────
     let raf, last, player, enemies, bullets, missiles, enemyShots;
     let particles, texts, clouds, drones, explosions, radio, powerups, mines;
+    let crashers, playerCrash;
     let waveIndex, nextId, ended, pendingResult, pendingResultAt;
+    let maxDroneCount, bossDropPending;
     let shake, flash, lock, camera, bgScroll;
     let score, combo, comboTimer, bestCombo, totalKills;
     let shockwaves; // AAA shockwave rings
@@ -274,15 +355,17 @@
       waveIndex = 0; nextId = 1;
       enemies = []; bullets = []; missiles = []; enemyShots = [];
       particles = []; texts = []; explosions = [];
+      crashers = []; playerCrash = null;
       drones = Array.from({ length: HELI_UPGRADES.initialDrones }, (_, index) => ({
         side: (index - (HELI_UPGRADES.initialDrones - 1) / 2) * 0.86,
         hp: PLAYER_MAX_HP / 2,
         maxHp: PLAYER_MAX_HP / 2,
         cd: index * 90,
       }));
+      maxDroneCount = drones.length;
       radio = []; powerups = []; mines = []; shockwaves = [];
       clouds = createClouds();
-      ended = false; pendingResult = ''; pendingResultAt = 0;
+      ended = false; pendingResult = ''; pendingResultAt = 0; bossDropPending = false;
       shake = 0; flash = 0;
       lock = { targetId: null, amount: 0, locked: false, beep: 0 };
       camera = { x: 0, y: 0 };
@@ -321,6 +404,7 @@
           { side: -1, hp: PLAYER_MAX_HP / 2, maxHp: PLAYER_MAX_HP / 2, cd: 0 },
           { side: 1, hp: PLAYER_MAX_HP / 2, maxHp: PLAYER_MAX_HP / 2, cd: 160 }
         );
+        maxDroneCount = Math.max(maxDroneCount, drones.length);
         pushRadio('Drone Alpha', 'Dois drones aliados entrando em formação.');
       }
       if (kind === 'boss') pushRadio('Comando', 'ALERTA: fortaleza aérea entrando no setor!');
@@ -344,6 +428,7 @@
         phase: rand(0, Math.PI * 2),
         alive: true,
         hitFlash: 0,
+        spriteVariant: kind === 'common' ? Math.floor(Math.random() * enemyCommonBodies.length) : 0,
         behaviorPhase: Math.floor(rand(0, 3)),
       };
     }
@@ -471,14 +556,22 @@
     function tryDropPowerup(x, y, kind) {
       const roll = Math.random();
       let type;
-      if (kind === 'boss') type = 'missile';
+      if (kind === 'boss') type = 'bossDrop';
       else if (kind === 'elite' || kind === 'ace') {
-        type = roll < 0.35 ? 'hp' : roll < 0.6 ? 'missile' : roll < 0.8 ? 'shield' : 'rapid';
+        type = roll < 0.35 ? 'hp' : roll < 0.6 ? 'missile' : roll < 0.8 ? 'shield' : 'drone';
       } else {
         if (roll > 0.72) type = roll > 0.9 ? 'missile' : 'hp';
         else return;
       }
-      powerups.push({ x, y: y + rand(-10,10), vy: 1.2, type, life: 7000, id: nextId++, bob: rand(0, Math.PI*2) });
+      powerups.push({
+        x,
+        y: y + rand(-10,10),
+        vy: type === 'bossDrop' ? 0 : 1.2,
+        type,
+        life: type === 'bossDrop' ? Infinity : 7000,
+        id: nextId++,
+        bob: rand(0, Math.PI*2),
+      });
     }
 
     // ─── lock ─────────────────────────────────────────────────────────────────
@@ -507,6 +600,18 @@
     // ─── UPDATE ───────────────────────────────────────────────────────────────
     function update(dt, dtScale, now) {
       if (ended) return;
+      updateEngineLoops();
+
+      if (playerCrash) {
+        updateCrashes(dt, dtScale, now);
+        updateParticles(dt, dtScale);
+        updateShockwaves(dt, dtScale);
+        explosions.forEach(e => { e.r = lerp(e.r, e.maxR, 0.16); e.life -= dt; });
+        explosions = explosions.filter(e => e.life > 0);
+        shake *= 0.88;
+        flash = Math.max(0, flash - 0.025 * dtScale);
+        return;
+      }
 
       // Player movement
       const boost = (keys.shift && player.turbo > 0) ? 1.52 : 1;
@@ -522,7 +627,7 @@
       player.vx *= 0.88; player.vy *= 0.88;
       player.x += player.vx * dtScale; player.y += player.vy * dtScale;
       player.x = clamp(player.x, 34, WIDTH - 34);
-      player.y = clamp(player.y, PLAYER_HALF_MIN_Y, HEIGHT - 34);
+      player.y = clamp(player.y, 34, HEIGHT - 34);
       player.bank = lerp(player.bank, clamp(player.vx*5,-18,18), 0.12);
       player.angle = -Math.PI/2 + player.bank * 0.012;
 
@@ -565,9 +670,10 @@
       updateEnemyShots(dt, dtScale);
       updateParticles(dt, dtScale);
       updateShockwaves(dt, dtScale);
+      updateCrashes(dt, dtScale, now);
 
       // wave advance
-      if (enemies.length === 0) {
+      if (enemies.length === 0 && crashers.length === 0 && !bossDropPending) {
         waveIndex++;
         bullets.length = 0; enemyShots.length = 0;
         missiles = missiles.filter(m => m.from === 'player');
@@ -584,16 +690,23 @@
       }
 
       if (player.hp <= 0) {
-        ended = true;
-        bigExplosion(player.x, player.y, 2.2, '#38bdf8');
-        pendingResult = 'defeat';
-        pendingResultAt = now + 1100;
+        startPlayerCrash(now);
       }
 
       radio.forEach(r => r.life -= dt);
       radio = radio.filter(r => r.life > 0);
       shake *= 0.88;
       flash = Math.max(0, flash - 0.025 * dtScale);
+    }
+
+    function updateEngineLoops() {
+      const hasCommon = enemies.some(e => e.kind === 'common');
+      const hasElite = enemies.some(e => e.kind === 'elite' || e.kind === 'ace');
+      const hasBoss = enemies.some(e => e.kind === 'boss');
+      setLoop(soundLoops.aether, !playerCrash && !ended);
+      setLoop(soundLoops.common, hasCommon && !ended);
+      setLoop(soundLoops.elite, hasElite && !ended);
+      setLoop(soundLoops.boss, hasBoss && !ended);
     }
 
     function updateEnemies(dt, dtScale, now) {
@@ -664,10 +777,11 @@
     }
 
     function updateDrones(dt, dtScale, now) {
-      drones = drones.filter(d => d.hp > 0);
+      removeDestroyedDrones();
+      normalizeDroneFormation();
       drones.forEach(d => {
-        d.x = player.x + d.side * 58;
-        d.y = player.y + 26 + Math.sin(now/240 + d.side) * 8;
+        d.x = player.x + d.side * 118;
+        d.y = player.y + 58 + Math.sin(now/240 + d.side) * 10;
         d.cd -= dt;
         if (d.cd <= 0 && enemies.length) {
           const a = -Math.PI / 2;
@@ -677,14 +791,36 @@
       });
     }
 
+    function removeDestroyedDrones() {
+      for (let i = drones.length - 1; i >= 0; i--) {
+        const d = drones[i];
+        if (d.hp > 0) continue;
+        playSfx(SFX.droneExplosion, 0.62);
+        burst(d.x, d.y, '#a7f3d0', 14, 5, true);
+        shake = Math.max(shake, 2.5);
+        drones.splice(i, 1);
+      }
+    }
+
+    function normalizeDroneFormation() {
+      const count = drones.length;
+      drones.forEach((drone, index) => {
+        drone.side = count <= 1 ? 0 : (index - (count - 1) / 2) * 1.26;
+      });
+    }
+
     function updatePowerups(dt, dtScale, now) {
       for (let i = powerups.length - 1; i >= 0; i--) {
         const p = powerups[i];
-        p.y += p.vy * dtScale;
-        p.life -= dt;
+        if (p.type === 'bossDrop') {
+          p.x = clamp(p.x + Math.sin(now / 760 + p.id) * 0.18 * dtScale, 42, WIDTH - 42);
+        } else {
+          p.y += p.vy * dtScale;
+          p.life -= dt;
+        }
         p.bob += 0.04 * dtScale;
         if (p.y > HEIGHT - 20 || p.life <= 0) { powerups.splice(i, 1); continue; }
-        if (dist(p, player) < 28) {
+        if (dist(p, player) < (p.type === 'bossDrop' ? 42 : 28)) {
           applyPowerup(p.type);
           powerups.splice(i, 1);
         }
@@ -702,10 +838,32 @@
       } else if (type === 'shield') {
         player.shield = player.shieldMax;
         addText(player.x, player.y - 50, 'ESCUDO!', '#a78bfa', 900);
-      } else if (type === 'rapid') {
-        player.gunCd = 0;
-        addText(player.x, player.y - 50, 'RAPIDEZ!', '#facc15', 900);
+      } else if (type === 'drone') {
+        reviveDrone();
+      } else if (type === 'bossDrop') {
+        bossDropPending = false;
+        ended = true;
+        pendingResult = 'victory';
+        pendingResultAt = performance.now() + 350;
+        flash = Math.max(flash, 0.16);
+        addText(player.x, player.y - 54, 'ARTEFATO COLETADO', '#f0abfc', 1100);
       }
+    }
+
+    function reviveDrone() {
+      playSfx(SFX.getDrone, 0.68);
+      if (drones.length >= maxDroneCount) {
+        addText(player.x, player.y - 50, 'DRONES OK', '#a7f3d0', 900);
+        return;
+      }
+      drones.push({
+        side: 0,
+        hp: PLAYER_MAX_HP / 2,
+        maxHp: PLAYER_MAX_HP / 2,
+        cd: 90,
+      });
+      normalizeDroneFormation();
+      addText(player.x, player.y - 50, 'DRONE REVIVIDO', '#a7f3d0', 900);
     }
 
     function updateMines(dt, dtScale) {
@@ -844,10 +1002,6 @@
       texts = texts.filter(t => t.life > 0);
       explosions.forEach(e => { e.r = lerp(e.r, e.maxR, 0.16); e.life -= dt; });
       explosions = explosions.filter(e => e.life > 0);
-      clouds.forEach(c => {
-        c.x -= c.speed * dtScale;
-        if (c.x < -c.w - 40) { c.x = WIDTH + rand(20,140); c.y = rand(0, HEIGHT * 0.52); }
-      });
     }
 
     function updateShockwaves(dt, dtScale) {
@@ -855,14 +1009,90 @@
       shockwaves = shockwaves.filter(s => s.life > 0);
     }
 
+    function fallingSoundFor(kind, isPlayer = false) {
+      if (isPlayer) return SFX.aetherFalling;
+      if (kind === 'boss') return SFX.enemyBossFalling;
+      if (kind === 'elite' || kind === 'ace') return SFX.enemyEliteFalling;
+      return SFX.enemyCommonFalling;
+    }
+
+    function startCrash(unit, isPlayer = false, now = performance.now()) {
+      const kind = isPlayer ? 'player' : unit.kind;
+      crashers.push({
+        id: nextId++,
+        isPlayer,
+        kind,
+        x: unit.x,
+        y: unit.y,
+        startX: unit.x,
+        startY: unit.y,
+        angle: unit.angle || (isPlayer ? -Math.PI / 2 : Math.PI / 2),
+        scale: unit.scale || 1,
+        spriteVariant: unit.spriteVariant || 0,
+        life: 0,
+        duration: 3000,
+        finalX: unit.x + (isPlayer ? rand(-28, 28) : rand(-40, 40)),
+        finalY: clamp(unit.y + (isPlayer ? -72 : 92), 42, HEIGHT - 42),
+      });
+      playSfx(fallingSoundFor(kind, isPlayer), isPlayer ? 0.78 : kind === 'boss' ? 0.82 : 0.7);
+    }
+
+    function startPlayerCrash(now) {
+      if (playerCrash) return;
+      playerCrash = true;
+      player.hp = 0;
+      player.shield = 0;
+      stopAllLoops();
+      bullets.length = 0;
+      missiles.length = 0;
+      enemyShots.length = 0;
+      startCrash(player, true, now);
+    }
+
+    function updateCrashes(dt, dtScale, now) {
+      for (let i = crashers.length - 1; i >= 0; i--) {
+        const c = crashers[i];
+        c.life += dt;
+        const p = clamp(c.life / c.duration, 0, 1);
+        c.x = lerp(c.startX, c.finalX, p);
+        c.y = lerp(c.startY, c.finalY, p);
+        if (c.kind !== 'boss') c.angle += 0.045 * dtScale * (c.isPlayer ? -1 : 1);
+        if (Math.random() < 0.55) {
+          addParticle(c.x + rand(-18, 18), c.y + rand(-16, 18), rand(-0.8, 0.8), rand(0.2, 1.4), rand(8, 18), 'rgba(45,48,54,0.42)', rand(900, 1700), 'smoke');
+        }
+        if (Math.random() < 0.24) {
+          addParticle(c.x + rand(-14, 14), c.y + rand(-12, 16), rand(-0.5, 0.5), rand(-0.6, 0.4), rand(3, 8), pick(['#fb923c', '#facc15', '#ef4444']), rand(360, 720), 'spark');
+        }
+        if (p >= 1) finalizeCrash(i);
+      }
+    }
+
+    function finalizeCrash(index) {
+      const c = crashers[index];
+      crashers.splice(index, 1);
+      if (c.isPlayer) {
+        bigExplosion(c.x, c.y, 2.2, '#38bdf8');
+        pendingResult = 'defeat';
+        pendingResultAt = performance.now() + 900;
+        ended = true;
+        return;
+      }
+
+      const scale = c.kind === 'boss' ? 2.4 : c.kind === 'ace' ? 1.55 : c.kind === 'elite' ? 1.35 : 1;
+      bigExplosion(c.x, c.y, scale, c.kind === 'boss' ? '#c084fc' : (c.kind === 'elite' || c.kind === 'ace') ? '#facc15' : '#22d3ee');
+      playSfx(c.kind === 'common' ? pick([SFX.explosionA, SFX.explosionB]) : SFX.explosionElite, c.kind === 'boss' ? 0.82 : 0.62);
+      tryDropPowerup(c.x, c.y, c.kind);
+      if (c.kind === 'boss') {
+        bossDropPending = true;
+        pushRadio('Comando', 'Boss abatido. Colete o núcleo antes de encerrar a operação.');
+      }
+    }
+
     // ─── KILL ENEMY ───────────────────────────────────────────────────────────
     function killEnemy(index) {
       const e = enemies[index];
-      const scale = e.kind === 'boss' ? 2.4 : e.kind === 'ace' ? 1.55 : e.kind === 'elite' ? 1.35 : 1;
-      bigExplosion(e.x, e.y, scale, e.kind === 'boss' ? '#c084fc' : e.kind === 'elite' ? '#facc15' : '#22d3ee');
       addText(e.x, e.y, e.kind === 'boss' ? '🔥 BOSS DOWN' : '+ HIT', '#fff7ad', 1100);
-      playSfx(e.kind === 'common' ? pick([SFX.explosionA, SFX.explosionB]) : SFX.explosionElite, 0.62);
-      tryDropPowerup(e.x, e.y, e.kind);
+      startCrash(e, false);
 
       // score & combo
       combo = Math.min(combo + 1, 16);
@@ -885,19 +1115,18 @@
       ctx.translate(sx + camera.x, sy + camera.y);
 
       drawBackground(now);
-      drawClouds(0);
-      drawTerrain();
-      drawBoundary();
       drawMines(now);
       drawDrones();
       enemies.forEach(e => drawHelicopter(e, false, now));
-      drawPlayerDamageTrail();
-      drawHelicopter(player, true, now);
+      drawCrashes(now);
+      if (!playerCrash) {
+        drawPlayerDamageTrail();
+        drawHelicopter(player, true, now);
+      }
       drawPowerups(now);
       drawProjectiles(now);
       drawParticles();
       drawShockwaves();
-      drawClouds(2);
       drawExplosions();
       ctx.restore();
 
@@ -911,6 +1140,31 @@
       }
     }
 
+    function drawCrashes(now) {
+      crashers.forEach(c => {
+        const p = clamp(c.life / c.duration, 0, 1);
+        const shrink = c.kind === 'boss' ? lerp(1, 0.72, p) : lerp(1, 0.48, p);
+        const flicker = 0.88 + Math.sin(now / 90 + c.id) * 0.12;
+        const unit = {
+          id: c.id,
+          kind: c.isPlayer ? 'common' : c.kind,
+          x: c.x,
+          y: c.y,
+          angle: c.angle,
+          scale: c.scale * shrink,
+          spriteVariant: c.spriteVariant,
+          hp: 1,
+          maxHp: 0,
+          radius: 1,
+          hitFlash: 0,
+        };
+        ctx.save();
+        ctx.globalAlpha = lerp(1, 0.72, p) * flicker;
+        drawHelicopter(unit, c.isPlayer, now);
+        ctx.restore();
+      });
+    }
+
     function drawBackground(now) {
       if (hasBg) {
         const imgRatio = bg.width / bg.height, cr = WIDTH / HEIGHT;
@@ -919,30 +1173,8 @@
         ctx.drawImage(bg, (WIDTH-dw)/2, (HEIGHT-dh)/2, dw, dh);
         return;
       }
-      // Sky gradient
-      const g = ctx.createLinearGradient(0, 0, 0, HEIGHT);
-      g.addColorStop(0, '#04091e');
-      g.addColorStop(0.4, '#0c1a3a');
-      g.addColorStop(0.65, '#112240');
-      g.addColorStop(1, '#0f172a');
-      ctx.fillStyle = g;
+      ctx.fillStyle = '#020617';
       ctx.fillRect(-30, -30, WIDTH + 60, HEIGHT + 60);
-
-      // Stars
-      ctx.fillStyle = 'rgba(255,255,255,0.55)';
-      // static stars - use bgScroll as seed offset
-      for (let i = 0; i < 60; i++) {
-        const sx2 = ((i * 137.5 + 42) % (WIDTH + 60)) - 30;
-        const sy2 = ((i * 73.1 + 17) % (HEIGHT * 0.52));
-        const br = 0.3 + (i % 5) * 0.15;
-        ctx.globalAlpha = br;
-        ctx.fillRect(sx2, sy2, 1.2, 1.2);
-      }
-      ctx.globalAlpha = 1;
-
-      // Scroll lines
-      ctx.fillStyle = 'rgba(255,255,255,0.03)';
-      for (let y2 = (bgScroll % 48) - 48; y2 < HEIGHT + 48; y2 += 48) ctx.fillRect(-30, y2, WIDTH + 60, 1);
     }
 
     function drawTerrain() {
@@ -1010,6 +1242,10 @@
 
     function drawDrones() {
       drones.forEach(d => {
+        if (hasDroneBody) {
+          drawAetherDrone(d, performance.now());
+          return;
+        }
         ctx.save();
         ctx.translate(d.x, d.y);
         ctx.fillStyle = '#a7f3d0';
@@ -1028,6 +1264,47 @@
       });
     }
 
+    function drawAetherDrone(d, now) {
+      const bodyRenderW = 48;
+      const bodyRenderH = droneBody.naturalWidth && droneBody.naturalHeight
+        ? bodyRenderW * (droneBody.naturalHeight / droneBody.naturalWidth)
+        : 43;
+      const rotorRenderW = 14;
+      const rotorRenderH = droneRotor.naturalWidth && droneRotor.naturalHeight
+        ? rotorRenderW * (droneRotor.naturalHeight / droneRotor.naturalWidth)
+        : rotorRenderW;
+      const rotorPoints = [
+        { x: 0.10, y: 0.115, spin: 1 },
+        { x: 0.902, y: 0.115, spin: -1 },
+        { x: 0.092, y: 0.878, spin: -1 },
+        { x: 0.902, y: 0.873, spin: 1 },
+      ];
+
+      ctx.save();
+      ctx.translate(d.x, d.y);
+
+      ctx.drawImage(droneBody, -bodyRenderW / 2, -bodyRenderH / 2, bodyRenderW, bodyRenderH);
+
+      if (hasDroneRotor) {
+        rotorPoints.forEach(point => {
+          const rx = (point.x - 0.5) * bodyRenderW;
+          const ry = (point.y - 0.5) * bodyRenderH;
+          ctx.save();
+          ctx.translate(rx, ry);
+          ctx.rotate((now / 20) * point.spin);
+          ctx.globalAlpha = 0.98;
+          ctx.drawImage(droneRotor, -rotorRenderW / 2, -rotorRenderH / 2, rotorRenderW, rotorRenderH);
+          ctx.restore();
+        });
+      }
+
+      ctx.fillStyle = 'rgba(0,0,0,0.58)';
+      ctx.fillRect(-16, bodyRenderH / 2 + 4, 32, 3);
+      ctx.fillStyle = '#4ade80';
+      ctx.fillRect(-16, bodyRenderH / 2 + 4, 32 * clamp(d.hp / 90, 0, 1), 3);
+      ctx.restore();
+    }
+
     function drawPlayerDamageTrail() {
       const hpPct = player.hp / player.maxHp;
       if (hpPct > 0.65) return;
@@ -1040,6 +1317,28 @@
 
     // ─── HELICOPTER DRAW (detailed) ────────────────────────────────────────────
     function drawHelicopter(u, isPlayer, now) {
+      if (isPlayer && (hasAetherBody || hasAetherRotor)) {
+        drawAetherHelicopter(u, now);
+        return;
+      }
+      if (!isPlayer && u.kind === 'common') {
+        const body = enemyCommonBodies[u.spriteVariant % enemyCommonBodies.length] || enemyCommonBodies[0];
+        drawEnemySpriteHelicopter(u, now, body, 126, 130, 0.44);
+        return;
+      }
+      if (!isPlayer && u.kind === 'elite') {
+        drawEnemySpriteHelicopter(u, now, hasEnemyEliteBody ? enemyEliteBody : enemyCommonBodies[0], 154, 158, 0.43);
+        return;
+      }
+      if (!isPlayer && u.kind === 'ace') {
+        drawEnemySpriteHelicopter(u, now, hasEnemyEliteBody ? enemyEliteBody : enemyCommonBodies[2], 166, 170, 0.43);
+        return;
+      }
+      if (!isPlayer && u.kind === 'boss') {
+        drawEnemyBossHelicopter(u, now);
+        return;
+      }
+
       const hpPct = u.hp !== undefined && u.maxHp ? clamp(u.hp/u.maxHp,0,1) : 1;
       const color = isPlayer ? '#38bdf8' : (u.kind==='boss'?'#c084fc':u.kind==='elite'?'#f59e0b':u.kind==='ace'?'#fb7185':'#f43f5e');
       const dark = isPlayer ? '#075985' : (u.kind==='boss'?'#581c87':'#881337');
@@ -1050,15 +1349,6 @@
       ctx.translate(u.x, u.y);
       ctx.scale(scale, scale);
       ctx.rotate(u.angle);
-
-      // Hit flash overlay
-      if (u.hitFlash > 0) {
-        ctx.globalAlpha = clamp(u.hitFlash / 80, 0, 0.65);
-        // draw flash as white rect behind
-        ctx.fillStyle = '#fff';
-        ctx.fillRect(-50, -20, 100, 40);
-        ctx.globalAlpha = 1;
-      }
 
       // ─ Tail boom
       ctx.fillStyle = dark;
@@ -1171,6 +1461,178 @@
       drawHealthBar(u, isPlayer);
     }
 
+    function drawAetherHelicopter(u, now) {
+      const hpPct = u.hp !== undefined && u.maxHp ? clamp(u.hp/u.maxHp,0,1) : 1;
+      const bodyRenderH = 196;
+      const bodyRenderW = bodyRenderH * (796 / 1488);
+      const bodyHubX = 0.5;
+      const bodyHubY = 616 / 1488;
+      const rotorRenderW = 224;
+      const rotorRenderH = aetherRotor.naturalWidth && aetherRotor.naturalHeight
+        ? rotorRenderW * (aetherRotor.naturalHeight / aetherRotor.naturalWidth)
+        : rotorRenderW;
+      const rotation = u.angle + Math.PI / 2;
+
+      ctx.save();
+      ctx.translate(u.x, u.y);
+      ctx.rotate(rotation);
+
+      if (hasAetherBody) {
+        ctx.drawImage(
+          aetherBody,
+          -bodyRenderW * bodyHubX,
+          -bodyRenderH * bodyHubY,
+          bodyRenderW,
+          bodyRenderH
+        );
+      }
+
+      if (hpPct < 0.55) {
+        ctx.fillStyle = 'rgba(0,0,0,0.5)';
+        ctx.beginPath(); ctx.arc(-6, 9, 5, 0, Math.PI*2); ctx.fill();
+      }
+      if (hpPct < 0.28) {
+        ctx.fillStyle = '#fb923c';
+        ctx.beginPath(); ctx.moveTo(-20,12); ctx.lineTo(-11,25); ctx.lineTo(-4,10); ctx.fill();
+      }
+
+      if (hasAetherRotor) {
+        ctx.save();
+        ctx.rotate(now / 26);
+        ctx.globalAlpha = 0.98;
+        ctx.drawImage(aetherRotor, -rotorRenderW / 2, -rotorRenderH / 2, rotorRenderW, rotorRenderH);
+        ctx.restore();
+      }
+
+      ctx.restore();
+
+      if (player.shield > 0) {
+        const alpha = clamp(player.shield / player.shieldMax, 0, 1);
+        ctx.save();
+        ctx.globalAlpha = alpha * 0.35;
+        ctx.beginPath();
+        ctx.arc(player.x, player.y, 46, 0, Math.PI*2);
+        ctx.fillStyle = '#a78bfa';
+        ctx.fill();
+        ctx.globalAlpha = alpha * 0.7;
+        ctx.strokeStyle = '#c4b5fd';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      drawHealthBar(u, true);
+    }
+
+    function drawEnemySpriteHelicopter(u, now, body, bodyRenderH, rotorRenderW, bodyHubY) {
+      const hpPct = u.hp !== undefined && u.maxHp ? clamp(u.hp/u.maxHp,0,1) : 1;
+      const bodyRenderW = body.loaded && body.naturalHeight
+        ? bodyRenderH * (body.naturalWidth / body.naturalHeight)
+        : 60;
+      const bodyHubX = 0.5;
+      const rotorRenderH = enemyCommonRotor.naturalHeight && enemyCommonRotor.naturalWidth
+        ? rotorRenderW * (enemyCommonRotor.naturalHeight / enemyCommonRotor.naturalWidth)
+        : 130;
+      const rotation = u.angle - Math.PI / 2;
+
+      ctx.save();
+      ctx.translate(u.x, u.y);
+      ctx.scale(u.scale || 1, u.scale || 1);
+      ctx.rotate(rotation);
+
+      if (body.loaded) {
+        ctx.drawImage(
+          body,
+          -bodyRenderW * bodyHubX,
+          -bodyRenderH * bodyHubY,
+          bodyRenderW,
+          bodyRenderH
+        );
+      }
+
+      if (hpPct < 0.55) {
+        ctx.fillStyle = 'rgba(0,0,0,0.54)';
+        ctx.beginPath(); ctx.arc(-7, 9, 5, 0, Math.PI*2); ctx.fill();
+      }
+      if (hpPct < 0.28) {
+        ctx.fillStyle = '#fb923c';
+        ctx.beginPath(); ctx.moveTo(13, 18); ctx.lineTo(22, 33); ctx.lineTo(29, 15); ctx.fill();
+      }
+
+      if (hasEnemyCommonRotor) {
+        ctx.save();
+        ctx.rotate(now / 23);
+        ctx.globalAlpha = 0.98;
+        ctx.drawImage(enemyCommonRotor, -rotorRenderW / 2, -rotorRenderH / 2, rotorRenderW, rotorRenderH);
+        ctx.restore();
+      }
+
+      ctx.restore();
+      drawHealthBar(u, false);
+    }
+
+    function drawEnemyBossHelicopter(u, now) {
+      const hpPct = u.hp !== undefined && u.maxHp ? clamp(u.hp/u.maxHp,0,1) : 1;
+      const body = hasEnemyBossBody ? enemyBossBody : enemyCommonBodies[2];
+      const bodyRenderH = 248;
+      const bodyRenderW = body.loaded && body.naturalHeight
+        ? bodyRenderH * (body.naturalWidth / body.naturalHeight)
+        : 174;
+      const bodyHubX = 0.5;
+      const bodyHubY = 0.34;
+      const rotorRenderW = 78;
+      const rotorRenderH = enemyCommonRotor.naturalHeight && enemyCommonRotor.naturalWidth
+        ? rotorRenderW * (enemyCommonRotor.naturalHeight / enemyCommonRotor.naturalWidth)
+        : 78;
+      const rotation = u.angle - Math.PI / 2;
+      const rotorPoints = [
+        { x: 0.118, y: 0.088, spin: 1 },
+        { x: 0.882, y: 0.088, spin: -1 },
+        { x: 0.118, y: 0.765, spin: -1 },
+        { x: 0.882, y: 0.765, spin: 1 },
+      ];
+
+      ctx.save();
+      ctx.translate(u.x, u.y);
+      ctx.scale(u.scale || 1, u.scale || 1);
+      ctx.rotate(rotation);
+
+      if (body.loaded) {
+        ctx.drawImage(
+          body,
+          -bodyRenderW * bodyHubX,
+          -bodyRenderH * bodyHubY,
+          bodyRenderW,
+          bodyRenderH
+        );
+      }
+
+      if (hpPct < 0.55) {
+        ctx.fillStyle = 'rgba(0,0,0,0.54)';
+        ctx.beginPath(); ctx.arc(-11, 18, 8, 0, Math.PI*2); ctx.fill();
+      }
+      if (hpPct < 0.28) {
+        ctx.fillStyle = '#fb923c';
+        ctx.beginPath(); ctx.moveTo(22, 34); ctx.lineTo(34, 55); ctx.lineTo(44, 29); ctx.fill();
+      }
+
+      if (hasEnemyCommonRotor) {
+        rotorPoints.forEach(point => {
+          const rx = (point.x - bodyHubX) * bodyRenderW;
+          const ry = (point.y - bodyHubY) * bodyRenderH;
+          ctx.save();
+          ctx.translate(rx, ry);
+          ctx.rotate((now / 22) * point.spin);
+          ctx.globalAlpha = 0.96;
+          ctx.drawImage(enemyCommonRotor, -rotorRenderW / 2, -rotorRenderH / 2, rotorRenderW, rotorRenderH);
+          ctx.restore();
+        });
+      }
+
+      ctx.restore();
+      drawHealthBar(u, false);
+    }
+
     function drawHealthBar(u, isPlayer) {
       if (!u.maxHp) return;
       const w = isPlayer ? 58 : (u.kind === 'boss' ? 150 : 74);
@@ -1193,24 +1655,41 @@
     }
 
     function drawPowerups(now) {
-      const icons = { hp: '❤', missile: '🚀', shield: '🛡', rapid: '⚡' };
-      const colors = { hp: '#4ade80', missile: '#60a5fa', shield: '#a78bfa', rapid: '#facc15' };
+      const icons = { hp: '❤', missile: '🚀', shield: '🛡', drone: '◆', bossDrop: '✦' };
+      const colors = { hp: '#4ade80', missile: '#60a5fa', shield: '#a78bfa', drone: '#a7f3d0', bossDrop: '#f0abfc' };
       powerups.forEach(p => {
         const bob = Math.sin(p.bob) * 5;
+        const radius = p.type === 'bossDrop' ? 26 : 16;
+        const glowRadius = p.type === 'bossDrop' ? 38 : 22;
         ctx.save();
         ctx.translate(p.x, p.y + bob);
         // glow
-        const g = ctx.createRadialGradient(0, 0, 0, 0, 0, 22);
+        const g = ctx.createRadialGradient(0, 0, 0, 0, 0, glowRadius);
         g.addColorStop(0, colors[p.type] + '44');
         g.addColorStop(1, 'transparent');
         ctx.fillStyle = g;
-        ctx.beginPath(); ctx.arc(0, 0, 22, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(0, 0, glowRadius, 0, Math.PI*2); ctx.fill();
         // ring
         ctx.strokeStyle = colors[p.type];
-        ctx.lineWidth = 2;
-        ctx.beginPath(); ctx.arc(0, 0, 16, 0, Math.PI*2); ctx.stroke();
+        ctx.lineWidth = p.type === 'bossDrop' ? 3 : 2;
+        ctx.beginPath(); ctx.arc(0, 0, radius, 0, Math.PI*2); ctx.stroke();
+        if (p.type === 'bossDrop') {
+          ctx.rotate(now / 420);
+          ctx.strokeStyle = 'rgba(255,255,255,0.72)';
+          ctx.beginPath();
+          ctx.moveTo(0, -34);
+          ctx.lineTo(0, -24);
+          ctx.moveTo(0, 24);
+          ctx.lineTo(0, 34);
+          ctx.moveTo(-34, 0);
+          ctx.lineTo(-24, 0);
+          ctx.moveTo(24, 0);
+          ctx.lineTo(34, 0);
+          ctx.stroke();
+          ctx.rotate(-now / 420);
+        }
         // icon
-        ctx.font = '18px serif';
+        ctx.font = p.type === 'bossDrop' ? '24px serif' : '18px serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText(icons[p.type], 0, 1);
@@ -1416,6 +1895,7 @@
     // ─── RESULT ───────────────────────────────────────────────────────────────
     function showResult(result) {
       lastResult = result;
+      stopAllLoops();
       resultTitle.textContent = result === 'victory' ? 'Vitória!' : 'Derrota';
       resultTitle.style.color = result === 'victory' ? '#6ee7b7' : '#fda4af';
       resultText.textContent = result === 'victory'

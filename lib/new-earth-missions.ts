@@ -9,6 +9,7 @@ export type NewEarthMissionEvent =
   | { type: 'defense-bosses'; amount?: number }
   | { type: 'construction-complete'; colonyId: string; constructionType: NewEarthConstructionType; completedCount?: number }
   | { type: 'card-upgrade'; cardId: string; level: number }
+  | { type: 'surface-victory'; siteId?: string; colonyId?: string; battleKind?: 'tank' | 'helicopter' }
   | { type: 'submarine-victory'; siteId?: string; colonyId?: string }
   | { type: 'submarine-treasure'; amount?: number };
 
@@ -76,6 +77,7 @@ export type NewEarthMissionGenerationContext = {
   canRunSeaSearch?: boolean;
   canDefendSearches?: boolean;
   directBattlesUnlocked?: boolean;
+  canUseSurfaceBattles?: boolean;
   canUseSubmarines?: boolean;
   colonies?: NewEarthMissionColonyContext[];
   upgradeableCards?: Array<{
@@ -421,6 +423,60 @@ const NEW_EARTH_MISSION_CATALOG: NewEarthMission[] = [
     },
   }),
   makeMission({
+    id: 'surface-win-european-ruins',
+    title: { en: 'European Breakthrough', pt: 'Ruptura Europeia' },
+    description: {
+      en: 'Win one ground battle in the European Ruins.',
+      pt: 'Vença uma batalha terrestre nas Ruínas Européias.',
+    },
+    objectiveLabel: { en: 'Ground victory', pt: 'Vitória terrestre' },
+    eventType: 'surface-victory',
+    target: 1,
+    progress: 0,
+    completed: false,
+    claimed: false,
+    reward: {
+      qc: scaleNewEarthMissionQcReward(42000),
+      supplies: { defense: 16, materials: 22, tech: 10 },
+    },
+  }),
+  makeMission({
+    id: 'surface-win-elysium-airspace',
+    title: { en: 'Elysium Airspace', pt: 'Espaço Aéreo de Elysium' },
+    description: {
+      en: 'Win two helicopter battles in New Earth surface zones.',
+      pt: 'Vença duas batalhas de helicóptero nas zonas de superfície da Nova Terra.',
+    },
+    objectiveLabel: { en: 'Air victories', pt: 'Vitórias aéreas' },
+    eventType: 'surface-victory',
+    target: 2,
+    progress: 0,
+    completed: false,
+    claimed: false,
+    reward: {
+      qc: scaleNewEarthMissionQcReward(46000),
+      supplies: { defense: 18, tech: 16, meds: 8 },
+    },
+  }),
+  makeMission({
+    id: 'surface-all-fronts',
+    title: { en: 'All Surface Fronts', pt: 'Todas as Frentes de Superfície' },
+    description: {
+      en: 'Win three New Earth surface battles.',
+      pt: 'Vença três batalhas de superfície da Nova Terra.',
+    },
+    objectiveLabel: { en: 'Surface victories', pt: 'Vitórias de superfície' },
+    eventType: 'surface-victory',
+    target: 3,
+    progress: 0,
+    completed: false,
+    claimed: false,
+    reward: {
+      qc: scaleNewEarthMissionQcReward(62000),
+      missingCard: true,
+    },
+  }),
+  makeMission({
     id: 'submarine-win-abyssal',
     title: { en: 'Abyssal Contact', pt: 'Contato Abissal' },
     description: {
@@ -576,6 +632,7 @@ const isMissionEligible = (mission: NewEarthMission, context: NewEarthMissionGen
       && Math.max(1, Math.floor(Number(card.level) || 1)) < targetLevel
     ));
   }
+  if (mission.eventType === 'surface-victory') return Boolean(context.canUseSurfaceBattles);
   if (mission.eventType === 'submarine-victory' || mission.eventType === 'submarine-treasure') return Boolean(context.canUseSubmarines);
   return true;
 };
@@ -792,6 +849,11 @@ export const recordNewEarthMissionEvent = (
 
     if (event.type === 'arcade-action') {
       if (mission.gameId !== event.gameId || mission.arcadeActionId !== event.actionId) return mission;
+    }
+
+    if (event.type === 'surface-victory') {
+      if (mission.id === 'surface-win-european-ruins' && event.siteId !== 'ruinas-europeias') return mission;
+      if (mission.id === 'surface-win-elysium-airspace' && event.battleKind !== 'helicopter') return mission;
     }
 
     const increment = event.type === 'submarine-treasure' || event.type === 'defense-kills' || event.type === 'defense-bosses' || event.type === 'arcade-action'

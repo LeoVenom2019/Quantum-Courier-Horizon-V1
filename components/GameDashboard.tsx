@@ -156,15 +156,21 @@ import {
 } from '@/lib/new-earth-submarines';
 import {
   NEW_EARTH_HELICOPTERS_STORAGE_KEY,
+  NEW_EARTH_SURFACE_BATTLES_STORAGE_KEY,
   MAX_NEW_EARTH_HELICOPTER_UPGRADE_LEVEL,
   NEW_EARTH_HELICOPTER_UPGRADES,
   createDefaultNewEarthHelicopterState,
+  createDefaultNewEarthSurfaceBattleProgress,
   getNewEarthHelicopterStats,
   getNewEarthHelicopterUpgradeCost,
+  getNewEarthSurfaceBattleReward,
   normalizeNewEarthHelicopterState,
+  normalizeNewEarthSurfaceBattleProgress,
+  recordNewEarthSurfaceBattleVictory,
   type NewEarthHelicopterColonyId,
   type NewEarthHelicopterState,
   type NewEarthHelicopterUpgradeId,
+  type NewEarthSurfaceBattleProgress,
 } from '@/lib/new-earth-helicopters';
 import {
   NEW_EARTH_MUSEUM_STORAGE_KEY,
@@ -322,6 +328,10 @@ const NEW_EARTH_GLACIAL_ZONE_BACKGROUNDS = Array.from({ length: 4 }, (_, index) 
   `/assets/rota4/new_land_assets/glacial_zone_new_land_system/glacial_zone_background_${index + 1}.webp`
 ));
 
+const NEW_EARTH_EUROPEAN_RUINS_BACKGROUNDS = Array.from({ length: 5 }, (_, index) => (
+  `/assets/rota4/new_land_assets/european_ruins_new_land_system/european_background_${index + 1}.webp`
+));
+
 const pickNewEarthBackground = (backgrounds: readonly string[]) => (
   backgrounds[Math.floor(Math.random() * backgrounds.length)] || backgrounds[0] || ''
 );
@@ -344,7 +354,7 @@ const NEW_EARTH_SURFACE_SITE_BRIEFINGS: Record<NewEarthSurfaceBattleSiteId, {
       pt: 'Controle o tanque, avance pelo cenário e elimine os blindados hostis antes que a linha de suprimentos seja cortada.',
       en: 'Control the tank, move through the field, and eliminate hostile armor before the supply line is cut.',
     },
-    backgrounds: ['/assets/rota4/new_land_assets/forgotten_continent_new_land_system/genesis_background_3.webp'],
+    backgrounds: NEW_EARTH_EUROPEAN_RUINS_BACKGROUNDS,
   },
   'zona-glacial': {
     title: { pt: 'Zona Glacial', en: 'Glacial Zone' },
@@ -1060,6 +1070,7 @@ const DashboardContent = memo(({
   const [newEarthMapFeedback, setNewEarthMapFeedback] = useState<string | null>(null);
   const [newEarthSubmarines, setNewEarthSubmarines] = useState<NewEarthSubmarineState>(() => createDefaultNewEarthSubmarineState());
   const [newEarthHelicopters, setNewEarthHelicopters] = useState<NewEarthHelicopterState>(() => createDefaultNewEarthHelicopterState());
+  const [newEarthSurfaceBattles, setNewEarthSurfaceBattles] = useState<NewEarthSurfaceBattleProgress>(() => createDefaultNewEarthSurfaceBattleProgress());
   const [newEarthMuseumOpen, setNewEarthMuseumOpen] = useState(false);
   const [newEarthMuseumCategory, setNewEarthMuseumCategory] = useState<NewEarthTreasureCategory>('rare_fish');
   const [newEarthMuseumPage, setNewEarthMuseumPage] = useState(0);
@@ -1127,6 +1138,27 @@ const DashboardContent = memo(({
       })
       .catch(error => {
         console.warn('Unable to load New Earth helicopter save data', error);
+      });
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+    GameStorage.load(NEW_EARTH_SURFACE_BATTLES_STORAGE_KEY)
+      .then(saved => {
+        if (!mounted) return;
+        const normalized = normalizeNewEarthSurfaceBattleProgress(saved);
+        setNewEarthSurfaceBattles(normalized);
+        if (!saved || typeof saved !== 'object') {
+          GameStorage.save(normalized, NEW_EARTH_SURFACE_BATTLES_STORAGE_KEY).catch(error => {
+            console.warn('Unable to initialize New Earth surface battle save data', error);
+          });
+        }
+      })
+      .catch(error => {
+        console.warn('Unable to load New Earth surface battle save data', error);
       });
     return () => {
       mounted = false;
@@ -3509,6 +3541,21 @@ const DashboardContent = memo(({
       window.dispatchEvent(new CustomEvent('qch:new-earth-missions-updated', { detail: result.state }));
     } catch (error) {
       console.warn('Unable to update New Earth submarine mission progress', error);
+    }
+  }, []);
+
+  const recordSurfaceBattleMissionProgress = useCallback(async (
+    event: { type: 'surface-victory'; siteId: NewEarthSurfaceBattleSiteId; colonyId: string; battleKind: NewEarthSurfaceBattleKind }
+  ) => {
+    try {
+      const saved = await GameStorage.load(NEW_EARTH_MISSIONS_STORAGE_KEY);
+      const normalized = normalizeNewEarthMissionState(saved, { canUseSurfaceBattles: true });
+      const result = recordNewEarthMissionEvent(normalized, event);
+      if (!result.changed) return;
+      await GameStorage.save(result.state, NEW_EARTH_MISSIONS_STORAGE_KEY);
+      window.dispatchEvent(new CustomEvent('qch:new-earth-missions-updated', { detail: result.state }));
+    } catch (error) {
+      console.warn('Unable to update New Earth surface battle mission progress', error);
     }
   }, []);
 
@@ -8412,14 +8459,36 @@ const DashboardContent = memo(({
           onClose={() => setActiveSurfaceBattle(null)}
           onVictory={() => {
             const siteTitle = NEW_EARTH_SURFACE_SITE_BRIEFINGS[activeSurfaceBattle.siteId].title[language as 'pt' | 'en'];
-            dispatch({ type: 'EARN_QC', payload: { amount: 25000 + Math.max(0, battleLevel - 1) * 2500, source: 'battle' } });
+            const completedBattleLevel = Math.max(1, battleLevel || 1);
+            const previousVictories = newEarthSurfaceBattles[activeSurfaceBattle.siteId]?.victories || 0;
+            const reward = getNewEarthSurfaceBattleReward(activeSurfaceBattle.battleKind, completedBattleLevel, previousVictories);
+            const nextSurfaceBattles = recordNewEarthSurfaceBattleVictory(
+              newEarthSurfaceBattles,
+              activeSurfaceBattle.siteId,
+              completedBattleLevel
+            );
+            setNewEarthSurfaceBattles(nextSurfaceBattles);
+            GameStorage.save(nextSurfaceBattles, NEW_EARTH_SURFACE_BATTLES_STORAGE_KEY).catch(error => {
+              console.warn('Unable to save New Earth surface battle progress', error);
+            });
+            recordSurfaceBattleMissionProgress({
+              type: 'surface-victory',
+              siteId: activeSurfaceBattle.siteId,
+              colonyId: activeSurfaceBattle.colonyId,
+              battleKind: activeSurfaceBattle.battleKind,
+            });
+            dispatch({ type: 'EARN_QC', payload: { amount: reward, source: 'battle' } });
+            updateHistoryStats('acquired', reward, routeTierRef.current, 'battle');
+            updateHistoryStats('battle_win', 1, routeTierRef.current);
             addLog(
               language === 'pt'
-                ? `Vitória em ${siteTitle}.`
-                : `Victory at ${siteTitle}.`,
+                ? `Vitória em ${siteTitle}: +${formatValue(reward)} QC.`
+                : `Victory at ${siteTitle}: +${formatValue(reward)} QC.`,
               'success'
             );
-            setActiveSurfaceBattle(null);
+            if (activeSurfaceBattle.battleKind === 'helicopter') {
+              setActiveSurfaceBattle(null);
+            }
           }}
           onDefeat={() => {
             addLog(
@@ -8428,7 +8497,9 @@ const DashboardContent = memo(({
                 : 'The attack force retreated to regroup.',
               'error'
             );
-            setActiveSurfaceBattle(null);
+            if (activeSurfaceBattle.battleKind === 'helicopter') {
+              setActiveSurfaceBattle(null);
+            }
           }}
         />
       )}
@@ -9706,6 +9777,12 @@ const DashboardContent = memo(({
                           const briefing = NEW_EARTH_SURFACE_SITE_BRIEFINGS[selectedSurfaceBattleBriefing.siteId];
                           const colonyName = selectedSurfaceBattleBriefing.colonyId === 'colony-1' ? 'Genesis' : 'Elysium';
                           const isTankBattle = selectedSurfaceBattleBriefing.battleKind === 'tank';
+                          const previousVictories = newEarthSurfaceBattles[selectedSurfaceBattleBriefing.siteId]?.victories || 0;
+                          const estimatedReward = getNewEarthSurfaceBattleReward(
+                            selectedSurfaceBattleBriefing.battleKind,
+                            Math.max(1, battleLevel || 1),
+                            previousVictories
+                          );
 
                           return (
                             <motion.div
@@ -9798,12 +9875,12 @@ const DashboardContent = memo(({
                                 <div className="flex items-end justify-between gap-4">
                                   <div className="rounded-2xl border border-emerald-200/16 bg-emerald-950/28 px-4 py-3">
                                     <p className="font-mono text-[9px] font-black uppercase tracking-[0.26em] text-emerald-100/60">
-                                      {language === 'pt' ? 'Protótipo operacional' : 'Operational prototype'}
+                                      {language === 'pt' ? 'Recompensa da operação' : 'Operation reward'}
                                     </p>
                                     <p className="mt-1 text-sm font-bold text-emerald-50/82">
                                       {language === 'pt'
-                                        ? 'Veículos desenhados no canvas agora; sprites animados entram na próxima etapa.'
-                                        : 'Vehicles are canvas-drawn for now; animated sprites come in the next pass.'}
+                                        ? `+${formatValue(estimatedReward)} QC ao vencer. Vitórias neste local: ${previousVictories}.`
+                                        : `+${formatValue(estimatedReward)} QC on victory. Victories at this site: ${previousVictories}.`}
                                     </p>
                                   </div>
                                   <PremiumCanvasButton

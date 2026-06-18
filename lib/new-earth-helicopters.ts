@@ -1,6 +1,9 @@
 export const NEW_EARTH_HELICOPTERS_STORAGE_KEY = 'new_earth_helicopters';
+export const NEW_EARTH_SURFACE_BATTLES_STORAGE_KEY = 'new_earth_surface_battles';
 
 export type NewEarthHelicopterColonyId = 'colony-3';
+export type NewEarthSurfaceBattleSiteId = 'zona-glacial' | 'ruinas-europeias' | 'continente-esquecido';
+export type NewEarthSurfaceBattleKind = 'tank' | 'helicopter';
 
 export type NewEarthHelicopterUpgradeId =
   | 'speed'
@@ -13,6 +16,11 @@ export type NewEarthHelicopterUpgradeId =
 export type NewEarthHelicopterUpgradeLevels = Record<NewEarthHelicopterUpgradeId, number>;
 
 export type NewEarthHelicopterState = Record<NewEarthHelicopterColonyId, NewEarthHelicopterUpgradeLevels>;
+export type NewEarthSurfaceBattleProgress = Record<NewEarthSurfaceBattleSiteId, {
+  victories: number;
+  bestBattleLevel: number;
+  lastVictoryAt: number | null;
+}>;
 
 export const MAX_NEW_EARTH_HELICOPTER_UPGRADE_LEVEL = 5;
 
@@ -93,3 +101,60 @@ export const getNewEarthHelicopterStats = (levels: NewEarthHelicopterUpgradeLeve
   armorReduction: levels.armor * 10,
   initialDrones: levels.initialDrones,
 });
+
+export const createDefaultNewEarthSurfaceBattleProgress = (): NewEarthSurfaceBattleProgress => ({
+  'zona-glacial': { victories: 0, bestBattleLevel: 0, lastVictoryAt: null },
+  'ruinas-europeias': { victories: 0, bestBattleLevel: 0, lastVictoryAt: null },
+  'continente-esquecido': { victories: 0, bestBattleLevel: 0, lastVictoryAt: null },
+});
+
+export const normalizeNewEarthSurfaceBattleProgress = (raw: unknown): NewEarthSurfaceBattleProgress => {
+  const defaults = createDefaultNewEarthSurfaceBattleProgress();
+  if (!raw || typeof raw !== 'object') return defaults;
+
+  (Object.keys(defaults) as NewEarthSurfaceBattleSiteId[]).forEach(siteId => {
+    const saved = (raw as Record<string, unknown>)[siteId];
+    if (!saved || typeof saved !== 'object') return;
+    const savedRecord = saved as Record<string, unknown>;
+    defaults[siteId] = {
+      victories: Math.max(0, Math.floor(Number(savedRecord.victories) || 0)),
+      bestBattleLevel: Math.max(0, Math.floor(Number(savedRecord.bestBattleLevel) || 0)),
+      lastVictoryAt: savedRecord.lastVictoryAt == null
+        ? null
+        : Number.isFinite(Number(savedRecord.lastVictoryAt)) ? Number(savedRecord.lastVictoryAt) : null,
+    };
+  });
+
+  return defaults;
+};
+
+export const recordNewEarthSurfaceBattleVictory = (
+  progress: NewEarthSurfaceBattleProgress,
+  siteId: NewEarthSurfaceBattleSiteId,
+  battleLevel: number,
+  now = Date.now()
+): NewEarthSurfaceBattleProgress => {
+  const normalized = normalizeNewEarthSurfaceBattleProgress(progress);
+  const current = normalized[siteId];
+  return {
+    ...normalized,
+    [siteId]: {
+      victories: current.victories + 1,
+      bestBattleLevel: Math.max(current.bestBattleLevel, Math.max(1, Math.floor(Number(battleLevel) || 1))),
+      lastVictoryAt: now,
+    },
+  };
+};
+
+export const getNewEarthSurfaceBattleReward = (
+  battleKind: NewEarthSurfaceBattleKind,
+  battleLevel: number,
+  previousVictories = 0
+) => {
+  const safeLevel = Math.max(1, Math.floor(Number(battleLevel) || 1));
+  const repeatMultiplier = previousVictories > 0 ? 0.55 : 1;
+  const base = battleKind === 'tank' ? 34000 : 30000;
+  const levelBonus = safeLevel * (battleKind === 'tank' ? 3200 : 2800);
+
+  return Math.round((base + levelBonus) * repeatMultiplier);
+};

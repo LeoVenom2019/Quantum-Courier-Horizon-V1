@@ -1370,6 +1370,10 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
       (colony.id === 'colony-2' || colony.id === 'colony-4') &&
       isColonyReadyForPopulation(colony.constructions)
     ));
+    const surfaceBattleColoniesReady = colonies.some(colony => (
+      (colony.id === 'colony-1' || colony.id === 'colony-3') &&
+      isColonyReadyForPopulation(colony.constructions)
+    ));
     const directBattlesUnlocked = colonies.length > 0 && colonies.every(colony => isColonyReadyForPopulation(colony.constructions));
 
     return {
@@ -1379,6 +1383,7 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
       canRunSeaSearch: !directBattlesUnlocked,
       canDefendSearches: pendingDefenseThreats.length > 0 || Boolean(activeDefenseThreat),
       directBattlesUnlocked,
+      canUseSurfaceBattles: surfaceBattleColoniesReady,
       canUseSubmarines: submarineColoniesReady,
       upgradeableCards,
       colonies: colonies.map(colony => ({
@@ -4035,6 +4040,7 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
               const getMissionBg = (m: any) => {
                 if (m.eventType === 'search-complete') return m.searchId === 'sea' ? 'bg_sea_search.webp' : 'bg_land_search.webp';
                 if (m.eventType === 'construction-complete') return 'bg_construction.webp';
+                if (m.eventType.startsWith('surface')) return 'bg_hangar_defense.webp';
                 if (m.eventType.startsWith('submarine')) return 'bg_submarine.webp';
                 if (m.eventType.startsWith('arcade')) return 'bg_arcade.webp';
                 if (m.eventType === 'card-upgrade') return 'bg_card_upgrade.webp';
