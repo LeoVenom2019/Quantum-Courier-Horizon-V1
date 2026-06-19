@@ -7,6 +7,14 @@ import { PremiumCanvasButton } from './ui/PremiumCanvasButton';
 export type NewEarthSurfaceBattleSiteId = 'zona-glacial' | 'ruinas-europeias' | 'continente-esquecido';
 export type NewEarthSurfaceBattleKind = 'tank' | 'helicopter';
 
+type NewEarthSupplyReward = Partial<Record<'materials' | 'biomass' | 'tech' | 'defense' | 'food' | 'meds', number>>;
+
+export type NewEarthSurfaceBattleVictoryPayload = {
+  qcReward?: number;
+  supplies?: NewEarthSupplyReward;
+  specialDrop?: boolean;
+};
+
 interface NewEarthSurfaceBattleProps {
   language: 'en' | 'pt';
   siteId: NewEarthSurfaceBattleSiteId;
@@ -22,8 +30,15 @@ interface NewEarthSurfaceBattleProps {
     armorReduction: number;
     initialDrones: number;
   };
+  tankStats?: {
+    speedBonus: number;
+    shotDamageBonus: number;
+    shotSpeedBonus: number;
+    armorReduction: number;
+    rewardBonus: number;
+  };
   onClose: () => void;
-  onVictory: () => void;
+  onVictory: (payload?: NewEarthSurfaceBattleVictoryPayload) => void;
   onDefeat: () => void;
 }
 
@@ -321,6 +336,12 @@ const rand = (min: number, max: number) => min + Math.random() * (max - min);
 const pick = <T,>(items: readonly T[]) => items[Math.floor(Math.random() * items.length)];
 const lerp = (from: number, to: number, amount: number) => from + (to - from) * amount;
 
+const getHelicopterAltitudeBob = (unit: Unit, now: number, isPlayer = false) => {
+  const phase = unit.id * 1.618 + (isPlayer ? 0.7 : 0);
+  const amplitude = isPlayer ? 3.2 : unit.kind === 'boss' ? 2.4 : unit.kind === 'elite' ? 3 : 3.5;
+  return Math.sin(now / 1120 + phase) * amplitude + Math.sin(now / 1780 + phase * 0.7) * 0.9;
+};
+
 const colorWithAlpha = (color: string, alpha: number) => {
   if (color.startsWith('#')) {
     const hex = color.slice(1);
@@ -444,6 +465,7 @@ export default function NewEarthSurfaceBattle({
   defenseBattleLevel,
   background,
   helicopterStats,
+  tankStats,
   onClose,
   onVictory,
   onDefeat,
@@ -458,6 +480,10 @@ export default function NewEarthSurfaceBattle({
   const [result, setResult] = useState<'victory' | 'defeat' | ''>('');
   const [hud, setHud] = useState({ hp: 100, enemies: 0 });
   const theme = SITE_THEME[siteId];
+  const tankSpeedBonus = tankStats?.speedBonus || 0;
+  const tankShotDamageBonus = tankStats?.shotDamageBonus || 0;
+  const tankShotSpeedBonus = tankStats?.shotSpeedBonus || 0;
+  const tankArmorReduction = tankStats?.armorReduction || 0;
   const enemyCount = battleKind === 'helicopter'
     ? HELICOPTER_TOTAL_WAVES
     : TANK_TOTAL_WAVES;
@@ -1129,7 +1155,7 @@ export default function NewEarthSurfaceBattle({
         player.y = clamp(player.y, 32, HEIGHT - 32);
         player.angle = -Math.PI / 2;
       } else {
-        const accel = 2.4;
+        const accel = 2.4 * (1 + tankSpeedBonus / 100);
         if (mx || my) {
           player.vx = lerp(player.vx || 0, (mx / mag) * accel, 0.18);
           player.vy = lerp(player.vy || 0, (my / mag) * accel, 0.18);
@@ -1187,7 +1213,7 @@ export default function NewEarthSurfaceBattle({
           playSurfaceSfx(SURFACE_SFX.playerShot, 0.46);
           const shotAngle = player.turretAngle ?? player.angle;
           const tip = barrelTip(player, true);
-          addShot(tip.x - Math.cos(shotAngle) * 36, tip.y - Math.sin(shotAngle) * 36, shotAngle, 'player', TANK_PLAYER_DAMAGE, 11.2, 'common');
+          addShot(tip.x - Math.cos(shotAngle) * 36, tip.y - Math.sin(shotAngle) * 36, shotAngle, 'player', Math.round(TANK_PLAYER_DAMAGE * (1 + tankShotDamageBonus / 100)), 11.2 * (1 + tankShotSpeedBonus / 100), 'common');
           player.recoil = 12;
           fireTankMuzzle(player, true);
           ejectTankCasing(player);
@@ -1308,7 +1334,7 @@ export default function NewEarthSurfaceBattle({
             shots.splice(i, 1);
           }
         } else if (Math.hypot(player.x - shot.x, player.y - shot.y) < player.radius) {
-          player.hp -= shot.damage;
+          player.hp -= battleKind === 'tank' ? shot.damage * Math.max(0.1, 1 - tankArmorReduction / 100) : shot.damage;
           spawnProjectileImpact(shot.x, shot.y, shot.visualType === 'boss' ? '#e879f9' : shot.visualType === 'elite' ? '#fde68a' : '#ef4444', shot.visualType === 'boss' ? 1.55 : shot.visualType === 'elite' ? 1.25 : 1, Math.atan2(shot.vy, shot.vx));
           shots.splice(i, 1);
         }
@@ -1355,30 +1381,33 @@ export default function NewEarthSurfaceBattle({
       enemies.forEach(enemy => {
         const enemyKind = enemy.kind || 'common';
         const scale = battleKind === 'helicopter' ? HELICOPTER_ENEMY_STATS[enemyKind].colorScale : 1;
+        let enemyVisualY = enemy.y;
         if (battleKind === 'tank') {
           drawTankUnit(enemy, false);
         } else {
+          enemyVisualY = enemy.y + getHelicopterAltitudeBob(enemy, now);
+          const visualEnemy = { ...enemy, y: enemyVisualY };
           ctx.save();
-          ctx.translate(enemy.x, enemy.y);
+          ctx.translate(enemy.x, enemyVisualY);
           ctx.scale(scale, scale);
-          ctx.translate(-enemy.x, -enemy.y);
-          drawHelicopter(ctx, enemy, theme.palette.enemy, theme.palette.enemyDark, false, spin);
+          ctx.translate(-enemy.x, -enemyVisualY);
+          drawHelicopter(ctx, visualEnemy, theme.palette.enemy, theme.palette.enemyDark, false, spin);
           ctx.restore();
         }
         ctx.fillStyle = 'rgba(0,0,0,0.58)';
-        ctx.fillRect(enemy.x - 32, enemy.y - 42, 64, 5);
+        ctx.fillRect(enemy.x - 32, enemyVisualY - 42, 64, 5);
         ctx.fillStyle = theme.palette.enemy;
-        ctx.fillRect(enemy.x - 32, enemy.y - 42, 64 * Math.max(0, enemy.hp / enemy.maxHp), 5);
+        ctx.fillRect(enemy.x - 32, enemyVisualY - 42, 64 * Math.max(0, enemy.hp / enemy.maxHp), 5);
         if (battleKind === 'helicopter' || enemyKind !== 'common') {
           ctx.font = '700 10px monospace';
           ctx.fillStyle = 'rgba(255,255,255,0.72)';
           ctx.textAlign = 'center';
-          ctx.fillText(enemyKind.toUpperCase(), enemy.x, enemy.y - 48);
+          ctx.fillText(enemyKind.toUpperCase(), enemy.x, enemyVisualY - 48);
           ctx.textAlign = 'left';
         }
       });
       if (battleKind === 'tank') drawTankUnit(player, true);
-      else drawHelicopter(ctx, player, theme.palette.player, theme.palette.playerDark, true, -spin);
+      else drawHelicopter(ctx, { ...player, y: player.y + getHelicopterAltitudeBob(player, now, true) }, theme.palette.player, theme.palette.playerDark, true, -spin);
 
       shots.forEach(shot => {
         if (battleKind === 'tank') {
@@ -1634,7 +1663,7 @@ export default function NewEarthSurfaceBattle({
 
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
-  }, [background, battleKind, defenseBattleLevel, enemyCount, language, onDefeat, onVictory, theme]);
+  }, [background, battleKind, defenseBattleLevel, enemyCount, language, onDefeat, onVictory, tankArmorReduction, tankShotDamageBonus, tankShotSpeedBonus, tankSpeedBonus, theme]);
 
   const updateMouse = (event: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
@@ -1762,3 +1791,4 @@ export default function NewEarthSurfaceBattle({
     </div>
   );
 }
+

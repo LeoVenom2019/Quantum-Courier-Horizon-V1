@@ -1,7 +1,9 @@
 export const NEW_EARTH_HELICOPTERS_STORAGE_KEY = 'new_earth_helicopters';
+export const NEW_EARTH_TANKS_STORAGE_KEY = 'new_earth_tanks';
 export const NEW_EARTH_SURFACE_BATTLES_STORAGE_KEY = 'new_earth_surface_battles';
 
 export type NewEarthHelicopterColonyId = 'colony-3';
+export type NewEarthTankColonyId = 'colony-1';
 export type NewEarthSurfaceBattleSiteId = 'zona-glacial' | 'ruinas-europeias' | 'continente-esquecido';
 export type NewEarthSurfaceBattleKind = 'tank' | 'helicopter';
 
@@ -16,6 +18,16 @@ export type NewEarthHelicopterUpgradeId =
 export type NewEarthHelicopterUpgradeLevels = Record<NewEarthHelicopterUpgradeId, number>;
 
 export type NewEarthHelicopterState = Record<NewEarthHelicopterColonyId, NewEarthHelicopterUpgradeLevels>;
+
+export type NewEarthTankUpgradeId =
+  | 'speed'
+  | 'shotDamage'
+  | 'shotSpeed'
+  | 'armor'
+  | 'capture';
+
+export type NewEarthTankUpgradeLevels = Record<NewEarthTankUpgradeId, number>;
+export type NewEarthTankState = Record<NewEarthTankColonyId, NewEarthTankUpgradeLevels>;
 export type NewEarthSurfaceBattleProgress = Record<NewEarthSurfaceBattleSiteId, {
   victories: number;
   bestBattleLevel: number;
@@ -23,6 +35,7 @@ export type NewEarthSurfaceBattleProgress = Record<NewEarthSurfaceBattleSiteId, 
 }>;
 
 export const MAX_NEW_EARTH_HELICOPTER_UPGRADE_LEVEL = 5;
+export const MAX_NEW_EARTH_TANK_UPGRADE_LEVEL = 5;
 
 export const NEW_EARTH_HELICOPTER_UPGRADES: Array<{
   id: NewEarthHelicopterUpgradeId;
@@ -70,8 +83,52 @@ const DEFAULT_LEVELS: NewEarthHelicopterUpgradeLevels = {
   initialDrones: 0,
 };
 
+export const NEW_EARTH_TANK_UPGRADES: Array<{
+  id: NewEarthTankUpgradeId;
+  label: Record<'pt' | 'en', string>;
+  description: Record<'pt' | 'en', string>;
+}> = [
+  {
+    id: 'speed',
+    label: { pt: 'Velocidade do Tanque', en: 'Tank Speed' },
+    description: { pt: '+5% velocidade por nível', en: '+5% speed per level' },
+  },
+  {
+    id: 'shotDamage',
+    label: { pt: 'Dano do Tiro', en: 'Shot Damage' },
+    description: { pt: '+5% dano por nível', en: '+5% damage per level' },
+  },
+  {
+    id: 'shotSpeed',
+    label: { pt: 'Velocidade do Tiro', en: 'Shot Speed' },
+    description: { pt: '+10% velocidade do tiro por nível', en: '+10% shot speed per level' },
+  },
+  {
+    id: 'armor',
+    label: { pt: 'Armadura', en: 'Armor' },
+    description: { pt: '+5% resistência por nível', en: '+5% resistance per level' },
+  },
+  {
+    id: 'capture',
+    label: { pt: 'Captação', en: 'Capture' },
+    description: { pt: '+20% recompensas por nível', en: '+20% rewards per level' },
+  },
+];
+
+const DEFAULT_TANK_LEVELS: NewEarthTankUpgradeLevels = {
+  speed: 0,
+  shotDamage: 0,
+  shotSpeed: 0,
+  armor: 0,
+  capture: 0,
+};
+
 export const createDefaultNewEarthHelicopterState = (): NewEarthHelicopterState => ({
   'colony-3': { ...DEFAULT_LEVELS },
+});
+
+export const createDefaultNewEarthTankState = (): NewEarthTankState => ({
+  'colony-1': { ...DEFAULT_TANK_LEVELS },
 });
 
 export const normalizeNewEarthHelicopterState = (raw: unknown): NewEarthHelicopterState => {
@@ -93,6 +150,25 @@ export const normalizeNewEarthHelicopterState = (raw: unknown): NewEarthHelicopt
 
 export const getNewEarthHelicopterUpgradeCost = (level: number) => Math.round(520 + Math.pow(level + 1, 1.38) * 220);
 
+export const normalizeNewEarthTankState = (raw: unknown): NewEarthTankState => {
+  const defaults = createDefaultNewEarthTankState();
+  if (!raw || typeof raw !== 'object') return defaults;
+
+  const colonyLevels = (raw as Record<string, unknown>)['colony-1'];
+  if (!colonyLevels || typeof colonyLevels !== 'object') return defaults;
+
+  NEW_EARTH_TANK_UPGRADES.forEach(upgrade => {
+    const level = Number((colonyLevels as Record<string, unknown>)[upgrade.id]);
+    defaults['colony-1'][upgrade.id] = Number.isFinite(level)
+      ? Math.min(MAX_NEW_EARTH_TANK_UPGRADE_LEVEL, Math.max(0, Math.floor(level)))
+      : 0;
+  });
+
+  return defaults;
+};
+
+export const getNewEarthTankUpgradeCost = (level: number) => Math.round(620 + Math.pow(level + 1, 1.42) * 260);
+
 export const getNewEarthHelicopterStats = (levels: NewEarthHelicopterUpgradeLevels) => ({
   speedBonus: levels.speed * 10,
   gunDamageBonus: levels.gunDamage * 20,
@@ -100,6 +176,14 @@ export const getNewEarthHelicopterStats = (levels: NewEarthHelicopterUpgradeLeve
   startingMissiles: 1 + levels.extraMissiles,
   armorReduction: levels.armor * 10,
   initialDrones: levels.initialDrones,
+});
+
+export const getNewEarthTankStats = (levels: NewEarthTankUpgradeLevels) => ({
+  speedBonus: levels.speed * 5,
+  shotDamageBonus: levels.shotDamage * 5,
+  shotSpeedBonus: levels.shotSpeed * 10,
+  armorReduction: levels.armor * 5,
+  rewardBonus: levels.capture * 20,
 });
 
 export const createDefaultNewEarthSurfaceBattleProgress = (): NewEarthSurfaceBattleProgress => ({

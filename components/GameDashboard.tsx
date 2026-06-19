@@ -112,7 +112,7 @@ import { MINI_GAMES_CONFIG } from '@/lib/mini-games-config';
 import { MiniGames } from './MiniGames';
 import { ColonySystem, Colony, cleanColoniesData } from './ColonySystem';
 import NewEarthUnderwaterBattle from './NewEarthUnderwaterBattle';
-import NewEarthSurfaceBattle, { type NewEarthSurfaceBattleKind, type NewEarthSurfaceBattleSiteId } from './NewEarthSurfaceBattle';
+import NewEarthSurfaceBattle, { type NewEarthSurfaceBattleKind, type NewEarthSurfaceBattleSiteId, type NewEarthSurfaceBattleVictoryPayload } from './NewEarthSurfaceBattle';
 import {
   ARCADE_CARD_REWARD_CHANCE,
   ARCADE_CARD_REWARD_RULES,
@@ -156,20 +156,30 @@ import {
 } from '@/lib/new-earth-submarines';
 import {
   NEW_EARTH_HELICOPTERS_STORAGE_KEY,
+  NEW_EARTH_TANKS_STORAGE_KEY,
   NEW_EARTH_SURFACE_BATTLES_STORAGE_KEY,
   MAX_NEW_EARTH_HELICOPTER_UPGRADE_LEVEL,
+  MAX_NEW_EARTH_TANK_UPGRADE_LEVEL,
   NEW_EARTH_HELICOPTER_UPGRADES,
+  NEW_EARTH_TANK_UPGRADES,
   createDefaultNewEarthHelicopterState,
+  createDefaultNewEarthTankState,
   createDefaultNewEarthSurfaceBattleProgress,
   getNewEarthHelicopterStats,
   getNewEarthHelicopterUpgradeCost,
+  getNewEarthTankStats,
+  getNewEarthTankUpgradeCost,
   getNewEarthSurfaceBattleReward,
   normalizeNewEarthHelicopterState,
+  normalizeNewEarthTankState,
   normalizeNewEarthSurfaceBattleProgress,
   recordNewEarthSurfaceBattleVictory,
   type NewEarthHelicopterColonyId,
   type NewEarthHelicopterState,
   type NewEarthHelicopterUpgradeId,
+  type NewEarthTankColonyId,
+  type NewEarthTankState,
+  type NewEarthTankUpgradeId,
   type NewEarthSurfaceBattleProgress,
 } from '@/lib/new-earth-helicopters';
 import {
@@ -485,7 +495,9 @@ const NEW_EARTH_SUBMARINE_PREVIEW_BACKGROUNDS: Record<NewEarthSubmarineColonyId,
 };
 
 const NEW_EARTH_HELICOPTER_NAME = 'AETHER';
-const NEW_EARTH_HELICOPTER_PREVIEW_BACKGROUND = '/assets/rota4/colonys/elysium/1elysium_colony.webp';
+const NEW_EARTH_TANK_NAME = 'HORIZON WARDEN';
+const NEW_EARTH_TANK_PREVIEW_BACKGROUND = '/assets/rota4/new_land_assets/european_ruins_new_land_system/european_background_2.webp';
+const NEW_EARTH_HELICOPTER_PREVIEW_BACKGROUND = '/assets/rota4/new_land_assets/forgotten_continent_new_land_system/forgotten_continent_background_1.webp';
 
 const NEW_EARTH_SECTOR_ORDER: ColonySectorId[] = ['culture', 'economy', 'health', 'happiness', 'security', 'technology'];
 
@@ -1070,6 +1082,7 @@ const DashboardContent = memo(({
   const [newEarthMapFeedback, setNewEarthMapFeedback] = useState<string | null>(null);
   const [newEarthSubmarines, setNewEarthSubmarines] = useState<NewEarthSubmarineState>(() => createDefaultNewEarthSubmarineState());
   const [newEarthHelicopters, setNewEarthHelicopters] = useState<NewEarthHelicopterState>(() => createDefaultNewEarthHelicopterState());
+  const [newEarthTanks, setNewEarthTanks] = useState<NewEarthTankState>(() => createDefaultNewEarthTankState());
   const [newEarthSurfaceBattles, setNewEarthSurfaceBattles] = useState<NewEarthSurfaceBattleProgress>(() => createDefaultNewEarthSurfaceBattleProgress());
   const [newEarthMuseumOpen, setNewEarthMuseumOpen] = useState(false);
   const [newEarthMuseumCategory, setNewEarthMuseumCategory] = useState<NewEarthTreasureCategory>('rare_fish');
@@ -1138,6 +1151,26 @@ const DashboardContent = memo(({
       })
       .catch(error => {
         console.warn('Unable to load New Earth helicopter save data', error);
+      });
+    return () => {
+      mounted = false;
+    };
+  }, []);
+  useEffect(() => {
+    let mounted = true;
+    GameStorage.load(NEW_EARTH_TANKS_STORAGE_KEY)
+      .then(saved => {
+        if (!mounted) return;
+        const normalized = normalizeNewEarthTankState(saved);
+        setNewEarthTanks(normalized);
+        if (!saved || typeof saved !== 'object') {
+          GameStorage.save(normalized, NEW_EARTH_TANKS_STORAGE_KEY).catch(error => {
+            console.warn('Unable to initialize New Earth tank save data', error);
+          });
+        }
+      })
+      .catch(error => {
+        console.warn('Unable to load New Earth tank save data', error);
       });
     return () => {
       mounted = false;
@@ -1821,6 +1854,20 @@ const DashboardContent = memo(({
     [selectedNewEarthColony?.id]
   );
 
+  const selectedNewEarthTankColonyId = (
+    selectedNewEarthColony?.id === 'colony-1'
+      ? selectedNewEarthColony.id
+      : null
+  ) as NewEarthTankColonyId | null;
+
+  const selectedNewEarthTankLevels = selectedNewEarthTankColonyId
+    ? newEarthTanks[selectedNewEarthTankColonyId]
+    : null;
+
+  const selectedNewEarthTankStats = selectedNewEarthTankLevels
+    ? getNewEarthTankStats(selectedNewEarthTankLevels)
+    : null;
+
   const selectedNewEarthSubmarineColonyId = (
     selectedNewEarthColony?.id === 'colony-2' || selectedNewEarthColony?.id === 'colony-4'
       ? selectedNewEarthColony.id
@@ -1848,6 +1895,12 @@ const DashboardContent = memo(({
   const selectedNewEarthHelicopterStats = selectedNewEarthHelicopterLevels
     ? getNewEarthHelicopterStats(selectedNewEarthHelicopterLevels)
     : null;
+  const activeSurfaceBattleTankStats = useMemo(
+    () => activeSurfaceBattle?.battleKind === 'tank'
+      ? getNewEarthTankStats(newEarthTanks['colony-1'])
+      : undefined,
+    [activeSurfaceBattle?.battleKind, newEarthTanks]
+  );
 
   const selectedNewEarthCard = selectedNewEarthCardIndex !== null
     ? selectedNewEarthColonyCards[selectedNewEarthCardIndex]
@@ -1959,6 +2012,39 @@ const DashboardContent = memo(({
     setNewEarthMapFeedback(null);
     playSfx('level_up');
   }, [dispatch, language, newEarthHelicopters, playRandomNewEarthAccessDenied, playSfx]);
+  const upgradeNewEarthTank = useCallback((colonyId: NewEarthTankColonyId, upgradeId: NewEarthTankUpgradeId) => {
+    const currentLevel = newEarthTanks[colonyId][upgradeId] || 0;
+    if (currentLevel >= MAX_NEW_EARTH_TANK_UPGRADE_LEVEL) {
+      playSfx('error');
+      return;
+    }
+
+    const cost = getNewEarthTankUpgradeCost(currentLevel);
+    if (qcRef.current < cost) {
+      setNewEarthMapFeedback(
+        language === 'pt'
+          ? `QC insuficiente para melhorar o tanque. Necessário ${cost.toLocaleString()} QC.`
+          : `Not enough QC to upgrade the tank. Need ${cost.toLocaleString()} QC.`
+      );
+      playRandomNewEarthAccessDenied();
+      return;
+    }
+
+    const nextState = normalizeNewEarthTankState({
+      ...newEarthTanks,
+      [colonyId]: {
+        ...newEarthTanks[colonyId],
+        [upgradeId]: currentLevel + 1,
+      },
+    });
+    setNewEarthTanks(nextState);
+    dispatch({ type: 'SPEND_QC', payload: { amount: cost } });
+    GameStorage.save(nextState, NEW_EARTH_TANKS_STORAGE_KEY).catch(error => {
+      console.warn('Unable to save New Earth tank upgrade', error);
+    });
+    setNewEarthMapFeedback(null);
+    playSfx('level_up');
+  }, [dispatch, language, newEarthTanks, playRandomNewEarthAccessDenied, playSfx]);
 
 
   const setQc = useCallback((val: number | ((prev: number) => number)) => {
@@ -3802,6 +3888,34 @@ const DashboardContent = memo(({
         .catch(error => console.warn('Failed to persist underwater treasure reward', error));
     }
   }, [activeUnderwaterBattle?.colonyId, activeUnderwaterBattle?.siteId, dispatch, recordSubmarineMissionProgress]);
+  const awardNewEarthSupplies = useCallback((supplies: Partial<Record<NewEarthSupplyId, number>>) => {
+    const normalized = Object.entries(supplies).reduce<Partial<Record<NewEarthSupplyId, number>>>((acc, [key, value]) => {
+      const amount = Math.max(0, Math.floor(Number(value) || 0));
+      if (amount > 0) acc[key as NewEarthSupplyId] = amount;
+      return acc;
+    }, {});
+    if (!Object.keys(normalized).length) return 0;
+
+    const supplyAwardEvent = new CustomEvent('qch:colony-supplies-awarded', {
+      detail: normalized,
+      cancelable: true,
+    });
+    const handledByColonySystem = !window.dispatchEvent(supplyAwardEvent);
+    if (!handledByColonySystem) {
+      GameStorage.load('colony_supplies_data')
+        .then(saved => {
+          const current = saved && typeof saved === 'object' ? saved as Record<string, number> : {};
+          const next = { ...current };
+          Object.entries(normalized).forEach(([key, value]) => {
+            next[key] = Math.max(0, Math.floor(Number(next[key] || 0) + Number(value || 0)));
+          });
+          return GameStorage.save(next, 'colony_supplies_data');
+        })
+        .catch(error => console.warn('Failed to persist surface battle supply reward', error));
+    }
+
+    return Object.values(normalized).reduce((sum, value) => sum + Math.max(0, Math.floor(Number(value) || 0)), 0);
+  }, []);
 
   const activeUnderwaterBattleColony = useMemo(() => (
     activeUnderwaterBattle
@@ -8456,12 +8570,15 @@ const DashboardContent = memo(({
           helicopterStats={activeSurfaceBattle.battleKind === 'helicopter'
             ? getNewEarthHelicopterStats(newEarthHelicopters['colony-3'])
             : undefined}
+          tankStats={activeSurfaceBattleTankStats}
           onClose={() => setActiveSurfaceBattle(null)}
-          onVictory={() => {
+          onVictory={(payload?: NewEarthSurfaceBattleVictoryPayload) => {
             const siteTitle = NEW_EARTH_SURFACE_SITE_BRIEFINGS[activeSurfaceBattle.siteId].title[language as 'pt' | 'en'];
             const completedBattleLevel = Math.max(1, battleLevel || 1);
             const previousVictories = newEarthSurfaceBattles[activeSurfaceBattle.siteId]?.victories || 0;
-            const reward = getNewEarthSurfaceBattleReward(activeSurfaceBattle.battleKind, completedBattleLevel, previousVictories);
+            const fallbackReward = getNewEarthSurfaceBattleReward(activeSurfaceBattle.battleKind, completedBattleLevel, previousVictories);
+            const reward = Math.max(0, Math.floor(Number(payload?.qcReward ?? fallbackReward)));
+            const supplyTotal = payload?.supplies ? awardNewEarthSupplies(payload.supplies) : 0;
             const nextSurfaceBattles = recordNewEarthSurfaceBattleVictory(
               newEarthSurfaceBattles,
               activeSurfaceBattle.siteId,
@@ -8482,8 +8599,8 @@ const DashboardContent = memo(({
             updateHistoryStats('battle_win', 1, routeTierRef.current);
             addLog(
               language === 'pt'
-                ? `Vitória em ${siteTitle}: +${formatValue(reward)} QC.`
-                : `Victory at ${siteTitle}: +${formatValue(reward)} QC.`,
+                ? `Vitória em ${siteTitle}: +${formatValue(reward)} QC${supplyTotal > 0 ? ` + ${formatValue(supplyTotal)} recursos` : ''}${payload?.specialDrop ? ' + item especial simulado' : ''}.`
+                : `Victory at ${siteTitle}: +${formatValue(reward)} QC${supplyTotal > 0 ? ` + ${formatValue(supplyTotal)} supplies` : ''}${payload?.specialDrop ? ' + simulated special item' : ''}.`,
               'success'
             );
             if (activeSurfaceBattle.battleKind === 'helicopter') {
@@ -10186,8 +10303,107 @@ const DashboardContent = memo(({
                                 </div>
 
                                 <div className="min-h-0 overflow-hidden rounded-2xl border border-red-300/18 bg-black/36 p-4">
-                                  {selectedNewEarthSubmarineColonyId && selectedNewEarthSubmarineLevels && selectedNewEarthSubmarineStats ? (
-                                    <div className="relative flex h-full min-h-0 flex-col overflow-hidden rounded-xl border border-cyan-300/14 bg-slate-950/72 p-3">
+                                  {selectedNewEarthTankColonyId && selectedNewEarthTankLevels && selectedNewEarthTankStats ? (
+                                    <div className="relative flex h-full min-h-0 flex-col overflow-hidden rounded-xl border border-emerald-300/14 bg-slate-950/72 p-3">
+                                      <img
+                                        src="/assets/rota4/colonys/genesis/genesis_factory.webp"
+                                        alt=""
+                                        aria-hidden="true"
+                                        className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-20"
+                                      />
+                                      <div className="pointer-events-none absolute inset-0 bg-black/66" />
+                                      <div className="relative z-10 grid min-h-0 flex-1 grid-cols-[minmax(220px,0.78fr)_minmax(320px,1.22fr)] gap-3 overflow-hidden rounded-xl border border-emerald-200/12 bg-black/42 p-3">
+                                        <div className="relative flex min-h-0 items-center justify-center overflow-hidden rounded-xl border border-emerald-300/18 bg-emerald-950/18">
+                                          <img
+                                            src={NEW_EARTH_TANK_PREVIEW_BACKGROUND}
+                                            alt=""
+                                            aria-hidden="true"
+                                            className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-72"
+                                          />
+                                          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_52%,rgba(52,211,153,0.18),transparent_58%),linear-gradient(180deg,rgba(2,6,23,0.18),rgba(2,6,23,0.52))]" />
+                                          <motion.div
+                                            key="genesis-tank-preview"
+                                            animate={{ y: [0, -3, 0, 2, 0] }}
+                                            transition={{ duration: 3.8, repeat: Infinity, ease: 'easeInOut' }}
+                                            className="relative z-10 h-[190px] w-[190px] drop-shadow-[0_0_22px_rgba(52,211,153,0.28)]"
+                                          >
+                                            <img
+                                              src="/assets/rota4/colonys/genesis/aether_tank/1tank_player_body.webp"
+                                              alt=""
+                                              aria-hidden="true"
+                                              className="absolute left-1/2 top-1/2 h-[172px] w-[172px] -translate-x-1/2 -translate-y-1/2 object-contain"
+                                            />
+                                            <motion.img
+                                              src="/assets/rota4/colonys/genesis/aether_tank/1tank_player_turret.webp"
+                                              alt=""
+                                              aria-hidden="true"
+                                              animate={{ rotate: [-4, 5, -4] }}
+                                              transition={{ duration: 4.4, repeat: Infinity, ease: 'easeInOut' }}
+                                              className="absolute left-1/2 top-1/2 h-[156px] w-[156px] -translate-x-1/2 -translate-y-1/2 object-contain"
+                                            />
+                                          </motion.div>
+                                        </div>
+                                        <div className="grid min-h-0 grid-rows-[70px_1fr] gap-2">
+                                          <div className="flex items-center rounded-xl border border-emerald-200/16 bg-black/58 px-4">
+                                            <p className="font-orbitron text-3xl font-black uppercase leading-none text-white">{NEW_EARTH_TANK_NAME}</p>
+                                          </div>
+                                          <div className="grid min-h-0 grid-cols-2 gap-2">
+                                            {[
+                                              { label: language === 'pt' ? 'Velocidade' : 'Speed', value: `+${selectedNewEarthTankStats.speedBonus}%` },
+                                              { label: language === 'pt' ? 'Dano' : 'Damage', value: `+${selectedNewEarthTankStats.shotDamageBonus}%` },
+                                              { label: language === 'pt' ? 'Tiro' : 'Shot', value: `+${selectedNewEarthTankStats.shotSpeedBonus}%` },
+                                              { label: language === 'pt' ? 'Armadura' : 'Armor', value: `-${selectedNewEarthTankStats.armorReduction}%` },
+                                              { label: language === 'pt' ? 'Captação' : 'Capture', value: `+${selectedNewEarthTankStats.rewardBonus}%` },
+                                            ].map(attribute => (
+                                              <div key={attribute.label} className="flex min-h-0 min-w-0 flex-col justify-center rounded-xl border border-emerald-200/16 bg-black/58 px-3 py-2">
+                                                <p className="truncate font-mono text-[8px] uppercase tracking-[0.16em] text-emerald-100/58">{attribute.label}</p>
+                                                <p className="mt-1 truncate font-orbitron text-xl font-black leading-none text-white">{attribute.value}</p>
+                                              </div>
+                                            ))}
+                                          </div>
+                                        </div>
+                                      </div>
+
+                                      <div className="relative z-10 mt-3 grid h-[142px] shrink-0 grid-cols-5 gap-2">
+                                        {NEW_EARTH_TANK_UPGRADES.map(upgrade => {
+                                          const level = selectedNewEarthTankLevels[upgrade.id] || 0;
+                                          const isMax = level >= MAX_NEW_EARTH_TANK_UPGRADE_LEVEL;
+                                          const cost = getNewEarthTankUpgradeCost(level);
+                                          return (
+                                            <PremiumCanvasButton
+                                              key={upgrade.id}
+                                              type="button"
+                                              onClick={() => upgradeNewEarthTank(selectedNewEarthTankColonyId, upgrade.id)}
+                                              disabled={isMax}
+                                              tone={isMax ? 'steel' : 'cyan'}
+                                              className="min-h-0 rounded-xl"
+                                              contentClassName={`flex h-full flex-col items-stretch justify-center px-2.5 py-2 text-left ${isMax ? 'text-zinc-500' : 'text-emerald-50'}`}
+                                            >
+                                              <div className="flex min-w-0 flex-col gap-1">
+                                                <span className="truncate font-mono text-[8px] font-black uppercase tracking-[0.12em]">
+                                                  {upgrade.label[language as 'pt' | 'en']}
+                                                </span>
+                                                <span className="w-fit rounded-full border border-white/10 bg-black/42 px-1.5 py-0.5 font-mono text-[7px] font-black uppercase tracking-[0.08em]">
+                                                  {isMax ? 'MAX' : `${formatValue(cost)} QC`}
+                                                </span>
+                                              </div>
+                                              <div className="mt-1.5 flex items-center gap-2">
+                                                <span className="shrink-0 font-orbitron text-[11px] font-black uppercase leading-none">
+                                                  LVL {level}/{MAX_NEW_EARTH_TANK_UPGRADE_LEVEL}
+                                                </span>
+                                                <div className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full border border-emerald-100/10 bg-black/50">
+                                                  <div
+                                                    className={`h-full rounded-full ${isMax ? 'bg-zinc-500' : 'bg-emerald-300'}`}
+                                                    style={{ width: `${(level / MAX_NEW_EARTH_TANK_UPGRADE_LEVEL) * 100}%` }}
+                                                  />
+                                                </div>
+                                              </div>
+                                            </PremiumCanvasButton>
+                                          );
+                                        })}
+                                      </div>
+                                    </div>
+                                  ) : selectedNewEarthSubmarineColonyId && selectedNewEarthSubmarineLevels && selectedNewEarthSubmarineStats ? (                                    <div className="relative flex h-full min-h-0 flex-col overflow-hidden rounded-xl border border-cyan-300/14 bg-slate-950/72 p-3">
                                       <img
                                         src="/assets/rota4/missions/bg_submarine.webp"
                                         alt=""
@@ -10301,22 +10517,58 @@ const DashboardContent = memo(({
                                           <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_48%,rgba(125,211,252,0.22),transparent_58%),linear-gradient(180deg,rgba(2,6,23,0.12),rgba(2,6,23,0.38))]" />
                                           <motion.div
                                             key="elysium-helicopter-preview"
-                                            animate={{ y: [0, -8, 0, 6, 0], rotate: [0, -1.5, 0, 1.5, 0] }}
+                                            animate={{ y: [0, -5, 0, 4, 0], rotate: [0, -0.8, 0, 0.8, 0] }}
                                             transition={{
-                                              duration: 4.6,
+                                              duration: 4.9,
                                               repeat: Infinity,
                                               ease: 'easeInOut',
                                             }}
-                                            className="relative z-10 flex h-full max-h-[205px] w-full items-center justify-center px-3 py-3 drop-shadow-[0_0_22px_rgba(125,211,252,0.34)]"
+                                            className="relative z-10 h-full max-h-[205px] w-full px-3 py-3 drop-shadow-[0_0_22px_rgba(125,211,252,0.34)]"
                                           >
-                                            <div className="relative h-24 w-48">
-                                              <div className="absolute left-1/2 top-1/2 h-8 w-28 -translate-x-1/2 -translate-y-1/2 rounded-full border border-sky-100/40 bg-sky-300/80 shadow-[0_0_28px_rgba(125,211,252,0.42)]" />
-                                              <div className="absolute left-1/2 top-[45%] h-4 w-48 -translate-x-1/2 rounded-full bg-white/70 blur-[1px]" />
-                                              <div className="absolute left-1/2 top-[42%] h-2 w-44 -translate-x-1/2 rounded-full bg-sky-100/90" />
-                                              <div className="absolute left-[16%] top-1/2 h-3 w-12 -translate-y-1/2 rounded-full bg-slate-300/80" />
-                                              <div className="absolute right-[18%] top-1/2 h-3 w-10 -translate-y-1/2 rounded-full bg-slate-300/80" />
-                                              <div className="absolute left-1/2 top-[62%] h-10 w-2 -translate-x-1/2 rounded-full bg-sky-100/75" />
+                                            <div className="absolute left-1/2 top-1/2 h-[150px] w-[230px] -translate-x-1/2 -translate-y-1/2">
+                                              <img
+                                                src="/assets/rota4/colonys/elysium/aether/aether_helicopter_body.webp"
+                                                alt=""
+                                                aria-hidden="true"
+                                                className="absolute left-1/2 top-1/2 h-[132px] w-[210px] -translate-x-1/2 -translate-y-1/2 object-contain"
+                                              />
+                                              <motion.img
+                                                src="/assets/rota4/colonys/elysium/aether/helice.webp"
+                                                alt=""
+                                                aria-hidden="true"
+                                                animate={{ rotate: 360 }}
+                                                transition={{ duration: 0.18, repeat: Infinity, ease: 'linear' }}
+                                                className="absolute left-[48%] top-[32%] h-[112px] w-[112px] -translate-x-1/2 -translate-y-1/2 object-contain opacity-90"
+                                              />
                                             </div>
+                                            <motion.div
+                                              animate={{ y: [0, -3, 0, 2, 0] }}
+                                              transition={{ duration: 3.2, repeat: Infinity, ease: 'easeInOut' }}
+                                              className="absolute right-[11%] top-[60%] h-[32px] w-[41px]"
+                                            >
+                                              <img
+                                                src="/assets/rota4/colonys/elysium/aether/drone_player.webp"
+                                                alt=""
+                                                aria-hidden="true"
+                                                className="absolute inset-0 h-full w-full object-contain"
+                                              />
+                                              {[
+                                                ['left-[16%]', 'top-[18%]'],
+                                                ['left-[84%]', 'top-[18%]'],
+                                                ['left-[16%]', 'top-[82%]'],
+                                                ['left-[84%]', 'top-[82%]'],
+                                              ].map(([left, top], index) => (
+                                                <motion.img
+                                                  key={`aether-drone-helice-${index}`}
+                                                  src="/assets/rota4/colonys/elysium/aether/drone_helice.webp"
+                                                  alt=""
+                                                  aria-hidden="true"
+                                                  animate={{ rotate: 360 }}
+                                                  transition={{ duration: 0.14, repeat: Infinity, ease: 'linear' }}
+                                                  className={`absolute ${left} ${top} h-[18px] w-[18px] -translate-x-1/2 -translate-y-1/2 object-contain opacity-90`}
+                                                />
+                                              ))}
+                                            </motion.div>
                                           </motion.div>
                                         </div>
                                         <div className="grid min-h-0 grid-rows-[70px_1fr] gap-2">
@@ -12102,14 +12354,4 @@ export const GameDashboard = memo((props: GameDashboardProps) => {
 });
 
 export default GameDashboard;
-
-
-
-
-
-
-
-
-
-
 

@@ -162,6 +162,14 @@
     const playerGunDamage = Math.round(18 * (1 + HELI_UPGRADES.gunDamageBonus / 100));
     const playerMissileDamage = Math.round(175 * (1 + HELI_UPGRADES.missileDamageBonus / 100));
     const droneGunDamage = Math.max(1, Math.round(playerGunDamage / 2));
+    const DRONE_FORMATION_SLOTS = [
+      { x: -160, y: -78, follow: 0.082, phase: 0.4 },
+      { x: -92, y: -126, follow: 0.074, phase: 1.7 },
+      { x: 92, y: -126, follow: 0.068, phase: 2.9 },
+      { x: 160, y: -78, follow: 0.062, phase: 4.1 },
+      { x: 0, y: -184, follow: 0.054, phase: 5.2 },
+    ];
+    const DRONE_FORMATION_BY_COUNT = [[], [4], [1, 2], [1, 2, 4], [0, 1, 2, 3], [0, 1, 2, 3, 4]];
 
     const ENEMY_STATS = {
       common: { hp: 240, shotDamage: 32, cooldown: 1050, radius: 28, label: 'COMUM', scale: 1, score: 100 },
@@ -169,6 +177,9 @@
       ace:    { hp: 700, shotDamage: 40, cooldown: 640,  radius: 40, label: 'ACE',   scale: 1.28, score: 400 },
       boss:   { hp: 1800, shotDamage:52, cooldown: 500,  radius: 68, label: 'BOSS',  scale: 1.9,  score: 2000 },
     };
+    const BOSS_ROTOR_MAX_HP = 320;
+    const BOSS_ROTOR_HIT_RADIUS = 46;
+    const BOSS_CORE_HIT_RADIUS = 48;
 
     const SFX = {
       playerShot:   '/assets/rota4/battles/player/horizon/shoot_rt4.ogg',
@@ -225,6 +236,9 @@
     const aetherRotor = new Image(); let hasAetherRotor = false;
     aetherRotor.onload = () => { hasAetherRotor = true; };
     aetherRotor.src = '/assets/rota4/colonys/elysium/aether/helice.webp';
+    const aetherMissile = new Image(); let hasAetherMissile = false;
+    aetherMissile.onload = () => { hasAetherMissile = true; };
+    aetherMissile.src = '/assets/rota4/colonys/elysium/aether/aether_missil.webp';
     const droneBody = new Image(); let hasDroneBody = false;
     droneBody.onload = () => { hasDroneBody = true; };
     droneBody.src = '/assets/rota4/colonys/elysium/aether/drone_player.webp';
@@ -357,11 +371,14 @@
       particles = []; texts = []; explosions = [];
       crashers = []; playerCrash = null;
       drones = Array.from({ length: HELI_UPGRADES.initialDrones }, (_, index) => ({
-        side: (index - (HELI_UPGRADES.initialDrones - 1) / 2) * 0.86,
+        formationIndex: index,
+        x: player.x,
+        y: player.y - 90,
         hp: PLAYER_MAX_HP / 2,
         maxHp: PLAYER_MAX_HP / 2,
         cd: index * 90,
       }));
+      normalizeDroneFormation();
       maxDroneCount = drones.length;
       radio = []; powerups = []; mines = []; shockwaves = [];
       clouds = createClouds();
@@ -401,9 +418,10 @@
       for (let i = 0; i < count; i++) enemies.push(createEnemy(kind, i, count));
       if (waveIndex === 2 && drones.length === 0) {
         drones.push(
-          { side: -1, hp: PLAYER_MAX_HP / 2, maxHp: PLAYER_MAX_HP / 2, cd: 0 },
-          { side: 1, hp: PLAYER_MAX_HP / 2, maxHp: PLAYER_MAX_HP / 2, cd: 160 }
+          { formationIndex: 0, x: player.x - 70, y: player.y - 80, hp: PLAYER_MAX_HP / 2, maxHp: PLAYER_MAX_HP / 2, cd: 0 },
+          { formationIndex: 1, x: player.x + 70, y: player.y - 80, hp: PLAYER_MAX_HP / 2, maxHp: PLAYER_MAX_HP / 2, cd: 160 }
         );
+        normalizeDroneFormation();
         maxDroneCount = Math.max(maxDroneCount, drones.length);
         pushRadio('Drone Alpha', 'Dois drones aliados entrando em formação.');
       }
@@ -430,6 +448,10 @@
         hitFlash: 0,
         spriteVariant: kind === 'common' ? Math.floor(Math.random() * enemyCommonBodies.length) : 0,
         behaviorPhase: Math.floor(rand(0, 3)),
+        bossParts: kind === 'boss' ? {
+          rotors: Array.from({ length: 4 }, () => ({ hp: BOSS_ROTOR_MAX_HP, maxHp: BOSS_ROTOR_MAX_HP, stoppedAngle: rand(0, Math.PI * 2) })),
+          coreUnlocked: false,
+        } : null,
       };
     }
 
@@ -779,9 +801,15 @@
     function updateDrones(dt, dtScale, now) {
       removeDestroyedDrones();
       normalizeDroneFormation();
-      drones.forEach(d => {
-        d.x = player.x + d.side * 118;
-        d.y = player.y + 58 + Math.sin(now/240 + d.side) * 10;
+      drones.forEach((d, index) => {
+        const slot = DRONE_FORMATION_SLOTS[d.formationSlot ?? 4] || DRONE_FORMATION_SLOTS[4];
+        const swayX = Math.sin(now / 520 + slot.phase) * 4;
+        const swayY = Math.sin(now / 680 + slot.phase * 1.37) * 3;
+        const targetX = clamp(player.x + slot.x + swayX, 28, WIDTH - 28);
+        const targetY = clamp(player.y + slot.y + swayY, 28, HEIGHT - 28);
+        const follow = clamp(slot.follow * dtScale * (1 - Math.min(index, 4) * 0.035), 0.018, 0.16);
+        d.x = Number.isFinite(d.x) ? lerp(d.x, targetX, follow) : targetX;
+        d.y = Number.isFinite(d.y) ? lerp(d.y, targetY, follow) : targetY;
         d.cd -= dt;
         if (d.cd <= 0 && enemies.length) {
           const a = -Math.PI / 2;
@@ -803,9 +831,11 @@
     }
 
     function normalizeDroneFormation() {
-      const count = drones.length;
+      const count = Math.min(drones.length, DRONE_FORMATION_SLOTS.length);
+      const formation = DRONE_FORMATION_BY_COUNT[count] || DRONE_FORMATION_BY_COUNT[DRONE_FORMATION_BY_COUNT.length - 1];
       drones.forEach((drone, index) => {
-        drone.side = count <= 1 ? 0 : (index - (count - 1) / 2) * 1.26;
+        drone.formationIndex = index;
+        drone.formationSlot = formation[index] ?? DRONE_FORMATION_SLOTS.length - 1;
       });
     }
 
@@ -857,7 +887,9 @@
         return;
       }
       drones.push({
-        side: 0,
+        formationIndex: drones.length,
+        x: player.x,
+        y: player.y - 64,
         hp: PLAYER_MAX_HP / 2,
         maxHp: PLAYER_MAX_HP / 2,
         cd: 90,
@@ -887,6 +919,125 @@
       }
     }
 
+    function getBossRotorLayout(u) {
+      const body = hasEnemyBossBody ? enemyBossBody : enemyCommonBodies[2];
+      const bodyRenderH = 248;
+      const bodyRenderW = body.loaded && body.naturalHeight
+        ? bodyRenderH * (body.naturalWidth / body.naturalHeight)
+        : 174;
+      const bodyHubX = 0.5;
+      const bodyHubY = 0.34;
+      const rotorPoints = [
+        { x: 0.118, y: 0.088, spin: 1 },
+        { x: 0.882, y: 0.088, spin: -1 },
+        { x: 0.118, y: 0.765, spin: -1 },
+        { x: 0.882, y: 0.765, spin: 1 },
+      ];
+      return { bodyRenderW, bodyRenderH, bodyHubX, bodyHubY, rotorPoints };
+    }
+
+    function bossLocalToWorld(u, lx, ly) {
+      const scale = u.scale || 1;
+      const rotation = u.angle - Math.PI / 2;
+      const cos = Math.cos(rotation);
+      const sin = Math.sin(rotation);
+      return {
+        x: u.x + (lx * cos - ly * sin) * scale,
+        y: u.y + (lx * sin + ly * cos) * scale,
+      };
+    }
+
+    function bossWorldToLocal(u, x, y) {
+      const scale = u.scale || 1;
+      const rotation = u.angle - Math.PI / 2;
+      const dx = (x - u.x) / scale;
+      const dy = (y - u.y) / scale;
+      const cos = Math.cos(-rotation);
+      const sin = Math.sin(-rotation);
+      return {
+        x: dx * cos - dy * sin,
+        y: dx * sin + dy * cos,
+      };
+    }
+
+    function bossRotorLocalPoint(u, rotorIndex) {
+      const layout = getBossRotorLayout(u);
+      const point = layout.rotorPoints[rotorIndex];
+      return {
+        x: (point.x - layout.bodyHubX) * layout.bodyRenderW,
+        y: (point.y - layout.bodyHubY) * layout.bodyRenderH,
+      };
+    }
+
+    function bossRotorWorldPoint(u, rotorIndex) {
+      const local = bossRotorLocalPoint(u, rotorIndex);
+      return bossLocalToWorld(u, local.x, local.y);
+    }
+
+    function bossRotorsDestroyed(u) {
+      return !!u.bossParts && u.bossParts.rotors.every(part => part.hp <= 0);
+    }
+
+    function bossMissileAimPoint(u, missile) {
+      if (!u || u.kind !== 'boss' || !u.bossParts || bossRotorsDestroyed(u)) return u;
+      let best = null;
+      u.bossParts.rotors.forEach((part, index) => {
+        if (part.hp <= 0) return;
+        const point = bossRotorWorldPoint(u, index);
+        const distance = Math.hypot(point.x - missile.x, point.y - missile.y);
+        if (!best || distance < best.distance) best = { ...point, distance };
+      });
+      return best || u;
+    }
+
+    function damageBossTarget(e, x, y, damage, sourceColor, isMissile = false) {
+      if (e.kind !== 'boss' || !e.bossParts) return { hit: false, destroyed: false };
+      const local = bossWorldToLocal(e, x, y);
+      let closestRotor = null;
+      e.bossParts.rotors.forEach((part, index) => {
+        if (part.hp <= 0) return;
+        const point = bossRotorLocalPoint(e, index);
+        const distance = Math.hypot(local.x - point.x, local.y - point.y);
+        if (!closestRotor || distance < closestRotor.distance) closestRotor = { part, index, point, distance };
+      });
+
+      if (closestRotor && closestRotor.distance <= BOSS_ROTOR_HIT_RADIUS) {
+        closestRotor.part.hp = Math.max(0, closestRotor.part.hp - damage);
+        e.hitFlash = Math.max(e.hitFlash || 0, 70);
+        const worldPoint = bossRotorWorldPoint(e, closestRotor.index);
+        burst(x, y, sourceColor, isMissile ? 8 : 5, isMissile ? 5 : 3, false);
+        addText(worldPoint.x + rand(-10, 10), worldPoint.y - 12, `H${closestRotor.index + 1} -${damage}`, '#fbbf24', 620);
+        if (closestRotor.part.hp <= 0) {
+          closestRotor.part.hp = 0;
+          closestRotor.part.stoppedAngle = rand(0, Math.PI * 2);
+          addText(worldPoint.x - 22, worldPoint.y - 24, 'HÉLICE OFF', '#fb923c', 980);
+          bigExplosion(worldPoint.x, worldPoint.y, 0.72, '#fb923c');
+          if (bossRotorsDestroyed(e)) {
+            e.bossParts.coreUnlocked = true;
+            pushRadio('Comando', 'Hélices destruídas. Núcleo central vulnerável!');
+            addText(e.x - 58, e.y + 12, 'NÚCLEO VULNERÁVEL', '#f0abfc', 1300);
+          }
+        }
+        return { hit: true, destroyed: false };
+      }
+
+      const coreDistance = Math.hypot(local.x, local.y);
+      if (coreDistance <= BOSS_CORE_HIT_RADIUS || Math.hypot(e.x - x, e.y - y) < e.radius * e.scale * 0.7) {
+        if (!bossRotorsDestroyed(e)) {
+          e.hitFlash = Math.max(e.hitFlash || 0, 42);
+          addText(x + rand(-8, 8), y - 14, 'HÉLICES PRIMEIRO', '#93c5fd', 650);
+          burst(x, y, '#93c5fd', 4, 2.6, false);
+          return { hit: true, destroyed: false };
+        }
+        e.hp -= damage;
+        e.hitFlash = Math.max(e.hitFlash || 0, 120);
+        burst(x, y, sourceColor, isMissile ? 12 : 6, isMissile ? 6 : 3.6, false);
+        addText(x + rand(-10, 10), y - 10, `NÚCLEO -${damage}`, '#f0abfc', 720);
+        return { hit: true, destroyed: e.hp <= 0 };
+      }
+
+      return { hit: false, destroyed: false };
+    }
     function updateBullets(dt, dtScale) {
       for (let i = bullets.length - 1; i >= 0; i--) {
         const b = bullets[i];
@@ -894,6 +1045,15 @@
         if (b.life <= 0 || b.x < -20 || b.x > WIDTH + 20 || b.y < -20 || b.y > HEIGHT + 20) { bullets.splice(i, 1); continue; }
         for (let j = enemies.length - 1; j >= 0; j--) {
           const e = enemies[j];
+          if (e.kind === 'boss') {
+            const bossHit = damageBossTarget(e, b.x, b.y, b.damage, b.drone ? '#a7f3d0' : '#67e8f9');
+            if (bossHit.hit) {
+              bullets.splice(i, 1);
+              if (bossHit.destroyed) killEnemy(j);
+              break;
+            }
+            continue;
+          }
           if (Math.hypot(e.x - b.x, e.y - b.y) < e.radius * e.scale * 0.7) {
             e.hp -= b.damage; e.hitFlash = 80;
             burst(b.x, b.y, b.drone ? '#a7f3d0' : '#67e8f9', b.drone ? 3 : 5, 3, false);
@@ -910,7 +1070,8 @@
     function updateMissiles(dt, dtScale) {
       for (let i = missiles.length - 1; i >= 0; i--) {
         const m = missiles[i];
-        const target = m.from === 'player' ? enemies.find(e => e.id === m.targetId) : player;
+        const rawTarget = m.from === 'player' ? enemies.find(e => e.id === m.targetId) : player;
+        const target = m.from === 'player' && rawTarget?.kind === 'boss' ? bossMissileAimPoint(rawTarget, m) : rawTarget;
         if (target) {
           const desired = angleTo(m, target);
           const current = Math.atan2(m.vy, m.vx);
@@ -931,6 +1092,16 @@
         if (m.from === 'player') {
           for (let j = enemies.length - 1; j >= 0; j--) {
             const e = enemies[j];
+            if (e.kind === 'boss') {
+              const bossHit = damageBossTarget(e, m.x, m.y, m.damage, '#38bdf8', true);
+              if (bossHit.hit) {
+                bigExplosion(m.x, m.y, 1.1, '#bae6fd');
+                missiles.splice(i, 1);
+                if (bossHit.destroyed) killEnemy(j);
+                break;
+              }
+              continue;
+            }
             const hitRadius = e.radius * e.scale * (m.guaranteed ? 1.42 : 0.75);
             if (Math.hypot(e.x - m.x, e.y - m.y) < hitRadius) {
               e.hp -= m.damage; e.hitFlash = 120;
@@ -1116,13 +1287,13 @@
 
       drawBackground(now);
       drawMines(now);
-      drawDrones();
       enemies.forEach(e => drawHelicopter(e, false, now));
       drawCrashes(now);
       if (!playerCrash) {
         drawPlayerDamageTrail();
         drawHelicopter(player, true, now);
       }
+      drawDrones();
       drawPowerups(now);
       drawProjectiles(now);
       drawParticles();
@@ -1571,26 +1742,98 @@
       drawHealthBar(u, false);
     }
 
+    function drawBossPartBars(u) {
+      if (!u.bossParts) return;
+      u.bossParts.rotors.forEach((part, index) => {
+        const point = bossRotorWorldPoint(u, index);
+        const pct = clamp(part.hp / part.maxHp, 0, 1);
+        const w = 48;
+        const y = point.y - 31;
+        ctx.save();
+        ctx.fillStyle = 'rgba(0,0,0,0.68)';
+        ctx.fillRect(point.x - w / 2 - 1, y - 1, w + 2, 7);
+        ctx.fillStyle = 'rgba(255,255,255,0.1)';
+        ctx.fillRect(point.x - w / 2, y, w, 5);
+        ctx.fillStyle = pct > 0.5 ? '#facc15' : pct > 0.18 ? '#fb923c' : '#ef4444';
+        ctx.fillRect(point.x - w / 2, y, w * pct, 5);
+        ctx.fillStyle = part.hp <= 0 ? '#fb923c' : '#fff7ad';
+        ctx.font = '700 9px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText(part.hp <= 0 ? 'OFF' : `H${index + 1}`, point.x, y - 4);
+        ctx.textAlign = 'left';
+        ctx.restore();
+      });
+
+      const coreUnlocked = bossRotorsDestroyed(u);
+      ctx.save();
+      ctx.font = '900 10px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillStyle = coreUnlocked ? '#f0abfc' : 'rgba(186,230,253,0.78)';
+      ctx.fillText(coreUnlocked ? 'NÚCLEO VULNERÁVEL' : 'NÚCLEO BLOQUEADO', u.x, u.y + 58);
+      ctx.textAlign = 'left';
+      ctx.restore();
+    }
+
+    function drawBossRotorDamage(u, rotorIndex, rx, ry, now) {
+      const part = u.bossParts?.rotors?.[rotorIndex];
+      if (!part || part.hp > 0) return;
+      const phase = now / 170 + rotorIndex * 1.73;
+      const pulse = 0.78 + Math.sin(phase) * 0.18;
+      ctx.save();
+      ctx.globalCompositeOperation = 'source-over';
+      for (let i = 0; i < 5; i++) {
+        const drift = (now / (38 + i * 11) + rotorIndex * 17 + i * 9) % 28;
+        const sx = rx - 14 + Math.sin(phase + i) * 10 + i * 5;
+        const sy = ry - 8 - drift;
+        const size = (14 + i * 4) * (0.75 + pulse * 0.25);
+        ctx.globalAlpha = Math.max(0, 0.34 - i * 0.035 - drift / 105);
+        ctx.fillStyle = i < 2 ? 'rgba(20,24,31,0.82)' : 'rgba(83,92,104,0.58)';
+        ctx.beginPath();
+        ctx.ellipse(sx, sy, size * 1.15, size * 0.72, Math.sin(phase + i) * 0.45, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.globalAlpha = 0.9;
+      const flameX = rx + 11 + Math.sin(phase * 1.4) * 4;
+      const flameY = ry + 15;
+      const flameH = 30 + pulse * 12;
+      const flameW = 15 + pulse * 7;
+      const flame = ctx.createRadialGradient(flameX, flameY, 0, flameX, flameY + 8, flameH);
+      flame.addColorStop(0, 'rgba(255,255,235,0.95)');
+      flame.addColorStop(0.28, 'rgba(251,191,36,0.86)');
+      flame.addColorStop(0.62, 'rgba(251,113,20,0.58)');
+      flame.addColorStop(1, 'rgba(127,29,29,0)');
+      ctx.fillStyle = flame;
+      ctx.beginPath();
+      ctx.moveTo(flameX - flameW * 0.55, flameY + 4);
+      ctx.quadraticCurveTo(flameX - flameW, flameY + flameH * 0.42, flameX - 2, flameY + flameH);
+      ctx.quadraticCurveTo(flameX + flameW * 0.9, flameY + flameH * 0.35, flameX + flameW * 0.52, flameY + 1);
+      ctx.quadraticCurveTo(flameX + 2, flameY + 11, flameX - flameW * 0.55, flameY + 4);
+      ctx.fill();
+
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.globalAlpha = 0.62;
+      ctx.fillStyle = 'rgba(7,10,16,0.78)';
+      ctx.beginPath();
+      ctx.arc(rx - 3, ry + 4, 17 + pulse * 4, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
     function drawEnemyBossHelicopter(u, now) {
       const hpPct = u.hp !== undefined && u.maxHp ? clamp(u.hp/u.maxHp,0,1) : 1;
       const body = hasEnemyBossBody ? enemyBossBody : enemyCommonBodies[2];
-      const bodyRenderH = 248;
-      const bodyRenderW = body.loaded && body.naturalHeight
-        ? bodyRenderH * (body.naturalWidth / body.naturalHeight)
-        : 174;
-      const bodyHubX = 0.5;
-      const bodyHubY = 0.34;
+      const layout = getBossRotorLayout(u);
+      const bodyRenderH = layout.bodyRenderH;
+      const bodyRenderW = layout.bodyRenderW;
+      const bodyHubX = layout.bodyHubX;
+      const bodyHubY = layout.bodyHubY;
       const rotorRenderW = 78;
       const rotorRenderH = enemyCommonRotor.naturalHeight && enemyCommonRotor.naturalWidth
         ? rotorRenderW * (enemyCommonRotor.naturalHeight / enemyCommonRotor.naturalWidth)
         : 78;
       const rotation = u.angle - Math.PI / 2;
-      const rotorPoints = [
-        { x: 0.118, y: 0.088, spin: 1 },
-        { x: 0.882, y: 0.088, spin: -1 },
-        { x: 0.118, y: 0.765, spin: -1 },
-        { x: 0.882, y: 0.765, spin: 1 },
-      ];
+      const rotorPoints = layout.rotorPoints;
 
       ctx.save();
       ctx.translate(u.x, u.y);
@@ -1617,19 +1860,32 @@
       }
 
       if (hasEnemyCommonRotor) {
-        rotorPoints.forEach(point => {
+        rotorPoints.forEach((point, index) => {
           const rx = (point.x - bodyHubX) * bodyRenderW;
           const ry = (point.y - bodyHubY) * bodyRenderH;
+          const rotorHp = u.bossParts?.rotors?.[index]?.hp ?? 1;
           ctx.save();
           ctx.translate(rx, ry);
-          ctx.rotate((now / 22) * point.spin);
-          ctx.globalAlpha = 0.96;
+          ctx.rotate(rotorHp <= 0 ? (u.bossParts?.rotors?.[index]?.stoppedAngle || 0) : (now / 22) * point.spin);
+          ctx.globalAlpha = rotorHp <= 0 ? 0.84 : 0.96;
           ctx.drawImage(enemyCommonRotor, -rotorRenderW / 2, -rotorRenderH / 2, rotorRenderW, rotorRenderH);
           ctx.restore();
+          drawBossRotorDamage(u, index, rx, ry, now);
         });
       }
 
+      if (u.bossParts && !bossRotorsDestroyed(u)) {
+        ctx.save();
+        ctx.strokeStyle = 'rgba(147,197,253,0.72)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(0, 0, BOSS_CORE_HIT_RADIUS, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+      }
+
       ctx.restore();
+      drawBossPartBars(u);
       drawHealthBar(u, false);
     }
 
@@ -1731,15 +1987,33 @@
         const a = Math.atan2(m.vy, m.vx);
         ctx.save();
         ctx.translate(m.x, m.y);
-        ctx.rotate(a);
+        const useAetherMissileSprite = m.from === 'player' && hasAetherMissile;
+        ctx.rotate(useAetherMissileSprite ? a + Math.PI / 2 : a);
         ctx.shadowColor = m.from === 'player' ? '#38bdf8' : '#fb7185';
         ctx.shadowBlur = 8;
-        ctx.fillStyle = m.from === 'player' ? '#e0f2fe' : '#fecdd3';
-        ctx.fillRect(-11,-3,22,6);
-        ctx.fillStyle = m.from === 'player' ? '#38bdf8' : '#fb7185';
-        ctx.beginPath(); ctx.moveTo(12,0); ctx.lineTo(2,-6); ctx.lineTo(2,6); ctx.closePath(); ctx.fill();
-        ctx.fillStyle = '#fb923c';
-        ctx.beginPath(); ctx.moveTo(-11,0); ctx.lineTo(-24,-5); ctx.lineTo(-19,0); ctx.lineTo(-24,5); ctx.closePath(); ctx.fill();
+        if (useAetherMissileSprite) {
+          const missileW = 18;
+          const missileH = aetherMissile.naturalWidth && aetherMissile.naturalHeight
+            ? missileW * (aetherMissile.naturalHeight / aetherMissile.naturalWidth)
+            : 16;
+          ctx.drawImage(aetherMissile, -missileW / 2, -missileH / 2, missileW, missileH);
+          ctx.globalAlpha = 0.55;
+          ctx.fillStyle = '#fb923c';
+          ctx.beginPath();
+          ctx.moveTo(0, missileH / 2 - 3);
+          ctx.lineTo(-6, missileH / 2 + 13);
+          ctx.lineTo(0, missileH / 2 + 8);
+          ctx.lineTo(6, missileH / 2 + 13);
+          ctx.closePath();
+          ctx.fill();
+        } else {
+          ctx.fillStyle = m.from === 'player' ? '#e0f2fe' : '#fecdd3';
+          ctx.fillRect(-11,-3,22,6);
+          ctx.fillStyle = m.from === 'player' ? '#38bdf8' : '#fb7185';
+          ctx.beginPath(); ctx.moveTo(12,0); ctx.lineTo(2,-6); ctx.lineTo(2,6); ctx.closePath(); ctx.fill();
+          ctx.fillStyle = '#fb923c';
+          ctx.beginPath(); ctx.moveTo(-11,0); ctx.lineTo(-24,-5); ctx.lineTo(-19,0); ctx.lineTo(-24,5); ctx.closePath(); ctx.fill();
+        }
         ctx.restore();
       });
     }
@@ -1990,3 +2264,4 @@
   </script>
 </body>
 </html>
+

@@ -313,6 +313,7 @@ const route4NewEarthTankSpriteImages = [
 const route4NewEarthAetherHelicopterImages = [
   '/assets/rota4/colonys/elysium/aether/aether_helicopter_body.webp',
   '/assets/rota4/colonys/elysium/aether/helice.webp',
+  '/assets/rota4/colonys/elysium/aether/aether_missil.webp',
   '/assets/rota4/colonys/elysium/aether/drone_player.webp',
   '/assets/rota4/colonys/elysium/aether/drone_helice.webp',
 ];
