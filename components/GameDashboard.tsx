@@ -1757,6 +1757,13 @@ const DashboardContent = memo(({
   const lastProcessedYearRef = React.useRef(-1);
   const autoClaimMissionsRef = React.useRef(autoClaimMissions);
   const route4PopulationMilestoneRef = React.useRef<Set<number>>(new Set<number>());
+  const newEarthSubmarinesRef = React.useRef(newEarthSubmarines);
+  const newEarthHelicoptersRef = React.useRef(newEarthHelicopters);
+  const newEarthTanksRef = React.useRef(newEarthTanks);
+  const newEarthSurfaceBattlesRef = React.useRef(newEarthSurfaceBattles);
+  const newEarthMuseumTreasuresRef = React.useRef(newEarthMuseumTreasures);
+  const newEarthWarIntelCollectionRef = React.useRef(newEarthWarIntelCollection);
+  const newEarthAchievementMetricsRef = React.useRef(newEarthAchievementMetrics);
   // Last-flushed baselines for the 500ms flush loop.
   // The flush loop must compare against these, NOT against the stale Redux state snapshot.
   const lastFlushedQcRef = React.useRef(qc);
@@ -1844,6 +1851,24 @@ const DashboardContent = memo(({
   useEffect(() => {
     coloniesRef.current = colonies;
   }, [colonies]);
+
+  useEffect(() => {
+    newEarthSubmarinesRef.current = newEarthSubmarines;
+    newEarthHelicoptersRef.current = newEarthHelicopters;
+    newEarthTanksRef.current = newEarthTanks;
+    newEarthSurfaceBattlesRef.current = newEarthSurfaceBattles;
+    newEarthMuseumTreasuresRef.current = newEarthMuseumTreasures;
+    newEarthWarIntelCollectionRef.current = newEarthWarIntelCollection;
+    newEarthAchievementMetricsRef.current = newEarthAchievementMetrics;
+  }, [
+    newEarthSubmarines,
+    newEarthHelicopters,
+    newEarthTanks,
+    newEarthSurfaceBattles,
+    newEarthMuseumTreasures,
+    newEarthWarIntelCollection,
+    newEarthAchievementMetrics,
+  ]);
 
 
   // 3. Missions, Achievements & History
@@ -4610,6 +4635,14 @@ const DashboardContent = memo(({
       hydrosphere: hydrosphereRef.current,
       biosphere: biosphereRef.current,
       colonies: coloniesRef.current,
+      newEarthSubmarines: newEarthSubmarinesRef.current,
+      newEarthHelicopters: newEarthHelicoptersRef.current,
+      newEarthTanks: newEarthTanksRef.current,
+      newEarthSurfaceBattles: newEarthSurfaceBattlesRef.current,
+      newEarthMuseumTreasures: newEarthMuseumTreasuresRef.current,
+      newEarthWarIntel: newEarthWarIntelCollectionRef.current,
+      newEarthAchievementMetrics: newEarthAchievementMetricsRef.current,
+      secretAlienNameUnlocked: typeof localStorage !== 'undefined' && localStorage.getItem('qch_secret_alien_name_unlocked') === 'true',
       unlockedVoidAircraft: unlockedVoidAircraftRef.current,
       voidAircraftConstruction: voidAircraftConstructionRef.current,
       voidAutoShipmentUnlocked: voidAutoShipmentUnlockedRef.current,
@@ -6519,7 +6552,15 @@ const DashboardContent = memo(({
       robotRepairProgress: robotRepairProgressRef.current,
       isRobotRepaired: isRobotRepairedRef.current,
       battleShipUpgradeLevel: battleShipUpgradeLevelRef.current,
-      colonies
+      colonies,
+      newEarthSubmarines,
+      newEarthHelicopters,
+      newEarthTanks,
+      newEarthSurfaceBattles,
+      newEarthMuseumTreasures,
+      newEarthWarIntel: newEarthWarIntelCollection,
+      newEarthAchievementMetrics,
+      secretAlienNameUnlocked: typeof localStorage !== 'undefined' && localStorage.getItem('qch_secret_alien_name_unlocked') === 'true'
     };
 
     try {

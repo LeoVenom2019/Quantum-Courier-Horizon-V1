@@ -13,7 +13,7 @@ import { useSFX } from '@/hooks/useSFX';
 import { useSoundMaster } from '@/hooks/useSoundMaster';
 import { HorizonRadioModal } from '@/components/HorizonRadioModal';
 import { GameStorage } from '@/lib/game-storage';
-import { SaveManager } from '@/lib/save-manager';
+import { COLONY_SAVE_STORAGE_KEYS, SaveManager } from '@/lib/save-manager';
 import { Language, t } from '@/lib/i18n';
 import { ThemeColor } from '@/lib/game-data';
 import {
@@ -1197,7 +1197,7 @@ export default function GameHome() {
   
 
 
-  const resetStorageKeys = ['time_travel_save', 'colonies_data', 'history_data', 'qch_settings', 'arcade_card_reward_milestones'];
+  const resetStorageKeys = ['time_travel_save', 'time_travel_save_backup_last_valid', 'time_travel_save_backup_corrupted', 'history_data', 'qch_settings', 'jukebox_settings', 'qch_secret_alien_name_unlocked', ...COLONY_SAVE_STORAGE_KEYS];
 
   const clearProgressStorage = async (options?: { allowImmediateSave?: boolean }) => {
     GameStorage.markReset(10000);
@@ -1312,24 +1312,15 @@ export default function GameHome() {
   };
 
   const handleExportSave = async () => {
+    const supplementalEntries = await Promise.all(
+      COLONY_SAVE_STORAGE_KEYS.map(async key => [key, await GameStorage.load(key)] as const)
+    );
     const data = {
       time_travel_save: await GameStorage.load('time_travel_save'),
-      colonies_data: await GameStorage.load('colonies_data'),
-      colony_cards_data: await GameStorage.load('colony_cards_data'),
-      colony_card_levels: await GameStorage.load('colony_card_levels'),
-      colony_search_upgrade_levels: await GameStorage.load('colony_search_upgrade_levels'),
-      colony_active_search: await GameStorage.load('colony_active_search'),
-      colony_search_threat_bonus: await GameStorage.load('colony_search_threat_bonus'),
-      horizon_ship_xp: await GameStorage.load('horizon_ship_xp'),
-      route4_defense_battle_level: await GameStorage.load('route4_defense_battle_level'),
-      battle_cards_loadout: await GameStorage.load('battle_cards_loadout'),
-      battle_card_legendary_pity: await GameStorage.load('battle_card_legendary_pity'),
-      colony_supplies_data: await GameStorage.load('colony_supplies_data'),
-      defense_special_loadout: await GameStorage.load('defense_special_loadout'),
-      colony_defense_threats: await GameStorage.load('colony_defense_threats'),
-      arcade_card_reward_milestones: await GameStorage.load('arcade_card_reward_milestones'),
+      ...Object.fromEntries(supplementalEntries),
+      qch_secret_alien_name_unlocked: localStorage.getItem('qch_secret_alien_name_unlocked') === 'true',
       export_date: new Date().toISOString(),
-      version: '1.2'
+      version: '1.3'
     };
 
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
@@ -1353,20 +1344,14 @@ export default function GameHome() {
       try {
         const data = JSON.parse(e.target?.result as string);
         if (data.time_travel_save) await GameStorage.save(data.time_travel_save, 'time_travel_save');
-        if (data.colonies_data) await GameStorage.save(data.colonies_data, 'colonies_data');
-        if (data.colony_cards_data) await GameStorage.save(data.colony_cards_data, 'colony_cards_data');
-        if (data.colony_card_levels) await GameStorage.save(data.colony_card_levels, 'colony_card_levels');
-        if (data.colony_search_upgrade_levels) await GameStorage.save(data.colony_search_upgrade_levels, 'colony_search_upgrade_levels');
-        if (data.colony_active_search) await GameStorage.save(data.colony_active_search, 'colony_active_search');
-        if (data.colony_search_threat_bonus) await GameStorage.save(data.colony_search_threat_bonus, 'colony_search_threat_bonus');
-        if (data.horizon_ship_xp !== undefined) await GameStorage.save(data.horizon_ship_xp, 'horizon_ship_xp');
-        if (data.route4_defense_battle_level !== undefined) await GameStorage.save(data.route4_defense_battle_level, 'route4_defense_battle_level');
-        if (data.battle_cards_loadout) await GameStorage.save(data.battle_cards_loadout, 'battle_cards_loadout');
-        if (data.battle_card_legendary_pity !== undefined) await GameStorage.save(data.battle_card_legendary_pity, 'battle_card_legendary_pity');
-        if (data.colony_supplies_data) await GameStorage.save(data.colony_supplies_data, 'colony_supplies_data');
-        if (data.defense_special_loadout) await GameStorage.save(data.defense_special_loadout, 'defense_special_loadout');
-        if (data.colony_defense_threats) await GameStorage.save(data.colony_defense_threats, 'colony_defense_threats');
-        if (data.arcade_card_reward_milestones) await GameStorage.save(data.arcade_card_reward_milestones, 'arcade_card_reward_milestones');
+        for (const key of COLONY_SAVE_STORAGE_KEYS) {
+          if (Object.prototype.hasOwnProperty.call(data, key)) {
+            await GameStorage.save(data[key], key);
+          }
+        }
+        if (data.qch_secret_alien_name_unlocked === true) {
+          localStorage.setItem('qch_secret_alien_name_unlocked', 'true');
+        }
         
         playSfx('click');
         setTimeout(() => window.location.reload(), 500);

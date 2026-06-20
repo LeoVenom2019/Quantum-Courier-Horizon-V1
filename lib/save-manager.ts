@@ -1,4 +1,4 @@
-export const CURRENT_SAVE_VERSION = "1.2.2";
+export const CURRENT_SAVE_VERSION = "1.3.0";
 
 const VALID_ROUTE_TIERS = new Set(['Solar', 'Interstellar', 'Void', 'Earth']);
 
@@ -25,6 +25,9 @@ const hasRoute4SaveSignals = (data: any): boolean => {
     hasArrayItems(colonyStorage.colonies_data) ||
     Boolean(colonySystem.newEarthMissions || colonyStorage.new_earth_missions) ||
     Boolean(colonySystem.newEarthSubmarines || colonyStorage.new_earth_submarines) ||
+    Boolean(colonySystem.newEarthHelicopters || colonyStorage.new_earth_helicopters) ||
+    Boolean(colonySystem.newEarthTanks || colonyStorage.new_earth_tanks) ||
+    Boolean(colonySystem.newEarthSurfaceBattles || colonyStorage.new_earth_surface_battles) ||
     Boolean(colonySystem.newEarthMuseumTreasures || colonyStorage.new_earth_museum_treasures) ||
     Boolean(colonySystem.newEarthWarIntel || colonyStorage.new_earth_war_intel) ||
     Boolean(colonySystem.newEarthAchievementMetrics || colonyStorage.new_earth_achievement_metrics)
@@ -61,6 +64,9 @@ export const COLONY_SAVE_STORAGE_KEYS = [
   'arcade_card_reward_milestones',
   'new_earth_missions',
   'new_earth_submarines',
+  'new_earth_helicopters',
+  'new_earth_tanks',
+  'new_earth_surface_battles',
   'new_earth_museum_treasures',
   'new_earth_war_intel',
   'new_earth_achievement_metrics',
@@ -70,6 +76,56 @@ export const COLONY_SAVE_STORAGE_KEYS = [
 export type ColonySaveStorageKey = typeof COLONY_SAVE_STORAGE_KEYS[number];
 
 const MAX_PENDING_DEFENSE_THREATS = 6;
+
+const isPlainObject = (value: unknown): value is Record<string, any> => (
+  Boolean(value) && typeof value === 'object' && !Array.isArray(value)
+);
+
+const deepMergeSave = <T extends Record<string, any>>(defaults: T, value: any): T => {
+  if (!isPlainObject(value)) return defaults;
+  const result: Record<string, any> = { ...defaults };
+
+  Object.entries(value).forEach(([key, incoming]) => {
+    const fallback = result[key];
+    if (Array.isArray(fallback)) {
+      result[key] = Array.isArray(incoming) ? incoming : fallback;
+      return;
+    }
+    if (isPlainObject(fallback)) {
+      result[key] = deepMergeSave(fallback, incoming);
+      return;
+    }
+    if (incoming !== undefined && incoming !== null) result[key] = incoming;
+  });
+
+  return result as T;
+};
+
+const safeNumber = (value: unknown, fallback = 0, min = 0, max = Number.MAX_SAFE_INTEGER) => {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return fallback;
+  return Math.min(max, Math.max(min, numeric));
+};
+
+const sanitizeNumberRecord = (value: unknown): Record<string, number> => {
+  if (!isPlainObject(value)) return {};
+  return Object.entries(value).reduce((acc, [key, raw]) => {
+    acc[key] = safeNumber(raw, 0);
+    return acc;
+  }, {} as Record<string, number>);
+};
+
+const sanitizeBooleanRecord = (value: unknown): Record<string, boolean> => {
+  if (!isPlainObject(value)) return {};
+  return Object.entries(value).reduce((acc, [key, raw]) => {
+    acc[key] = Boolean(raw);
+    return acc;
+  }, {} as Record<string, boolean>);
+};
+
+const sanitizeStringArray = (value: unknown): string[] => (
+  Array.isArray(value) ? Array.from(new Set(value.filter(item => typeof item === 'string'))) : []
+);
 
 export interface ColonySystemSaveData {
   colonies: any[];
@@ -90,9 +146,11 @@ export interface ColonySystemSaveData {
   arcadeCardRewardMilestones: Record<string, any>;
   newEarthMissions: any;
   newEarthSubmarines: any;
+  newEarthHelicopters: any;
+  newEarthTanks: any;
+  newEarthSurfaceBattles: any;
   newEarthMuseumTreasures: any;
-  newEarthWarIntel: any;
-    newEarthAchievementMetrics: any;
+  newEarthWarIntel: any;  newEarthAchievementMetrics: any;
   storage: Partial<Record<ColonySaveStorageKey, any>>;
 }
 
@@ -151,6 +209,9 @@ const createColonySystemSave = (flatData: any): ColonySystemSaveData => {
   const arcadeCardRewardMilestones = getFlatOrStorageValue(flatData, 'arcadeCardRewardMilestones', 'arcade_card_reward_milestones', {});
   const newEarthMissions = getFlatOrStorageValue(flatData, 'newEarthMissions', 'new_earth_missions', null);
   const newEarthSubmarines = getFlatOrStorageValue(flatData, 'newEarthSubmarines', 'new_earth_submarines', null);
+  const newEarthHelicopters = getFlatOrStorageValue(flatData, 'newEarthHelicopters', 'new_earth_helicopters', null);
+  const newEarthTanks = getFlatOrStorageValue(flatData, 'newEarthTanks', 'new_earth_tanks', null);
+  const newEarthSurfaceBattles = getFlatOrStorageValue(flatData, 'newEarthSurfaceBattles', 'new_earth_surface_battles', null);
   const newEarthMuseumTreasures = getFlatOrStorageValue(flatData, 'newEarthMuseumTreasures', 'new_earth_museum_treasures', {});
   const newEarthWarIntel = getFlatOrStorageValue(flatData, 'newEarthWarIntel', 'new_earth_war_intel', {});
   const newEarthAchievementMetrics = getFlatOrStorageValue(flatData, 'newEarthAchievementMetrics', 'new_earth_achievement_metrics', {});
@@ -184,6 +245,9 @@ const createColonySystemSave = (flatData: any): ColonySystemSaveData => {
     arcadeCardRewardMilestones: arcadeCardRewardMilestones && typeof arcadeCardRewardMilestones === 'object' ? arcadeCardRewardMilestones : {},
     newEarthMissions: newEarthMissions && typeof newEarthMissions === 'object' ? newEarthMissions : null,
     newEarthSubmarines: newEarthSubmarines && typeof newEarthSubmarines === 'object' ? newEarthSubmarines : null,
+    newEarthHelicopters: newEarthHelicopters && typeof newEarthHelicopters === 'object' ? newEarthHelicopters : null,
+    newEarthTanks: newEarthTanks && typeof newEarthTanks === 'object' ? newEarthTanks : null,
+    newEarthSurfaceBattles: newEarthSurfaceBattles && typeof newEarthSurfaceBattles === 'object' ? newEarthSurfaceBattles : null,
     newEarthMuseumTreasures: newEarthMuseumTreasures && typeof newEarthMuseumTreasures === 'object' ? newEarthMuseumTreasures : {},
     newEarthWarIntel: newEarthWarIntel && typeof newEarthWarIntel === 'object' ? newEarthWarIntel : {},
     newEarthAchievementMetrics: newEarthAchievementMetrics && typeof newEarthAchievementMetrics === 'object' ? newEarthAchievementMetrics : {},
@@ -205,6 +269,9 @@ const createColonySystemSave = (flatData: any): ColonySystemSaveData => {
       arcade_card_reward_milestones: arcadeCardRewardMilestones && typeof arcadeCardRewardMilestones === 'object' ? arcadeCardRewardMilestones : {},
       new_earth_missions: newEarthMissions && typeof newEarthMissions === 'object' ? newEarthMissions : null,
       new_earth_submarines: newEarthSubmarines && typeof newEarthSubmarines === 'object' ? newEarthSubmarines : null,
+      new_earth_helicopters: newEarthHelicopters && typeof newEarthHelicopters === 'object' ? newEarthHelicopters : null,
+      new_earth_tanks: newEarthTanks && typeof newEarthTanks === 'object' ? newEarthTanks : null,
+      new_earth_surface_battles: newEarthSurfaceBattles && typeof newEarthSurfaceBattles === 'object' ? newEarthSurfaceBattles : null,
       new_earth_museum_treasures: newEarthMuseumTreasures && typeof newEarthMuseumTreasures === 'object' ? newEarthMuseumTreasures : {},
       new_earth_war_intel: newEarthWarIntel && typeof newEarthWarIntel === 'object' ? newEarthWarIntel : {},
       new_earth_achievement_metrics: newEarthAchievementMetrics && typeof newEarthAchievementMetrics === 'object' ? newEarthAchievementMetrics : {},
@@ -242,6 +309,7 @@ export interface ModularSaveData {
     solarEnergy: number;
     aetherionTubes: number;
     hasSeenRoute2UnlockMessage: boolean;
+    secretAlienNameUnlocked: boolean;
   };
   routes: {
     unlockedRouteIds: string[];
@@ -373,7 +441,9 @@ export const SaveManager = {
         miningWaste: flatData.miningWaste || 0,
         solarEnergy: flatData.solarEnergy || 0,
         aetherionTubes: flatData.aetherionTubes || 0,
-        hasSeenRoute2UnlockMessage: flatData.hasSeenRoute2UnlockMessage || false
+        hasSeenRoute2UnlockMessage: flatData.hasSeenRoute2UnlockMessage || false,
+        secretAlienNameUnlocked: Boolean(flatData.secretAlienNameUnlocked)
+          || (typeof localStorage !== 'undefined' && localStorage.getItem('qch_secret_alien_name_unlocked') === 'true')
       },
       routes: {
         unlockedRouteIds: flatData.unlockedRouteIds || [],
@@ -587,6 +657,7 @@ export const SaveManager = {
           seenTutorials: rawData.seenTutorials || {},
           arcadeScores: rawData.arcadeScores || {},
           hasSeenRoute2UnlockMessage: rawData.hasSeenRoute2UnlockMessage || false,
+          secretAlienNameUnlocked: Boolean(rawData.secretAlienNameUnlocked),
           playerName: rawData.playerName || '',
         }
       };
@@ -751,8 +822,118 @@ export const SaveManager = {
         seenTutorials: g.seenTutorials || {},
         arcadeScores: rawData.arcadeScores || {},
         hasSeenRoute2UnlockMessage: g.hasSeenRoute2UnlockMessage || false,
+        secretAlienNameUnlocked: Boolean(g.secretAlienNameUnlocked),
         playerName: g.playerName || '',
       }
     };
   }
 };
+
+export const getDefaultSave = (): ModularSaveData => SaveManager.createSave({});
+
+export const migrateSave = (rawData: any): ModularSaveData => {
+  if (!rawData || typeof rawData !== 'object') return getDefaultSave();
+
+  const defaultSave = getDefaultSave();
+  const modularCandidate = rawData.version ? rawData : SaveManager.createSave(rawData);
+  const migrated = deepMergeSave(defaultSave, modularCandidate);
+  migrated.version = CURRENT_SAVE_VERSION;
+
+  return migrated;
+};
+
+export const sanitizeSave = (rawData: any): ModularSaveData => {
+  const save = migrateSave(rawData);
+
+  save.global.qc = safeNumber(save.global.qc, 0);
+  save.global.gameTimeSeconds = safeNumber(save.global.gameTimeSeconds, 0);
+  save.global.totalDeliveries = safeNumber(save.global.totalDeliveries, 0);
+  save.global.playerName = typeof save.global.playerName === 'string' ? save.global.playerName : '';
+  save.global.routeTier = normalizeSavedRouteTier(save.global.routeTier, save);
+  save.global.unlockedAchievements = sanitizeStringArray(save.global.unlockedAchievements);
+  save.global.achievementProgress = sanitizeNumberRecord(save.global.achievementProgress);
+  save.global.activeCodes = sanitizeBooleanRecord(save.global.activeCodes);
+  save.global.seenTutorials = sanitizeBooleanRecord(save.global.seenTutorials);
+  save.global.completedInitialMissions = sanitizeStringArray(save.global.completedInitialMissions);
+  save.global.radarUnlocked = sanitizeBooleanRecord(save.global.radarUnlocked);
+  save.global.secretAlienNameUnlocked = Boolean(save.global.secretAlienNameUnlocked);
+
+  save.routes.unlockedRouteIds = sanitizeStringArray(save.routes.unlockedRouteIds);
+  save.routes.autoTravelSlots = sanitizeNumberRecord(save.routes.autoTravelSlots);
+  save.routes.autoTravelActive = sanitizeBooleanRecord(save.routes.autoTravelActive);
+  save.routes.autoTravelDesired = sanitizeNumberRecord(save.routes.autoTravelDesired);
+  save.routes.doubleRouteLevel = safeNumber(save.routes.doubleRouteLevel, 0);
+
+  save.ships.ownedShips = sanitizeNumberRecord(save.ships.ownedShips);
+  save.ships.shipXP = safeNumber(save.ships.shipXP, 0);
+  save.ships.shipLevel = safeNumber(save.ships.shipLevel, 1, 1);
+
+  save.tech.techLevels = isPlainObject(save.tech.techLevels) ? save.tech.techLevels : {};
+  save.tech.unlockedTechLevels = sanitizeNumberRecord(save.tech.unlockedTechLevels);
+
+  save.mining.miningRobots = sanitizeNumberRecord(save.mining.miningRobots);
+  save.mining.miningRobotLevels = sanitizeNumberRecord(save.mining.miningRobotLevels);
+  save.mining.oresCollected = sanitizeNumberRecord(save.mining.oresCollected);
+  save.mining.autoSellByOre = sanitizeBooleanRecord(save.mining.autoSellByOre);
+  save.mining.autoSellUnlockedByOre = sanitizeBooleanRecord(save.mining.autoSellUnlockedByOre);
+  save.mining.miningCompressionLevels = sanitizeNumberRecord(save.mining.miningCompressionLevels);
+
+  save.earth_reconstruction.earthPopulation = safeNumber(save.earth_reconstruction.earthPopulation, 0);
+  save.earth_reconstruction.earthMaleRatio = safeNumber(save.earth_reconstruction.earthMaleRatio, 0.5, 0, 1);
+  save.earth_reconstruction.earthBiodiversity = safeNumber(save.earth_reconstruction.earthBiodiversity, 0, 0, 100);
+  save.earth_reconstruction.earthHealth = safeNumber(save.earth_reconstruction.earthHealth, 0, 0, 100);
+  save.earth_reconstruction.earthHappiness = safeNumber(save.earth_reconstruction.earthHappiness, 0, 0, 100);
+  save.earth_reconstruction.earthSecurity = safeNumber(save.earth_reconstruction.earthSecurity, 0, 0, 100);
+  save.earth_reconstruction.earthQualityOfLife = safeNumber(save.earth_reconstruction.earthQualityOfLife, 0, 0, 100);
+  save.earth_reconstruction.earthEvents = Array.isArray(save.earth_reconstruction.earthEvents) ? save.earth_reconstruction.earthEvents : [];
+  save.earth_reconstruction.colonies = Array.isArray(save.earth_reconstruction.colonies) ? save.earth_reconstruction.colonies : [];
+
+  save.colony_system = createColonySystemSave({
+    ...save.colony_system,
+    colonies: save.colony_system.colonies,
+    colonyCardIds: save.colony_system.ownedCardIds,
+    colonyCardLevels: save.colony_system.cardLevels,
+    colonySearchUpgradeLevels: save.colony_system.searchUpgradeLevels,
+    colonyActiveSearches: save.colony_system.activeSearches,
+    colonySearchThreatBonus: save.colony_system.searchThreatBonus,
+    route4SearchBattleCycle: save.colony_system.searchBattleCycle,
+    horizonShipXp: save.colony_system.horizonShipXp,
+    route4DefenseBattleLevel: save.colony_system.defenseBattleLevel,
+    battleCardsLoadout: save.colony_system.battleLoadout,
+    battleCardLegendaryPity: save.colony_system.legendaryBattleCardPity,
+    colonySupplies: save.colony_system.supplies,
+    defenseSpecialLoadout: save.colony_system.defenseSpecialLoadout,
+    colonyDefenseThreats: save.colony_system.pendingDefenseThreats,
+    arcadeCardRewardMilestones: save.colony_system.arcadeCardRewardMilestones,
+    newEarthMissions: save.colony_system.newEarthMissions,
+    newEarthSubmarines: save.colony_system.newEarthSubmarines,
+    newEarthHelicopters: save.colony_system.newEarthHelicopters,
+    newEarthTanks: save.colony_system.newEarthTanks,
+    newEarthSurfaceBattles: save.colony_system.newEarthSurfaceBattles,
+    newEarthMuseumTreasures: save.colony_system.newEarthMuseumTreasures,
+    newEarthWarIntel: save.colony_system.newEarthWarIntel,
+    newEarthAchievementMetrics: save.colony_system.newEarthAchievementMetrics,
+  });
+
+  save.arcadeScores = sanitizeNumberRecord(save.arcadeScores);
+  save.unlockedCodes = sanitizeStringArray(save.unlockedCodes);
+
+  return save;
+};
+
+export const validateSave = (rawData: any): boolean => {
+  try {
+    const save = sanitizeSave(rawData);
+    return Boolean(save.version && save.global && save.routes && save.colony_system);
+  } catch {
+    return false;
+  }
+};
+
+export const loadSave = (rawData: any): any => SaveManager.loadSave(sanitizeSave(rawData));
+export const saveGame = (flatData: any): ModularSaveData => sanitizeSave(SaveManager.createSave(flatData));
+export const resetSave = (): ModularSaveData => getDefaultSave();
+export const exportSave = (flatData: any): ModularSaveData => saveGame(flatData);
+export const importSave = (rawData: any): ModularSaveData => sanitizeSave(rawData);
+export const createBackupSave = (rawData: any): ModularSaveData | null => validateSave(rawData) ? sanitizeSave(rawData) : null;
+export const restoreBackupSave = (rawData: any): ModularSaveData | null => validateSave(rawData) ? sanitizeSave(rawData) : null;

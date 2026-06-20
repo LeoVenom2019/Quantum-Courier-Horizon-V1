@@ -6,8 +6,55 @@
  * replaced with Firebase or any other backend service.
  */
 
-import { COLONY_SAVE_STORAGE_KEYS, type ColonySaveStorageKey } from './save-manager';
+import { COLONY_SAVE_STORAGE_KEYS, sanitizeSave, validateSave, type ColonySaveStorageKey } from './save-manager';
 
+
+const MAIN_SAVE_KEY = 'time_travel_save';
+const LAST_VALID_BACKUP_KEY = 'time_travel_save_backup_last_valid';
+const CORRUPTED_BACKUP_KEY = 'time_travel_save_backup_corrupted';
+const isDev = () => typeof process !== 'undefined' && process.env?.NODE_ENV !== 'production';
+const devLog = (...args: any[]) => {
+  if (isDev()) console.info('[GameStorage]', ...args);
+};
+
+const readJson = (key: string): any | null => {
+  const raw = localStorage.getItem(key);
+  if (!raw) return null;
+  return JSON.parse(raw);
+};
+
+const writeJson = (key: string, value: any) => {
+  localStorage.setItem(key, JSON.stringify(value));
+};
+
+const backupLastValidMainSave = () => {
+  try {
+    const current = readJson(MAIN_SAVE_KEY);
+    if (current && validateSave(current)) {
+      writeJson(LAST_VALID_BACKUP_KEY, sanitizeSave(current));
+    }
+  } catch {
+    // Existing save is unreadable; the new write path still proceeds with sanitized data.
+  }
+};
+
+const backupCorruptedMainSave = (raw: string | null) => {
+  if (!raw) return;
+  try {
+    localStorage.setItem(CORRUPTED_BACKUP_KEY, raw);
+  } catch {}
+};
+
+const loadLastValidBackup = (): any | null => {
+  try {
+    const backup = readJson(LAST_VALID_BACKUP_KEY);
+    if (backup && validateSave(backup)) {
+      devLog('restored last valid backup save');
+      return sanitizeSave(backup);
+    }
+  } catch {}
+  return null;
+};
 const SUPPLEMENTAL_LEGACY_KEYS: Partial<Record<ColonySaveStorageKey, string>> = {
   colonies_data: 'colonies',
   colony_cards_data: 'ownedCardIds',
@@ -26,6 +73,9 @@ const SUPPLEMENTAL_LEGACY_KEYS: Partial<Record<ColonySaveStorageKey, string>> = 
   arcade_card_reward_milestones: 'arcadeCardRewardMilestones',
   new_earth_missions: 'newEarthMissions',
   new_earth_submarines: 'newEarthSubmarines',
+  new_earth_helicopters: 'newEarthHelicopters',
+  new_earth_tanks: 'newEarthTanks',
+  new_earth_surface_battles: 'newEarthSurfaceBattles',
   new_earth_museum_treasures: 'newEarthMuseumTreasures',
   new_earth_war_intel: 'newEarthWarIntel',
   new_earth_achievement_metrics: 'newEarthAchievementMetrics',
@@ -75,7 +125,7 @@ const mergeSupplementalSaveValue = (key: ColonySaveStorageKey, localValue: any, 
     return merged;
   }
 
-  if (key === 'new_earth_museum_treasures' || key === 'new_earth_war_intel' || key === 'new_earth_achievement_metrics') {
+  if (key === 'new_earth_museum_treasures' || key === 'new_earth_war_intel' || key === 'new_earth_achievement_metrics' || key === 'new_earth_helicopters' || key === 'new_earth_tanks' || key === 'new_earth_surface_battles') {
     return {
       ...(mainValue && typeof mainValue === 'object' ? mainValue : {}),
       ...(localValue && typeof localValue === 'object' ? localValue : {}),
@@ -132,49 +182,51 @@ export const GameStorage = {
    * @param data The data object to be saved.
    * @param key The storage key (defaults to 'time_travel_save').
    */
-  save: async (data: any, key: string = 'time_travel_save'): Promise<void> => {
+  save: async (data: any, key: string = MAIN_SAVE_KEY): Promise<void> => {
     try {
-      if (key === 'time_travel_save' && GameStorage.isResetBlocked()) {
+      if (key === MAIN_SAVE_KEY && GameStorage.isResetBlocked()) {
         return;
       }
 
-      // 1. Instant Save to LocalStorage
-      const serializedData = JSON.stringify(data);
+      const dataToPersist = key === MAIN_SAVE_KEY ? sanitizeSave(data) : data;
+      if (key === MAIN_SAVE_KEY) backupLastValidMainSave();
+
+      const serializedData = JSON.stringify(dataToPersist);
       localStorage.setItem(key, serializedData);
 
+      if (key === MAIN_SAVE_KEY && validateSave(dataToPersist)) {
+        writeJson(LAST_VALID_BACKUP_KEY, dataToPersist);
+      }
+
       if (COLONY_SAVE_STORAGE_KEYS.includes(key as ColonySaveStorageKey)) {
-        const mainSaveRaw = localStorage.getItem('time_travel_save');
+        const mainSaveRaw = localStorage.getItem(MAIN_SAVE_KEY);
         if (mainSaveRaw) {
           const supplementalKey = key as ColonySaveStorageKey;
-          const mainSave = JSON.parse(mainSaveRaw);
+          const mainSave = sanitizeSave(JSON.parse(mainSaveRaw));
           const previous = getSupplementalSaveFromMainSave(mainSave, supplementalKey);
-          const merged = mergeSupplementalSaveValue(supplementalKey, data, previous);
+          const merged = mergeSupplementalSaveValue(supplementalKey, dataToPersist, previous);
           const legacyKey = SUPPLEMENTAL_LEGACY_KEYS[supplementalKey];
 
-          mainSave.colony_system = mainSave.colony_system && typeof mainSave.colony_system === 'object'
-            ? mainSave.colony_system
+          const colonySystem = mainSave.colony_system as Record<string, any>;
+          colonySystem.storage = colonySystem.storage && typeof colonySystem.storage === 'object'
+            ? colonySystem.storage
             : {};
-          mainSave.colony_system.storage = mainSave.colony_system.storage && typeof mainSave.colony_system.storage === 'object'
-            ? mainSave.colony_system.storage
-            : {};
-          mainSave.colony_system.storage[supplementalKey] = merged;
-          if (legacyKey) mainSave.colony_system[legacyKey] = merged;
-          localStorage.setItem('time_travel_save', JSON.stringify(mainSave));
+          colonySystem.storage[supplementalKey] = merged;
+          if (legacyKey) colonySystem[legacyKey] = merged;
+          const sanitizedMainSave = sanitizeSave(mainSave);
+          localStorage.setItem(MAIN_SAVE_KEY, JSON.stringify(sanitizedMainSave));
+          writeJson(LAST_VALID_BACKUP_KEY, sanitizedMainSave);
         }
       }
 
-      // 2. Background Sync to Server API (Cloud Save)
-      // Only for main gameplay saves
-      if (key === 'time_travel_save') {
+      if (key === MAIN_SAVE_KEY) {
         fetch('/api/save', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: serializedData,
-          // Use 'keepalive' to ensure the request completes even if the page is closing
-          keepalive: true 
+          body: JSON.stringify(dataToPersist),
+          keepalive: true
         }).catch(err => {
-          // Silent fail for background sync to not disrupt gameplay
-          console.debug('GameStorage: Cloud sync deferred/failed', err);
+          if (isDev()) console.debug('GameStorage: Cloud sync deferred/failed', err);
         });
       }
 
@@ -188,22 +240,40 @@ export const GameStorage = {
    * @param key The storage key (defaults to 'time_travel_save').
    * @returns The parsed data or null if not found.
    */
-  load: async (key: string = 'time_travel_save'): Promise<any | null> => {
+  load: async (key: string = MAIN_SAVE_KEY): Promise<any | null> => {
     try {
-      if (key === 'time_travel_save' && GameStorage.isResetBlocked()) {
+      if (key === MAIN_SAVE_KEY && GameStorage.isResetBlocked()) {
         return null;
       }
 
       const isColonySupplementalKey = COLONY_SAVE_STORAGE_KEYS.includes(key as ColonySaveStorageKey);
-
-      // 1. Try LocalStorage first
       const serializedData = localStorage.getItem(key);
-      const parsedLocalData = serializedData ? JSON.parse(serializedData) : null;
+      let parsedLocalData: any = null;
+
+      try {
+        parsedLocalData = serializedData ? JSON.parse(serializedData) : null;
+      } catch (error) {
+        if (key === MAIN_SAVE_KEY) {
+          backupCorruptedMainSave(serializedData);
+          const backup = loadLastValidBackup();
+          if (backup) return backup;
+        }
+        throw error;
+      }
+
+      if (key === MAIN_SAVE_KEY && parsedLocalData) {
+        const sanitizedLocalData = sanitizeSave(parsedLocalData);
+        writeJson(MAIN_SAVE_KEY, sanitizedLocalData);
+        writeJson(LAST_VALID_BACKUP_KEY, sanitizedLocalData);
+        devLog('loaded save', { version: sanitizedLocalData.version });
+        return sanitizedLocalData;
+      }
 
       if (isColonySupplementalKey) {
-        const mainSave = localStorage.getItem('time_travel_save');
-        if (mainSave) {
-          const supplemental = getSupplementalSaveFromMainSave(JSON.parse(mainSave), key as ColonySaveStorageKey);
+        const mainSaveRaw = localStorage.getItem(MAIN_SAVE_KEY);
+        if (mainSaveRaw) {
+          const mainSave = sanitizeSave(JSON.parse(mainSaveRaw));
+          const supplemental = getSupplementalSaveFromMainSave(mainSave, key as ColonySaveStorageKey);
           const merged = mergeSupplementalSaveValue(key as ColonySaveStorageKey, parsedLocalData, supplemental);
           if (merged !== null && merged !== undefined) {
             localStorage.setItem(key, JSON.stringify(merged));
@@ -216,17 +286,16 @@ export const GameStorage = {
         return parsedLocalData;
       }
 
-      // 2. Fallback to AppData API if LocalStorage is empty (ONLY for main save)
-      if (key === 'time_travel_save') {
-        console.log(`GameStorage: LocalStorage empty for ${key}, checking AppData fallback...`);
+      if (key === MAIN_SAVE_KEY) {
+        devLog(`LocalStorage empty for ${key}, checking AppData fallback...`);
         const response = await fetch(`/api/save?key=${key}&t=${Date.now()}`, { cache: 'no-store' });
         if (response.ok) {
           const result = await response.json();
           if (result.success && result.data) {
-            console.log('GameStorage: Restored save from AppData!');
-            // Repopulate localStorage for next time
-            localStorage.setItem(key, JSON.stringify(result.data));
-            return result.data;
+            const sanitized = sanitizeSave(result.data);
+            localStorage.setItem(key, JSON.stringify(sanitized));
+            writeJson(LAST_VALID_BACKUP_KEY, sanitized);
+            return sanitized;
           }
         }
       }
@@ -235,7 +304,8 @@ export const GameStorage = {
         const response = await fetch(`/api/save?key=time_travel_save&t=${Date.now()}`, { cache: 'no-store' });
         if (response.ok) {
           const result = await response.json();
-          const supplemental = getSupplementalSaveFromMainSave(result.data, key as ColonySaveStorageKey);
+          const sanitizedMain = result.data ? sanitizeSave(result.data) : null;
+          const supplemental = sanitizedMain ? getSupplementalSaveFromMainSave(sanitizedMain, key as ColonySaveStorageKey) : null;
           const merged = mergeSupplementalSaveValue(key as ColonySaveStorageKey, parsedLocalData, supplemental);
           if (merged !== null && merged !== undefined) {
             localStorage.setItem(key, JSON.stringify(merged));
@@ -247,10 +317,10 @@ export const GameStorage = {
       return null;
     } catch (error) {
       console.warn('GameStorage: fallback load failed', error);
+      if (key === MAIN_SAVE_KEY) return loadLastValidBackup();
       return null;
     }
   },
-
   /**
    * Logs a game event to the background log file.
    */
@@ -306,7 +376,7 @@ export const GameStorage = {
       localStorage.removeItem(key);
 
       // If it's the main save, also clear from AppData backend
-      if (key === 'time_travel_save') {
+      if (key === MAIN_SAVE_KEY) {
         await fetch(`/api/save?t=${Date.now()}`, {
           method: 'DELETE',
           cache: 'no-store'
