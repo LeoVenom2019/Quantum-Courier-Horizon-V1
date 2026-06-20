@@ -25,7 +25,9 @@ const hasRoute4SaveSignals = (data: any): boolean => {
     hasArrayItems(colonyStorage.colonies_data) ||
     Boolean(colonySystem.newEarthMissions || colonyStorage.new_earth_missions) ||
     Boolean(colonySystem.newEarthSubmarines || colonyStorage.new_earth_submarines) ||
-    Boolean(colonySystem.newEarthMuseumTreasures || colonyStorage.new_earth_museum_treasures)
+    Boolean(colonySystem.newEarthMuseumTreasures || colonyStorage.new_earth_museum_treasures) ||
+    Boolean(colonySystem.newEarthWarIntel || colonyStorage.new_earth_war_intel) ||
+    Boolean(colonySystem.newEarthAchievementMetrics || colonyStorage.new_earth_achievement_metrics)
   );
 };
 
@@ -60,6 +62,8 @@ export const COLONY_SAVE_STORAGE_KEYS = [
   'new_earth_missions',
   'new_earth_submarines',
   'new_earth_museum_treasures',
+  'new_earth_war_intel',
+  'new_earth_achievement_metrics',
   'route4_qc_reset_done',
 ] as const;
 
@@ -87,6 +91,8 @@ export interface ColonySystemSaveData {
   newEarthMissions: any;
   newEarthSubmarines: any;
   newEarthMuseumTreasures: any;
+  newEarthWarIntel: any;
+    newEarthAchievementMetrics: any;
   storage: Partial<Record<ColonySaveStorageKey, any>>;
 }
 
@@ -146,6 +152,8 @@ const createColonySystemSave = (flatData: any): ColonySystemSaveData => {
   const newEarthMissions = getFlatOrStorageValue(flatData, 'newEarthMissions', 'new_earth_missions', null);
   const newEarthSubmarines = getFlatOrStorageValue(flatData, 'newEarthSubmarines', 'new_earth_submarines', null);
   const newEarthMuseumTreasures = getFlatOrStorageValue(flatData, 'newEarthMuseumTreasures', 'new_earth_museum_treasures', {});
+  const newEarthWarIntel = getFlatOrStorageValue(flatData, 'newEarthWarIntel', 'new_earth_war_intel', {});
+  const newEarthAchievementMetrics = getFlatOrStorageValue(flatData, 'newEarthAchievementMetrics', 'new_earth_achievement_metrics', {});
   const route4QcResetDone = Boolean(getFlatOrStorageValue(flatData, 'route4QcResetDone', 'route4_qc_reset_done', false));
   const normalizedPendingDefenseThreats = Array.isArray(pendingDefenseThreats)
     ? pendingDefenseThreats.filter(threat => threat?.status === 'pending').slice(0, MAX_PENDING_DEFENSE_THREATS)
@@ -177,6 +185,8 @@ const createColonySystemSave = (flatData: any): ColonySystemSaveData => {
     newEarthMissions: newEarthMissions && typeof newEarthMissions === 'object' ? newEarthMissions : null,
     newEarthSubmarines: newEarthSubmarines && typeof newEarthSubmarines === 'object' ? newEarthSubmarines : null,
     newEarthMuseumTreasures: newEarthMuseumTreasures && typeof newEarthMuseumTreasures === 'object' ? newEarthMuseumTreasures : {},
+    newEarthWarIntel: newEarthWarIntel && typeof newEarthWarIntel === 'object' ? newEarthWarIntel : {},
+    newEarthAchievementMetrics: newEarthAchievementMetrics && typeof newEarthAchievementMetrics === 'object' ? newEarthAchievementMetrics : {},
     storage: {
       colonies_data: Array.isArray(colonies) ? colonies : [],
       colony_cards_data: Array.isArray(ownedCardIds) ? ownedCardIds : [],
@@ -196,6 +206,8 @@ const createColonySystemSave = (flatData: any): ColonySystemSaveData => {
       new_earth_missions: newEarthMissions && typeof newEarthMissions === 'object' ? newEarthMissions : null,
       new_earth_submarines: newEarthSubmarines && typeof newEarthSubmarines === 'object' ? newEarthSubmarines : null,
       new_earth_museum_treasures: newEarthMuseumTreasures && typeof newEarthMuseumTreasures === 'object' ? newEarthMuseumTreasures : {},
+      new_earth_war_intel: newEarthWarIntel && typeof newEarthWarIntel === 'object' ? newEarthWarIntel : {},
+      new_earth_achievement_metrics: newEarthAchievementMetrics && typeof newEarthAchievementMetrics === 'object' ? newEarthAchievementMetrics : {},
       route4_qc_reset_done: route4QcResetDone,
     },
   };

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { NEW_EARTH_SUBMARINE_DEPTH_STAGES } from '@/lib/new-earth-submarines';
@@ -8,6 +8,10 @@ import { NEW_EARTH_TREASURES_BY_RARITY, type NewEarthTreasure } from '@/lib/new-
 import { PremiumCanvasButton } from './ui/PremiumCanvasButton';
 
 export type UnderwaterBattleSiteId = 'oceano-abissal' | 'cemiterio-navios';
+const subscribeClientReady = () => () => {};
+const getClientReadySnapshot = () => true;
+const getServerReadySnapshot = () => false;
+const useClientReady = () => useSyncExternalStore(subscribeClientReady, getClientReadySnapshot, getServerReadySnapshot);
 type UnderwaterSubmarineColonyId = 'colony-2' | 'colony-4';
 type PlayerSubmarineSpriteKey =
   | 'front'
@@ -54,7 +58,7 @@ interface NewEarthUnderwaterBattleProps {
     speedBonus: number;
     oxygenSeconds?: number;
   };
-  onVictory?: () => void;
+  onVictory?: (summary: { kills: number; depth: number }) => void;
   onDefeat?: () => void;
   onTreasureLoot?: (payload: TreasureRewardPayload) => void;
   defenseBattleLevel: number;
@@ -2078,7 +2082,7 @@ export default function NewEarthUnderwaterBattle({
     turnStartedAt: 0,
     useBackTurnArc: false,
   });
-  const [mounted, setMounted] = useState(false);
+  const mounted = useClientReady();
   const stateRef = useRef({
     player: { x: 145, y: HEIGHT / 2, vx: 0, vy: 0, hp: 100, maxHp: 100, cooldown: 0, angle: 0, thrust: 0, lastThrustAt: 0 } as PlayerEntity,
     enemies: [] as VecEntity[],
@@ -2105,7 +2109,16 @@ export default function NewEarthUnderwaterBattle({
   const oxygenRemainingMsRef = useRef(0);
   const oxygenInitializedRef = useRef(false);
   const lastHudUpdateAtRef = useRef(0);
-  const [currentDepthIndex, setCurrentDepthIndex] = useState(0);
+  const currentDiveKey = `${siteId}:${colonyId}`;
+  const [currentDepthState, setCurrentDepthState] = useState(() => ({ key: currentDiveKey, index: 0 }));
+  const currentDepthIndex = currentDepthState.key === currentDiveKey ? currentDepthState.index : 0;
+  const setCurrentDepthIndex = useCallback((value: React.SetStateAction<number>) => {
+    setCurrentDepthState(prev => {
+      const previousIndex = prev.key === currentDiveKey ? prev.index : 0;
+      const index = typeof value === 'function' ? value(previousIndex) : value;
+      return { key: currentDiveKey, index };
+    });
+  }, [currentDiveKey]);
   const site = SITE_CONFIG[siteId];
   const maxDepth = submarineStats.maxDepth;
   const playerMaxHp = Math.round(100 * (1 + submarineStats.hullResistance / 100));
@@ -2147,12 +2160,7 @@ export default function NewEarthUnderwaterBattle({
   }), [language]);
 
   useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  useEffect(() => {
     oxygenInitializedRef.current = false;
-    setCurrentDepthIndex(0);
   }, [siteId, colonyId]);
 
   const updateAimFromPointer = (event: React.PointerEvent<HTMLCanvasElement>) => {
@@ -2319,18 +2327,23 @@ export default function NewEarthUnderwaterBattle({
     stoppingSfxPlayedRef.current = false;
     lastStoppingSfxAtRef.current = 0;
     playerExplosionPlayedRef.current = false;
-    setStatus('fighting');
-    setHull(playerMaxHp);
-    setKills(0);
-    setTreasuresFound(0);
     if (!oxygenInitializedRef.current) {
       oxygenInitializedRef.current = true;
       oxygenRemainingMsRef.current = oxygenReserveMs;
     }
     lastHudUpdateAtRef.current = 0;
-    setOxygenPercent(Math.max(0, Math.min(100, Math.round((oxygenRemainingMsRef.current / oxygenReserveMs) * 100))));
-    setCurrentDepthMeters(getSimulatedDepthFromPlayerY(state.player.y, currentDepthIndex));
-    setPortalFeedback(null);
+
+    const resetHudTimeout = window.setTimeout(() => {
+      setStatus('fighting');
+      setHull(playerMaxHp);
+      setKills(0);
+      setTreasuresFound(0);
+      setOxygenPercent(Math.max(0, Math.min(100, Math.round((oxygenRemainingMsRef.current / oxygenReserveMs) * 100))));
+      setCurrentDepthMeters(getSimulatedDepthFromPlayerY(state.player.y, currentDepthIndex));
+      setPortalFeedback(null);
+    }, 0);
+
+    return () => window.clearTimeout(resetHudTimeout);
   }, [currentDepthIndex, oxygenReserveMs, playerMaxHp, siteId, treasureTotal]);
 
   useEffect(() => {
@@ -2931,7 +2944,7 @@ export default function NewEarthUnderwaterBattle({
             setStatus('exploration');
             if (!state.victoryHandled) {
               state.victoryHandled = true;
-              onVictory?.();
+              onVictory?.({ kills: state.kills, depth: depthMeters });
             }
           } else if (state.player.hp <= 0) {
             if (!playerExplosionPlayedRef.current) {
@@ -3255,7 +3268,7 @@ export default function NewEarthUnderwaterBattle({
     return () => {
       if (frameRef.current) cancelAnimationFrame(frameRef.current);
     };
-  }, [backgroundSrc, colonyId, currentDepthIndex, labels.finalDepth, labels.oxygenDepleted, labels.portal, language, mounted, nextDepthMeters, onDefeat, onTreasureLoot, onVictory, oxygenReserveMs, playerMaxSpeed, playerShotDamage, playerShotSpeed, unlockedDepthIndex]);
+  }, [backgroundSrc, colonyId, currentDepthIndex, labels, labels.finalDepth, labels.oxygenDepleted, labels.portal, language, mounted, nextDepthMeters, onDefeat, onTreasureLoot, onVictory, oxygenReserveMs, playerMaxSpeed, playerShotDamage, playerShotSpeed, setCurrentDepthIndex, unlockedDepthIndex]);
 
   useEffect(() => () => {
     activeLaunchAudiosRef.current.forEach(stopUnderwaterSound);
@@ -3430,3 +3443,4 @@ export default function NewEarthUnderwaterBattle({
 
   return createPortal(overlay, document.body);
 }
+

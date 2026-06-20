@@ -299,4 +299,6 @@ const MissionsTab = memo(() => {
   );
 });
 
+MissionsTab.displayName = 'MissionsTab';
+
 export default MissionsTab;

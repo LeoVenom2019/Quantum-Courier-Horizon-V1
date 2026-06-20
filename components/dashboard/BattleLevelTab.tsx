@@ -1,6 +1,7 @@
 'use client';
 
 import React, { memo } from 'react';
+import Image from 'next/image';
 import { motion } from 'motion/react';
 import { 
   Radar, 
@@ -120,7 +121,7 @@ const BattleLevelTab = memo(({
             {/* Sci-Fi Radar Texture & Background */}
             <div className="absolute inset-0 pointer-events-none select-none overflow-hidden z-0">
               {/* WebP Texture */}
-              <img
+              <Image unoptimized width={800} height={600}
                 src="/assets/texturas/bg_battle_radar.webp"
                 alt=""
                 aria-hidden="true"
@@ -237,7 +238,7 @@ const BattleLevelTab = memo(({
             {/* Sci-Fi Doom Protocol Texture & Background */}
             <div className="absolute inset-0 pointer-events-none select-none overflow-hidden z-0">
               {/* WebP Texture */}
-              <img
+              <Image unoptimized width={800} height={600}
                 src="/assets/texturas/bg_doom_protocol.webp"
                 alt=""
                 aria-hidden="true"
@@ -298,7 +299,7 @@ const BattleLevelTab = memo(({
               {/* Sci-Fi Skip Battles Texture & Background */}
               <div className="absolute inset-0 pointer-events-none select-none overflow-hidden z-0">
                 {/* WebP Texture */}
-                <img
+                <Image unoptimized width={800} height={600}
                   src="/images/bg_route2_rect.webp"
                   alt=""
                   aria-hidden="true"
@@ -346,7 +347,7 @@ const BattleLevelTab = memo(({
             {/* Sci-Fi Battle Level Texture & Background */}
             <div className="absolute inset-0 pointer-events-none select-none overflow-hidden z-0">
               {/* WebP Texture */}
-              <img
+              <Image unoptimized width={800} height={600}
                 src="/assets/texturas/bg_battle_level.webp"
                 alt=""
                 aria-hidden="true"
@@ -402,7 +403,7 @@ const BattleLevelTab = memo(({
             {/* Sci-Fi Rewards Texture & Background */}
             <div className="absolute inset-0 pointer-events-none select-none overflow-hidden z-0">
               {/* WebP Texture */}
-              <img
+              <Image unoptimized width={800} height={600}
                 src="/assets/texturas/bg_level_rewards.webp"
                 alt=""
                 aria-hidden="true"
@@ -470,7 +471,7 @@ const BattleLevelTab = memo(({
             {/* Sci-Fi Ship & Combat Status Texture & Background */}
             <div className="absolute inset-0 pointer-events-none select-none overflow-hidden z-0">
               {/* WebP Texture */}
-              <img
+              <Image unoptimized width={800} height={600}
                 src="/assets/texturas/bg_ship_combat_status.webp"
                 alt=""
                 aria-hidden="true"

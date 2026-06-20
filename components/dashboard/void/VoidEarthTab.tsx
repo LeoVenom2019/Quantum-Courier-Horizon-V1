@@ -1,6 +1,7 @@
 'use client';
 
 import React, { memo } from 'react';
+import Image from 'next/image';
 import { motion } from 'motion/react';
 import { Globe, Zap, Cpu, Heart, Gem, Leaf } from 'lucide-react';
 import { useDashboard } from '../DashboardProvider';
@@ -52,7 +53,7 @@ const VoidEarthTab = memo(() => {
               transition={{ duration: 60, repeat: Infinity, ease: "linear" }}
             >
               <div className="absolute inset-0 rounded-full bg-blue-500/10 blur-[60px]" />
-              <img 
+              <Image unoptimized width={800} height={600} 
                 src="/images/void_earth/earth_restored_preview.png" 
                 alt="Earth Preview" 
                 className={`w-full h-full object-contain transition-all duration-1000 ${totalProgress >= 100 ? 'brightness-110 drop-shadow-[0_0_40px_rgba(16,185,129,0.4)]' : 'brightness-50 grayscale-[50%]'}`}
@@ -146,5 +147,7 @@ const VoidEarthTab = memo(() => {
     </div>
   );
 });
+
+VoidEarthTab.displayName = 'VoidEarthTab';
 
 export default VoidEarthTab;

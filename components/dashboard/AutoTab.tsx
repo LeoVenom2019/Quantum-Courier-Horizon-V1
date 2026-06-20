@@ -1,6 +1,7 @@
 'use client';
 
 import React, { memo } from 'react';
+import Image from 'next/image';
 import { motion } from 'motion/react';
 import { Flame, Coins, Zap } from 'lucide-react';
 import { ROUTES, SHIPS } from '@/lib/game-data';
@@ -55,7 +56,7 @@ const AutoTab = memo(() => {
         className={`glass-panel ${isInterstellar ? 'neon-border-orange' : 'neon-border-cyan'} p-4 rounded-xl overflow-hidden relative group shrink-0 cursor-pointer hover:bg-white/5 transition-all`}
       >
         <div className="absolute inset-0 pointer-events-none select-none overflow-hidden z-0">
-          <img
+          <Image unoptimized width={800} height={600}
             src={AETHERION_CHAMBER_BACKGROUND}
             alt=""
             aria-hidden="true"

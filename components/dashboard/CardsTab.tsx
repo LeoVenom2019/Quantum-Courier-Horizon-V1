@@ -1,6 +1,7 @@
 'use client';
 
 import React, { memo, useEffect, useMemo, useState } from 'react';
+import Image from 'next/image';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   BadgeCheck,
@@ -202,7 +203,7 @@ const CardTile = ({
   const backgroundImage = getCardBackgroundImage(card.rarity);
   const content = (
     <>
-      <img
+      <Image unoptimized width={800} height={600}
         src={backgroundImage}
         alt=""
         aria-hidden="true"
@@ -987,7 +988,7 @@ const CardsTab = memo(function CardsTab() {
               exit={{ opacity: 0, scale: 0.94, y: 10 }}
               className={`relative grid h-[min(736px,calc(100vh-1rem))] w-full max-w-5xl gap-5 overflow-hidden rounded-[2rem] border border-white/15 bg-zinc-950 p-5 md:grid-cols-[0.9fr_1.1fr] md:p-6 ${getCardStyle(selectedCard.card.rarity, getCardClass(selectedCard.card))}`}
             >
-              <img
+              <Image unoptimized width={800} height={600}
                 src={getCardModalBackgroundImage(selectedCard.card.rarity, getCardClass(selectedCard.card))}
                 alt=""
                 aria-hidden="true"

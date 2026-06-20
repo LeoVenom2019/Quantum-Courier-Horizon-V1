@@ -44,6 +44,8 @@ export type NewEarthMission = {
   constructionTargetCount?: number;
   cardId?: string;
   cardTargetLevel?: number;
+  surfaceSiteId?: string;
+  surfaceBattleKind?: 'tank' | 'helicopter';
 };
 
 export type NewEarthMissionState = {
@@ -435,6 +437,8 @@ const NEW_EARTH_MISSION_CATALOG: NewEarthMission[] = [
     progress: 0,
     completed: false,
     claimed: false,
+    surfaceSiteId: 'ruinas-europeias',
+    surfaceBattleKind: 'tank',
     reward: {
       qc: scaleNewEarthMissionQcReward(42000),
       supplies: { defense: 16, materials: 22, tech: 10 },
@@ -453,9 +457,127 @@ const NEW_EARTH_MISSION_CATALOG: NewEarthMission[] = [
     progress: 0,
     completed: false,
     claimed: false,
+    surfaceBattleKind: 'helicopter',
     reward: {
       qc: scaleNewEarthMissionQcReward(46000),
       supplies: { defense: 18, tech: 16, meds: 8 },
+    },
+  }),
+  makeMission({
+    id: 'surface-helicopter-glacial-radar-sweep',
+    title: { en: 'Glacial Radar Sweep', pt: 'Varredura do Radar Glacial' },
+    description: {
+      en: 'Win a helicopter battle in the Glacial Zone and break the enemy radar curtain before the strike wave forms.',
+      pt: 'Vença uma batalha de helicóptero na Zona Glacial e rompa a cortina de radares inimiga antes da formação da onda de ataque.',
+    },
+    objectiveLabel: { en: 'Glacial air victory', pt: 'Vitória aérea glacial' },
+    eventType: 'surface-victory',
+    target: 1,
+    progress: 0,
+    completed: false,
+    claimed: false,
+    surfaceSiteId: 'zona-glacial',
+    surfaceBattleKind: 'helicopter',
+    reward: {
+      qc: scaleNewEarthMissionQcReward(44000),
+      supplies: { defense: 16, tech: 18, meds: 6 },
+    },
+  }),
+  makeMission({
+    id: 'surface-helicopter-forgotten-blockade',
+    title: { en: 'Forgotten Blockade Run', pt: 'Ruptura do Bloqueio Esquecido' },
+    description: {
+      en: 'Win a helicopter battle in the Forgotten Continent and disrupt the hostile air cordon around Elysium.',
+      pt: 'Vença uma batalha de helicóptero no Continente Esquecido e desorganize o cordão aéreo hostil ao redor de Elysium.',
+    },
+    objectiveLabel: { en: 'Forgotten air victory', pt: 'Vitória aérea esquecida' },
+    eventType: 'surface-victory',
+    target: 1,
+    progress: 0,
+    completed: false,
+    claimed: false,
+    surfaceSiteId: 'continente-esquecido',
+    surfaceBattleKind: 'helicopter',
+    reward: {
+      qc: scaleNewEarthMissionQcReward(48000),
+      supplies: { defense: 18, tech: 18, materials: 12 },
+    },
+  }),
+  makeMission({
+    id: 'surface-helicopter-escort-breaker',
+    title: { en: 'Escort Breaker', pt: 'Quebra-Escolta' },
+    description: {
+      en: 'Win three helicopter battles and force enemy escorts to abandon their attack corridors.',
+      pt: 'Vença três batalhas de helicóptero e force as escoltas inimigas a abandonarem os corredores de ataque.',
+    },
+    objectiveLabel: { en: 'Helicopter victories', pt: 'Vitórias de helicóptero' },
+    eventType: 'surface-victory',
+    target: 3,
+    progress: 0,
+    completed: false,
+    claimed: false,
+    surfaceBattleKind: 'helicopter',
+    reward: {
+      qc: scaleNewEarthMissionQcReward(68000),
+      supplies: { defense: 24, tech: 22, meds: 10 },
+    },
+  }),
+  makeMission({
+    id: 'surface-tank-european-supply-line',
+    title: { en: 'European Supply Line', pt: 'Linha de Suprimento Europeia' },
+    description: {
+      en: 'Win a tank battle in the European Ruins and cut the armored supply route feeding the siege batteries.',
+      pt: 'Vença uma batalha de tanque nas Ruínas Européias e corte a rota blindada que abastece as baterias de cerco.',
+    },
+    objectiveLabel: { en: 'European tank victory', pt: 'Vitória de tanque europeia' },
+    eventType: 'surface-victory',
+    target: 1,
+    progress: 0,
+    completed: false,
+    claimed: false,
+    surfaceSiteId: 'ruinas-europeias',
+    surfaceBattleKind: 'tank',
+    reward: {
+      qc: scaleNewEarthMissionQcReward(45000),
+      supplies: { defense: 20, materials: 22, tech: 10 },
+    },
+  }),
+  makeMission({
+    id: 'surface-tank-siege-column',
+    title: { en: 'Siege Column Collapse', pt: 'Colapso da Coluna de Cerco' },
+    description: {
+      en: 'Win two tank battles and collapse the enemy column before it can open a breach toward Genesis.',
+      pt: 'Vença duas batalhas de tanque e derrube a coluna inimiga antes que ela abra uma brecha rumo a Genesis.',
+    },
+    objectiveLabel: { en: 'Tank victories', pt: 'Vitórias de tanque' },
+    eventType: 'surface-victory',
+    target: 2,
+    progress: 0,
+    completed: false,
+    claimed: false,
+    surfaceBattleKind: 'tank',
+    reward: {
+      qc: scaleNewEarthMissionQcReward(56000),
+      supplies: { defense: 26, materials: 24, tech: 12 },
+    },
+  }),
+  makeMission({
+    id: 'surface-tank-bunker-silence',
+    title: { en: 'Bunker Silence', pt: 'Silêncio do Bunker' },
+    description: {
+      en: 'Win three tank battles and silence the command bunkers coordinating the heavy assault.',
+      pt: 'Vença três batalhas de tanque e silencie os bunkers de comando que coordenam o ataque pesado.',
+    },
+    objectiveLabel: { en: 'Tank victories', pt: 'Vitórias de tanque' },
+    eventType: 'surface-victory',
+    target: 3,
+    progress: 0,
+    completed: false,
+    claimed: false,
+    surfaceBattleKind: 'tank',
+    reward: {
+      qc: scaleNewEarthMissionQcReward(72000),
+      supplies: { defense: 30, materials: 28, tech: 16 },
     },
   }),
   makeMission({
@@ -597,6 +719,33 @@ const getMissionCatalog = (context?: NewEarthMissionGenerationContext) => [
   ...createCardUpgradeMissions(context),
 ];
 
+const NEW_EARTH_SURFACE_SITE_COLONY_REQUIREMENTS: Record<string, string> = {
+  'zona-glacial': 'colony-3',
+  'ruinas-europeias': 'colony-1',
+  'continente-esquecido': 'colony-3',
+};
+
+const NEW_EARTH_SURFACE_KIND_COLONY_REQUIREMENTS: Record<'tank' | 'helicopter', string[]> = {
+  tank: ['colony-1'],
+  helicopter: ['colony-3'],
+};
+
+const isContextColonyReady = (context: NewEarthMissionGenerationContext, colonyId: string) => (
+  (context.colonies || []).some(colony => colony.id === colonyId && colony.allBaseConstructionsComplete === true)
+);
+
+const isSurfaceMissionEligible = (mission: NewEarthMission, context: NewEarthMissionGenerationContext) => {
+  if (!context.canUseSurfaceBattles) return false;
+  if (mission.surfaceSiteId) {
+    const requiredColonyId = NEW_EARTH_SURFACE_SITE_COLONY_REQUIREMENTS[mission.surfaceSiteId];
+    return requiredColonyId ? isContextColonyReady(context, requiredColonyId) : true;
+  }
+  if (mission.surfaceBattleKind) {
+    const requiredColonyIds = NEW_EARTH_SURFACE_KIND_COLONY_REQUIREMENTS[mission.surfaceBattleKind] || [];
+    return requiredColonyIds.length === 0 || requiredColonyIds.some(colonyId => isContextColonyReady(context, colonyId));
+  }
+  return true;
+};
 const isMissionEligible = (mission: NewEarthMission, context: NewEarthMissionGenerationContext = {}) => {
   if (mission.reward.missingCard && context.hasMissingCards !== true) return false;
 
@@ -632,7 +781,7 @@ const isMissionEligible = (mission: NewEarthMission, context: NewEarthMissionGen
       && Math.max(1, Math.floor(Number(card.level) || 1)) < targetLevel
     ));
   }
-  if (mission.eventType === 'surface-victory') return Boolean(context.canUseSurfaceBattles);
+  if (mission.eventType === 'surface-victory') return isSurfaceMissionEligible(mission, context);
   if (mission.eventType === 'submarine-victory' || mission.eventType === 'submarine-treasure') return Boolean(context.canUseSubmarines);
   return true;
 };
@@ -852,8 +1001,10 @@ export const recordNewEarthMissionEvent = (
     }
 
     if (event.type === 'surface-victory') {
-      if (mission.id === 'surface-win-european-ruins' && event.siteId !== 'ruinas-europeias') return mission;
-      if (mission.id === 'surface-win-elysium-airspace' && event.battleKind !== 'helicopter') return mission;
+      if (mission.surfaceSiteId && mission.surfaceSiteId !== event.siteId) return mission;
+      if (mission.surfaceBattleKind && mission.surfaceBattleKind !== event.battleKind) return mission;
+      if (!mission.surfaceSiteId && mission.id === 'surface-win-european-ruins' && event.siteId !== 'ruinas-europeias') return mission;
+      if (!mission.surfaceBattleKind && mission.id === 'surface-win-elysium-airspace' && event.battleKind !== 'helicopter') return mission;
     }
 
     const increment = event.type === 'submarine-treasure' || event.type === 'defense-kills' || event.type === 'defense-bosses' || event.type === 'arcade-action'

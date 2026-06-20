@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useRef, useState, useEffect, memo, useCallback } from 'react';
+import React, { useRef, useState, useEffect, memo, useCallback, useMemo } from 'react';
 import { motion } from 'motion/react';
 import { Shield, Target, MousePointer2, X } from 'lucide-react';
 
@@ -378,8 +378,10 @@ const VoidBattleArena = memo(function VoidBattleArena({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 800, height: 500 });
-  const isBossEncounter = initialEnemies.some(enemy => enemy.type === 'Boss')
-    || (enemyQueue || []).some(enemy => enemy.type === 'Boss');
+  const isBossEncounter = useMemo(() => (
+    initialEnemies.some(enemy => enemy.type === 'Boss')
+      || (enemyQueue || []).some(enemy => enemy.type === 'Boss')
+  ), [enemyQueue, initialEnemies]);
   const bossIntro = routeTier === 'Void' && isBossEncounter ? BOSS_INTROS[locationId] : undefined;
   const [showBossIntro, setShowBossIntro] = useState(Boolean(bossIntro));
   const [meteorEventEnabled] = useState(() => (
@@ -389,8 +391,12 @@ const VoidBattleArena = memo(function VoidBattleArena({
       && initialEnemies.length > 0
       && Math.random() < 0.3
   ));
-  const battleEnemies = meteorEventEnabled ? [initialEnemies[0]] : initialEnemies;
-  const battleEnemyQueue = meteorEventEnabled ? [] : (enemyQueue || []);
+  const battleEnemies = useMemo(() => (
+    meteorEventEnabled ? [initialEnemies[0]] : initialEnemies
+  ), [initialEnemies, meteorEventEnabled]);
+  const battleEnemyQueue = useMemo(() => (
+    meteorEventEnabled ? [] : (enemyQueue || [])
+  ), [enemyQueue, meteorEventEnabled]);
   const battleIsGroupBattle = meteorEventEnabled ? false : isGroupBattle;
   const meteoriteQcValue = Math.max(0, Math.floor(meteoriteRewardValue || 0));
   const meteorQcValue = meteoriteQcValue * 3;
@@ -659,7 +665,7 @@ const VoidBattleArena = memo(function VoidBattleArena({
     return () => {
       cancelled = true;
     };
-  }, [battleAssetKey]);
+  }, [activeShipImage, battleAssetKey, battleEnemies, battleEnemyQueue, locationId, playerShipStats.rarity, routeTier]);
 
   // Load and Prepare Video Background
   useEffect(() => {

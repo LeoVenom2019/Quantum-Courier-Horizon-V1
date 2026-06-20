@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
+import Image from 'next/image';
 import { motion, AnimatePresence } from 'motion/react';
 import { ChevronRight } from 'lucide-react';
 
@@ -167,7 +168,7 @@ export const LoreScreen = React.memo(({
               animate={{ scale: 1, opacity: 1 }}
               className={`relative w-[300px] h-[300px] rounded-[3rem] overflow-hidden border-4 ${theme === 'purple' ? 'border-purple-500/50 shadow-[0_0_50px_rgba(168,85,247,0.3)]' : 'border-orange-500/50 shadow-[0_0_50px_rgba(249,115,22,0.3)]'} bg-black mb-8`}
             >
-              <img 
+              <Image unoptimized width={800} height={600} 
                 src={imageSrc}
                 alt="Narrative Visual"
                 className="w-full h-full object-cover"

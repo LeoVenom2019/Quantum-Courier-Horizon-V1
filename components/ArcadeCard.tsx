@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import Image from 'next/image';
 import { motion } from 'motion/react';
 import { Info, Play, ImageOff, LockKeyhole } from 'lucide-react';
 import { PremiumCanvasButton } from './ui/PremiumCanvasButton';
@@ -42,24 +43,29 @@ const ArcadeCard: React.FC<ArcadeCardProps> = ({
   language = 'pt',
 }) => {
   const isVideoPreview = /\.(mp4|webm|ogg)$/i.test(screenshot || '');
-  const [mediaError, setMediaError] = useState(!screenshot);
-  const [mediaLoaded, setMediaLoaded] = useState(false);
+  const [mediaAsset, setMediaAsset] = useState<{ src: string; loaded: boolean; error: boolean } | null>(null);
   const isAvailable = status.toUpperCase().includes('DISPONÍVEL') || status.toUpperCase().includes('AVAILABLE');
 
   useEffect(() => {
-    setMediaLoaded(false);
-    setMediaError(!screenshot);
-
     if (!screenshot || isVideoPreview) return;
-    const img = new Image();
-    img.src = screenshot;
+
+    const src = screenshot;
+    let cancelled = false;
+    const img = new window.Image();
+    img.src = src;
     img.onload = () => {
-      setMediaLoaded(true);
-      setMediaError(false);
+      if (!cancelled) {
+        setMediaAsset({ src, loaded: true, error: false });
+      }
     };
     img.onerror = () => {
-      setMediaLoaded(false);
-      setMediaError(true);
+      if (!cancelled) {
+        setMediaAsset({ src, loaded: false, error: true });
+      }
+    };
+
+    return () => {
+      cancelled = true;
     };
   }, [screenshot, isVideoPreview]);
 
@@ -82,7 +88,7 @@ const ArcadeCard: React.FC<ArcadeCardProps> = ({
       <div className="relative mx-auto h-full w-full max-w-[280px]">
         <div className="absolute inset-0 overflow-hidden rounded-[1.25rem]">
           {cabinetImage ? (
-            <img
+            <Image unoptimized width={800} height={600}
               src={cabinetImage}
               alt=""
               className="absolute inset-0 h-full w-full object-contain drop-shadow-[0_26px_34px_rgba(0,0,0,0.7)]"
@@ -93,7 +99,7 @@ const ArcadeCard: React.FC<ArcadeCardProps> = ({
           )}
 
           <div className="absolute left-[17.9%] top-[31.7%] aspect-[4/3] w-[63.2%] overflow-hidden rounded-[0.65rem] bg-black">
-            {screenshot && isVideoPreview && !mediaError ? (
+            {screenshot && isVideoPreview && !(mediaAsset?.src === screenshot && mediaAsset.error) ? (
               <video
                 className="absolute inset-0 h-full w-full object-cover opacity-95 transition-transform duration-700 group-hover:scale-[1.035]"
                 src={screenshot}
@@ -102,13 +108,12 @@ const ArcadeCard: React.FC<ArcadeCardProps> = ({
                 loop
                 playsInline
                 preload="metadata"
-                onCanPlay={() => setMediaLoaded(true)}
+                onCanPlay={() => setMediaAsset({ src: screenshot, loaded: true, error: false })}
                 onError={() => {
-                  setMediaLoaded(false);
-                  setMediaError(true);
+                  setMediaAsset({ src: screenshot, loaded: false, error: true });
                 }}
               />
-            ) : screenshot && mediaLoaded && !mediaError ? (
+            ) : screenshot && mediaAsset?.src === screenshot && mediaAsset.loaded && !mediaAsset.error ? (
               <div
                 className="absolute inset-0 bg-cover bg-center opacity-95 transition-all duration-700 group-hover:scale-[1.035]"
                 style={{ backgroundImage: `url(${screenshot})` }}

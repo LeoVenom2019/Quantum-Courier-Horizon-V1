@@ -1,162 +1,78 @@
-<!doctype html>
-<html lang="pt-BR">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>QCH - Batalha de Helicópteros V3</title>
-  <style>
-    :root {
-      color-scheme: dark;
-      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: #020617;
-      color: #e5e7eb;
-    }
-    * { box-sizing: border-box; }
-    html, body { height: 100%; margin: 0; overflow: hidden; background: #020617; }
-    body { display: flex; align-items: stretch; justify-content: stretch; padding: 0; }
-    .shell {
-      width: 100%;
-      height: 100vh;
-      display: flex; flex-direction: column; overflow: hidden;
-      border: 1px solid rgba(255,255,255,0.14);
-      border-radius: 24px;
-      background: rgba(3,7,18,0.96);
-      box-shadow: 0 0 42px rgba(0,0,0,0.64);
-    }
-    header {
-      min-height: 68px; display: flex; align-items: center;
-      justify-content: space-between; gap: 18px; padding: 10px 18px;
-      border-bottom: 1px solid rgba(255,255,255,0.1);
-      background: rgba(0,0,0,0.48);
-    }
-    .eyebrow {
-      margin: 0 0 4px;
-      color: rgba(207,250,254,0.75);
-      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-      font-size: 10px; font-weight: 900; letter-spacing: 0.34em; text-transform: uppercase;
-    }
-    h1 {
-      margin: 0; color: #fff;
-      font-size: clamp(16px, 2vw, 24px);
-      font-weight: 950; letter-spacing: 0.08em; text-transform: uppercase;
-    }
-    .hud {
-      display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px;
-      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-      font-size: 10px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase;
-    }
-    .pill {
-      min-width: 82px; padding: 7px 10px;
-      border: 1px solid rgba(255,255,255,0.11);
-      border-radius: 10px; background: rgba(0,0,0,0.36); text-align: center;
-    }
-    .pill.highlight { border-color: rgba(250,204,21,0.4); background: rgba(250,204,21,0.08); }
-    .pill.combo { border-color: rgba(251,146,60,0.5); background: rgba(251,146,60,0.1); color: #fb923c; }
-    .arena-wrap {
-      position: relative; min-height: 0; flex: 1;
-      display: flex; align-items: center; justify-content: center; background: #000;
-    }
-    canvas { display: block; width: auto; height: 100%; max-width: 100%; max-height: 100%; cursor: crosshair; }
-    .help-bar {
-      flex: 0 0 auto;
-      padding: 9px 18px;
-      border-top: 1px solid rgba(255,255,255,0.1);
-      background: rgba(0,0,0,0.56);
-      color: rgba(226,232,240,0.8); font-size: 11px; font-weight: 700; line-height: 1.45;
-    }
-    .help-bar strong {
-      display: inline-block; margin-right: 10px;
-      color: rgba(207,250,254,0.92);
-      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-      font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase;
-    }
-    .overlay {
-      position: absolute; inset: 0; display: none;
-      align-items: center; justify-content: center;
-      padding: 24px; background: rgba(0,0,0,0.76);
-    }
-    .overlay.show { display: flex; }
-    .modal {
-      width: min(580px, 100%); padding: 32px;
-      border: 1px solid rgba(255,255,255,0.16);
-      border-radius: 20px; background: rgba(3,7,18,0.96);
-      text-align: center; box-shadow: 0 0 40px rgba(255,255,255,0.08);
-    }
-    .modal h2 { margin: 0; font-size: 48px; font-weight: 950; letter-spacing: 0.08em; text-transform: uppercase; }
-    .modal p { margin: 12px auto 0; max-width: 440px; color: rgba(203,213,225,0.88); font-size: 14px; font-weight: 700; line-height: 1.55; }
-    .modal .stats { margin-top: 18px; display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
-    .stat-box { padding: 10px 16px; border: 1px solid rgba(255,255,255,0.12); border-radius: 12px; background: rgba(255,255,255,0.04); font-family: ui-monospace, monospace; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; }
-    .stat-box span { display: block; font-size: 22px; font-weight: 950; margin-bottom: 2px; color: #fff; }
-    button {
-      margin-top: 22px; width: 100%; height: 48px;
-      border: 1px solid rgba(255,255,255,0.16); border-radius: 14px;
-      background: linear-gradient(180deg, #0891b2, #155e75);
-      color: #fff; cursor: pointer; font-weight: 950; letter-spacing: 0.2em; text-transform: uppercase;
-    }
-  </style>
-</head>
-<body>
-  <main class="shell">
-    <header>
-      <div>
-        <p class="eyebrow">QCH / Nova Terra / Batalha aérea V3</p>
-        <h1>Batalha de Helicópteros</h1>
-      </div>
-      <div class="hud">
-        <div class="pill">HP <span id="playerHp">500</span></div>
-        <div class="pill" id="shieldPill">Escudo <span id="shieldLabel">—</span></div>
-        <div class="pill">Turbo <span id="turboLabel">100%</span></div>
-        <div class="pill">Alvos <span id="targetsLeft">10</span></div>
-        <div class="pill">Onda <span id="waveLabel">1/10</span></div>
-        <div class="pill">Tipo <span id="enemyKind">COMUM</span></div>
-        <div class="pill">Míssil <span id="missileLabel">2</span></div>
-        <div class="pill highlight">Score <span id="scoreLabel">0</span></div>
-        <div class="pill combo" id="comboPill">Combo <span id="comboLabel">x1</span></div>
-      </div>
-    </header>
+// @ts-nocheck
+'use client';
+import React, { useEffect, useRef } from 'react';
+import { X } from 'lucide-react';
+import { PremiumCanvasButton } from './ui/PremiumCanvasButton';
 
-    <section class="arena-wrap">
-      <canvas id="battle" width="1280" height="720"></canvas>
-      <div class="overlay" id="overlay">
-        <div class="modal">
-          <h2 id="resultTitle">Vitória</h2>
-          <p id="resultText">Operação concluída.</p>
-          <div class="stats">
-            <div class="stat-box"><span id="finalScore">0</span>Score Final</div>
-            <div class="stat-box"><span id="finalCombo">x1</span>Melhor Combo</div>
-            <div class="stat-box"><span id="finalKills">0</span>Abatidos</div>
-          </div>
-          <button type="button" id="restart">Reiniciar Missão</button>
-        </div>
-      </div>
-    </section>
-    <div class="help-bar">
-      <strong>Controles</strong>
-      WASD/setas movem · Clique seguro = metralhadora · Mire p/ LOCK · Botão direito ou Espaço = míssil · Shift = turbo · Colete power-ups!
-    </div>
-  </main>
+type NewEarthHelicopterBattleStats = {
+  speedBonus: number;
+  gunDamageBonus: number;
+  missileDamageBonus: number;
+  startingMissiles: number;
+  armorReduction: number;
+  initialDrones: number;
+};
 
-  <script>
+interface NewEarthHelicopterBattleProps {
+  language: 'en' | 'pt';
+  title: string;
+  colonyName: string;
+  background?: string;
+  helicopterStats?: Partial<NewEarthHelicopterBattleStats>;
+  onClose: () => void;
+  onVictory: () => void;
+  onDefeat: () => void;
+}
+
+export function NewEarthHelicopterBattle({
+  language,
+  title,
+  colonyName,
+  background,
+  helicopterStats,
+  onClose,
+  onVictory,
+  onDefeat,
+}: NewEarthHelicopterBattleProps) {
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const onVictoryRef = useRef(onVictory);
+  const onDefeatRef = useRef(onDefeat);
+  const speedBonus = helicopterStats?.speedBonus ?? 0;
+  const gunDamageBonus = helicopterStats?.gunDamageBonus ?? 0;
+  const missileDamageBonus = helicopterStats?.missileDamageBonus ?? 0;
+  const startingMissiles = helicopterStats?.startingMissiles ?? 1;
+  const armorReduction = helicopterStats?.armorReduction ?? 0;
+  const initialDrones = helicopterStats?.initialDrones ?? 0;
+  const continueLabel = language === 'pt' ? 'Continuar' : 'Continue';
+
+  useEffect(() => {
+    onVictoryRef.current = onVictory;
+    onDefeatRef.current = onDefeat;
+  }, [onDefeat, onVictory]);
+
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!root) return;
+
     const WIDTH = 1280, HEIGHT = 720;
     const ENEMY_HALF_MAX_Y = HEIGHT / 2 - 22;
     const PLAYER_MAX_HP = 500;
     const TOTAL_WAVES = 10;
 
-    const battleParams = new URLSearchParams(window.location.search);
-    const BACKGROUND_WEBP_SRC = battleParams.get('background') || '';
+    const BACKGROUND_WEBP_SRC = background || '';
     const SHOW_GAMEPLAY_TEXT = false;
 
-    const clampParam = (name, min, max, fallback = 0) => {
-      const value = Number(battleParams.get(name));
-      return Number.isFinite(value) ? Math.min(max, Math.max(min, value)) : fallback;
+    const clampStat = (value, min, max, fallback = 0) => {
+      const numeric = Number(value);
+      return Number.isFinite(numeric) ? Math.min(max, Math.max(min, numeric)) : fallback;
     };
     const HELI_UPGRADES = {
-      speedBonus: clampParam('speedBonus', 0, 50),
-      gunDamageBonus: clampParam('gunDamageBonus', 0, 100),
-      missileDamageBonus: clampParam('missileDamageBonus', 0, 100),
-      startingMissiles: clampParam('startingMissiles', 1, 6, 1),
-      armorReduction: clampParam('armorReduction', 0, 50),
-      initialDrones: clampParam('initialDrones', 0, 5),
+      speedBonus: clampStat(speedBonus, 0, 50),
+      gunDamageBonus: clampStat(gunDamageBonus, 0, 100),
+      missileDamageBonus: clampStat(missileDamageBonus, 0, 100),
+      startingMissiles: clampStat(startingMissiles, 1, 6, 1),
+      armorReduction: clampStat(armorReduction, 0, 50),
+      initialDrones: clampStat(initialDrones, 0, 5),
     };
     const playerSpeedMultiplier = 1 + HELI_UPGRADES.speedBonus / 100;
     const playerGunDamage = Math.round(18 * (1 + HELI_UPGRADES.gunDamageBonus / 100));
@@ -175,9 +91,9 @@
       common: { hp: 240, shotDamage: 32, cooldown: 1050, radius: 28, label: 'COMUM', scale: 1, score: 100 },
       elite:  { hp: 520, shotDamage: 46, cooldown: 800,  radius: 36, label: 'ELITE', scale: 1.18, score: 250 },
       ace:    { hp: 700, shotDamage: 40, cooldown: 640,  radius: 40, label: 'ACE',   scale: 1.28, score: 400 },
-      boss:   { hp: 1800, shotDamage:52, cooldown: 500,  radius: 68, label: 'BOSS',  scale: 1.9,  score: 2000 },
+      boss:   { hp: 3600, shotDamage:52, cooldown: 500,  radius: 68, label: 'BOSS',  scale: 1.9,  score: 2000 },
     };
-    const BOSS_ROTOR_MAX_HP = 320;
+    const BOSS_ROTOR_MAX_HP = 800;
     const BOSS_ROTOR_HIT_RADIUS = 46;
     const BOSS_CORE_HIT_RADIUS = 48;
 
@@ -202,30 +118,29 @@
     };
 
     // ─── canvas & DOM ─────────────────────────────────────────────────────────
-    const canvas = document.getElementById('battle');
+    const canvas = root.querySelector('#battle');
     const ctx = canvas.getContext('2d');
     canvas.tabIndex = 0;
-    const hpEl = document.getElementById('playerHp');
-    const shieldEl = document.getElementById('shieldLabel');
-    const shieldPill = document.getElementById('shieldPill');
-    const turboEl = document.getElementById('turboLabel');
-    const targetsEl = document.getElementById('targetsLeft');
-    const waveEl = document.getElementById('waveLabel');
-    const kindEl = document.getElementById('enemyKind');
-    const missileEl = document.getElementById('missileLabel');
-    const scoreEl = document.getElementById('scoreLabel');
-    const comboEl = document.getElementById('comboLabel');
-    const comboPill = document.getElementById('comboPill');
-    const overlay = document.getElementById('overlay');
-    const resultTitle = document.getElementById('resultTitle');
-    const resultText = document.getElementById('resultText');
-    const finalScore = document.getElementById('finalScore');
-    const finalCombo = document.getElementById('finalCombo');
-    const finalKills = document.getElementById('finalKills');
-    const restart = document.getElementById('restart');
-    const embedded = new URLSearchParams(window.location.search).get('embedded') === '1';
+    const hpEl = root.querySelector('#playerHp');
+    const shieldEl = root.querySelector('#shieldLabel');
+    const shieldPill = root.querySelector('#shieldPill');
+    const turboEl = root.querySelector('#turboLabel');
+    const targetsEl = root.querySelector('#targetsLeft');
+    const waveEl = root.querySelector('#waveLabel');
+    const kindEl = root.querySelector('#enemyKind');
+    const missileEl = root.querySelector('#missileLabel');
+    const scoreEl = root.querySelector('#scoreLabel');
+    const comboEl = root.querySelector('#comboLabel');
+    const comboPill = root.querySelector('#comboPill');
+    const overlay = root.querySelector('#overlay');
+    const resultTitle = root.querySelector('#resultTitle');
+    const resultText = root.querySelector('#resultText');
+    const finalScore = root.querySelector('#finalScore');
+    const finalCombo = root.querySelector('#finalCombo');
+    const finalKills = root.querySelector('#finalKills');
+    const restart = root.querySelector('#restart');
     let lastResult = '';
-    if (embedded) restart.textContent = 'Continuar';
+    restart.textContent = continueLabel;
 
     const keys = {};
     const mouse = { x: WIDTH / 2, y: HEIGHT / 2, down: false };
@@ -434,7 +349,7 @@
       const spread = count === 1 ? 0 : (i - (count - 1) / 2) * 170;
       return {
         id: nextId++, kind,
-        x: WIDTH/2 + spread, y: kind === 'boss' ? 88 : 76 + i * 18,
+        x: WIDTH/2 + spread, y: kind === 'boss' ? -180 : 76 + i * 18,
         baseX: WIDTH/2 + spread,
         hp: stats.hp, maxHp: stats.hp,
         radius: stats.radius, scale: stats.scale,
@@ -490,16 +405,81 @@
     }
 
     function bigExplosion(x, y, scale = 1, color = '#f97316') {
-      // concentric rings
-      explosions.push({ x, y, r: 6, maxR: 85 * scale, life: 480, maxLife: 480, color, ring: 0 });
-      explosions.push({ x, y, r: 4, maxR: 55 * scale, life: 340, maxLife: 340, color: '#fff7ad', ring: 1 });
-      // shockwave
-      shockwaves.push({ x, y, r: 0, maxR: 120 * scale, life: 280, maxLife: 280 });
       burst(x, y, color, 34 * scale, 9 * scale, true);
+      for (let i = 0; i < Math.round(10 * scale); i++) {
+        addParticle(x + rand(-16, 16) * scale, y + rand(-12, 12) * scale, rand(-2.8, 2.8) * scale, rand(-3.8, 0.6) * scale, rand(10, 24) * scale, 'rgba(72,76,84,0.36)', rand(900, 1700), 'smoke');
+      }
       shake = Math.max(shake, 5 * scale);
-      flash = Math.max(flash, 0.18 * scale);
+      flash = Math.max(flash, 0.12 * scale);
     }
 
+    function aaaExplosion(x, y, kind = 'common') {
+      const type = kind === 'ace' ? 'elite' : kind;
+      const scale = type === 'boss' ? 2.28 : type === 'elite' ? 1.52 : 1.08;
+      const mainColor = type === 'boss' ? '#c084fc' : type === 'elite' ? '#facc15' : '#fb923c';
+      const palette = type === 'boss'
+        ? ['#f0abfc', '#c084fc', '#ffffff', '#fb923c', '#7c3aed']
+        : type === 'elite'
+          ? ['#fef08a', '#facc15', '#ffffff', '#fb923c', '#f97316']
+          : ['#fff7ad', '#fb923c', '#facc15', '#ffffff', '#ef4444'];
+
+      flash = Math.max(flash, type === 'boss' ? 0.38 : type === 'elite' ? 0.28 : 0.18);
+      shake = Math.max(shake, type === 'boss' ? 18 : type === 'elite' ? 11 : 6);
+      burst(x, y, mainColor, type === 'boss' ? 128 : type === 'elite' ? 82 : 52, type === 'boss' ? 16 : type === 'elite' ? 12 : 8.5, true);
+
+      const flameCount = type === 'boss' ? 46 : type === 'elite' ? 30 : 18;
+      for (let i = 0; i < flameCount; i++) {
+        const a = rand(0, Math.PI * 2);
+        const speed = rand(1.4, type === 'boss' ? 8.8 : 6.4) * scale;
+        addParticle(
+          x + rand(-22, 22) * scale,
+          y + rand(-16, 16) * scale,
+          Math.cos(a) * speed,
+          Math.sin(a) * speed - rand(0.4, 2.4) * scale,
+          rand(4, 13) * scale,
+          pick(palette),
+          rand(360, 920),
+          'spark'
+        );
+      }
+
+      const debrisCount = type === 'boss' ? 36 : type === 'elite' ? 22 : 12;
+      for (let i = 0; i < debrisCount; i++) {
+        const a = rand(0, Math.PI * 2);
+        const speed = rand(7, 21) * scale;
+        addParticle(x + rand(-28, 28), y + rand(-22, 22), Math.cos(a) * speed, Math.sin(a) * speed - 2, rand(3, 8) * scale, pick(['#94a3b8', '#cbd5e1', '#64748b', '#fb923c']), rand(740, 1600), 'debris');
+      }
+
+      const smokeCount = type === 'boss' ? 42 : type === 'elite' ? 26 : 15;
+      for (let i = 0; i < smokeCount; i++) {
+        addParticle(x + rand(-28, 28) * scale, y + rand(-20, 20) * scale, rand(-2.8, 2.8) * scale, rand(-4.2, 0.6) * scale, rand(14, 38) * scale, 'rgba(54,58,66,0.42)', rand(1000, 2100), 'smoke');
+      }
+
+      const streakCount = type === 'boss' ? 42 : type === 'elite' ? 26 : 16;
+      for (let i = 0; i < streakCount; i++) {
+        const a = (i / streakCount) * Math.PI * 2 + rand(-0.18, 0.18);
+        const speed = rand(9, 24) * scale;
+        addParticle(x, y, Math.cos(a) * speed, Math.sin(a) * speed, rand(2.5, 6) * scale, pick(palette), rand(420, 900), 'spark');
+      }
+
+      if (type === 'boss') {
+        for (let i = 0; i < 10; i++) {
+          window.setTimeout(() => {
+            const ox = rand(-78, 78) * scale;
+            const oy = rand(-50, 50) * scale;
+            burst(x + ox, y + oy, pick(palette), 20, 9 * scale, true);
+          }, 140 + i * 72);
+        }
+      } else if (type === 'elite') {
+        for (let i = 0; i < 5; i++) {
+          window.setTimeout(() => {
+            const ox = rand(-38, 38) * scale;
+            const oy = rand(-28, 28) * scale;
+            burst(x + ox, y + oy, pick(palette), 12, 7 * scale, false);
+          }, 120 + i * 70);
+        }
+      }
+    }
     // ─── firing ───────────────────────────────────────────────────────────────
     function firePlayerGun() {
       if (player.gunCd > 0) return;
@@ -743,9 +723,11 @@
           // just let it drift naturally
         }
 
-        const amp = enemy.kind === 'boss' ? 55 : 105;
-        let desiredX = enemy.baseX + Math.sin(enemy.phase * (enemy.kind === 'boss' ? 0.7 : 1.2)) * amp;
-        let desiredY = (enemy.kind === 'boss' ? 96 : 72) + Math.sin(enemy.phase * 1.5) * (enemy.kind === 'boss' ? 12 : 24);
+        const amp = enemy.kind === 'boss' ? 30 : 105;
+        let desiredX = enemy.baseX + Math.sin(enemy.phase * (enemy.kind === 'boss' ? 0.42 : 1.2)) * amp;
+        let desiredY = enemy.kind === 'boss'
+          ? HEIGHT / 2 - 12 + Math.sin(enemy.phase * 0.55) * 7
+          : 72 + Math.sin(enemy.phase * 1.5) * 24;
 
         // dive bomb behaviour for ace/elite
         if (enemy.kind === 'ace' || enemy.kind === 'elite') {
@@ -767,8 +749,9 @@
         }
 
         const oldX = enemy.x;
-        enemy.x = lerp(enemy.x, clamp(desiredX, 52, WIDTH-52), 0.025 * dtScale);
-        enemy.y = lerp(enemy.y, clamp(desiredY, 36, ENEMY_HALF_MAX_Y), enemy.diving ? 0.045 * dtScale : 0.025 * dtScale);
+        enemy.x = lerp(enemy.x, clamp(desiredX, 52, WIDTH-52), (enemy.kind === 'boss' ? 0.012 : 0.025) * dtScale);
+        const maxEnemyY = enemy.kind === 'boss' ? HEIGHT / 2 + 4 : ENEMY_HALF_MAX_Y;
+        enemy.y = lerp(enemy.y, clamp(desiredY, 36, maxEnemyY), enemy.diving ? 0.045 * dtScale : (enemy.kind === 'boss' ? 0.014 : 0.025) * dtScale);
         enemy.bank = lerp(enemy.bank, clamp((enemy.x - oldX)*6,-14,14), 0.08);
         enemy.angle = Math.PI/2 + enemy.bank * 0.012;
 
@@ -1245,15 +1228,14 @@
       const c = crashers[index];
       crashers.splice(index, 1);
       if (c.isPlayer) {
-        bigExplosion(c.x, c.y, 2.2, '#38bdf8');
+        aaaExplosion(c.x, c.y, 'elite');
         pendingResult = 'defeat';
         pendingResultAt = performance.now() + 900;
         ended = true;
         return;
       }
 
-      const scale = c.kind === 'boss' ? 2.4 : c.kind === 'ace' ? 1.55 : c.kind === 'elite' ? 1.35 : 1;
-      bigExplosion(c.x, c.y, scale, c.kind === 'boss' ? '#c084fc' : (c.kind === 'elite' || c.kind === 'ace') ? '#facc15' : '#22d3ee');
+      aaaExplosion(c.x, c.y, c.kind);
       playSfx(c.kind === 'common' ? pick([SFX.explosionA, SFX.explosionB]) : SFX.explosionElite, c.kind === 'boss' ? 0.82 : 0.62);
       tryDropPowerup(c.x, c.y, c.kind);
       if (c.kind === 'boss') {
@@ -1266,6 +1248,7 @@
     function killEnemy(index) {
       const e = enemies[index];
       addText(e.x, e.y, e.kind === 'boss' ? '🔥 BOSS DOWN' : '+ HIT', '#fff7ad', 1100);
+      aaaExplosion(e.x, e.y, e.kind);
       startCrash(e, false);
 
       // score & combo
@@ -1490,6 +1473,13 @@
     }
 
     // ─── HELICOPTER DRAW (detailed) ────────────────────────────────────────────
+    function altitudeScaleFor(u, now, isPlayer = false) {
+      const phase = (u.id || 0) * 1.31 + (isPlayer ? 0.8 : 0);
+      const slow = Math.sin(now / (isPlayer ? 1550 : u.kind === 'boss' ? 2100 : 1700) + phase) * (isPlayer ? 0.012 : u.kind === 'boss' ? 0.007 : 0.01);
+      const secondary = Math.sin(now / 2700 + phase * 0.73) * 0.004;
+      return 1 + slow + secondary;
+    }
+
     function drawHelicopter(u, isPlayer, now) {
       if (isPlayer && (hasAetherBody || hasAetherRotor)) {
         drawAetherHelicopter(u, now);
@@ -1649,6 +1639,8 @@
 
       ctx.save();
       ctx.translate(u.x, u.y);
+      const altitudeScale = altitudeScaleFor(u, now, true);
+      ctx.scale(altitudeScale, altitudeScale);
       ctx.rotate(rotation);
 
       if (hasAetherBody) {
@@ -1711,7 +1703,8 @@
 
       ctx.save();
       ctx.translate(u.x, u.y);
-      ctx.scale(u.scale || 1, u.scale || 1);
+      const altitudeScale = altitudeScaleFor(u, now, false);
+      ctx.scale((u.scale || 1) * altitudeScale, (u.scale || 1) * altitudeScale);
       ctx.rotate(rotation);
 
       if (body.loaded) {
@@ -1840,7 +1833,8 @@
 
       ctx.save();
       ctx.translate(u.x, u.y);
-      ctx.scale(u.scale || 1, u.scale || 1);
+      const altitudeScale = altitudeScaleFor(u, now, false);
+      ctx.scale((u.scale || 1) * altitudeScale, (u.scale || 1) * altitudeScale);
       ctx.rotate(rotation);
 
       if (body.loaded) {
@@ -2039,8 +2033,8 @@
         const alpha = clamp(s.life / s.maxLife, 0, 1);
         ctx.save();
         ctx.globalAlpha = alpha * 0.35;
-        ctx.strokeStyle = 'rgba(255,255,255,0.8)';
-        ctx.lineWidth = 3 * alpha;
+        ctx.strokeStyle = s.color || 'rgba(255,255,255,0.8)';
+        ctx.lineWidth = (s.width || 3) * alpha;
         ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, Math.PI*2); ctx.stroke();
         ctx.restore();
       });
@@ -2173,11 +2167,13 @@
     function showResult(result) {
       lastResult = result;
       stopAllLoops();
-      resultTitle.textContent = result === 'victory' ? 'Vitória!' : 'Derrota';
-      resultTitle.style.color = result === 'victory' ? '#6ee7b7' : '#fda4af';
-      resultText.textContent = result === 'victory'
-        ? 'Zona aérea limpa. Missão cumprida, piloto!'
-        : 'A força aérea de Elysium recuou para reorganização.';
+      if (result === 'victory') {
+        onVictoryRef.current();
+        return;
+      }
+      resultTitle.textContent = 'Derrota';
+      resultTitle.style.color = '#fda4af';
+      resultText.textContent = 'A força aérea de Elysium recuou para reorganização.';
       finalScore.textContent = score.toLocaleString();
       finalCombo.textContent = `x${bestCombo}`;
       finalKills.textContent = totalKills;
@@ -2225,46 +2221,94 @@
       }
       if (k === ' ') { firePlayerMissile(); keys[' '] = false; }
     }
-    window.addEventListener('message', ev => {
-      if (ev.origin !== window.location.origin) return;
-      const detail = ev.data;
-      if (!detail || detail.type !== 'qch-helicopter-input') return;
-      setInputKey(detail.key, detail.event === 'keydown');
-    });
+    const listenerController = new AbortController();
+    const listenerOptions = { signal: listenerController.signal };
+
     window.addEventListener('keydown', ev => {
       const k = ev.key.toLowerCase();
       if (movKeys.has(k)) ev.preventDefault();
       setInputKey(k, true);
-    });
+    }, listenerOptions);
     window.addEventListener('keyup', ev => {
       const k = ev.key.toLowerCase();
       if (movKeys.has(k)) ev.preventDefault();
       setInputKey(k, false);
-    });
-    canvas.addEventListener('mousemove', updateMouse);
+    }, listenerOptions);
+    canvas.addEventListener('mousemove', updateMouse, listenerOptions);
     canvas.addEventListener('mousedown', ev => {
       ev.preventDefault(); canvas.focus(); updateMouse(ev);
       if (ev.button === 2) firePlayerMissile();
       else mouse.down = true;
-    });
-    window.addEventListener('mouseup', () => { mouse.down = false; });
-    canvas.addEventListener('contextmenu', ev => ev.preventDefault());
+    }, listenerOptions);
+    window.addEventListener('mouseup', () => { mouse.down = false; }, listenerOptions);
+    canvas.addEventListener('contextmenu', ev => ev.preventDefault(), listenerOptions);
     restart.addEventListener('click', () => {
-      if (embedded && lastResult) {
-        window.parent?.postMessage({
-          type: 'qch-helicopter-battle-result',
-          result: lastResult,
-          score,
-          bestCombo,
-          totalKills
-        }, window.location.origin);
+      if (lastResult) {
+        onDefeatRef.current();
         return;
       }
       reset();
-    });
+    }, listenerOptions);
 
     reset();
-  </script>
-</body>
-</html>
 
+    return () => {
+      listenerController.abort();
+      cancelAnimationFrame(raf);
+      stopAllLoops();
+    };
+  }, [armorReduction, background, continueLabel, gunDamageBonus, initialDrones, missileDamageBonus, speedBonus, startingMissiles]);
+
+  return (
+    <div ref={rootRef} className="fixed inset-0 z-[80] flex items-center justify-center bg-black/96 p-2 text-slate-100">
+      <main className="flex h-[98vh] w-full max-w-[98vw] flex-col overflow-hidden rounded-3xl border border-white/15 bg-slate-950 shadow-[0_0_42px_rgba(0,0,0,0.64)]">
+        <header className="flex min-h-[68px] shrink-0 items-center justify-between gap-4 border-b border-white/10 bg-black/50 px-4 py-2">
+          <div className="min-w-0">
+            <p className="mb-1 font-mono text-[10px] font-black uppercase tracking-[0.34em] text-cyan-100/75">QCH / Nova Terra / {colonyName}</p>
+            <h1 className="truncate text-[clamp(16px,2vw,24px)] font-black uppercase tracking-[0.08em] text-white">{title}</h1>
+          </div>
+          <div className="flex min-w-0 flex-1 flex-wrap justify-end gap-1.5 font-mono text-[10px] font-extrabold uppercase tracking-[0.1em]">
+            <div className="min-w-[82px] rounded-[10px] border border-white/10 bg-black/35 px-2.5 py-1.5 text-center">HP <span id="playerHp">500</span></div>
+            <div className="min-w-[82px] rounded-[10px] border border-white/10 bg-black/35 px-2.5 py-1.5 text-center" id="shieldPill">Escudo <span id="shieldLabel">-</span></div>
+            <div className="min-w-[82px] rounded-[10px] border border-white/10 bg-black/35 px-2.5 py-1.5 text-center">Turbo <span id="turboLabel">100%</span></div>
+            <div className="min-w-[82px] rounded-[10px] border border-white/10 bg-black/35 px-2.5 py-1.5 text-center">Alvos <span id="targetsLeft">10</span></div>
+            <div className="min-w-[82px] rounded-[10px] border border-white/10 bg-black/35 px-2.5 py-1.5 text-center">Onda <span id="waveLabel">1/10</span></div>
+            <div className="min-w-[82px] rounded-[10px] border border-white/10 bg-black/35 px-2.5 py-1.5 text-center">Tipo <span id="enemyKind">COMUM</span></div>
+            <div className="min-w-[82px] rounded-[10px] border border-white/10 bg-black/35 px-2.5 py-1.5 text-center">Missil <span id="missileLabel">2</span></div>
+            <div className="min-w-[82px] rounded-[10px] border border-yellow-300/40 bg-yellow-300/10 px-2.5 py-1.5 text-center">Score <span id="scoreLabel">0</span></div>
+            <div className="min-w-[82px] rounded-[10px] border border-orange-400/50 bg-orange-400/10 px-2.5 py-1.5 text-center text-orange-400" id="comboPill">Combo <span id="comboLabel">x1</span></div>
+          </div>
+          <PremiumCanvasButton
+            type="button"
+            onClick={onClose}
+            tone="steel"
+            className="h-10 w-10 shrink-0 rounded-full border border-cyan-300/25 bg-black/40 text-cyan-100 hover:bg-cyan-300/10"
+            aria-label={language === 'pt' ? 'Fechar batalha' : 'Close battle'}
+          >
+            <X className="h-5 w-5" />
+          </PremiumCanvasButton>
+        </header>
+
+        <section className="relative flex min-h-0 flex-1 items-center justify-center bg-black">
+          <canvas id="battle" width={1280} height={720} className="block h-full max-h-full max-w-full cursor-crosshair" />
+          <div className="absolute inset-0 hidden items-center justify-center bg-black/75 p-6 [&.show]:flex" id="overlay">
+            <div className="w-[min(580px,100%)] rounded-[20px] border border-white/15 bg-slate-950/95 p-8 text-center shadow-[0_0_40px_rgba(255,255,255,0.08)]">
+              <h2 id="resultTitle" className="m-0 text-5xl font-black uppercase tracking-[0.08em]">Derrota</h2>
+              <p id="resultText" className="mx-auto mt-3 max-w-[440px] text-sm font-bold leading-6 text-slate-300/90">Operacao concluida.</p>
+              <div className="mt-4 flex flex-wrap justify-center gap-3">
+                <div className="rounded-xl border border-white/10 bg-white/[0.04] px-4 py-2.5 font-mono text-[11px] font-extrabold uppercase tracking-[0.1em]"><span id="finalScore" className="mb-0.5 block text-[22px] font-black text-white">0</span>Score Final</div>
+                <div className="rounded-xl border border-white/10 bg-white/[0.04] px-4 py-2.5 font-mono text-[11px] font-extrabold uppercase tracking-[0.1em]"><span id="finalCombo" className="mb-0.5 block text-[22px] font-black text-white">x1</span>Melhor Combo</div>
+                <div className="rounded-xl border border-white/10 bg-white/[0.04] px-4 py-2.5 font-mono text-[11px] font-extrabold uppercase tracking-[0.1em]"><span id="finalKills" className="mb-0.5 block text-[22px] font-black text-white">0</span>Abatidos</div>
+              </div>
+              <button type="button" id="restart" className="mt-5 h-12 w-full rounded-[14px] border border-white/15 bg-gradient-to-b from-rose-600 to-rose-800 font-black uppercase tracking-[0.2em] text-white">Continuar</button>
+            </div>
+          </div>
+        </section>
+        <div className="shrink-0 border-t border-white/10 bg-black/55 px-4 py-2 text-[11px] font-bold leading-5 text-slate-200/80">
+          <strong className="mr-2.5 inline-block font-mono text-[10px] uppercase tracking-[0.2em] text-cyan-100/90">Controles</strong>
+          WASD/setas movem - Clique seguro = metralhadora - Mire p/ LOCK - Botao direito ou Espaco = missil - Shift = turbo - Colete power-ups!
+        </div>
+      </main>
+    </div>
+  );
+}

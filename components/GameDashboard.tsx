@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef, useMemo, memo } from 'react';
+import Image from 'next/image';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Rocket,
@@ -67,7 +68,8 @@ import {
   MousePointer2,
   Loader2,
   Play,
-  Pause
+  Pause,
+  FileText
 } from 'lucide-react';
 import {
   ROUTES,
@@ -116,6 +118,9 @@ import NewEarthSurfaceBattle, { type NewEarthSurfaceBattleKind, type NewEarthSur
 import {
   ARCADE_CARD_REWARD_CHANCE,
   ARCADE_CARD_REWARD_RULES,
+  BASE_BATTLE_SHIP_STATS,
+  BATTLE_CARD_SLOTS,
+  COLONY_CARD_CATALOG,
   ColonyCard,
   ColonyCardLevels,
   ColonySectorId,
@@ -123,6 +128,7 @@ import {
   POLITICAL_CARD_SLOTS,
   SECTOR_CONFIG,
   getBattleEffects,
+  calculateBattleShipStats,
   getArcadeWildcardPerks,
   getCardBackgroundImage,
   getCardById,
@@ -130,9 +136,12 @@ import {
   getCardLevel,
   getPoliticalEffects,
   getPoliticalPassiveBonuses,
+  getHorizonLevelFromXp,
+  isBattleCard,
   isPoliticalCard,
   normalizeOwnedColonyCardIds,
   rollAnyMissingColonyCardReward,
+  isWildcardCard,
 } from '@/lib/colony-cards';
 import {
   NEW_EARTH_MISSIONS_STORAGE_KEY,
@@ -192,6 +201,18 @@ import {
   type NewEarthTreasure,
   type NewEarthTreasureCategory,
 } from '@/lib/new-earth-treasures';
+import {
+  NEW_EARTH_HELICOPTER_WAR_INTEL,
+  NEW_EARTH_TANK_WAR_INTEL,
+  NEW_EARTH_WAR_INTEL_CATALOG,
+  NEW_EARTH_WAR_INTEL_STORAGE_KEY,
+  NEW_EARTH_WAR_INTEL_SCROLLS,
+  getNextNewEarthWarIntelDrop,
+  normalizeNewEarthWarIntelCollection,
+  type NewEarthWarIntel,
+  type NewEarthWarIntelCollection,
+  type NewEarthWarIntelKind,
+} from '@/lib/new-earth-war-intel';
 import { LoreScreen, RobotVisual } from './LoreSystem';
 import Lottie from 'lottie-react';
 import EconomicGoals from './dashboard/EconomicGoals';
@@ -295,6 +316,20 @@ type NewEarthSurfaceBattleBriefing = {
   background: string;
 };
 
+type NewEarthSurfaceVictorySummary = {
+  id: number;
+  battleKind: NewEarthSurfaceBattleKind;
+  siteTitle: string;
+  qc: number;
+  supplies: Partial<Record<NewEarthSupplyId, number>>;
+  intel: NewEarthWarIntel | null;
+  intelNew: boolean;
+  intelCollected: number;
+  intelTotal: number;
+};
+
+const rollNewEarthBattleReward = (min: number, max: number) => Math.round(min + Math.random() * (max - min));
+
 const NEW_EARTH_UNDERWATER_SITE_BRIEFINGS: Record<NewEarthUnderwaterSiteId, {
   title: Record<'pt' | 'en', string>;
   subtitle: Record<'pt' | 'en', string>;
@@ -370,12 +405,12 @@ const NEW_EARTH_SURFACE_SITE_BRIEFINGS: Record<NewEarthSurfaceBattleSiteId, {
     title: { pt: 'Zona Glacial', en: 'Glacial Zone' },
     subtitle: { pt: 'Elysium - ataque aéreo', en: 'Elysium - air assault' },
     lore: {
-      pt: 'Frentes congeladas escondem baterias hostis e patrulhas aéreas. Elysium deve manter a metade inferior do espaço de combate e derrubar os alvos acima.',
-      en: 'Frozen fronts hide hostile batteries and air patrols. Elysium must hold the lower half of the combat zone and shoot down targets above.',
+      pt: 'Frentes congeladas escondem baterias hostis e patrulhas aéreas. Elysium deve romper o bloqueio pelo ar, sobreviver ao fogo guiado e eliminar as ondas inimigas.',
+      en: 'Frozen fronts hide hostile batteries and air patrols. Elysium must break the blockade from the air, survive guided fire, and eliminate enemy waves.',
     },
     objective: {
-      pt: 'Pilote o helicóptero, permaneça no setor aliado e destrua as aeronaves inimigas sem cruzar a linha de contenção.',
-      en: 'Pilot the helicopter, stay in allied airspace, and destroy enemy aircraft without crossing the containment line.',
+      pt: 'Pilote o helicóptero, esquive dos disparos, use drones e mísseis no momento certo e derrube todos os alvos da patrulha.',
+      en: 'Pilot the helicopter, dodge incoming fire, use drones and missiles at the right moment, and destroy every patrol target.',
     },
     backgrounds: NEW_EARTH_GLACIAL_ZONE_BACKGROUNDS,
   },
@@ -387,8 +422,8 @@ const NEW_EARTH_SURFACE_SITE_BRIEFINGS: Record<NewEarthSurfaceBattleSiteId, {
       en: 'The continent holds buried cities and intermittent military signals. Only Elysium has the air reach to strike and withdraw safely.',
     },
     objective: {
-      pt: 'Use o helicóptero para limpar o espaço superior enquanto mantém a formação de Elysium na metade inferior da arena.',
-      en: 'Use the helicopter to clear the upper airspace while keeping Elysium formation in the lower half of the arena.',
+      pt: 'Use o helicóptero para avançar sobre a zona hostil, travar alvos prioritários e destruir a patrulha antes que o bloqueio se reorganize.',
+      en: 'Use the helicopter to push into hostile airspace, lock priority targets, and destroy the patrol before the blockade regroups.',
     },
     backgrounds: NEW_EARTH_FORGOTTEN_CONTINENT_BACKGROUNDS,
   },
@@ -399,6 +434,13 @@ const NEW_EARTH_MUSEUM_MARKER = {
   label: 'MUSEU',
   left: '59.6%',
   top: '44.7%',
+} as const;
+
+const NEW_EARTH_WAR_INTEL_MARKER = {
+  id: 'new-earth-war-intel',
+  label: 'INFORMAÇÕES DE GUERRA',
+  left: '70.3%',
+  top: '42.1%',
 } as const;
 
 const NEW_EARTH_DISTRIBUTION_MARKER = {
@@ -483,6 +525,7 @@ const NEW_EARTH_MUSEUM_CATEGORIES: {
 ];
 
 const NEW_EARTH_MUSEUM_ITEMS_PER_PAGE = 4;
+const NEW_EARTH_WAR_INTEL_ITEMS_PER_PAGE = 4;
 
 const NEW_EARTH_SUBMARINE_NAMES: Record<NewEarthSubmarineColonyId, string> = {
   'colony-4': 'NEPTUNE',
@@ -636,7 +679,7 @@ const NewEarthCardThumb = ({
       className="group relative mx-auto aspect-[2/3] h-full min-h-0 rounded-xl"
       contentClassName="block"
     >
-      <img src={getCardBackgroundImage(card.rarity)} alt="" className="absolute inset-0 h-full w-full object-cover" />
+      <Image unoptimized width={800} height={600} src={getCardBackgroundImage(card.rarity)} alt="" className="absolute inset-0 h-full w-full object-cover" />
       <div className="absolute inset-0 bg-gradient-to-t from-black/86 via-black/18 to-transparent" />
       <div className="absolute left-2 top-2 z-10 flex max-w-[78%] flex-wrap gap-1">
         <span className="rounded-full bg-black/58 px-1.5 py-0.5 font-mono text-[5px] font-black uppercase tracking-[0.12em] text-white/85">
@@ -714,7 +757,7 @@ const NewEarthCardDetail = ({
         </PremiumCanvasButton>
 
         <div className="relative aspect-[2/3] h-full max-h-[760px] overflow-hidden rounded-[3.8%] border border-cyan-100/45 bg-black shadow-[0_0_45px_rgba(34,211,238,0.18)]">
-          <img src={getCardBackgroundImage(card.rarity)} alt={card.name[language]} className="absolute inset-0 h-full w-full object-cover" />
+          <Image unoptimized width={800} height={600} src={getCardBackgroundImage(card.rarity)} alt={card.name[language]} className="absolute inset-0 h-full w-full object-cover" />
           <div className="absolute inset-0 bg-gradient-to-b from-black/8 via-transparent to-black/18" />
           <div className="absolute left-[11%] right-[11%] top-[18%]">
             <div className="flex flex-wrap gap-2">
@@ -784,7 +827,8 @@ const BattleStarField = memo(({ theme = 'cyan' }: { theme?: any }) => {
     y: Math.random() * 100,
     size: Math.random() * 2 + 0.5,
     duration: Math.random() * 3 + 2,
-    opacity: Math.random() * 0.5 + 0.2
+    opacity: Math.random() * 0.5 + 0.2,
+    delay: Math.random() * -3
   })));
 
   return (
@@ -800,7 +844,7 @@ const BattleStarField = memo(({ theme = 'cyan' }: { theme?: any }) => {
             height: Math.max(1, star.size / 2),
             opacity: star.opacity,
             animationDuration: `${star.duration}s`,
-            animationDelay: `${-Math.random() * star.duration}s`
+            animationDelay: `${star.delay}s`
           }}
         />
       ))}
@@ -808,9 +852,81 @@ const BattleStarField = memo(({ theme = 'cyan' }: { theme?: any }) => {
   );
 });
 
+BattleStarField.displayName = 'BattleStarField';
+
 // Constants and Types moved to external files
 
 // Translations and Constants moved to external files in @/lib
+
+const randomUnit = () => Math.random();
+const nowTimestamp = () => Date.now();
+
+const NEW_EARTH_ACHIEVEMENT_METRICS_STORAGE_KEY = 'new_earth_achievement_metrics';
+
+type NewEarthAchievementMetrics = {
+  perfectLandSearchDefenses: number;
+  perfectSeaSearchDefenses: number;
+  directBattleVictories: number;
+  missionsCompleted: number;
+  specialUses: Record<'apocalypse-laser' | 'hellfire-barrage' | 'thor-oath' | 'special-slot-4', number>;
+  enemySubmarinesDestroyed: number;
+  maxSubmarineDepth: number;
+};
+
+const createDefaultNewEarthAchievementMetrics = (): NewEarthAchievementMetrics => ({
+  perfectLandSearchDefenses: 0,
+  perfectSeaSearchDefenses: 0,
+  directBattleVictories: 0,
+  missionsCompleted: 0,
+  specialUses: {
+    'apocalypse-laser': 0,
+    'hellfire-barrage': 0,
+    'thor-oath': 0,
+    'special-slot-4': 0,
+  },
+  enemySubmarinesDestroyed: 0,
+  maxSubmarineDepth: 0,
+});
+
+const safeMetricNumber = (value: unknown) => Math.max(0, Math.floor(Number(value) || 0));
+
+const normalizeNewEarthAchievementMetrics = (raw: unknown): NewEarthAchievementMetrics => {
+  const defaults = createDefaultNewEarthAchievementMetrics();
+  if (!raw || typeof raw !== 'object') return defaults;
+  const source = raw as Record<string, any>;
+  const specialUses = source.specialUses && typeof source.specialUses === 'object' ? source.specialUses : {};
+
+  return {
+    perfectLandSearchDefenses: safeMetricNumber(source.perfectLandSearchDefenses),
+    perfectSeaSearchDefenses: safeMetricNumber(source.perfectSeaSearchDefenses),
+    directBattleVictories: safeMetricNumber(source.directBattleVictories),
+    missionsCompleted: safeMetricNumber(source.missionsCompleted),
+    specialUses: {
+      'apocalypse-laser': safeMetricNumber(specialUses['apocalypse-laser']),
+      'hellfire-barrage': safeMetricNumber(specialUses['hellfire-barrage']),
+      'thor-oath': safeMetricNumber(specialUses['thor-oath']),
+      'special-slot-4': safeMetricNumber(specialUses['special-slot-4']),
+    },
+    enemySubmarinesDestroyed: safeMetricNumber(source.enemySubmarinesDestroyed),
+    maxSubmarineDepth: safeMetricNumber(source.maxSubmarineDepth),
+  };
+};
+
+const loadArcadeScoresFromStorage = (): Record<string, number> => {
+  const scores: Record<string, number> = {};
+  if (typeof window === 'undefined') return scores;
+
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (key && key.endsWith('_high_score')) {
+      const gameId = key.replace(/_/g, '-').replace('-high-score', '');
+      const saved = localStorage.getItem(key);
+      if (saved) scores[gameId] = parseInt(saved);
+    }
+  }
+
+  return scores;
+};
 
 interface GameDashboardProps {
   language: Language;
@@ -975,7 +1091,7 @@ const DashboardContent = memo(({
   } = useEarth();
 
   const [formatNumbers, setFormatNumbers] = useState(false);
-  const [arcadeScores, setArcadeScores] = useState<Record<string, number>>({});
+  const [arcadeScores, setArcadeScores] = useState<Record<string, number>>(() => loadArcadeScoresFromStorage());
   const arcadeScoresRef = React.useRef(arcadeScores);
   const arcadeRunStartScoresRef = React.useRef<Record<string, number>>({});
   useEffect(() => {
@@ -1070,6 +1186,20 @@ const DashboardContent = memo(({
   const [showDoomProtocolInfo, setShowDoomProtocolInfo] = useState(false);
   const [showCaptureInfo, setShowCaptureInfo] = useState(false);
   const [showRoute2Confirm, setShowRoute2Confirm] = useState(false);
+  const [route2ConfirmParticles] = useState(() => Array.from({ length: 50 }, (_, i) => ({
+    id: i,
+    x: `${Math.random() * 100}%`,
+    y: `${Math.random() * 100}%`,
+    opacity: Math.random() * 0.5,
+    scale: Math.random() * 0.5 + 0.5,
+    duration: Math.random() * 10 + 5,
+    delay: Math.random() * 5,
+  })));
+  const [route2ConfirmWarpLines] = useState(() => Array.from({ length: 20 }, (_, i) => ({
+    id: i,
+    x: `${Math.random() * 100}%`,
+    delay: Math.random() * 2,
+  })));
   const [isFirstInvasionBattle, setIsFirstInvasionBattle] = useState(false);
   const [route4DefenseThreatAlert, setRoute4DefenseThreatAlert] = useState<{ title: string; remainingSeconds: number } | null>(null);
   const [openRoute4DefenseRequest, setOpenRoute4DefenseRequest] = useState(0);
@@ -1077,6 +1207,9 @@ const DashboardContent = memo(({
   const [pendingArcadeDefenseGameId, setPendingArcadeDefenseGameId] = useState<string | null>(null);
   const [selectedColonyId, setSelectedColonyId] = useState<string>('colony-1');
   const [newEarthCardLevels, setNewEarthCardLevels] = useState<ColonyCardLevels>({});
+  const [newEarthOwnedCardIds, setNewEarthOwnedCardIds] = useState<string[]>([]);
+  const [newEarthBattleLoadout, setNewEarthBattleLoadout] = useState<Record<string, string>>({});
+  const [newEarthAchievementMetrics, setNewEarthAchievementMetrics] = useState<NewEarthAchievementMetrics>(() => createDefaultNewEarthAchievementMetrics());
   const [selectedNewEarthColonyId, setSelectedNewEarthColonyId] = useState<string | null>(null);
   const [selectedNewEarthCardIndex, setSelectedNewEarthCardIndex] = useState<number | null>(null);
   const [newEarthMapFeedback, setNewEarthMapFeedback] = useState<string | null>(null);
@@ -1088,10 +1221,16 @@ const DashboardContent = memo(({
   const [newEarthMuseumCategory, setNewEarthMuseumCategory] = useState<NewEarthTreasureCategory>('rare_fish');
   const [newEarthMuseumPage, setNewEarthMuseumPage] = useState(0);
   const [newEarthMuseumTreasures, setNewEarthMuseumTreasures] = useState<NewEarthMuseumTreasures>({});
+  const [newEarthWarIntelOpen, setNewEarthWarIntelOpen] = useState(false);
+  const [newEarthWarIntelKind, setNewEarthWarIntelKind] = useState<NewEarthWarIntelKind>('helicopter');
+  const [newEarthWarIntelPage, setNewEarthWarIntelPage] = useState(0);
+  const [newEarthWarIntelCollection, setNewEarthWarIntelCollection] = useState<NewEarthWarIntelCollection>({});
+  const [selectedNewEarthWarIntel, setSelectedNewEarthWarIntel] = useState<NewEarthWarIntelCollection[string] | null>(null);
+  const [newEarthSurfaceVictorySummary, setNewEarthSurfaceVictorySummary] = useState<NewEarthSurfaceVictorySummary | null>(null);
   const [newEarthDistributionOpen, setNewEarthDistributionOpen] = useState(false);
   const [newEarthDistributionColonyId, setNewEarthDistributionColonyId] = useState<string | null>(null);
   const [newEarthDistributionSupplies, setNewEarthDistributionSupplies] = useState<NewEarthSupplies>(NEW_EARTH_DEFAULT_SUPPLIES);
-  const [newEarthDistributionNeedSeed, setNewEarthDistributionNeedSeed] = useState(() => Date.now());
+  const [newEarthDistributionNeedSeed, setNewEarthDistributionNeedSeed] = useState(() => nowTimestamp());
   const [selectedUnderwaterBriefing, setSelectedUnderwaterBriefing] = useState<{
     siteId: NewEarthUnderwaterSiteId;
     colonyId: NewEarthSubmarineColonyId;
@@ -1179,6 +1318,115 @@ const DashboardContent = memo(({
 
   useEffect(() => {
     let mounted = true;
+
+    const loadAchievementSources = async () => {
+      try {
+        const [cardsSaved, loadoutSaved, metricsSaved, missionsSaved] = await Promise.all([
+          GameStorage.load('colony_cards_data'),
+          GameStorage.load('battle_cards_loadout'),
+          GameStorage.load(NEW_EARTH_ACHIEVEMENT_METRICS_STORAGE_KEY),
+          GameStorage.load('new_earth_missions'),
+        ]);
+        if (!mounted) return;
+        setNewEarthOwnedCardIds(normalizeOwnedColonyCardIds(Array.isArray(cardsSaved) ? cardsSaved : undefined));
+        setNewEarthBattleLoadout(loadoutSaved && typeof loadoutSaved === 'object' ? loadoutSaved : {});
+        const normalizedMetrics = normalizeNewEarthAchievementMetrics(metricsSaved);
+        const savedMissionIds = new Set<string>();
+        if (missionsSaved && typeof missionsSaved === 'object') {
+          const missionState = missionsSaved as Record<string, any>;
+          if (Array.isArray(missionState.completedMissionIds)) {
+            missionState.completedMissionIds.forEach((id: unknown) => {
+              if (typeof id === 'string') savedMissionIds.add(id);
+            });
+          }
+          if (Array.isArray(missionState.claimedMissionIds)) {
+            missionState.claimedMissionIds.forEach((id: unknown) => {
+              if (typeof id === 'string') savedMissionIds.add(id);
+            });
+          }
+          if (Array.isArray(missionState.missions)) {
+            missionState.missions.forEach((mission: any) => {
+              if (typeof mission?.id === 'string' && (mission.completed || mission.claimed)) {
+                savedMissionIds.add(mission.id);
+              }
+            });
+          }
+        }
+        normalizedMetrics.missionsCompleted = Math.max(normalizedMetrics.missionsCompleted, savedMissionIds.size);
+        setNewEarthAchievementMetrics(normalizedMetrics);
+        if (!metricsSaved || typeof metricsSaved !== 'object' || normalizedMetrics.missionsCompleted > normalizeNewEarthAchievementMetrics(metricsSaved).missionsCompleted) {
+          GameStorage.save(normalizedMetrics, NEW_EARTH_ACHIEVEMENT_METRICS_STORAGE_KEY).catch(error => {
+            console.warn('Unable to initialize New Earth achievement metrics', error);
+          });
+        }
+      } catch (error) {
+        console.warn('Unable to load New Earth achievement sources', error);
+      }
+    };
+
+    const handleCardsUpdated = (event: Event) => {
+      const detail = (event as CustomEvent<string[]>).detail;
+      if (Array.isArray(detail)) setNewEarthOwnedCardIds(normalizeOwnedColonyCardIds(detail));
+      else void loadAchievementSources();
+    };
+
+    const handleLoadoutUpdated = (event: Event) => {
+      const detail = (event as CustomEvent<Record<string, string>>).detail;
+      if (detail && typeof detail === 'object') setNewEarthBattleLoadout(detail);
+      else void loadAchievementSources();
+    };
+
+    const handleCardLevelsUpdated = (event: Event) => {
+      const detail = (event as CustomEvent<ColonyCardLevels>).detail;
+      if (detail && typeof detail === 'object') setNewEarthCardLevels(detail);
+    };
+
+    const handleMetricEvent = (event: Event) => {
+      const detail = (event as CustomEvent<Record<string, any>>).detail;
+      if (!detail || typeof detail !== 'object') return;
+      const amount = Math.max(1, Math.floor(Number(detail.amount) || 1));
+      setNewEarthAchievementMetrics(current => {
+        const next = normalizeNewEarthAchievementMetrics(current);
+        if (detail.type === 'special-used') {
+          const specialId = detail.specialId as keyof NewEarthAchievementMetrics['specialUses'];
+          if (Object.prototype.hasOwnProperty.call(next.specialUses, specialId)) {
+            next.specialUses[specialId] += amount;
+          }
+        } else if (detail.type === 'perfect-search-defense') {
+          if (detail.searchId === 'land') next.perfectLandSearchDefenses += amount;
+          if (detail.searchId === 'sea') next.perfectSeaSearchDefenses += amount;
+        } else if (detail.type === 'direct-battle-victory') {
+          next.directBattleVictories += amount;
+        } else if (detail.type === 'new-earth-mission-completed') {
+          next.missionsCompleted += amount;
+        } else if (detail.type === 'submarine-victory') {
+          next.enemySubmarinesDestroyed += Math.max(0, Math.floor(Number(detail.kills) || 0));
+          next.maxSubmarineDepth = Math.max(next.maxSubmarineDepth, Math.max(0, Math.floor(Number(detail.depth) || 0)));
+        } else {
+          return current;
+        }
+        GameStorage.save(next, NEW_EARTH_ACHIEVEMENT_METRICS_STORAGE_KEY).catch(error => {
+          console.warn('Unable to save New Earth achievement metrics', error);
+        });
+        return next;
+      });
+    };
+
+    void loadAchievementSources();
+    window.addEventListener('qch:colony-cards-updated', handleCardsUpdated);
+    window.addEventListener('qch:battle-loadout-updated', handleLoadoutUpdated);
+    window.addEventListener('qch:colony-card-levels-updated', handleCardLevelsUpdated);
+    window.addEventListener('qch:new-earth-achievement-metric', handleMetricEvent);
+    return () => {
+      mounted = false;
+      window.removeEventListener('qch:colony-cards-updated', handleCardsUpdated);
+      window.removeEventListener('qch:battle-loadout-updated', handleLoadoutUpdated);
+      window.removeEventListener('qch:colony-card-levels-updated', handleCardLevelsUpdated);
+      window.removeEventListener('qch:new-earth-achievement-metric', handleMetricEvent);
+    };
+  }, []);
+  useEffect(() => {
+    let mounted = true;
     GameStorage.load(NEW_EARTH_SURFACE_BATTLES_STORAGE_KEY)
       .then(saved => {
         if (!mounted) return;
@@ -1213,6 +1461,26 @@ const DashboardContent = memo(({
       })
       .catch(error => {
         console.warn('Unable to load New Earth museum save data', error);
+      });
+    return () => {
+      mounted = false;
+    };
+  }, []);
+  useEffect(() => {
+    let mounted = true;
+    GameStorage.load(NEW_EARTH_WAR_INTEL_STORAGE_KEY)
+      .then(saved => {
+        if (!mounted) return;
+        const normalized = normalizeNewEarthWarIntelCollection(saved);
+        setNewEarthWarIntelCollection(normalized);
+        if (!saved || typeof saved !== 'object') {
+          GameStorage.save(normalized, NEW_EARTH_WAR_INTEL_STORAGE_KEY).catch(error => {
+            console.warn('Unable to initialize New Earth war intel save data', error);
+          });
+        }
+      })
+      .catch(error => {
+        console.warn('Unable to load New Earth war intel save data', error);
       });
     return () => {
       mounted = false;
@@ -1263,7 +1531,7 @@ const DashboardContent = memo(({
 
   useEffect(() => {
     if (!newEarthDistributionOpen) return;
-    const interval = window.setInterval(() => setNewEarthDistributionNeedSeed(Date.now()), 90000);
+    const interval = window.setInterval(() => setNewEarthDistributionNeedSeed(nowTimestamp()), 90000);
     return () => window.clearInterval(interval);
   }, [newEarthDistributionOpen]);
 
@@ -1387,7 +1655,8 @@ const DashboardContent = memo(({
   const hasTriggeredVoidWarRef = React.useRef(false);
   const lastPregnancyYearRef = React.useRef(0);
   const isColoniesOpenRef = React.useRef(false);
-  const earthEventTimerRef = React.useRef(Math.random() * 120 + 120);
+  const [initialEarthEventTimer] = useState(() => Math.random() * 120 + 120);
+  const earthEventTimerRef = React.useRef(initialEarthEventTimer);
   const coloniesRef = React.useRef(colonies);
   const extractionCycleProgressRef = React.useRef<any>(null);
   const hasWonEliminateEnemiesRoute3Ref = React.useRef(false);
@@ -1425,7 +1694,7 @@ const DashboardContent = memo(({
       }, 2000); // 2 second grace period
       return () => clearTimeout(timer);
     }
-  }, [isLoaded]);
+  }, [isLoaded, playerName]);
 
   const pendingMissionProgressRef = React.useRef<Record<string, number>>({});
   const missionFlushCounterRef = React.useRef(0);
@@ -1581,7 +1850,7 @@ const DashboardContent = memo(({
     voidAutoShipmentActive, voidAutoShipmentUnlocked,
     earthPopulation, earthMaleRatio, earthBiodiversity, earthHealth,
     earthHappiness, earthSecurity, earthQualityOfLife, earthEvents,
-    earthProjectBoostCount, earthSeason, earthReconstructionProgress,
+    earthCouples, earthBirthRegistry, earthProjectBoostCount, earthSeason, earthReconstructionProgress,
     atmosphere, temperature, hydrosphere, biosphere,
     voidPOIsInspiration, voidPOIQCDonations, voidDonationModes, hasWonEliminateEnemiesRoute3,
     robotRepairProgress, isRobotRepaired, activeBattle,
@@ -1594,7 +1863,7 @@ const DashboardContent = memo(({
   // 5. Misc & Global
   useEffect(() => {
     isLoadedRef.current = isLoaded;
-  }, [isLoaded]);
+  }, [isLoaded, playerName]);
 
   useEffect(() => {
     activeMiniGameIdRef.current = activeMiniGameId;
@@ -1627,7 +1896,7 @@ const DashboardContent = memo(({
 
 
   useEffect(() => {
-    lastRandomBattleTimeRef.current = Date.now();
+    lastRandomBattleTimeRef.current = nowTimestamp();
   }, []);
 
 
@@ -1814,7 +2083,7 @@ const DashboardContent = memo(({
   }, [playSfx, setActiveTab]);
 
   const handleDashboardTabChange = useCallback((tab: string) => {
-    if (activeMiniGameIdRef.current && tab !== activeTabRef.current) {
+    if (activeMiniGameId && tab !== activeTab) {
       setArcadeTabWarning('Saia do fliperama antes de trocar de aba');
       playSfx('warning_gaming');
       window.setTimeout(() => setArcadeTabWarning(null), 2400);
@@ -1827,7 +2096,7 @@ const DashboardContent = memo(({
       playSfx('aba_click');
     }
     setActiveTab(tab as any);
-  }, [playSfx, setActiveTab]);
+  }, [activeMiniGameId, activeTab, playSfx, setActiveTab]);
 
   const selectedNewEarthColony = useMemo(
     () => colonies.find((colony: Colony) => colony.id === selectedNewEarthColonyId) || null,
@@ -2217,7 +2486,7 @@ const DashboardContent = memo(({
       jukebox.stop();
     }
 
-  }, [activeMiniGameId, routeTier, isLoaded, musicOn, jukebox.playPlaylist, jukebox.stop, jukebox.currentTrack?.url]);
+  }, [activeMiniGameId, routeTier, isLoaded, musicOn, jukebox, jukebox.playPlaylist, jukebox.stop, jukebox.currentTrack?.url]);
   const setOresCollected = useCallback((val: Record<string, number> | ((prev: Record<string, number>) => Record<string, number>)) => {
     const nextVal = typeof val === 'function' ? val(oresCollectedRef.current) : val;
     oresCollectedRef.current = nextVal;
@@ -2729,7 +2998,7 @@ const DashboardContent = memo(({
           type: 'population',
           importance: 'population',
           permanent: true,
-          timestamp: Date.now(),
+          timestamp: nowTimestamp(),
         }, ...prev]);
         addLog(
           language === 'pt'
@@ -3164,7 +3433,7 @@ const DashboardContent = memo(({
     const selectedResourceColonyName = selectedResourceColony?.name || (language === 'pt' ? 'uma colônia pioneira' : 'a pioneer colony');
     const sourceDescription = language === 'pt' ? source.desc.pt : source.desc.en;
     const newEvent = {
-      id: `ev-v2-${Date.now()}-${Math.floor(Math.random() * 1000000)}`,
+      id: `ev-v2-${nowTimestamp()}-${Math.floor(Math.random() * 1000000)}`,
       year: isFixed ? source.year : year,
       month: isFixed ? 1 : month,
       name: language === 'pt' ? source.name.pt : source.name.en,
@@ -3188,7 +3457,7 @@ const DashboardContent = memo(({
       colonyPopulation: source.colonyPopulation,
       targetColonyId: selectedResourceColony?.id,
       specialStyles,
-      timestamp: Date.now()
+      timestamp: nowTimestamp()
     };
 
     setEarthEvents(prev => [newEvent, ...prev]);
@@ -3248,7 +3517,7 @@ const DashboardContent = memo(({
       earthHappinessRef.current = nextHappiness;
       dispatch({ type: 'UPDATE_EARTH_STATE', payload: { happiness: nextHappiness } });
     }
-  }, [language]);
+  }, [dispatch, language, setColonies, setEarthEvents]);
 
   // Global Game Time & Earth Simulation Loop (Route 4)
   useEffect(() => {
@@ -3316,13 +3585,13 @@ const DashboardContent = memo(({
         earthEventTimerRef.current -= timeFactor;
         if (earthEventTimerRef.current <= 0) {
           generateEarthEvent();
-          earthEventTimerRef.current = Math.random() * 40 + 40; // Increased frequency (was 120-240)
+          earthEventTimerRef.current = randomUnit() * 40 + 40; // Increased frequency (was 120-240)
         }
       }
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [isLoaded, isArcadeUnlocked, isColoniesUnlocked, generateEarthEvent]);
+  }, [isLoaded, isArcadeUnlocked, isColoniesUnlocked, generateEarthEvent, dispatch]);
 
   // Year Change Events (Population Growth & Events)
   useEffect(() => {
@@ -3385,7 +3654,7 @@ const DashboardContent = memo(({
       };
     }));
 
-  }, [gameTime.years, isLoaded, language, colonies, setColonies]);
+  }, [gameTime.years, isLoaded, language, colonies, setColonies, addLog, setEarthPopulation]);
 
   const [selectedUpgradePoint, setSelectedUpgradePoint] = useState<number | null>(null);
 
@@ -3434,7 +3703,7 @@ const DashboardContent = memo(({
     if (routeTier !== 'Void') return;
 
     const timer = setInterval(() => {
-      const currentTime = Date.now();
+      const currentTime = nowTimestamp();
 
       VOID_POIS.forEach(poi => {
         const progress = getPOIProgress(poi.id);
@@ -3592,7 +3861,7 @@ const DashboardContent = memo(({
         completedMissionIds: missions.filter(mission => mission.completed).map(mission => mission.id),
         claimedMissionIds: missions.filter(mission => mission.claimed).map(mission => mission.id),
         cycle: Math.max(0, Math.floor(Number(saved.cycle) || 0)),
-        generatedAt: Number(saved.generatedAt) || Date.now(),
+        generatedAt: Number(saved.generatedAt) || nowTimestamp(),
         renewAvailableAt: saved.renewAvailableAt ? Number(saved.renewAvailableAt) : null,
         cycleRewardClaimed: Boolean(saved.cycleRewardClaimed),
       };
@@ -3652,7 +3921,20 @@ const DashboardContent = memo(({
     setSelectedUnderwaterBriefing(null);
     setSelectedSurfaceBattleBriefing(null);
     setNewEarthDistributionOpen(false);
+    setNewEarthWarIntelOpen(false);
     setNewEarthMuseumOpen(true);
+    playSfx('aba_click');
+  }, [playSfx]);
+
+  const handleNewEarthWarIntelMarkerClick = useCallback(() => {
+    setSelectedNewEarthColonyId(null);
+    setSelectedNewEarthCardIndex(null);
+    setNewEarthMapFeedback(null);
+    setSelectedUnderwaterBriefing(null);
+    setSelectedSurfaceBattleBriefing(null);
+    setNewEarthDistributionOpen(false);
+    setNewEarthMuseumOpen(false);
+    setNewEarthWarIntelOpen(true);
     playSfx('aba_click');
   }, [playSfx]);
 
@@ -3678,7 +3960,7 @@ const DashboardContent = memo(({
       if (current && colonies.some((colony: Colony) => colony.id === current)) return current;
       return colonies.find((colony: Colony) => colony.name.toLowerCase() === 'eden')?.id || colonies[0]?.id || null;
     });
-    setNewEarthDistributionNeedSeed(Date.now());
+    setNewEarthDistributionNeedSeed(nowTimestamp());
     GameStorage.load('colony_supplies_data')
       .then(saved => setNewEarthDistributionSupplies(normalizeDistributionSupplies(saved)))
       .catch(error => console.warn('Unable to refresh distribution center supplies', error));
@@ -3825,7 +4107,16 @@ const DashboardContent = memo(({
     setActiveSurfaceBattle(selectedSurfaceBattleBriefing);
     setSelectedSurfaceBattleBriefing(null);
     setNewEarthMapFeedback(null);
-    playSfx('battle_click');
+    if (typeof Audio !== 'undefined') {
+      const missionStartSfx = selectedSurfaceBattleBriefing.battleKind === 'tank'
+        ? '/assets/rota4/SFX_new_land/helicopters_tanks/tank_start_mission.ogg'
+        : '/assets/rota4/SFX_new_land/helicopters_tanks/helicopter_start_mission.ogg';
+      const audio = new Audio(missionStartSfx);
+      audio.volume = 0.62;
+      audio.play().catch(() => undefined);
+    } else {
+      playSfx('battle_click');
+    }
   }, [playSfx, selectedSurfaceBattleBriefing]);
 
   const handleUnderwaterTreasureLoot = useCallback((payload: any) => {
@@ -3840,7 +4131,7 @@ const DashboardContent = memo(({
           ...normalized,
           [treasure.id]: {
             ...treasure,
-            foundAt: Date.now(),
+            foundAt: nowTimestamp(),
             siteId: activeUnderwaterBattle?.siteId,
             colonyId: activeUnderwaterBattle?.colonyId,
           },
@@ -3930,20 +4221,6 @@ const DashboardContent = memo(({
   ), [activeSurfaceBattle, colonies]);
 
   useEffect(() => {
-    // Load arcade scores from localStorage initially
-    const scores: { [key: string]: number } = {};
-    if (typeof window !== 'undefined') {
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key && key.endsWith('_high_score')) {
-          const gameId = key.replace(/_/g, '-').replace('-high-score', '');
-          const saved = localStorage.getItem(key);
-          if (saved) scores[gameId] = parseInt(saved);
-        }
-      }
-    }
-    setArcadeScores(scores);
-
     const handleMessage = (event: MessageEvent) => {
       if (!event.data) return;
 
@@ -4005,7 +4282,7 @@ const DashboardContent = memo(({
             setEarthEvents(prev => {
               const filtered = prev.filter((ev: any) => !(ev?.permanent === true && ev?.type === 'arcade' && ev?.gameId === gameId));
               return [{
-                id: `route4-arcade-record-${gameId}-${Date.now()}`,
+                id: `route4-arcade-record-${gameId}-${nowTimestamp()}`,
                 gameId,
                 month: evMonth,
                 year: evYear,
@@ -4014,7 +4291,7 @@ const DashboardContent = memo(({
                 type: 'arcade',
                 importance: 'arcade',
                 permanent: true,
-                timestamp: Date.now(),
+                timestamp: nowTimestamp(),
               }, ...filtered];
             });
 
@@ -4032,7 +4309,7 @@ const DashboardContent = memo(({
               : `${score.toLocaleString()} points registered! Incredibly close to the record of ${previousRecord.toLocaleString()} points.`;
 
             setEarthEvents(prev => [{
-              id: `route4-arcade-near-record-${gameId}-${Date.now()}`,
+              id: `route4-arcade-near-record-${gameId}-${nowTimestamp()}`,
               gameId,
               month: evMonth,
               year: evYear,
@@ -4041,7 +4318,7 @@ const DashboardContent = memo(({
               type: 'arcade',
               importance: 'arcade',
               permanent: false,
-              timestamp: Date.now(),
+              timestamp: nowTimestamp(),
             }, ...prev]);
 
             addLog(
@@ -4068,7 +4345,7 @@ const DashboardContent = memo(({
     };
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, [evaluateArcadeCardReward, jukebox.stop, language, playerName, recordArcadeActionMissionProgress, recordArcadeMissionProgress]);
+  }, [evaluateArcadeCardReward, jukebox, jukebox.stop, language, playerName, recordArcadeActionMissionProgress, recordArcadeMissionProgress, addLog, setEarthEvents, setEarthHappiness, setEarthHealth, setEarthQualityOfLife, setEarthSecurity]);
 
 
   const updateHistoryStats = useCallback((
@@ -4152,7 +4429,7 @@ const DashboardContent = memo(({
         platform: typeof window !== 'undefined' ? window.navigator.userAgent : 'unknown'
       }, playerName);
     }
-  }, [isLoaded]);
+  }, [isLoaded, playerName]);
 
 
   // Centralized Save Function
@@ -4265,7 +4542,7 @@ const DashboardContent = memo(({
 
     const modularSave = SaveManager.createSave(saveData);
     await GameStorage.save(modularSave, 'time_travel_save');
-  }, [isLoaded, playerName, seenTutorials, autoClaimMissions, isVoidWarActive, voidWarProgress, voidCompactedResources, voidDonationModes, route4Unlocked, unlockedAchievements, achievementProgress]);
+  }, [isLoaded, playerName, seenTutorials, autoClaimMissions, radarUnlocked]);
 
   // --- AUTOMATED SAVING ---
 
@@ -4308,7 +4585,7 @@ const DashboardContent = memo(({
   const addEarthYears = useCallback((years: number) => {
     setGameTimeSeconds(prev => prev + (years * 1200));
     addLog(`${language === 'pt' ? 'História avançou ' : 'History advanced '}${years}${language === 'pt' ? ' anos devido ao progresso monumental!' : ' years due to monumental progress!'}`, 'success');
-  }, [language, addLog]);
+  }, [language, addLog, setGameTimeSeconds]);
 
   const handleBuildingComplete = useCallback((type: string, level: number) => {
     // Permanent boost when building levels up
@@ -4330,7 +4607,7 @@ const DashboardContent = memo(({
       setEarthQualityOfLife(prev => Math.min(100, prev + unit));
       setEarthHappiness(prev => Math.min(100, prev + unit * 0.5));
     }
-  }, []);
+  }, [setEarthBiodiversity, setEarthHappiness, setEarthHealth, setEarthQualityOfLife, setEarthSecurity]);
 
   const getEconomicMultipliers = useCallback(() => {
     let costMult = 1;
@@ -4383,7 +4660,7 @@ const DashboardContent = memo(({
     const interval = setInterval(() => {
       if (routeTierRef.current !== 'Interstellar') return;
 
-      const now = Date.now();
+      const now = nowTimestamp();
       const newProgress: { [id: string]: number } = {};
       let hasChanged = false;
       const uniquePoints = Array.from(new Set(unlockedExtractionPointsRef.current));
@@ -4521,13 +4798,13 @@ const DashboardContent = memo(({
     }, 500); // Check every 500ms for more responsive automatic sales
 
     return () => clearInterval(interval);
-  }, [playSfx, routeTier]);
+  }, [playSfx, routeTier, dispatch, getEconomicMultipliers, setTotalExtractionProfit]);
 
   useEffect(() => {
     if (!researchingExtractionPoint) return;
 
     const timer = setInterval(() => {
-      if (Date.now() >= researchingExtractionPoint.endTime) {
+      if (nowTimestamp() >= researchingExtractionPoint.endTime) {
         setUnlockedExtractionPoints(prev => prev.includes(researchingExtractionPoint.id) ? prev : [...prev, researchingExtractionPoint.id]);
         setResearchingExtractionPoint(null);
         playSfx('tech_success');
@@ -4535,7 +4812,7 @@ const DashboardContent = memo(({
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [researchingExtractionPoint, playSfx]);
+  }, [researchingExtractionPoint, playSfx, setResearchingExtractionPoint, setUnlockedExtractionPoints]);
 
   const addXP = useCallback((amount: number) => {
     const maxLevel = routeTier === 'Solar' ? 10 : 20;
@@ -4553,7 +4830,7 @@ const DashboardContent = memo(({
       }
       return newLevel >= maxLevel ? 0 : newXP;
     });
-  }, [language, playSfx, addLog, routeTier]);
+  }, [playSfx, addLog, routeTier, setShipLevel, setShipXP, t]);
 
 
 
@@ -4673,7 +4950,7 @@ const DashboardContent = memo(({
     );
 
     return { qcReward, xpReward, aetherionReward };
-  }, [language, formatValue, addXP, updateHistoryStats, addLog, getEconomicMultipliers, updateAchievementProgress, t, performSave]);
+  }, [language, formatValue, addXP, updateHistoryStats, addLog, getEconomicMultipliers, setQc, setAetherion]);
   const resolveBattleDefeat = useCallback((battle: Battle) => {
     addLog(t('defeatShipDestroyed'), 'error');
   }, [addLog, t]);
@@ -4703,7 +4980,7 @@ const DashboardContent = memo(({
 
   const playerAttack = useCallback((type: 'laser' | 'plasma' | 'special' | 'shield') => {
     if (!activeBattleRef.current || activeBattleRef.current.isVictory || activeBattleRef.current.isDefeat) return;
-    const now = Date.now();
+    const now = nowTimestamp();
     const battle = { ...activeBattleRef.current };
 
     // Cooldowns (fixed)
@@ -4759,7 +5036,7 @@ const DashboardContent = memo(({
     }
 
     setActiveBattle(battle);
-  }, [language, playSfx, addLog, resolveBattleVictory]);
+  }, [playSfx, addLog, resolveBattleVictory, setActiveBattle, t]);
 
   const finishBattle = useCallback(() => {
     if (!activeBattleRef.current) return;
@@ -4796,7 +5073,7 @@ const DashboardContent = memo(({
 
     activeBattleRef.current = null;
     setActiveBattle(null);
-  }, [language, addLog]);
+  }, [addLog, setActiveBattle, setActiveDeliveries, setAutoTravelActive, setAutoTravelProgress, t]);
 
   useEffect(() => {
     if (activeBattle && (activeBattle.isVictory || activeBattle.isDefeat)) {
@@ -4808,7 +5085,7 @@ const DashboardContent = memo(({
         return () => clearTimeout(timer);
       }
     }
-  }, [activeBattle?.isVictory, activeBattle?.isDefeat, finishBattle]);
+  }, [activeBattle, activeBattle?.isVictory, activeBattle?.isDefeat, finishBattle]);
 
   // Handle Radar Scan Success
   useEffect(() => {
@@ -4892,9 +5169,9 @@ const DashboardContent = memo(({
           playerMaxHp: playerHp,
           playerHp: playerHp,
           reward: Math.floor(route.reward * (0.5 + enemyTier * 0.1) * (isBoss ? 5 : (isElite ? 2 : 1)) * multipliers.battleProfit * rewardMultiplier),
-          startTime: Date.now(),
+          startTime: nowTimestamp(),
           lastPlayerAttack: { laser: 0, plasma: 0, special: 0, shield: 0 },
-          lastEnemyAttack: Date.now() + 1000,
+          lastEnemyAttack: nowTimestamp() + 1000,
           shieldActive: false,
           lastShieldTime: 0,
           winProbability: winProb,
@@ -4914,7 +5191,7 @@ const DashboardContent = memo(({
         setScanResult(null);
       }
     }
-  }, [scanResult, activeBattle, activeDeliveries, autoTravelActive, autoTravelProgress, routeTier, battleLevel, doomPLevel, privatePoliceLevel, language, setFoundBattle, setScanResult, getEconomicMultipliers, getDoomPBonus, getPoliceBonus, playSfx, aetherion]);
+  }, [scanResult, activeBattle, activeDeliveries, autoTravelActive, autoTravelProgress, routeTier, battleLevel, doomPLevel, privatePoliceLevel, language, setFoundBattle, setScanResult, getEconomicMultipliers, playSfx, aetherion]);
 
   const completeInitialMission = useCallback((missionId: string) => {
     setMissions(prev => prev.map(m => {
@@ -4925,7 +5202,7 @@ const DashboardContent = memo(({
       }
       return m;
     }));
-  }, [t, addLog, playSfx]);
+  }, [t, addLog, playSfx, setMissions]);
 
   const generateMissions = useCallback(() => {
     const currentTier = routeTierRef.current;
@@ -5070,7 +5347,7 @@ const DashboardContent = memo(({
             }
 
             currentMissions.push({
-              id: `delivery_${ship.level}_${Date.now()}_${currentMissions.length}`,
+              id: `delivery_${ship.level}_${nowTimestamp()}_${currentMissions.length}`,
               title: languageRef.current === 'pt' ? `Entregas com ${ship.name}` : `Deliveries with ${ship.name}`,
               description: languageRef.current === 'pt' ? `Faça ${target} entregas com a ${ship.name}.` : `Make ${target} deliveries with the ${ship.name}.`,
               reward,
@@ -5125,7 +5402,7 @@ const DashboardContent = memo(({
             const itemName = isExtraction ? (item as any).resourceName : item.name;
 
             currentMissions.push({
-              id: `sell_${item.id}_${Date.now()}_${currentMissions.length}`,
+              id: `sell_${item.id}_${nowTimestamp()}_${currentMissions.length}`,
               title: languageRef.current === 'pt' ? `Venda de ${itemName}` : `Sell ${itemName}`,
               description: languageRef.current === 'pt' ? `Venda ${target} PACKS de ${itemName}.` : `Sell ${target} packs of ${itemName}.`,
               reward,
@@ -5148,7 +5425,7 @@ const DashboardContent = memo(({
     if (currentMissions.length !== missionsRef.current.length) {
       setMissions(currentMissions);
     }
-  }, [t, routeTier, missionRewardLevel, skillMiticaLevel, skillAlienLevel, skillLendariaLevel, missionMythicBonus, missionAlienBonus, missionLegendaryBonus, getEconomicMultipliers]);
+  }, [t, routeTier, getEconomicMultipliers, setMissions]);
 
   // Auto-Shipment stops once Project Terra is complete.
   useEffect(() => {
@@ -5259,7 +5536,7 @@ const DashboardContent = memo(({
 
     // Trigger mission generation after state update
     setTimeout(() => generateMissions(), 100);
-  }, [dispatch, t, playSfx, addLog, generateMissions, formatValue]);
+  }, [dispatch, t, playSfx, addLog, generateMissions, formatValue, setFloatingRewards]);
 
 
   useEffect(() => {
@@ -5325,7 +5602,7 @@ const DashboardContent = memo(({
     const mappingBonus = 1 + (solarMappingLevel * 0.1);
     const energyToAdd = count * 50 * (routeTier === 'Interstellar' ? mappingBonus : 1);
     solarEnergyRef.current = Math.min(7500, solarEnergyRef.current + energyToAdd);
-  }, [routeTier, solarMappingLevel]);
+  }, [routeTier, solarMappingLevel, dispatch]);
 
 
   // RHSE Tube Generation Logic: 2500 Waste + 2500 Solar = 1 Tube
@@ -5388,7 +5665,7 @@ const DashboardContent = memo(({
     if ((historyStats['Solar']?.missionsCompleted || 0) < 100) return false;
 
     return true;
-  }, [routeTier, unlockedTechLevels, ownedShips, techLevels, miningRobots, miningRobotLevels, autoTravelSlots, autoTravelActive, historyStats, miningCompressionLevels, totalDeliveries]);
+  }, [routeTier, unlockedTechLevels, ownedShips, techLevels, miningRobots, miningRobotLevels, autoTravelSlots, historyStats, miningCompressionLevels, totalDeliveries]);
 
   const isRoute3Unlocked = useCallback(() => {
     if (routeTier === 'Void') return true;
@@ -5445,7 +5722,7 @@ const DashboardContent = memo(({
     if (aggregatedMissions < 1000) return false;
 
     return true;
-  }, [routeTier, unlockedTechLevels, ownedShips, techLevels, miningRobots, miningRobotLevels, autoTravelSlots, autoTravelActive, historyStats, miningCompressionLevels, totalDeliveries]);
+  }, [routeTier, unlockedTechLevels, ownedShips, techLevels, miningRobots, miningRobotLevels, autoTravelSlots, historyStats, miningCompressionLevels, totalDeliveries]);
 
   const syncAchievements = useCallback(() => {
     // 1. First Delivery
@@ -5511,6 +5788,97 @@ const DashboardContent = memo(({
     const totalPerfects = Object.values(historyStats).reduce((acc, curr) => acc + (curr.perfectDeliveries || 0), 0);
     updateAchievementProgress('perfect_pilot', totalPerfects, true);
 
+    // 16. New Earth / Chapter 4
+    const colonyBuildProgress = (colonyId: string) => {
+      const colony = colonies.find(item => item.id === colonyId);
+      if (!colony) return 0;
+      return Math.min(60, (colony.constructions || []).reduce((total: number, construction: { level?: number }) => (
+        total + Math.max(0, Math.min(10, Math.floor(Number(construction.level) || 0)))
+      ), 0));
+    };
+    updateAchievementProgress('ne_eden_builder_60', colonyBuildProgress('colony-2'), true);
+    updateAchievementProgress('ne_genesis_builder_60', colonyBuildProgress('colony-1'), true);
+    updateAchievementProgress('ne_elysium_builder_60', colonyBuildProgress('colony-3'), true);
+    updateAchievementProgress('ne_gaia_builder_60', colonyBuildProgress('colony-4'), true);
+
+    updateAchievementProgress('ne_land_search_perfect_defenses_10', newEarthAchievementMetrics.perfectLandSearchDefenses, true);
+    updateAchievementProgress('ne_sea_search_perfect_defenses_10', newEarthAchievementMetrics.perfectSeaSearchDefenses, true);
+    updateAchievementProgress('ne_direct_battles_10', newEarthAchievementMetrics.directBattleVictories, true);
+
+    const savedHorizonProgress = getHorizonLevelFromXp(safeMetricNumber(localStorage.getItem('horizon_ship_xp')));
+    updateAchievementProgress('ne_horizon_level_50', savedHorizonProgress.level, true);
+    updateAchievementProgress('ne_horizon_level_100', savedHorizonProgress.level, true);
+
+    const equippedBattleCards = BATTLE_CARD_SLOTS.filter(slot => Boolean(newEarthBattleLoadout[slot])).length;
+    updateAchievementProgress('ne_horizon_battle_cards_6', equippedBattleCards, true);
+    updateAchievementProgress('ne_special_laser_10', newEarthAchievementMetrics.specialUses['apocalypse-laser'], true);
+    updateAchievementProgress('ne_special_barrage_10', newEarthAchievementMetrics.specialUses['hellfire-barrage'], true);
+    updateAchievementProgress('ne_special_thor_10', newEarthAchievementMetrics.specialUses['thor-oath'], true);
+    updateAchievementProgress('ne_special_blizzard_10', newEarthAchievementMetrics.specialUses['special-slot-4'], true);
+
+    const equippedCards = BATTLE_CARD_SLOTS
+      .map(slot => getCardById(newEarthBattleLoadout[slot]))
+      .filter((card): card is ColonyCard => Boolean(card));
+    const horizonStats = calculateBattleShipStats(equippedCards, BASE_BATTLE_SHIP_STATS, newEarthCardLevels, savedHorizonProgress.level);
+    updateAchievementProgress('ne_horizon_crit_90', horizonStats.critChance, true);
+    updateAchievementProgress('ne_horizon_stage_100', battleLevel, true);
+    updateAchievementProgress('ne_horizon_stage_200', battleLevel, true);
+
+    updateAchievementProgress('ne_missions_10', newEarthAchievementMetrics.missionsCompleted, true);
+    updateAchievementProgress('ne_missions_40', newEarthAchievementMetrics.missionsCompleted, true);
+
+    const ownedCards = new Set(newEarthOwnedCardIds);
+    const politicalCards = COLONY_CARD_CATALOG.filter(isPoliticalCard);
+    const battleCards = COLONY_CARD_CATALOG.filter(isBattleCard);
+    const wildcardCards = COLONY_CARD_CATALOG.filter(isWildcardCard);
+    const ownedPoliticalCount = politicalCards.filter(card => ownedCards.has(card.id)).length;
+    const ownedBattleCount = battleCards.filter(card => ownedCards.has(card.id)).length;
+    const ownedWildcardCount = wildcardCards.filter(card => ownedCards.has(card.id)).length;
+    updateAchievementProgress('ne_political_card_1', ownedPoliticalCount, true);
+    updateAchievementProgress('ne_political_cards_all', politicalCards.length > 0 && ownedPoliticalCount >= politicalCards.length ? 1 : 0, true);
+    updateAchievementProgress('ne_battle_card_1', ownedBattleCount, true);
+    updateAchievementProgress('ne_battle_cards_all', battleCards.length > 0 && ownedBattleCount >= battleCards.length ? 1 : 0, true);
+    updateAchievementProgress('ne_wildcard_1', ownedWildcardCount, true);
+    updateAchievementProgress('ne_wildcards_all', wildcardCards.length > 0 && ownedWildcardCount >= wildcardCards.length ? 1 : 0, true);
+
+    const museumHas = (id: string) => Boolean(newEarthMuseumTreasures[id]);
+    const rareFishFound = NEW_EARTH_RARE_FISH_TREASURES.filter(treasure => museumHas(treasure.id)).length;
+    const relicsFound = NEW_EARTH_RELIC_TREASURES.filter(treasure => museumHas(treasure.id)).length;
+    const rareRingsFound = NEW_EARTH_RARE_RING_TREASURES.filter(treasure => museumHas(treasure.id)).length;
+    updateAchievementProgress('ne_rare_fish_1', rareFishFound, true);
+    updateAchievementProgress('ne_rare_fish_all', NEW_EARTH_RARE_FISH_TREASURES.length > 0 && rareFishFound >= NEW_EARTH_RARE_FISH_TREASURES.length ? 1 : 0, true);
+    updateAchievementProgress('ne_relic_1', relicsFound, true);
+    updateAchievementProgress('ne_relics_all', NEW_EARTH_RELIC_TREASURES.length > 0 && relicsFound >= NEW_EARTH_RELIC_TREASURES.length ? 1 : 0, true);
+    updateAchievementProgress('ne_rare_ring_1', rareRingsFound, true);
+    updateAchievementProgress('ne_rare_rings_all', NEW_EARTH_RARE_RING_TREASURES.length > 0 && rareRingsFound >= NEW_EARTH_RARE_RING_TREASURES.length ? 1 : 0, true);
+
+    const aetherUpgradeTotal = NEW_EARTH_HELICOPTER_UPGRADES.reduce((total, upgrade) => total + (newEarthHelicopters['colony-3']?.[upgrade.id] || 0), 0);
+    const wardenUpgradeTotal = NEW_EARTH_TANK_UPGRADES.reduce((total, upgrade) => total + (newEarthTanks['colony-1']?.[upgrade.id] || 0), 0);
+    const helicopterWins = (newEarthSurfaceBattles['zona-glacial']?.victories || 0) + (newEarthSurfaceBattles['continente-esquecido']?.victories || 0);
+    const tankWins = newEarthSurfaceBattles['ruinas-europeias']?.victories || 0;
+    const helicopterIntel = Object.values(newEarthWarIntelCollection).filter(item => item.kind === 'helicopter').length;
+    const tankIntel = Object.values(newEarthWarIntelCollection).filter(item => item.kind === 'tank').length;
+    updateAchievementProgress('ne_aether_maxed', aetherUpgradeTotal, true);
+    updateAchievementProgress('ne_helicopter_win_1', helicopterWins, true);
+    updateAchievementProgress('ne_helicopter_wins_10', helicopterWins, true);
+    updateAchievementProgress('ne_helicopter_intel_all', helicopterIntel, true);
+    updateAchievementProgress('ne_warden_maxed', wardenUpgradeTotal, true);
+    updateAchievementProgress('ne_tank_win_1', tankWins, true);
+    updateAchievementProgress('ne_tank_wins_10', tankWins, true);
+    updateAchievementProgress('ne_tank_intel_all', tankIntel, true);
+
+    const submarineUpgradeTotal = (colonyId: NewEarthSubmarineColonyId) => NEW_EARTH_SUBMARINE_UPGRADES.reduce((total, upgrade) => (
+      total + (newEarthSubmarines[colonyId]?.[upgrade.id] || 0)
+    ), 0);
+    const deepestAvailableSubmarine = Math.max(
+      getNewEarthSubmarineStats(newEarthSubmarines['colony-4']).maxDepth,
+      getNewEarthSubmarineStats(newEarthSubmarines['colony-2']).maxDepth,
+      newEarthAchievementMetrics.maxSubmarineDepth
+    );
+    updateAchievementProgress('ne_neptune_maxed', submarineUpgradeTotal('colony-4'), true);
+    updateAchievementProgress('ne_poseidon_maxed', submarineUpgradeTotal('colony-2'), true);
+    updateAchievementProgress('ne_enemy_submarines_10', newEarthAchievementMetrics.enemySubmarinesDestroyed, true);
+    updateAchievementProgress('ne_submarine_depth_10000', deepestAvailableSubmarine, true);
   }, [
     updateAchievementProgress,
     totalDeliveries,
@@ -5522,15 +5890,24 @@ const DashboardContent = memo(({
     ownedShips,
     techLevels,
     earthReconstructionProgress,
-    battleLevel
+    battleLevel,
+    colonies,
+    newEarthAchievementMetrics,
+    newEarthBattleLoadout,
+    newEarthCardLevels,
+    newEarthOwnedCardIds,
+    newEarthMuseumTreasures,
+    newEarthHelicopters,
+    newEarthTanks,
+    newEarthSurfaceBattles,
+    newEarthWarIntelCollection,
+    newEarthSubmarines
   ]);
 
   useEffect(() => {
     if (!isLoaded) return;
     syncAchievements();
-    // Deliberate: run once after load, then on key progression milestones only.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isLoaded, totalDeliveries, historyStats, battleLevel, earthReconstructionProgress]);
+  }, [isLoaded, totalDeliveries, historyStats, battleLevel, earthReconstructionProgress, syncAchievements]);
 
   const startVoidTransition = () => {
     // Reset progress for Route 3
@@ -5676,7 +6053,7 @@ const DashboardContent = memo(({
       let researchTime = tech.researchTime;
       // No more conditional for Interstellar here because it's handled in the if block above
 
-      const elapsed = Date.now() - researchingTech.startTime;
+      const elapsed = nowTimestamp() - researchingTech.startTime;
       const remainingTime = Math.max(0, researchTime - elapsed);
 
       const boostRate = 500;
@@ -5711,13 +6088,13 @@ const DashboardContent = memo(({
       dispatch({ type: 'SET_HAS_SEEN_ROUTE2_MESSAGE', payload: { hasSeen: true } });
       playSfx('success');
     }
-  }, [isLoaded, isRoute2Unlocked, hasSeenRoute2UnlockMessage, addLog, t, playSfx, isTransitioning, showRoute2Lore, showVoidLore]);
+  }, [isLoaded, isRoute2Unlocked, hasSeenRoute2UnlockMessage, addLog, t, playSfx, isTransitioning, showRoute2Lore, showVoidLore, dispatch]);
 
   useEffect(() => {
     const interval = setInterval(() => {
       setCoffeePhraseIndex(prev => {
-        let next = Math.floor(Math.random() * 20);
-        while (next === prev) next = Math.floor(Math.random() * 20);
+        let next = Math.floor(randomUnit() * 20);
+        while (next === prev) next = Math.floor(randomUnit() * 20);
         return next;
       });
     }, 30000);
@@ -5809,7 +6186,7 @@ const DashboardContent = memo(({
       setColonies(cleanColoniesData(saved || [], language as any));
     };
     loadColonies();
-  }, [language]);
+  }, [dispatch, language, setColonies, setEarthEvents]);
 
   useEffect(() => {
     if (isLoaded && colonies.length > 0) {
@@ -5906,7 +6283,7 @@ const DashboardContent = memo(({
         routeId: route.id,
         progress: 0,
         speed: 0,
-        startTime: Date.now(),
+        startTime: nowTimestamp(),
         shipLevel: requiredLevel,
         distance: distance,
         status: status,
@@ -5915,7 +6292,7 @@ const DashboardContent = memo(({
     ]);
     addLog(`Ship launched to ${route.name}`, 'info');
     return true;
-  }, [playSfx, addLog, updateHistoryStats, completeInitialMission, language]);
+  }, [playSfx, addLog, updateHistoryStats, completeInitialMission, language, performSave, setActiveDeliveries, setQc, t]);
 
 
 
@@ -6116,7 +6493,7 @@ const DashboardContent = memo(({
           if (inUse < totalOwned) {
             shipsInUse[d.shipLevel] = inUse + 1;
             deliveriesStateChanged = true;
-            return { ...d, status: 'delivering', startTime: Date.now() };
+            return { ...d, status: 'delivering', startTime: nowTimestamp() };
           }
         }
         return d;
@@ -6157,7 +6534,7 @@ const DashboardContent = memo(({
       if (nextManual.length !== updatedDeliveries.length) deliveriesStateChanged = true;
 
       // Random Combat Encounter
-      const timeSinceLastBattle = Date.now() - lastRandomBattleTimeRef.current;
+      const timeSinceLastBattle = nowTimestamp() - lastRandomBattleTimeRef.current;
       const forcedBattle = timeSinceLastBattle > 180000;
       const battleFreqMultiplier = (battleLevelRef.current >= 35 && routeTierRef.current === 'Interstellar') ? 1.5 : 1;
       const candidateRouteIds = [
@@ -6251,9 +6628,9 @@ const DashboardContent = memo(({
               playerMaxHp: playerHp,
               playerHp: playerHp,
               reward: Math.floor(route.reward * (0.5 + enemyTier * 0.1) * (isBoss ? 5 : (isElite ? 2 : 1)) * multipliers.battleProfit * rewardMultiplier),
-              startTime: Date.now(),
+              startTime: nowTimestamp(),
               lastPlayerAttack: { laser: 0, plasma: 0, special: 0, shield: 0 },
-              lastEnemyAttack: Date.now() + 1000,
+              lastEnemyAttack: nowTimestamp() + 1000,
               shieldActive: false,
               lastShieldTime: 0,
               winProbability: winProb,
@@ -6267,7 +6644,7 @@ const DashboardContent = memo(({
               isBoss: isBoss
             };
 
-            lastRandomBattleTimeRef.current = Date.now();
+            lastRandomBattleTimeRef.current = nowTimestamp();
             updateHistoryStats('random_battle_found', 1, routeTierRef.current);
 
             if (battleLevelRef.current >= 30 && routeTierRef.current === 'Interstellar') {
@@ -6555,7 +6932,7 @@ const DashboardContent = memo(({
         const tech = TECHNOLOGIES_MAP.get(`${researching.tier}-${researching.level}`);
         if (tech) {
           let researchTime = tech.researchTime * (researching.tier === 'Interstellar' ? 0.5 : 1);
-          if (Date.now() - researching.startTime >= researchTime) {
+          if (nowTimestamp() - researching.startTime >= researchTime) {
             playSfx('tech_success');
             dispatch({ type: 'UNLOCK_TECH_LEVEL', payload: { tier: researching.tier, level: researching.level } });
             setResearchingTech(null);
@@ -6604,7 +6981,7 @@ const DashboardContent = memo(({
     }, 500);
 
     return () => { clearInterval(tick); clearInterval(flushInterval); };
-  }, []);
+  }, [addLog, autoSkipBattle, claimMission, completeInitialMission, dispatch, formatValue, getEconomicMultipliers, incrementDeliveries, playSfx, resolveBattleDefeat, resolveBattleVictory, setActiveDeliveries, setAetherion, setAetherionTubes, setAutoTravelActive, setAutoTravelProgress, setBattleNotification, setDeliveriesByLocation, setFloatingRewards, setFoundBattle, setMissions, setResearchingTech, setTotalDeliveries, setUnderAttackBattle, t, updateHistoryStats]);
 
 
   // Tutorial Trigger
@@ -6622,7 +6999,7 @@ const DashboardContent = memo(({
     }, 100);
 
     return () => clearTimeout(timeout);
-  }, [activeTab, seenTutorials, isLoaded]);
+  }, [activeTab, seenTutorials, isLoaded, playSfx]);
 
   // Fliperamas Tutorial Trigger
   useEffect(() => {
@@ -6778,7 +7155,7 @@ const DashboardContent = memo(({
     playSfx('buying_iten');
     addLog(`Auto-travel slot ${currentSlots + 1} purchased for ${route.name}`, 'success');
   }, [dispatch, qc, aetherion, autoTravelSlots,
-    playSfx, addLog, getEconomicMultipliers, updateHistoryStats, routeTier, completeInitialMission]);
+    playSfx, addLog, getEconomicMultipliers, getLocationMultiplier, updateHistoryStats, routeTier, completeInitialMission]);
 
   const getAutoTravelColor = (level: number) => {
     switch (level) {
@@ -6796,7 +7173,7 @@ const DashboardContent = memo(({
     if (routeTier !== 'Void') return;
 
     const interval = setInterval(() => {
-      const now = Date.now();
+      const now = nowTimestamp();
       const currentMissions = voidAircraftMissionsRef.current;
       const nextMissions = { ...currentMissions };
       let anyMissionChanged = false;
@@ -6811,7 +7188,7 @@ const DashboardContent = memo(({
             status: 'idle',
             endTime: null,
             rareFound: mission.rareFound,
-            restartAt: (upgrades.auto === 1 && voidAircraftAutoToggles[id]) ? Date.now() + 2000 : null
+            restartAt: (upgrades.auto === 1 && voidAircraftAutoToggles[id]) ? nowTimestamp() + 2000 : null
           };
           anyMissionChanged = true;
           playSuccess = true;
@@ -6880,8 +7257,8 @@ const DashboardContent = memo(({
           nextMissions[id] = {
             ...mission,
             status: 'mission',
-            startTime: Date.now(),
-            endTime: Date.now() + actualTime,
+            startTime: nowTimestamp(),
+            endTime: nowTimestamp() + actualTime,
             restartAt: null,
             earlyCheckDone: false
           };
@@ -6915,7 +7292,7 @@ const DashboardContent = memo(({
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [routeTier, voidAircraftUpgrades, voidAircraftAutoToggles, playSfx, addLog, t]);
+  }, [routeTier, voidAircraftUpgrades, voidAircraftAutoToggles, playSfx, addLog, t, dispatch, language, setVoidAircraftMissions]);
 
 
 
@@ -6927,7 +7304,7 @@ const DashboardContent = memo(({
 
   useEffect(() => {
     const interval = setInterval(() => {
-      const now = Date.now();
+      const now = nowTimestamp();
       let changed = false;
 
       setVoidAircraftConstruction(prev => {
@@ -6950,7 +7327,7 @@ const DashboardContent = memo(({
       });
     }, 1000);
     return () => clearInterval(interval);
-  }, [language, playSfx, addLog]);
+  }, [language, playSfx, addLog, setUnlockedVoidAircraft, setVoidAircraftConstruction]);
 
 
 
@@ -7123,10 +7500,10 @@ const DashboardContent = memo(({
     playSfx('saving_robot_event');
 
     const duration = 21000; // 21 seconds
-    const startTime = Date.now();
+    const startTime = nowTimestamp();
 
     const interval = setInterval(() => {
-      const elapsed = Date.now() - startTime;
+      const elapsed = nowTimestamp() - startTime;
       const progress = Math.min(100, (elapsed / duration) * 100);
       setRobotRepairProgress(progress);
 
@@ -7206,7 +7583,7 @@ const DashboardContent = memo(({
 
     const locId = forcedLocationId !== undefined
       ? forcedLocationId
-      : (voidWarAlertActive ? (1 + Math.floor(Math.random() * 9)) : 0);
+      : (voidWarAlertActive ? (1 + Math.floor(randomUnit() * 9)) : 0);
     const locKey = locId === 0 ? 'zero' : locId;
     const sectorBossNames = [
       'Devorador Alpha',
@@ -7246,18 +7623,18 @@ const DashboardContent = memo(({
 
       if (type === 'Padrão') {
         const hp = 90000 * 0.375;
-        stats = { hp: hp, maxHp: hp, shield: hp, maxShield: hp, damage: (30 + Math.random() * 20) * 2, qc: 50000 };
+        stats = { hp: hp, maxHp: hp, shield: hp, maxShield: hp, damage: (30 + randomUnit() * 20) * 2, qc: 50000 };
       } else if (type === 'Elite') {
         const hp = 225000 * 0.375;
-        stats = { hp: hp, maxHp: hp, shield: hp, maxShield: hp, damage: (60 + Math.random() * 20) * 2, qc: 150000 };
+        stats = { hp: hp, maxHp: hp, shield: hp, maxShield: hp, damage: (60 + randomUnit() * 20) * 2, qc: 150000 };
       } else {
         const hp = 390000 * 0.375;
         const shield = hp;
-        stats = { hp: hp, maxHp: hp, shield: shield, maxShield: shield, damage: (100 + Math.random() * 20) * 2, qc: 500000 };
+        stats = { hp: hp, maxHp: hp, shield: shield, maxShield: shield, damage: (100 + randomUnit() * 20) * 2, qc: 500000 };
       }
 
       const enemy: VoidBattleEnemy = {
-        id: `war-enemy-${Date.now()}`,
+        id: `war-enemy-${nowTimestamp()}`,
         type,
         name: type === 'Padrão' ? 'Aberração' : type === 'Elite' ? 'Horror Dimensional' : (sectorBossName || 'Devorador de Estrelas'),
         ...stats,
@@ -7266,12 +7643,12 @@ const DashboardContent = memo(({
         assetBaseName: routeTier === 'Void' && type === 'Boss' ? 'boss' : undefined,
         image: routeTier === 'Void'
           ? (type === 'Padrão'
-              ? `/assets/rota3/void/${locKey}/monster-common-${Math.floor(Math.random() * 4) + 1}_neutral.webp`
+              ? `/assets/rota3/void/${locKey}/monster-common-${Math.floor(randomUnit() * 4) + 1}_neutral.webp`
               : type === 'Elite'
                 ? '/assets/rota3/void/zero/monster-elite_neutral.webp'
                 : `/assets/rota3/void/${locKey}/boss_neutral.webp`)
           : (type === 'Padrão'
-            ? `/images/ships/battle/enemy-common-${Math.floor(Math.random() * 4) + 1}.webp`
+            ? `/images/ships/battle/enemy-common-${Math.floor(randomUnit() * 4) + 1}.webp`
             : type === 'Elite'
               ? '/images/ships/battle/enemy-elite.webp'
               : '/images/ships/battle/enemy-boss.webp')
@@ -7290,8 +7667,8 @@ const DashboardContent = memo(({
         playerY: 50,
         lastShot: 0,
         lastEnemyShot: 0,
-        lastEnemyMove: Date.now(),
-        lastEnemyAttack: Date.now(),
+        lastEnemyMove: nowTimestamp(),
+        lastEnemyAttack: nowTimestamp(),
         isGroupBattle: false,
         playerImage: voidBattleShipStats.rarity === 'mythic' ? '/assets/rota3/void/mitic_eclipse/mitic_eclipse_neutral.webp' : '/images/ships/battle/player-battle.webp',
         playerHp: voidBattleShipStats.hp,
@@ -7323,7 +7700,7 @@ const DashboardContent = memo(({
     addLog(t('scanningForTargets'), 'info');
 
     setTimeout(() => {
-      const numOptions = 2 + Math.floor(Math.random() * 4); // 2 to 5
+      const numOptions = 2 + Math.floor(randomUnit() * 4); // 2 to 5
       const options: VoidBattleEnemy[] = [];
 
       const rarityBossBonus = {
@@ -7349,8 +7726,8 @@ const DashboardContent = memo(({
             maxHp: 9000 * 0.75,
             shield: 400 * 0.75,
             maxShield: 400 * 0.75,
-            damage: 30 + Math.random() * 20,
-            qc: 5000 + Math.random() * 45000
+            damage: 30 + randomUnit() * 20,
+            qc: 5000 + randomUnit() * 45000
           };
         } else if (roll < bossThreshold) {
           type = 'Elite';
@@ -7359,7 +7736,7 @@ const DashboardContent = memo(({
             maxHp: 15000 * 0.75,
             shield: 800 * 0.75,
             maxShield: 800 * 0.75,
-            damage: 60 + Math.random() * 20,
+            damage: 60 + randomUnit() * 20,
             qc: 25000 + Math.random() * 75000
           };
         } else {
@@ -7369,7 +7746,7 @@ const DashboardContent = memo(({
             maxHp: 19500 * 0.75,
             shield: 1000 * 0.75,
             maxShield: 1000 * 0.75,
-            damage: 100 + Math.random() * 20,
+            damage: 100 + randomUnit() * 20,
             qc: 150000 + Math.random() * 100000
           };
         }
@@ -7380,16 +7757,16 @@ const DashboardContent = memo(({
         if (isVoid) {
           monsterName = type === 'Padrão' ? 'Aberração' : type === 'Elite' ? 'Horror Dimensional' : 'Devorador de Estrelas';
           imagePath = type === 'Padrão'
-            ? `/assets/rota3/void/${locKey}/monster-common-${Math.floor(Math.random() * 4) + 1}_neutral.webp`
+            ? `/assets/rota3/void/${locKey}/monster-common-${Math.floor(randomUnit() * 4) + 1}_neutral.webp`
             : type === 'Elite'
               ? '/assets/rota3/void/zero/monster-elite_neutral.webp'
               : `/assets/rota3/void/${locKey}/boss_neutral.webp`;
         } else {
-          imagePath = type === 'Padrão' ? `/images/ships/battle/enemy-common-${Math.floor(Math.random() * 4) + 1}.webp` : type === 'Elite' ? '/images/ships/battle/enemy-elite.webp' : '/images/ships/battle/enemy-boss.webp';
+          imagePath = type === 'Padrão' ? `/images/ships/battle/enemy-common-${Math.floor(randomUnit() * 4) + 1}.webp` : type === 'Elite' ? '/images/ships/battle/enemy-elite.webp' : '/images/ships/battle/enemy-boss.webp';
         }
 
         options.push({
-          id: `enemy-${Date.now()}-${i}`,
+          id: `enemy-${nowTimestamp()}-${i}`,
           type,
           name: monsterName,
           ...stats,
@@ -7429,8 +7806,8 @@ const DashboardContent = memo(({
       projectiles: [],
       particles: [],
       damageNumbers: [],
-      lastEnemyMove: Date.now(),
-      lastEnemyAttack: Date.now(),
+      lastEnemyMove: nowTimestamp(),
+      lastEnemyAttack: nowTimestamp(),
       isGroupBattle: isGroup,
       playerImage: voidBattleShipStats.rarity === 'mythic' ? '/assets/rota3/void/mitic_eclipse/mitic_eclipse_neutral.webp' : '/images/ships/battle/player-battle.webp',
       playerHp: voidBattleShipStats.hp,
@@ -7503,7 +7880,7 @@ const DashboardContent = memo(({
     }, 5000); // Every 5 seconds
 
     return () => clearInterval(interval);
-  }, [routeTier, voidPOIsInspiration, voidPOIQCDonations]);
+  }, [routeTier, voidPOIsInspiration, setEarthReconstructionProgress]);
 
   const getVoidDonationSfx = (mode: '1x' | '10x' | 'max') => {
     if (mode === 'max') return 'donation_3_void';
@@ -7665,7 +8042,7 @@ const DashboardContent = memo(({
                     transition={{ duration: 3, repeat: Infinity }}
                     className="absolute inset-0 bg-purple-500 blur-2xl"
                   />
-                  <img
+                  <Image unoptimized width={800} height={600}
                     src="/images/bobby_blue/bobby_blue_in_love.webp"
                     alt="Bobby Blue"
                     className="relative h-full w-full object-cover"
@@ -7725,7 +8102,7 @@ const DashboardContent = memo(({
                 left: `${Math.random() * 100}%`,
               }}
               animate={{
-                y: [0, -100 - Math.random() * 200],
+                y: [0, -100 - randomUnit() * 200],
                 opacity: [0, 1, 0],
                 scale: [0, 1.5, 0]
               }}
@@ -7823,7 +8200,7 @@ const DashboardContent = memo(({
               <div className="p-8 border-b border-emerald-500/20 flex justify-between items-center bg-emerald-500/10">
                 <div className="flex items-center gap-4">
                   <div className="w-12 h-12 rounded-xl border border-emerald-500/40 flex items-center justify-center bg-black/40 overflow-hidden shadow-[0_0_15px_rgba(16,185,129,0.2)]">
-                    <img src="/images/ui/earth_card.webp" alt="Earth" className="w-full h-full object-contain p-1 animate-spin-slow" />
+                    <Image unoptimized width={800} height={600} src="/images/ui/earth_card.webp" alt="Earth" className="w-full h-full object-contain p-1 animate-spin-slow" />
                   </div>
                   <div>
                     <h2 className="text-2xl font-orbitron font-black text-white tracking-widest uppercase">{t('restoration')}</h2>
@@ -7847,7 +8224,7 @@ const DashboardContent = memo(({
                 {/* Robot Section */}
                 <div className="flex items-start gap-6 bg-emerald-500/5 p-6 rounded-2xl border border-emerald-500/20">
                   <div className="w-24 h-24 rounded-2xl bg-emerald-500/10 border-2 border-emerald-500 flex items-center justify-center shrink-0 animate-float overflow-hidden shadow-[0_0_20px_rgba(16,185,129,0.3)]">
-                    <img src="/images/bobby_blue/bobby_blue_in_love.webp" alt="Bobby Blue" className="w-full h-full object-cover" />
+                    <Image unoptimized width={800} height={600} src="/images/bobby_blue/bobby_blue_in_love.webp" alt="Bobby Blue" className="w-full h-full object-cover" />
                   </div>
                   <div className="space-y-2">
                     <div className="flex items-center gap-2">
@@ -8534,7 +8911,10 @@ const DashboardContent = memo(({
           submarineStats={getNewEarthSubmarineStats(newEarthSubmarines[activeUnderwaterBattle.colonyId])}
           defenseBattleLevel={Math.max(1, battleLevel || 1)}
           onClose={() => setActiveUnderwaterBattle(null)}
-          onVictory={() => {
+          onVictory={(summary) => {
+            window.dispatchEvent(new CustomEvent('qch:new-earth-achievement-metric', {
+              detail: { type: 'submarine-victory', kills: summary.kills, depth: summary.depth },
+            }));
             recordSubmarineMissionProgress({
               type: 'submarine-victory',
               siteId: activeUnderwaterBattle.siteId,
@@ -8575,10 +8955,32 @@ const DashboardContent = memo(({
           onVictory={(payload?: NewEarthSurfaceBattleVictoryPayload) => {
             const siteTitle = NEW_EARTH_SURFACE_SITE_BRIEFINGS[activeSurfaceBattle.siteId].title[language as 'pt' | 'en'];
             const completedBattleLevel = Math.max(1, battleLevel || 1);
-            const previousVictories = newEarthSurfaceBattles[activeSurfaceBattle.siteId]?.victories || 0;
-            const fallbackReward = getNewEarthSurfaceBattleReward(activeSurfaceBattle.battleKind, completedBattleLevel, previousVictories);
-            const reward = Math.max(0, Math.floor(Number(payload?.qcReward ?? fallbackReward)));
-            const supplyTotal = payload?.supplies ? awardNewEarthSupplies(payload.supplies) : 0;
+            const reward = Math.max(0, Math.floor(Number(payload?.qcReward ?? rollNewEarthBattleReward(2_500_000, 5_000_000))));
+            const supplies: Partial<Record<NewEarthSupplyId, number>> = payload?.supplies || {
+              defense: rollNewEarthBattleReward(3_000, 7_000),
+              tech: rollNewEarthBattleReward(4_000, 8_000),
+            };
+            const supplyTotal = awardNewEarthSupplies(supplies);
+            const intelKind: NewEarthWarIntelKind = activeSurfaceBattle.battleKind === 'tank' ? 'tank' : 'helicopter';
+            const normalizedWarIntel = normalizeNewEarthWarIntelCollection(newEarthWarIntelCollection);
+            const droppedIntel = getNextNewEarthWarIntelDrop(normalizedWarIntel, intelKind, activeSurfaceBattle.siteId);
+            const intelNew = Boolean(droppedIntel);
+            const nextWarIntelCollection = droppedIntel
+              ? normalizeNewEarthWarIntelCollection({
+                ...normalizedWarIntel,
+                [droppedIntel.id]: {
+                  ...droppedIntel,
+                  scrollSrc: NEW_EARTH_WAR_INTEL_SCROLLS[Math.floor(Math.random() * NEW_EARTH_WAR_INTEL_SCROLLS.length)] || droppedIntel.scrollSrc,
+                  foundAt: nowTimestamp(),
+                  siteId: activeSurfaceBattle.siteId,
+                  colonyId: activeSurfaceBattle.colonyId,
+                },
+              })
+              : normalizedWarIntel;
+            setNewEarthWarIntelCollection(nextWarIntelCollection);
+            GameStorage.save(nextWarIntelCollection, NEW_EARTH_WAR_INTEL_STORAGE_KEY).catch(error => {
+              console.warn('Unable to save New Earth war intel drop', error);
+            });
             const nextSurfaceBattles = recordNewEarthSurfaceBattleVictory(
               newEarthSurfaceBattles,
               activeSurfaceBattle.siteId,
@@ -8597,15 +8999,26 @@ const DashboardContent = memo(({
             dispatch({ type: 'EARN_QC', payload: { amount: reward, source: 'battle' } });
             updateHistoryStats('acquired', reward, routeTierRef.current, 'battle');
             updateHistoryStats('battle_win', 1, routeTierRef.current);
+            const intelTotal = intelKind === 'tank' ? NEW_EARTH_TANK_WAR_INTEL.length : NEW_EARTH_HELICOPTER_WAR_INTEL.length;
+            const intelCollected = Object.values(nextWarIntelCollection).filter(item => item.kind === intelKind).length;
+            setNewEarthSurfaceVictorySummary({
+              id: nowTimestamp(),
+              battleKind: activeSurfaceBattle.battleKind,
+              siteTitle,
+              qc: reward,
+              supplies,
+              intel: droppedIntel,
+              intelNew,
+              intelCollected,
+              intelTotal,
+            });
             addLog(
               language === 'pt'
-                ? `Vitória em ${siteTitle}: +${formatValue(reward)} QC${supplyTotal > 0 ? ` + ${formatValue(supplyTotal)} recursos` : ''}${payload?.specialDrop ? ' + item especial simulado' : ''}.`
-                : `Victory at ${siteTitle}: +${formatValue(reward)} QC${supplyTotal > 0 ? ` + ${formatValue(supplyTotal)} supplies` : ''}${payload?.specialDrop ? ' + simulated special item' : ''}.`,
+                ? `Vitória em ${siteTitle}: +${formatValue(reward)} QC + ${formatValue(supplyTotal)} recursos + Informações de Guerra.`
+                : `Victory at ${siteTitle}: +${formatValue(reward)} QC + ${formatValue(supplyTotal)} supplies + War Intel.`,
               'success'
             );
-            if (activeSurfaceBattle.battleKind === 'helicopter') {
-              setActiveSurfaceBattle(null);
-            }
+            setActiveSurfaceBattle(null);
           }}
           onDefeat={() => {
             addLog(
@@ -8620,6 +9033,155 @@ const DashboardContent = memo(({
           }}
         />
       )}
+
+      <AnimatePresence>
+        {newEarthSurfaceVictorySummary && (
+          <motion.div
+            key={newEarthSurfaceVictorySummary.id}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[175] flex items-center justify-center bg-black/82 p-5 backdrop-blur-xl"
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.96, y: 18 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96, y: 18 }}
+              className="relative w-full max-w-5xl overflow-hidden rounded-3xl border border-emerald-200/20 bg-slate-950 p-6 shadow-[0_0_70px_rgba(16,185,129,0.18)]"
+            >
+              <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_0%,rgba(16,185,129,0.16),transparent_42%),radial-gradient(circle_at_80%_10%,rgba(56,189,248,0.12),transparent_40%),linear-gradient(180deg,rgba(2,6,23,0.74),rgba(0,0,0,0.92))]" />
+              <div className="relative z-10">
+                <div className="flex items-start justify-between gap-5">
+                  <div>
+                    <p className="font-mono text-[10px] font-black uppercase tracking-[0.42em] text-emerald-100/70">
+                      {language === 'pt' ? 'Operação concluída' : 'Operation complete'}
+                    </p>
+                    <h2 className="mt-2 font-orbitron text-5xl font-black uppercase leading-none text-white">
+                      {language === 'pt' ? 'Vitória' : 'Victory'}
+                    </h2>
+                    <p className="mt-3 max-w-2xl text-sm font-semibold text-slate-200/78">
+                      {newEarthSurfaceVictorySummary.siteTitle} · {newEarthSurfaceVictorySummary.battleKind === 'tank'
+                        ? (language === 'pt' ? 'Batalha terrestre' : 'Ground battle')
+                        : (language === 'pt' ? 'Batalha de helicópteros' : 'Helicopter battle')}
+                    </p>
+                  </div>
+                  <PremiumCanvasButton
+                    type="button"
+                    tone="steel"
+                    onClick={() => setNewEarthSurfaceVictorySummary(null)}
+                    className="h-10 w-10 rounded-full"
+                    contentClassName="text-slate-100"
+                  >
+                    <X size={18} />
+                  </PremiumCanvasButton>
+                </div>
+
+                <div className="mt-6 grid gap-3 md:grid-cols-3">
+                  <div className="rounded-2xl border border-yellow-200/18 bg-yellow-300/8 p-4">
+                    <div className="flex items-center gap-2 font-mono text-[9px] font-black uppercase tracking-[0.22em] text-yellow-100/64">
+                      <Coins size={15} /> QC
+                    </div>
+                    <p className="mt-3 font-orbitron text-3xl font-black text-yellow-100">+{formatValue(newEarthSurfaceVictorySummary.qc)}</p>
+                  </div>
+                  <div className="rounded-2xl border border-red-200/18 bg-red-300/8 p-4">
+                    <div className="flex items-center gap-2 font-mono text-[9px] font-black uppercase tracking-[0.22em] text-red-100/64">
+                      <ShieldCheck size={15} /> {language === 'pt' ? 'Núcleos de Defesa' : 'Defense Cores'}
+                    </div>
+                    <p className="mt-3 font-orbitron text-3xl font-black text-red-100">+{formatValue(newEarthSurfaceVictorySummary.supplies.defense || 0)}</p>
+                  </div>
+                  <div className="rounded-2xl border border-cyan-200/18 bg-cyan-300/8 p-4">
+                    <div className="flex items-center gap-2 font-mono text-[9px] font-black uppercase tracking-[0.22em] text-cyan-100/64">
+                      <Cpu size={15} /> {language === 'pt' ? 'Peças Tecnológicas' : 'Tech Parts'}
+                    </div>
+                    <p className="mt-3 font-orbitron text-3xl font-black text-cyan-100">+{formatValue(newEarthSurfaceVictorySummary.supplies.tech || 0)}</p>
+                  </div>
+                </div>
+
+                <div className="mt-4 rounded-2xl border border-slate-200/14 bg-black/42 p-4">
+                  <div className="grid gap-4 md:grid-cols-[150px_minmax(0,1fr)_220px]">
+                    <div className="relative min-h-[150px] overflow-hidden rounded-xl border border-amber-200/18 bg-slate-900/72 text-slate-100">
+                      {newEarthSurfaceVictorySummary.intel ? (
+                        <Image unoptimized width={800} height={600}
+                          src={newEarthSurfaceVictorySummary.intel.scrollSrc}
+                          alt={newEarthSurfaceVictorySummary.intel.title[language as 'pt' | 'en']}
+                          className="absolute inset-0 h-full w-full object-contain p-2 drop-shadow-[0_0_18px_rgba(251,191,36,0.2)]"
+                        />
+                      ) : (
+                        <div className="absolute inset-0 flex flex-col items-center justify-center">
+                          <FileText size={40} />
+                          <span className="mt-3 font-mono text-[10px] font-black uppercase tracking-[0.18em] text-slate-300">MAX</span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="min-w-0 py-1">
+                      <p className="font-mono text-[9px] font-black uppercase tracking-[0.24em] text-slate-400">
+                        {language === 'pt' ? 'Drop exclusivo colecionável' : 'Exclusive collectible drop'}
+                      </p>
+                      <h3 className="mt-2 font-orbitron text-2xl font-black uppercase text-white">
+                        {newEarthSurfaceVictorySummary.intel
+                          ? newEarthSurfaceVictorySummary.intel.title[language as 'pt' | 'en']
+                          : (language === 'pt' ? 'Coleção completa' : 'Collection complete')}
+                      </h3>
+                      <p className="mt-2 text-sm font-semibold leading-6 text-slate-200/78">
+                        {newEarthSurfaceVictorySummary.intel
+                          ? newEarthSurfaceVictorySummary.intel.summary[language as 'pt' | 'en']
+                          : (language === 'pt' ? 'Todos os pergaminhos desse tipo já foram recuperados.' : 'All scrolls of this type have already been recovered.')}
+                      </p>
+                      {newEarthSurfaceVictorySummary.intel && (
+                        <div className="mt-3 grid gap-2 text-xs font-semibold text-slate-300/76 md:grid-cols-2">
+                          <span>{language === 'pt' ? 'Capitão' : 'Captain'}: {newEarthSurfaceVictorySummary.intel.captain}</span>
+                          <span>{language === 'pt' ? 'Tempo estimado' : 'Estimated time'}: {newEarthSurfaceVictorySummary.intel.estimatedCombat[language as 'pt' | 'en']}</span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex flex-col justify-center rounded-xl border border-white/10 bg-white/5 p-4">
+                      <p className="font-mono text-[9px] font-black uppercase tracking-[0.22em] text-slate-400">
+                        {language === 'pt' ? 'Progresso do arquivo' : 'Archive progress'}
+                      </p>
+                      <p className="mt-2 font-orbitron text-3xl font-black text-white">
+                        {newEarthSurfaceVictorySummary.intelCollected} / {newEarthSurfaceVictorySummary.intelTotal}
+                      </p>
+                      <p className="mt-2 text-xs font-semibold text-slate-300/70">
+                        {newEarthSurfaceVictorySummary.intelNew
+                          ? (language === 'pt' ? 'Novo pergaminho arquivado.' : 'New scroll archived.')
+                          : (language === 'pt' ? 'Nenhum espaço novo disponível neste tipo.' : 'No new slot available for this type.')}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-5 flex flex-wrap justify-end gap-3">
+                  <PremiumCanvasButton
+                    type="button"
+                    tone="steel"
+                    onClick={() => {
+                      setNewEarthWarIntelKind(newEarthSurfaceVictorySummary.battleKind === 'tank' ? 'tank' : 'helicopter');
+                      setNewEarthWarIntelPage(Math.max(0, Math.ceil(newEarthSurfaceVictorySummary.intelCollected / NEW_EARTH_WAR_INTEL_ITEMS_PER_PAGE) - 1));
+                      setNewEarthSurfaceVictorySummary(null);
+                      setNewEarthWarIntelOpen(true);
+                    }}
+                    className="h-12 w-56"
+                    contentClassName="gap-2 text-xs tracking-[0.18em]"
+                  >
+                    <FileText size={17} />
+                    {language === 'pt' ? 'Abrir Arquivo' : 'Open Archive'}
+                  </PremiumCanvasButton>
+                  <PremiumCanvasButton
+                    type="button"
+                    tone="green"
+                    onClick={() => setNewEarthSurfaceVictorySummary(null)}
+                    className="h-12 w-52"
+                    contentClassName="gap-2 text-xs tracking-[0.18em]"
+                  >
+                    <CheckCircle2 size={17} />
+                    {language === 'pt' ? 'Continuar' : 'Continue'}
+                  </PremiumCanvasButton>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <SpaceAmbience isPlaying={musicOn} volume={0.2} />
 
@@ -9184,9 +9746,7 @@ const DashboardContent = memo(({
                   return (
                     <PremiumCanvasButton
                       key={tab}
-                      onClick={() => {
-                        handleDashboardTabChange(tab);
-                      }}
+                      onClick={handleDashboardTabChange.bind(null, tab)}
                       tone={dashboardPremiumTone(isActive, isAlertTab)}
                       className={`h-full min-h-[42px] flex-1 rounded-none px-2 py-2.5 whitespace-nowrap ${isAlertTab ? 'animate-pulse shadow-[0_0_24px_rgba(239,68,68,0.45)]' : ''}`}
                       contentClassName={`relative gap-2 text-[15px] font-orbitron font-bold tracking-widest uppercase ${dashboardPremiumText(isActive, isAlertTab)}`}
@@ -9329,11 +9889,11 @@ const DashboardContent = memo(({
                     exit={{ opacity: 0, scale: 0.95 }}
                     className="relative flex items-center justify-center w-full h-full min-h-[500px] rounded-3xl overflow-hidden"
                   >
-                    <img src="/assets/common/nebula_bg.webp" alt="" className="absolute inset-0 h-full w-full object-cover opacity-80" />
+                    <Image unoptimized width={800} height={600} src="/assets/common/nebula_bg.webp" alt="" className="absolute inset-0 h-full w-full object-cover opacity-80" />
                     <div className="absolute inset-0 bg-black/40" />
 
                     <div className={`relative max-w-md w-full glass-panel ${isInterstellar ? 'neon-border-orange' : 'neon-border-cyan'} rounded-2xl p-8 space-y-8 text-center overflow-hidden shadow-2xl`}>
-                      <img src="/assets/common/scifi_texture_bg.webp" alt="" className="absolute inset-0 h-full w-full object-cover opacity-30" />
+                      <Image unoptimized width={800} height={600} src="/assets/common/scifi_texture_bg.webp" alt="" className="absolute inset-0 h-full w-full object-cover opacity-30" />
                       <div className="absolute inset-0 bg-black/60" />
 
                       <div className="relative z-10 flex flex-col items-center gap-4">
@@ -9466,6 +10026,10 @@ const DashboardContent = memo(({
                           0%, 100% { box-shadow: 0 0 10px rgba(56,189,248,0.9), 0 0 22px rgba(14,165,233,0.38); }
                           50% { box-shadow: 0 0 18px rgba(186,230,253,0.98), 0 0 38px rgba(14,165,233,0.54); }
                         }
+                        @keyframes newEarthWarIntelDot {
+                          0%, 100% { box-shadow: 0 0 10px rgba(15,23,42,0.95), 0 0 24px rgba(0,0,0,0.72); }
+                          50% { box-shadow: 0 0 18px rgba(148,163,184,0.72), 0 0 40px rgba(0,0,0,0.88); }
+                        }
                       `}</style>
                       <div className="absolute inset-0 bg-gradient-to-b from-black/25 via-black/10 to-black/55" />
                       <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_38%,transparent_0%,rgba(0,0,0,0.28)_72%)]" />
@@ -9540,6 +10104,26 @@ const DashboardContent = memo(({
                           />
                           <span className="absolute left-4 top-[-1.15rem] whitespace-nowrap rounded-full border border-amber-200/25 bg-black/50 px-2 py-0.5 font-mono text-[8px] font-bold uppercase tracking-[0.22em] text-amber-50 shadow-[0_0_14px_rgba(251,191,36,0.2)]">
                             {NEW_EARTH_MUSEUM_MARKER.label}
+                          </span>
+                        </button>
+
+                        <button
+                          type="button"
+                          key={NEW_EARTH_WAR_INTEL_MARKER.id}
+                          onClick={handleNewEarthWarIntelMarkerClick}
+                          className="absolute h-8 w-8 text-left transition hover:scale-110"
+                          style={{ left: NEW_EARTH_WAR_INTEL_MARKER.left, top: NEW_EARTH_WAR_INTEL_MARKER.top }}
+                        >
+                          <span
+                            className="absolute left-0 top-0 h-8 w-8 rounded-full border border-black/80"
+                            style={{ animation: 'newEarthRadarPulse 2.2s ease-out infinite' }}
+                          />
+                          <span
+                            className="absolute left-0 top-0 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full border border-slate-300/80 bg-black"
+                            style={{ animation: 'newEarthWarIntelDot 2.2s ease-in-out infinite' }}
+                          />
+                          <span className="absolute left-4 top-[-1.15rem] whitespace-nowrap rounded-full border border-slate-400/20 bg-black/70 px-2 py-0.5 font-mono text-[8px] font-bold uppercase tracking-[0.22em] text-slate-100 shadow-[0_0_14px_rgba(0,0,0,0.55)]">
+                            {NEW_EARTH_WAR_INTEL_MARKER.label}
                           </span>
                         </button>
 
@@ -9789,7 +10373,7 @@ const DashboardContent = memo(({
                               exit={{ opacity: 0, scale: 0.97, y: 18 }}
                               className="absolute inset-6 z-30 overflow-hidden rounded-3xl border border-cyan-200/30 bg-slate-950/96 p-5 shadow-[0_0_58px_rgba(34,211,238,0.18)] backdrop-blur-md"
                             >
-                              <img
+                              <Image unoptimized width={800} height={600}
                                 src={briefing.background}
                                 alt=""
                                 aria-hidden="true"
@@ -9894,12 +10478,6 @@ const DashboardContent = memo(({
                           const briefing = NEW_EARTH_SURFACE_SITE_BRIEFINGS[selectedSurfaceBattleBriefing.siteId];
                           const colonyName = selectedSurfaceBattleBriefing.colonyId === 'colony-1' ? 'Genesis' : 'Elysium';
                           const isTankBattle = selectedSurfaceBattleBriefing.battleKind === 'tank';
-                          const previousVictories = newEarthSurfaceBattles[selectedSurfaceBattleBriefing.siteId]?.victories || 0;
-                          const estimatedReward = getNewEarthSurfaceBattleReward(
-                            selectedSurfaceBattleBriefing.battleKind,
-                            Math.max(1, battleLevel || 1),
-                            previousVictories
-                          );
 
                           return (
                             <motion.div
@@ -9908,7 +10486,7 @@ const DashboardContent = memo(({
                               exit={{ opacity: 0, scale: 0.97, y: 18 }}
                               className="absolute inset-6 z-30 overflow-hidden rounded-3xl border border-red-200/30 bg-slate-950/96 p-5 shadow-[0_0_58px_rgba(248,113,113,0.18)] backdrop-blur-md"
                             >
-                              <img
+                              <Image unoptimized width={800} height={600}
                                 src={selectedSurfaceBattleBriefing.background}
                                 alt=""
                                 aria-hidden="true"
@@ -9977,7 +10555,7 @@ const DashboardContent = memo(({
                                       <p className="mt-2 font-orbitron text-lg font-black uppercase text-white">
                                         {isTankBattle
                                           ? (language === 'pt' ? 'Movimento livre' : 'Free movement')
-                                          : (language === 'pt' ? 'Tela dividida' : 'Split airspace')}
+                                          : (language === 'pt' ? 'Combate aéreo' : 'Air combat')}
                                       </p>
                                     </div>
                                     <div className="rounded-2xl border border-red-200/18 bg-black/50 p-4">
@@ -9989,17 +10567,7 @@ const DashboardContent = memo(({
                                   </div>
                                 </div>
 
-                                <div className="flex items-end justify-between gap-4">
-                                  <div className="rounded-2xl border border-emerald-200/16 bg-emerald-950/28 px-4 py-3">
-                                    <p className="font-mono text-[9px] font-black uppercase tracking-[0.26em] text-emerald-100/60">
-                                      {language === 'pt' ? 'Recompensa da operação' : 'Operation reward'}
-                                    </p>
-                                    <p className="mt-1 text-sm font-bold text-emerald-50/82">
-                                      {language === 'pt'
-                                        ? `+${formatValue(estimatedReward)} QC ao vencer. Vitórias neste local: ${previousVictories}.`
-                                        : `+${formatValue(estimatedReward)} QC on victory. Victories at this site: ${previousVictories}.`}
-                                    </p>
-                                  </div>
+                                <div className="flex items-end justify-end gap-4">
                                   <PremiumCanvasButton
                                     type="button"
                                     tone="red"
@@ -10035,7 +10603,7 @@ const DashboardContent = memo(({
                               exit={{ opacity: 0, scale: 0.97, y: 18 }}
                               className="absolute inset-4 z-30 overflow-hidden rounded-3xl border border-amber-200/25 bg-slate-950/95 p-4 shadow-[0_0_54px_rgba(245,158,11,0.18)] backdrop-blur-md"
                             >
-                              <img
+                              <Image unoptimized width={800} height={600}
                                 src={activeCategory.background}
                                 alt=""
                                 aria-hidden="true"
@@ -10167,7 +10735,7 @@ const DashboardContent = memo(({
                                           key={treasure.id}
                                           className={`relative h-full min-h-0 overflow-hidden rounded-xl border bg-slate-950/76 p-3 ${recovered ? 'border-cyan-200/24 shadow-[0_0_22px_rgba(34,211,238,0.14)]' : 'border-white/10'}`}
                                         >
-                                          <img
+                                          <Image unoptimized width={800} height={600}
                                             src={activeCategory.cardBackground}
                                             alt=""
                                             aria-hidden="true"
@@ -10177,7 +10745,7 @@ const DashboardContent = memo(({
                                           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_30%_50%,rgba(34,211,238,0.14),transparent_58%)]" />
                                           <div className="relative z-10 grid h-full min-h-0 grid-cols-[minmax(112px,42%)_minmax(0,1fr)] items-center gap-3">
                                             <div className={`relative h-full min-h-0 w-full overflow-hidden rounded-lg border ${recovered ? 'border-cyan-200/22 bg-cyan-950/16' : 'border-white/10 bg-black/48'}`}>
-                                              <img
+                                              <Image unoptimized width={800} height={600}
                                                 src={activeCategory.background}
                                                 alt=""
                                                 aria-hidden="true"
@@ -10186,7 +10754,7 @@ const DashboardContent = memo(({
                                               <div className="absolute inset-0 bg-black/28" />
                                               <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_45%,rgba(125,211,252,0.22),transparent_64%)]" />
                                               {recovered ? (
-                                                <img
+                                                <Image unoptimized width={800} height={600}
                                                   src={treasure.src}
                                                   alt={treasure.name}
                                                   className="absolute inset-0 h-full w-full object-contain p-2 drop-shadow-[0_0_20px_rgba(125,211,252,0.26)]"
@@ -10224,6 +10792,273 @@ const DashboardContent = memo(({
                                   </div>
                                 </div>
                               </div>
+                            </motion.div>
+                          );
+                        })()}
+                      </AnimatePresence>
+                      <AnimatePresence>
+                        {newEarthWarIntelOpen && (() => {
+                          const activeIntelList = newEarthWarIntelKind === 'helicopter' ? NEW_EARTH_HELICOPTER_WAR_INTEL : NEW_EARTH_TANK_WAR_INTEL;
+                          const recoveredTotal = Object.keys(newEarthWarIntelCollection).length;
+                          const recoveredInKind = activeIntelList.filter(intel => newEarthWarIntelCollection[intel.id]).length;
+                          const totalIntelPages = Math.max(1, Math.ceil(activeIntelList.length / NEW_EARTH_WAR_INTEL_ITEMS_PER_PAGE));
+                          const safeIntelPage = Math.min(Math.max(0, newEarthWarIntelPage), totalIntelPages - 1);
+                          const pageIntel = activeIntelList.slice(
+                            safeIntelPage * NEW_EARTH_WAR_INTEL_ITEMS_PER_PAGE,
+                            safeIntelPage * NEW_EARTH_WAR_INTEL_ITEMS_PER_PAGE + NEW_EARTH_WAR_INTEL_ITEMS_PER_PAGE
+                          );
+
+                          return (
+                            <motion.div
+                              initial={{ opacity: 0, scale: 0.97, y: 18 }}
+                              animate={{ opacity: 1, scale: 1, y: 0 }}
+                              exit={{ opacity: 0, scale: 0.97, y: 18 }}
+                              className="absolute inset-4 z-30 overflow-hidden rounded-3xl border border-slate-200/18 bg-slate-950/96 p-4 shadow-[0_0_54px_rgba(0,0,0,0.48)] backdrop-blur-md"
+                            >
+                              <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_20%,rgba(148,163,184,0.12),transparent_46%),linear-gradient(180deg,rgba(2,6,23,0.54),rgba(0,0,0,0.86))]" />
+                              <div className="pointer-events-none absolute inset-0 opacity-35 [background-image:linear-gradient(rgba(148,163,184,0.12)_1px,transparent_1px),linear-gradient(90deg,rgba(148,163,184,0.08)_1px,transparent_1px)] [background-size:28px_28px]" />
+                              <PremiumCanvasButton
+                                type="button"
+                                onClick={() => {
+                                  setNewEarthWarIntelOpen(false);
+                                  playSfx('close_window');
+                                }}
+                                tone="steel"
+                                className="absolute right-5 top-5 z-20 h-10 w-10 rounded-full"
+                                contentClassName="text-cyan-100"
+                              >
+                                <X size={18} />
+                              </PremiumCanvasButton>
+
+                              <div className="relative z-10 flex h-full min-h-0 flex-col gap-4">
+                                <div className="pr-14">
+                                  <p className="font-mono text-[10px] font-black uppercase tracking-[0.42em] text-slate-200/68">
+                                    {language === 'pt' ? 'Banco de dados inimigo' : 'Enemy database'}
+                                  </p>
+                                  <div className="mt-2 flex items-end justify-between gap-5">
+                                    <div>
+                                      <h2 className="font-orbitron text-4xl font-black uppercase leading-none text-white drop-shadow-[0_0_18px_rgba(148,163,184,0.24)]">
+                                        {language === 'pt' ? 'Informações de Guerra' : 'War Intel'}
+                                      </h2>
+                                      <p className="mt-2 max-w-3xl text-sm font-semibold text-slate-200/76">
+                                        {language === 'pt'
+                                          ? 'Pergaminhos táticos coletados dos bosses de helicópteros e tanques. Cada arquivo registra capitães, manobras, frotas e teorias de ataque inimigas.'
+                                          : 'Tactical scrolls collected from helicopter and tank bosses. Each file records captains, maneuvers, fleets, and enemy attack theories.'}
+                                      </p>
+                                    </div>
+                                    <div className="rounded-2xl border border-slate-100/14 bg-black/56 px-4 py-3 text-right">
+                                      <p className="font-mono text-[9px] font-black uppercase tracking-[0.24em] text-slate-100/58">
+                                        {language === 'pt' ? 'Coleção' : 'Collection'}
+                                      </p>
+                                      <p className="mt-1 font-orbitron text-2xl font-black leading-none text-white">
+                                        {recoveredTotal} / {NEW_EARTH_WAR_INTEL_CATALOG.length}
+                                      </p>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-2">
+                                  {(['helicopter', 'tank'] as NewEarthWarIntelKind[]).map(kind => {
+                                    const list = kind === 'helicopter' ? NEW_EARTH_HELICOPTER_WAR_INTEL : NEW_EARTH_TANK_WAR_INTEL;
+                                    const recovered = list.filter(intel => newEarthWarIntelCollection[intel.id]).length;
+                                    const active = kind === newEarthWarIntelKind;
+                                    return (
+                                      <PremiumCanvasButton
+                                        key={kind}
+                                        type="button"
+                                        onClick={() => {
+                                          setNewEarthWarIntelKind(kind);
+                                          setNewEarthWarIntelPage(0);
+                                          playSfx('aba_click');
+                                        }}
+                                        tone={active ? 'cyan' : 'steel'}
+                                        className="h-14 rounded-xl"
+                                        contentClassName={`flex h-full flex-col items-start justify-center px-4 py-2 text-left ${active ? 'text-white' : 'text-slate-300'}`}
+                                      >
+                                        <span className="block truncate font-orbitron text-sm font-black uppercase tracking-[0.12em]">
+                                          {kind === 'helicopter'
+                                            ? (language === 'pt' ? 'Helicópteros' : 'Helicopters')
+                                            : (language === 'pt' ? 'Tanques' : 'Tanks')}
+                                        </span>
+                                        <span className="mt-1 block font-mono text-[9px] font-black uppercase tracking-[0.18em] opacity-70">
+                                          {recovered} / {list.length}
+                                        </span>
+                                      </PremiumCanvasButton>
+                                    );
+                                  })}
+                                </div>
+
+                                <div className="relative min-h-0 flex-1 overflow-hidden rounded-2xl border border-slate-200/12 bg-black/48 p-3">
+                                  <div className="mb-2 flex h-14 items-center justify-between gap-3">
+                                    <div className="flex min-w-0 items-center gap-3">
+                                      <PremiumCanvasButton
+                                        type="button"
+                                        onClick={() => {
+                                          setNewEarthWarIntelPage(page => Math.max(0, page - 1));
+                                          playSfx('aba_click');
+                                        }}
+                                        disabled={safeIntelPage <= 0}
+                                        tone="steel"
+                                        className="h-14 w-14 rounded-full"
+                                        contentClassName={safeIntelPage <= 0 ? 'text-slate-500' : 'text-cyan-100'}
+                                      >
+                                        <ChevronLeft size={24} />
+                                      </PremiumCanvasButton>
+                                      <h3 className="truncate font-orbitron text-3xl font-black uppercase leading-none text-white">
+                                        {newEarthWarIntelKind === 'helicopter'
+                                          ? (language === 'pt' ? 'Arquivos Aéreos' : 'Air Files')
+                                          : (language === 'pt' ? 'Arquivos Blindados' : 'Armored Files')}
+                                      </h3>
+                                    </div>
+                                    <div className="flex shrink-0 items-center gap-2">
+                                      <div className="rounded-full border border-white/12 bg-white/7 px-3 py-1.5 font-mono text-[10px] font-black uppercase tracking-[0.16em] text-slate-100/78">
+                                        {recoveredInKind} / {activeIntelList.length}
+                                      </div>
+                                      <div className="rounded-full border border-cyan-100/12 bg-black/46 px-3 py-1.5 font-mono text-[10px] font-black uppercase tracking-[0.16em] text-cyan-100/72">
+                                        {language === 'pt' ? 'Página' : 'Page'} {safeIntelPage + 1} / {totalIntelPages}
+                                      </div>
+                                      <PremiumCanvasButton
+                                        type="button"
+                                        onClick={() => {
+                                          setNewEarthWarIntelPage(page => Math.min(totalIntelPages - 1, page + 1));
+                                          playSfx('aba_click');
+                                        }}
+                                        disabled={safeIntelPage >= totalIntelPages - 1}
+                                        tone="steel"
+                                        className="h-14 w-14 rounded-full"
+                                        contentClassName={safeIntelPage >= totalIntelPages - 1 ? 'text-slate-500' : 'text-cyan-100'}
+                                      >
+                                        <ChevronRight size={24} />
+                                      </PremiumCanvasButton>
+                                    </div>
+                                  </div>
+
+                                  <div className="grid h-[calc(100%-64px)] min-h-0 grid-cols-2 grid-rows-[minmax(0,1fr)_minmax(0,1fr)] gap-3">
+                                    {pageIntel.map(intel => {
+                                      const collectedIntel = newEarthWarIntelCollection[intel.id];
+                                      const recovered = Boolean(collectedIntel);
+                                      return (
+                                        <div
+                                          key={intel.id}
+                                          role={recovered ? 'button' : undefined}
+                                          tabIndex={recovered ? 0 : -1}
+                                          onClick={() => {
+                                            if (!collectedIntel) return;
+                                            setSelectedNewEarthWarIntel(collectedIntel);
+                                            playSfx('view_card');
+                                          }}
+                                          onKeyDown={(event) => {
+                                            if (!collectedIntel || (event.key !== 'Enter' && event.key !== ' ')) return;
+                                            event.preventDefault();
+                                            setSelectedNewEarthWarIntel(collectedIntel);
+                                            playSfx('view_card');
+                                          }}
+                                          className={`relative h-full min-h-0 overflow-hidden rounded-xl border bg-slate-950/80 p-0 text-left transition ${recovered ? 'cursor-pointer border-slate-200/24 shadow-[0_0_22px_rgba(148,163,184,0.14)] hover:border-amber-200/45 hover:shadow-[0_0_26px_rgba(251,191,36,0.16)]' : 'border-white/10'}`}
+                                        >
+                                          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_25%_30%,rgba(248,250,252,0.09),transparent_50%),linear-gradient(135deg,rgba(15,23,42,0.94),rgba(0,0,0,0.72))]" />
+                                          <div className="relative z-10 flex h-full min-h-0 items-stretch">
+                                            <div className={`relative aspect-square h-full min-h-0 shrink-0 overflow-hidden ${recovered ? 'text-slate-50' : 'text-slate-400'}`}>
+                                              {recovered && collectedIntel ? (
+                                                <Image unoptimized width={800} height={800}
+                                                  src={collectedIntel.scrollSrc}
+                                                  alt={collectedIntel.title[language as 'pt' | 'en']}
+                                                  className="absolute inset-0 h-full w-full object-contain drop-shadow-[0_0_16px_rgba(251,191,36,0.18)]"
+                                                />
+                                              ) : (
+                                                <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/28">
+                                                  <Lock size={24} />
+                                                  <span className="mt-2 font-mono text-[9px] font-black uppercase tracking-[0.16em]">
+                                                    #{String(intel.index).padStart(2, '0')}
+                                                  </span>
+                                                </div>
+                                              )}
+                                            </div>
+                                            <div className="flex min-w-0 flex-1 flex-col items-center justify-center px-4 text-center">
+                                              <p className={`line-clamp-2 font-orbitron text-[16px] font-black uppercase leading-tight ${recovered ? 'text-white' : 'text-slate-300'}`}>
+                                                {intel.title[language as 'pt' | 'en']}
+                                              </p>
+                                              <p className="mt-2 line-clamp-2 max-w-[360px] text-[11px] font-semibold leading-snug text-slate-200/66">
+                                                {recovered
+                                                  ? (intel.kind === 'helicopter'
+                                                    ? (language === 'pt' ? 'Encontrado após interceptação de boss aéreo.' : 'Found after intercepting an aerial boss.')
+                                                    : (language === 'pt' ? 'Encontrado após neutralizar boss blindado.' : 'Found after neutralizing an armored boss.'))
+                                                  : (language === 'pt' ? 'Documento ainda não encontrado.' : 'Document not found yet.')}
+                                              </p>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              </div>
+
+                              <AnimatePresence>
+                                {selectedNewEarthWarIntel && (
+                                  <motion.div
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    exit={{ opacity: 0 }}
+                                    className="absolute inset-0 z-30 flex items-center justify-center bg-black/78 p-5 backdrop-blur-md"
+                                    onClick={() => setSelectedNewEarthWarIntel(null)}
+                                  >
+                                    <motion.div
+                                      initial={{ opacity: 0, scale: 0.95, y: 16 }}
+                                      animate={{ opacity: 1, scale: 1, y: 0 }}
+                                      exit={{ opacity: 0, scale: 0.95, y: 16 }}
+                                      className="relative flex h-full w-full items-center justify-center overflow-hidden rounded-3xl border border-amber-100/24 bg-black p-6 shadow-[0_0_60px_rgba(251,191,36,0.18)]"
+                                      onClick={(event) => event.stopPropagation()}
+                                    >
+                                      <div
+                                        className="relative aspect-square overflow-hidden drop-shadow-[0_0_28px_rgba(251,191,36,0.18)]"
+                                        style={{
+                                          width: 'min(88vw, calc(100vh - 132px), 640px)',
+                                          backgroundImage: `url(${selectedNewEarthWarIntel.scrollSrc})`,
+                                          backgroundPosition: 'center',
+                                          backgroundRepeat: 'no-repeat',
+                                          backgroundSize: 'contain',
+                                        }}
+                                      >
+                                        <div className="pointer-events-none absolute inset-[10%] bg-[radial-gradient(circle_at_50%_48%,rgba(255,244,196,0.04),rgba(0,0,0,0.08)_82%)]" />
+                                        <div
+                                          style={{
+                                            position: 'absolute',
+                                            left: '21%',
+                                            right: '21%',
+                                            top: '28%',
+                                            bottom: '30%',
+                                            zIndex: 20,
+                                            display: 'flex',
+                                            flexDirection: 'column',
+                                            justifyContent: 'center',
+                                            overflow: 'hidden',
+                                            color: '#26180d',
+                                            textAlign: 'left',
+                                            fontFamily: 'var(--font-handwriting)',
+                                            textShadow: '0 0 1px rgba(38, 24, 13, 0.22)',
+                                          }}
+                                        >
+                                          <p style={{ margin: 0, fontSize: 'clamp(18px, 2.45vmin, 27px)', fontWeight: 700, lineHeight: 0.94 }}>
+                                            {selectedNewEarthWarIntel.fleet[language as 'pt' | 'en']}
+                                          </p>
+                                          <p style={{ margin: 'clamp(5px, 1vmin, 10px) 0 0', fontSize: 'clamp(17px, 2.25vmin, 25px)', fontWeight: 700, lineHeight: 0.94 }}>
+                                            {selectedNewEarthWarIntel.summary[language as 'pt' | 'en']}
+                                          </p>
+                                        </div>
+                                      </div>
+                                      <PremiumCanvasButton
+                                        type="button"
+                                        onClick={() => setSelectedNewEarthWarIntel(null)}
+                                        tone="steel"
+                                        className="absolute right-5 top-5 z-20 h-10 w-10 rounded-full"
+                                        contentClassName="text-slate-100"
+                                      >
+                                        <X size={18} />
+                                      </PremiumCanvasButton>
+                                    </motion.div>
+                                  </motion.div>
+                                )}
+                              </AnimatePresence>
                             </motion.div>
                           );
                         })()}
@@ -10305,7 +11140,7 @@ const DashboardContent = memo(({
                                 <div className="min-h-0 overflow-hidden rounded-2xl border border-red-300/18 bg-black/36 p-4">
                                   {selectedNewEarthTankColonyId && selectedNewEarthTankLevels && selectedNewEarthTankStats ? (
                                     <div className="relative flex h-full min-h-0 flex-col overflow-hidden rounded-xl border border-emerald-300/14 bg-slate-950/72 p-3">
-                                      <img
+                                      <Image unoptimized width={800} height={600}
                                         src="/assets/rota4/colonys/genesis/genesis_factory.webp"
                                         alt=""
                                         aria-hidden="true"
@@ -10314,7 +11149,7 @@ const DashboardContent = memo(({
                                       <div className="pointer-events-none absolute inset-0 bg-black/66" />
                                       <div className="relative z-10 grid min-h-0 flex-1 grid-cols-[minmax(220px,0.78fr)_minmax(320px,1.22fr)] gap-3 overflow-hidden rounded-xl border border-emerald-200/12 bg-black/42 p-3">
                                         <div className="relative flex min-h-0 items-center justify-center overflow-hidden rounded-xl border border-emerald-300/18 bg-emerald-950/18">
-                                          <img
+                                          <Image unoptimized width={800} height={600}
                                             src={NEW_EARTH_TANK_PREVIEW_BACKGROUND}
                                             alt=""
                                             aria-hidden="true"
@@ -10327,7 +11162,7 @@ const DashboardContent = memo(({
                                             transition={{ duration: 3.8, repeat: Infinity, ease: 'easeInOut' }}
                                             className="relative z-10 h-[190px] w-[190px] drop-shadow-[0_0_22px_rgba(52,211,153,0.28)]"
                                           >
-                                            <img
+                                            <Image unoptimized width={800} height={600}
                                               src="/assets/rota4/colonys/genesis/aether_tank/1tank_player_body.webp"
                                               alt=""
                                               aria-hidden="true"
@@ -10404,7 +11239,7 @@ const DashboardContent = memo(({
                                       </div>
                                     </div>
                                   ) : selectedNewEarthSubmarineColonyId && selectedNewEarthSubmarineLevels && selectedNewEarthSubmarineStats ? (                                    <div className="relative flex h-full min-h-0 flex-col overflow-hidden rounded-xl border border-cyan-300/14 bg-slate-950/72 p-3">
-                                      <img
+                                      <Image unoptimized width={800} height={600}
                                         src="/assets/rota4/missions/bg_submarine.webp"
                                         alt=""
                                         aria-hidden="true"
@@ -10413,7 +11248,7 @@ const DashboardContent = memo(({
                                       <div className="pointer-events-none absolute inset-0 bg-black/64" />
                                       <div className="relative z-10 grid min-h-0 flex-1 grid-cols-[minmax(220px,0.78fr)_minmax(320px,1.22fr)] gap-3 overflow-hidden rounded-xl border border-cyan-200/12 bg-black/42 p-3">
                                         <div className="relative flex min-h-0 items-center justify-center overflow-hidden rounded-xl border border-cyan-300/18 bg-cyan-950/18">
-                                          <img
+                                          <Image unoptimized width={800} height={600}
                                             src={NEW_EARTH_SUBMARINE_PREVIEW_BACKGROUNDS[selectedNewEarthSubmarineColonyId]}
                                             alt=""
                                             aria-hidden="true"
@@ -10499,7 +11334,7 @@ const DashboardContent = memo(({
                                     </div>
                                   ) : selectedNewEarthHelicopterColonyId && selectedNewEarthHelicopterLevels && selectedNewEarthHelicopterStats ? (
                                     <div className="relative flex h-full min-h-0 flex-col overflow-hidden rounded-xl border border-sky-300/14 bg-slate-950/72 p-3">
-                                      <img
+                                      <Image unoptimized width={800} height={600}
                                         src="/assets/rota4/colonys/elysium/elysium_police.webp"
                                         alt=""
                                         aria-hidden="true"
@@ -10508,7 +11343,7 @@ const DashboardContent = memo(({
                                       <div className="pointer-events-none absolute inset-0 bg-black/64" />
                                       <div className="relative z-10 grid min-h-0 flex-1 grid-cols-[minmax(220px,0.78fr)_minmax(320px,1.22fr)] gap-3 overflow-hidden rounded-xl border border-sky-200/12 bg-black/42 p-3">
                                         <div className="relative flex min-h-0 items-center justify-center overflow-hidden rounded-xl border border-sky-300/18 bg-sky-950/18">
-                                          <img
+                                          <Image unoptimized width={800} height={600}
                                             src={NEW_EARTH_HELICOPTER_PREVIEW_BACKGROUND}
                                             alt=""
                                             aria-hidden="true"
@@ -10526,7 +11361,7 @@ const DashboardContent = memo(({
                                             className="relative z-10 h-full max-h-[205px] w-full px-3 py-3 drop-shadow-[0_0_22px_rgba(125,211,252,0.34)]"
                                           >
                                             <div className="absolute left-1/2 top-1/2 h-[150px] w-[230px] -translate-x-1/2 -translate-y-1/2">
-                                              <img
+                                              <Image unoptimized width={800} height={600}
                                                 src="/assets/rota4/colonys/elysium/aether/aether_helicopter_body.webp"
                                                 alt=""
                                                 aria-hidden="true"
@@ -10546,11 +11381,11 @@ const DashboardContent = memo(({
                                               transition={{ duration: 3.2, repeat: Infinity, ease: 'easeInOut' }}
                                               className="absolute right-[11%] top-[60%] h-[32px] w-[41px]"
                                             >
-                                              <img
+                                              <Image unoptimized width={800} height={600}
                                                 src="/assets/rota4/colonys/elysium/aether/drone_player.webp"
                                                 alt=""
                                                 aria-hidden="true"
-                                                className="absolute inset-0 h-full w-full object-contain"
+                                                className="absolute inset-0 h-full w-full object-contain drop-shadow-[0_0_28px_rgba(251,191,36,0.18)]"
                                               />
                                               {[
                                                 ['left-[16%]', 'top-[18%]'],
@@ -11017,34 +11852,34 @@ const DashboardContent = memo(({
             >
               {/* Background Particles */}
               <div className="absolute inset-0 pointer-events-none">
-                {[...Array(50)].map((_, i) => (
+                {route2ConfirmParticles.map((particle) => (
                   <motion.div
-                    key={i}
+                    key={particle.id}
                     initial={{
-                      x: Math.random() * 100 + '%',
-                      y: Math.random() * 100 + '%',
-                      opacity: Math.random() * 0.5,
-                      scale: Math.random() * 0.5 + 0.5
+                      x: particle.x,
+                      y: particle.y,
+                      opacity: particle.opacity,
+                      scale: particle.scale
                     }}
                     animate={{
                       y: [null, '110%'],
                       opacity: [null, 0]
                     }}
                     transition={{
-                      duration: Math.random() * 10 + 5,
+                      duration: particle.duration,
                       repeat: Infinity,
                       ease: "linear",
-                      delay: Math.random() * 5
+                      delay: particle.delay
                     }}
                     className="absolute w-1 h-1 bg-white rounded-full"
                   />
                 ))}
                 {/* Warp Lines */}
-                {[...Array(20)].map((_, i) => (
+                {route2ConfirmWarpLines.map((line) => (
                   <motion.div
-                    key={`warp-${i}`}
+                    key={`warp-${line.id}`}
                     initial={{
-                      x: Math.random() * 100 + '%',
+                      x: line.x,
                       y: -100,
                       opacity: 0,
                       height: 0
@@ -11058,7 +11893,7 @@ const DashboardContent = memo(({
                       duration: 0.5,
                       repeat: Infinity,
                       ease: "linear",
-                      delay: Math.random() * 2
+                      delay: line.delay
                     }}
                     className="absolute w-0.5 bg-orange-500/30 blur-[1px]"
                   />
@@ -11091,7 +11926,7 @@ const DashboardContent = memo(({
                     className="absolute inset-0 rounded-full border-4 border-t-orange-500 border-r-transparent border-b-orange-400 border-l-transparent shadow-[0_0_25px_rgba(249,115,22,0.3)]"
                   />
                   <div className="absolute inset-0 flex items-center justify-center">
-                    <img
+                    <Image unoptimized width={800} height={600}
                       src="/images/bobby_blue/bobby_blue_summer.webp"
                       alt="Bobby Blue"
                       className="w-16 h-16 object-contain"
@@ -11424,7 +12259,7 @@ const DashboardContent = memo(({
               >
                 <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(34,211,238,0.18),transparent_32%),linear-gradient(135deg,rgba(255,255,255,0.05),transparent_45%)]" />
                 <div className="relative aspect-[2/3] overflow-hidden rounded-[3.8%] border border-white/20 shadow-[0_0_42px_rgba(255,255,255,0.12)]">
-                  <img
+                  <Image unoptimized width={800} height={600}
                     src={getCardBackgroundImage(arcadeCardReward.rarity)}
                     alt=""
                     className="absolute inset-0 h-full w-full object-cover"
@@ -12022,7 +12857,7 @@ const DashboardContent = memo(({
                 className={`glass-panel p-8 rounded-3xl border ${selectedReward.color === 'emerald' ? 'border-emerald-500/40 shadow-[0_0_30px_rgba(16,185,129,0.2)]' : 'border-purple-500/40 shadow-[0_0_30px_rgba(168,85,247,0.2)]'} max-w-md w-full text-center relative overflow-hidden flex flex-col gap-6`}
                 onClick={(e) => e.stopPropagation()}
               >
-                <img
+                <Image unoptimized width={800} height={600}
                   src={SCIFI_TEXTURE_BACKGROUND}
                   alt=""
                   aria-hidden="true"
@@ -12345,6 +13180,8 @@ const DashboardContent = memo(({
   );
 });
 
+DashboardContent.displayName = 'DashboardContent';
+
 export const GameDashboard = memo((props: GameDashboardProps) => {
   return (
     <DashboardProvider language={props.language} jukebox={props.jukebox}>
@@ -12353,5 +13190,16 @@ export const GameDashboard = memo((props: GameDashboardProps) => {
   );
 });
 
+GameDashboard.displayName = 'GameDashboard';
+
 export default GameDashboard;
+
+
+
+
+
+
+
+
+
 

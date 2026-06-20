@@ -27,6 +27,8 @@ const SUPPLEMENTAL_LEGACY_KEYS: Partial<Record<ColonySaveStorageKey, string>> = 
   new_earth_missions: 'newEarthMissions',
   new_earth_submarines: 'newEarthSubmarines',
   new_earth_museum_treasures: 'newEarthMuseumTreasures',
+  new_earth_war_intel: 'newEarthWarIntel',
+  new_earth_achievement_metrics: 'newEarthAchievementMetrics',
   route4_qc_reset_done: 'route4QcResetDone',
 };
 
@@ -73,7 +75,7 @@ const mergeSupplementalSaveValue = (key: ColonySaveStorageKey, localValue: any, 
     return merged;
   }
 
-  if (key === 'new_earth_museum_treasures') {
+  if (key === 'new_earth_museum_treasures' || key === 'new_earth_war_intel' || key === 'new_earth_achievement_metrics') {
     return {
       ...(mainValue && typeof mainValue === 'object' ? mainValue : {}),
       ...(localValue && typeof localValue === 'object' ? localValue : {}),
@@ -315,4 +317,3 @@ export const GameStorage = {
     }
   }
 };
-

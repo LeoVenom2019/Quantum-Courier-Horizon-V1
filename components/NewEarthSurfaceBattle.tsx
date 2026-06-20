@@ -3,6 +3,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Crosshair, X } from 'lucide-react';
 import { PremiumCanvasButton } from './ui/PremiumCanvasButton';
+import { NewEarthHelicopterBattle } from './NewEarthHelicopterBattle';
 
 export type NewEarthSurfaceBattleSiteId = 'zona-glacial' | 'ruinas-europeias' | 'continente-esquecido';
 export type NewEarthSurfaceBattleKind = 'tank' | 'helicopter';
@@ -185,6 +186,13 @@ type DestroyedTank = {
   burn: number;
 };
 
+type TankBossDrop = {
+  id: number;
+  x: number;
+  y: number;
+  phase: number;
+};
+
 const WIDTH = 960;
 const HEIGHT = 540;
 const ENEMY_HALF_MAX_Y = HEIGHT / 2 - 28;
@@ -259,10 +267,12 @@ const TANK_SPRITES: Record<TankSpriteKind, TankSpriteConfig> = {
 };
 
 const SURFACE_SFX = {
-  playerShot: '/assets/rota4/battles/player/horizon/shoot_rt4.ogg',
-  enemyCommonShot: '/audio/sfx/shoot_enemy.ogg',
-  enemyEliteShot: '/audio/sfx/shoot_player.ogg',
-  enemyBossShot: '/assets/rota4/battles/player/horizon/apocalipse_laser_impact.ogg',
+  playerShot: '/assets/rota4/SFX_new_land/helicopters_tanks/tank_shoot_player.ogg',
+  enemyCommonShot: '/assets/rota4/SFX_new_land/helicopters_tanks/tank_enemy_comum_shoot.ogg',
+  enemyEliteShot: '/assets/rota4/SFX_new_land/helicopters_tanks/tank_enemy_elite_shoot.ogg',
+  enemyBossShot: '/assets/rota4/SFX_new_land/helicopters_tanks/tank_boss_shooting.ogg',
+  tankRunning: '/assets/rota4/SFX_new_land/helicopters_tanks/tank_player_running.ogg',
+  tankStopping: '/assets/rota4/SFX_new_land/helicopters_tanks/tank_player_stoping.ogg',
   commonExplosionA: '/assets/rota4/SFX_new_land/enemy_explosion_cap_4.ogg',
   commonExplosionB: '/assets/rota4/SFX_new_land/enemy_explosion_cap4_2.ogg',
   eliteExplosion: '/assets/rota4/SFX_new_land/explosion_elite_cap4.ogg',
@@ -475,8 +485,8 @@ export default function NewEarthSurfaceBattle({
   const mouseRef = useRef({ x: WIDTH / 2, y: HEIGHT / 2 });
   const shotRequestedRef = useRef(false);
   const endedRef = useRef(false);
-  const handledIframeResultRef = useRef(false);
-  const helicopterIframeRef = useRef<HTMLIFrameElement | null>(null);
+  const onVictoryRef = useRef(onVictory);
+  const onDefeatRef = useRef(onDefeat);
   const [result, setResult] = useState<'victory' | 'defeat' | ''>('');
   const [hud, setHud] = useState({ hp: 100, enemies: 0 });
   const theme = SITE_THEME[siteId];
@@ -488,53 +498,6 @@ export default function NewEarthSurfaceBattle({
     ? HELICOPTER_TOTAL_WAVES
     : TANK_TOTAL_WAVES;
 
-  useEffect(() => {
-    if (battleKind !== 'helicopter') return;
-    handledIframeResultRef.current = false;
-
-    const handleMessage = (event: MessageEvent) => {
-      if (event.origin !== window.location.origin) return;
-      const detail = event.data as { type?: string; result?: string } | null;
-      if (!detail || detail.type !== 'qch-helicopter-battle-result') return;
-      if (handledIframeResultRef.current) return;
-
-      if (detail.result === 'victory') {
-        handledIframeResultRef.current = true;
-        onVictory();
-        return;
-      }
-      if (detail.result === 'defeat') {
-        handledIframeResultRef.current = true;
-        onDefeat();
-      }
-    };
-
-    window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
-  }, [battleKind, onDefeat, onVictory]);
-
-  useEffect(() => {
-    if (battleKind !== 'helicopter') return;
-    const controlKeys = new Set(['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright', 'shift', ' ']);
-    const postInput = (event: KeyboardEvent, inputEvent: 'keydown' | 'keyup') => {
-      const key = event.key.toLowerCase();
-      if (!controlKeys.has(key)) return;
-      event.preventDefault();
-      helicopterIframeRef.current?.contentWindow?.postMessage({
-        type: 'qch-helicopter-input',
-        event: inputEvent,
-        key,
-      }, window.location.origin);
-    };
-    const down = (event: KeyboardEvent) => postInput(event, 'keydown');
-    const up = (event: KeyboardEvent) => postInput(event, 'keyup');
-    window.addEventListener('keydown', down);
-    window.addEventListener('keyup', up);
-    return () => {
-      window.removeEventListener('keydown', down);
-      window.removeEventListener('keyup', up);
-    };
-  }, [battleKind]);
 
   useEffect(() => {
     if (battleKind === 'helicopter') return;
@@ -662,7 +625,31 @@ export default function NewEarthSurfaceBattle({
     const shells: ShellCasing[] = [];
     const muzzleFlashes: MuzzleFlash[] = [];
     const destroyedTanks: DestroyedTank[] = [];
+    const tankBossDrops: TankBossDrop[] = [];
     let screenShake = 0;
+    const tankRunningAudio = typeof Audio !== 'undefined' ? new Audio(SURFACE_SFX.tankRunning) : null;
+    if (tankRunningAudio) {
+      tankRunningAudio.loop = true;
+      tankRunningAudio.volume = 0.26;
+    }
+    let tankWasMoving = false;
+
+    const setTankMovementSfx = (moving: boolean) => {
+      if (battleKind !== 'tank') return;
+      if (moving === tankWasMoving) return;
+      tankWasMoving = moving;
+      if (moving) {
+        if (!tankRunningAudio) return;
+        tankRunningAudio.currentTime = 0;
+        tankRunningAudio.play().catch(() => undefined);
+        return;
+      }
+      if (tankRunningAudio) {
+        tankRunningAudio.pause();
+        tankRunningAudio.currentTime = 0;
+      }
+      playSurfaceSfx(SURFACE_SFX.tankStopping, 0.44);
+    };
 
     const rotateToward = (angle: number, target: number, amount: number) => {
       let diff = target - angle;
@@ -861,16 +848,60 @@ export default function NewEarthSurfaceBattle({
     };
 
     const spawnEnemyExplosion = (enemy: Unit) => {
-      const kind = enemy.kind || 'common';
-      const explosionType = kind;
+      const explosionType = enemy.kind || 'common';
+      const scale = explosionType === 'boss' ? 2.15 : explosionType === 'elite' ? 1.45 : 1.05;
+      const palette = explosionType === 'boss' ? AAA_PALETTES.boss : explosionType === 'elite' ? AAA_PALETTES.elite : AAA_PALETTES.fire;
+      screenShake = Math.max(screenShake, explosionType === 'boss' ? 18 : explosionType === 'elite' ? 11 : 6);
+      addFlash(explosionType === 'boss' ? 'rgba(220,180,255,0.22)' : explosionType === 'elite' ? 'rgba(255,220,80,0.18)' : 'rgba(255,120,40,0.13)', 0.15, 0.72);
+      window.setTimeout(() => addFlash('rgba(255,120,40,0.10)', 0.18, 0.48), 45);
+      addBurst(enemy.x, enemy.y, palette, explosionType === 'boss' ? 132 : explosionType === 'elite' ? 84 : 54, explosionType === 'boss' ? 15 : explosionType === 'elite' ? 11 : 8, scale);
+      const flameCount = explosionType === 'boss' ? 50 : explosionType === 'elite' ? 32 : 20;
+      for (let i = 0; i < flameCount; i++) {
+        const angle = rand(0, Math.PI * 2);
+        const speed = rand(1.8, explosionType === 'boss' ? 8.8 : 6.6) * scale;
+        particles.push({
+          x: enemy.x + rand(-24, 24) * scale,
+          y: enemy.y + rand(-18, 18) * scale,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed - rand(0.5, 2.6) * scale,
+          life: rand(0.34, 0.92),
+          maxLife: 0.92,
+          size: rand(3.5, 12) * scale,
+          color: pick(palette),
+          drag: rand(0.92, 0.97),
+          growth: rand(-0.02, 0.05),
+          rotation: rand(0, Math.PI),
+          spin: rand(-0.2, 0.2),
+          type: 'spark',
+        });
+      }
+      const streakCount = explosionType === 'boss' ? 42 : explosionType === 'elite' ? 26 : 16;
+      for (let i = 0; i < streakCount; i++) {
+        addStreak(enemy.x, enemy.y, (i / streakCount) * Math.PI * 2 + rand(-0.18, 0.18), rand(9, 24) * scale, pick(AAA_PALETTES.spark), rand(26, 72) * scale, rand(0.8, 2.6) * scale);
+      }
+      for (let i = 0; i < (explosionType === 'boss' ? 36 : explosionType === 'elite' ? 22 : 12); i++) {
+        addDebris(enemy.x + rand(-32, 32), enemy.y + rand(-24, 24), scale, explosionType === 'boss' ? ['#c084fc', '#64748b', '#94a3b8', '#f0abfc', '#fb923c'] : explosionType === 'elite' ? ['#f97316', '#94a3b8', '#64748b', '#facc15'] : ['#fb923c', '#94a3b8', '#64748b']);
+      }
+      addSmoke(enemy.x, enemy.y, explosionType === 'boss' ? 42 : explosionType === 'elite' ? 26 : 15, scale);
+      if (explosionType === 'boss') {
+        for (let i = 0; i < 10; i++) {
+          window.setTimeout(() => {
+            const ox = rand(-78, 78) * scale;
+            const oy = rand(-50, 50) * scale;
+            addBurst(enemy.x + ox, enemy.y + oy, AAA_PALETTES.fire, 20, 8.5, scale * 0.72);
+            addSmoke(enemy.x + ox, enemy.y + oy, 5, scale * 0.65);
+          }, 140 + i * 72);
+        }
+      } else if (explosionType === 'elite') {
+        for (let i = 0; i < 5; i++) {
+          window.setTimeout(() => {
+            const ox = rand(-38, 38) * scale;
+            const oy = rand(-28, 28) * scale;
+            addBurst(enemy.x + ox, enemy.y + oy, AAA_PALETTES.fire, 12, 6.5, scale * 0.55);
+          }, 120 + i * 70);
+        }
+      }
       if (battleKind === 'tank') {
-        const scale = explosionType === 'boss' ? 1.35 : explosionType === 'elite' ? 1.1 : 0.9;
-        screenShake = Math.max(screenShake, explosionType === 'boss' ? 9 : explosionType === 'elite' ? 5 : 3);
-        addFlash(explosionType === 'boss' ? 'rgba(255,248,208,0.16)' : explosionType === 'elite' ? 'rgba(255,220,80,0.09)' : 'rgba(255,220,160,0.045)', 0.12, 0.8);
-        addShockwave(enemy.x, enemy.y, (explosionType === 'boss' ? 74 : explosionType === 'elite' ? 58 : 44) * scale, 'rgba(240,236,228,0.7)', (explosionType === 'boss' ? 4.2 : 3.2) * scale, 0.08, 7);
-        addBurst(enemy.x, enemy.y, ['#fff8e8', '#fde68a', '#f97316'], explosionType === 'boss' ? 6 : explosionType === 'elite' ? 4 : 3, explosionType === 'boss' ? 6.5 : 4.8, 0.75);
-        addSmoke(enemy.x, enemy.y, explosionType === 'boss' ? 3 : explosionType === 'elite' ? 2 : 1, scale * 0.72);
-        addDebris(enemy.x, enemy.y, scale * 0.75);
         destroyedTanks.push({
           x: enemy.x,
           y: enemy.y,
@@ -879,27 +910,13 @@ export default function NewEarthSurfaceBattle({
           burn: explosionType === 'boss' ? 1.05 : explosionType === 'elite' ? 0.75 : 0.45,
         });
         if (destroyedTanks.length > 8) destroyedTanks.shift();
-        playSurfaceSfx(explosionType === 'boss' ? SURFACE_SFX.eliteExplosion : explosionType === 'elite' ? SURFACE_SFX.eliteExplosion : pick([SURFACE_SFX.commonExplosionA, SURFACE_SFX.commonExplosionB]), explosionType === 'boss' ? 0.62 : 0.48);
-        return;
       }
-      const scale = explosionType === 'boss' ? 2.15 : explosionType === 'elite' ? 1.45 : 1.05;
-      const palette = explosionType === 'boss' ? AAA_PALETTES.boss : explosionType === 'elite' ? AAA_PALETTES.elite : AAA_PALETTES.common;
-      const glow = explosionType === 'boss' ? 'rgba(200,120,255,0.88)' : explosionType === 'elite' ? 'rgba(255,200,60,0.82)' : 'rgba(80,220,255,0.76)';
-      screenShake = Math.max(screenShake, explosionType === 'boss' ? 18 : explosionType === 'elite' ? 11 : 6);
-      addFlash(explosionType === 'boss' ? 'rgba(220,180,255,0.28)' : explosionType === 'elite' ? 'rgba(255,220,80,0.22)' : 'rgba(120,220,255,0.14)', 0.16, 0.95);
-      addGlow(enemy.x, enemy.y, (explosionType === 'boss' ? 320 : explosionType === 'elite' ? 200 : 130) * scale, glow);
-      addShockwave(enemy.x, enemy.y, 55 * scale, 'rgba(255,255,255,0.95)', 3.8 * scale, 0.07);
-      addShockwave(enemy.x, enemy.y, 105 * scale, explosionType === 'boss' ? 'rgba(192,132,252,0.80)' : explosionType === 'elite' ? 'rgba(251,191,36,0.80)' : 'rgba(34,211,238,0.78)', 5.5 * scale, 0.044, 4);
-      addShockwave(enemy.x, enemy.y, 168 * scale, 'rgba(200,60,40,0.40)', 8.5 * scale, 0.03, 8);
-      addBurst(enemy.x, enemy.y, palette, explosionType === 'boss' ? 110 : explosionType === 'elite' ? 72 : 44, explosionType === 'boss' ? 15 : explosionType === 'elite' ? 11 : 8, scale);
-      for (let i = 0; i < (explosionType === 'boss' ? 32 : explosionType === 'elite' ? 20 : 12); i++) {
-        addStreak(enemy.x, enemy.y, (i / 32) * Math.PI * 2, rand(8, 22) * scale, pick(AAA_PALETTES.spark), rand(30, 80) * scale, rand(1, 3) * scale);
-      }
-      for (let i = 0; i < (explosionType === 'boss' ? 28 : explosionType === 'elite' ? 16 : 8); i++) {
-        addDebris(enemy.x + rand(-28, 28), enemy.y + rand(-22, 22), scale, explosionType === 'boss' ? ['#c084fc', '#64748b', '#94a3b8', '#f0abfc'] : explosionType === 'elite' ? ['#f97316', '#94a3b8', '#64748b', '#facc15'] : ['#67e8f9', '#94a3b8', '#64748b']);
-      }
-      addSmoke(enemy.x, enemy.y, explosionType === 'boss' ? 30 : explosionType === 'elite' ? 18 : 10, scale);
       playSurfaceSfx(explosionType === 'boss' ? SURFACE_SFX.eliteExplosion : explosionType === 'elite' ? SURFACE_SFX.eliteExplosion : pick([SURFACE_SFX.commonExplosionA, SURFACE_SFX.commonExplosionB]), explosionType === 'boss' ? 0.9 : 0.74);
+    };
+    const spawnTankBossDrop = (x: number, y: number) => {
+      tankBossDrops.push({ id: nextId++, x: clamp(x, 54, WIDTH - 54), y: clamp(y, 54, HEIGHT - 54), phase: rand(0, Math.PI * 2) });
+      addGlow(x, y, 88, 'rgba(240,171,252,0.55)', 'rgba(168,85,247,0)', 0.8);
+      addShockwave(x, y, 92, 'rgba(240,171,252,0.68)', 3, 0.04, 6);
     };
 
     const addShot = (x: number, y: number, angle: number, from: Shot['from'], damage: number, speed: number, visualType: Shot['visualType'] = 'common') => {
@@ -1168,6 +1185,7 @@ export default function NewEarthSurfaceBattle({
         player.x = clamp(player.x + (player.vx || 0) * dtScale, 36, WIDTH - 36);
         player.y = clamp(player.y + (player.vy || 0) * dtScale, 36, HEIGHT - 36);
         player.speedNow = Math.hypot(player.x - previousPlayerX, player.y - previousPlayerY);
+        setTankMovementSfx(player.speedNow > 0.08);
         if (player.speedNow > 0.1) {
           player.angle = rotateToward(player.angle, Math.atan2(player.vy || 0, player.vx || 0), 0.12);
         }
@@ -1294,15 +1312,19 @@ export default function NewEarthSurfaceBattle({
             const shotX = tip.x - Math.cos(shotAngle) * 38;
             const shotY = tip.y - Math.sin(shotAngle) * 38;
             const tankStats = TANK_ENEMY_STATS[enemyKind];
-            addShot(shotX, shotY, shotAngle, 'enemy', tankStats.shotDamage, enemyKind === 'boss' ? 7.5 : enemyKind === 'elite' ? 7 : 6.4, enemyKind);
+            if (enemyKind === 'elite' || enemyKind === 'boss') {
+              const sideAngle = shotAngle + Math.PI / 2;
+              const spread = enemyKind === 'boss' ? 12 : 9;
+              const speed = enemyKind === 'boss' ? 7.2 : 7;
+              addShot(shotX + Math.cos(sideAngle) * spread, shotY + Math.sin(sideAngle) * spread, shotAngle, 'enemy', tankStats.shotDamage, speed, enemyKind);
+              addShot(shotX - Math.cos(sideAngle) * spread, shotY - Math.sin(sideAngle) * spread, shotAngle, 'enemy', tankStats.shotDamage, speed, enemyKind);
+            } else {
+              addShot(shotX, shotY, shotAngle, 'enemy', tankStats.shotDamage, 6.4, enemyKind);
+            }
             enemy.recoil = enemyKind === 'boss' ? 15 : 10;
             fireTankMuzzle(enemy, false);
             ejectTankCasing(enemy);
             screenShake = Math.max(screenShake, enemyKind === 'boss' ? 8 : 4);
-            if (enemyKind === 'boss') {
-              addShot(shotX, shotY, shotAngle + 0.1, 'enemy', Math.round(tankStats.shotDamage * 0.6), 6.5, enemyKind);
-              addShot(shotX, shotY, shotAngle - 0.1, 'enemy', Math.round(tankStats.shotDamage * 0.6), 6.5, enemyKind);
-            }
             enemy.cooldown = tankStats.cooldown + Math.random() * 350;
           }
         }
@@ -1342,8 +1364,9 @@ export default function NewEarthSurfaceBattle({
 
       for (let i = enemies.length - 1; i >= 0; i--) {
         if (enemies[i].hp <= 0) {
-          const defeatedKind = enemies[i].kind || 'common';
-          spawnEnemyExplosion(enemies[i]);
+          const defeatedEnemy = enemies[i];
+          const defeatedKind = defeatedEnemy.kind || 'common';
+          spawnEnemyExplosion(defeatedEnemy);
           enemies.splice(i, 1);
           if (battleKind === 'helicopter') {
             helicopterWaveIndex += 1;
@@ -1361,9 +1384,7 @@ export default function NewEarthSurfaceBattle({
             if (tankWaveIndex < TANK_TOTAL_WAVES) {
               enemies.push(createTankEnemy(tankWaveIndex));
             } else if (!endedRef.current && defeatedKind === 'boss') {
-              endedRef.current = true;
-              pendingResult = 'victory';
-              pendingResultAt = now + 1050;
+              spawnTankBossDrop(defeatedEnemy.x, defeatedEnemy.y);
             }
           }
         }
@@ -1454,7 +1475,8 @@ export default function NewEarthSurfaceBattle({
         const isEliteShot = shot.visualType === 'elite';
         const coreColor = isBossShot ? '#e879f9' : isEliteShot ? '#fde68a' : isEnemy ? '#ef4444' : '#22d3ee';
         const glowColor = isBossShot ? 'rgba(168,85,247,0.6)' : isEliteShot ? 'rgba(251,191,36,0.6)' : isEnemy ? 'rgba(239,68,68,0.52)' : 'rgba(34,211,238,0.48)';
-        const size = isBossShot ? 9 : isEliteShot ? 6.5 : isEnemy ? 5.4 : 4.8;
+        const commonEnemyShotSize = 5.4;
+        const size = isBossShot ? commonEnemyShotSize * 2 : isEliteShot ? 6.5 : isEnemy ? commonEnemyShotSize : 4.8;
         const pulse = 1 + Math.sin(now / 70 + shot.id) * 0.12;
 
         ctx.save();
@@ -1653,8 +1675,8 @@ export default function NewEarthSurfaceBattle({
 
       if (pendingResult && now >= pendingResultAt) {
         setResult(pendingResult);
-        if (pendingResult === 'victory') onVictory();
-        else onDefeat();
+        if (pendingResult === 'victory') onVictoryRef.current(battleKind === 'tank' ? { specialDrop: true } : undefined);
+        else onDefeatRef.current();
         return;
       }
 
@@ -1662,8 +1684,14 @@ export default function NewEarthSurfaceBattle({
     };
 
     raf = requestAnimationFrame(loop);
-    return () => cancelAnimationFrame(raf);
-  }, [background, battleKind, defenseBattleLevel, enemyCount, language, onDefeat, onVictory, tankArmorReduction, tankShotDamageBonus, tankShotSpeedBonus, tankSpeedBonus, theme]);
+    return () => {
+      cancelAnimationFrame(raf);
+      if (tankRunningAudio) {
+        tankRunningAudio.pause();
+        tankRunningAudio.currentTime = 0;
+      }
+    };
+  }, [background, battleKind, defenseBattleLevel, enemyCount, language, tankArmorReduction, tankShotDamageBonus, tankShotSpeedBonus, tankSpeedBonus, theme]);
 
   const updateMouse = (event: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
@@ -1676,47 +1704,17 @@ export default function NewEarthSurfaceBattle({
   };
 
   if (battleKind === 'helicopter') {
-    const helicopterParams = new URLSearchParams({
-      embedded: '1',
-      speedBonus: String(helicopterStats?.speedBonus ?? 0),
-      gunDamageBonus: String(helicopterStats?.gunDamageBonus ?? 0),
-      missileDamageBonus: String(helicopterStats?.missileDamageBonus ?? 0),
-      startingMissiles: String(helicopterStats?.startingMissiles ?? 1),
-      armorReduction: String(helicopterStats?.armorReduction ?? 0),
-      initialDrones: String(helicopterStats?.initialDrones ?? 0),
-    });
-    if (background) helicopterParams.set('background', background);
-
     return (
-      <div className="fixed inset-0 z-[160] flex items-center justify-center bg-black/88 p-1 backdrop-blur-xl">
-        <div className="relative flex h-[98vh] w-full max-w-[98vw] flex-col overflow-hidden rounded-[1.5rem] border border-white/12 bg-zinc-950 shadow-[0_0_80px_rgba(0,0,0,0.55)]">
-          <div className="flex shrink-0 items-center justify-between border-b border-white/10 bg-black/50 px-5 py-3">
-            <div>
-              <p className="font-mono text-[10px] font-black uppercase tracking-[0.34em] text-cyan-100/70">
-                {language === 'pt' ? 'Batalha aérea V3' : 'Air battle V3'}
-              </p>
-              <h2 className="font-orbitron text-xl font-black uppercase text-white">{theme.title[language]}</h2>
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="hidden rounded-xl border border-white/10 bg-black/35 px-3 py-2 font-mono text-[10px] uppercase tracking-[0.2em] text-slate-200 md:block">
-                {colonyName} / {language === 'pt' ? 'Operação aérea ativa' : 'Active air operation'}
-              </div>
-              <PremiumCanvasButton type="button" tone="steel" onClick={onClose} className="h-10 w-10 rounded-full" contentClassName="text-slate-100">
-                <X size={18} />
-              </PremiumCanvasButton>
-            </div>
-          </div>
-
-          <iframe
-            ref={helicopterIframeRef}
-            title={language === 'pt' ? 'Batalha de Helicópteros V3' : 'Helicopter Battle V3'}
-            src={`/prototypes/qch_batalha_helicopteros_v3.html?${helicopterParams.toString()}`}
-            className="min-h-0 flex-1 border-0 bg-black"
-            allow="autoplay"
-            onLoad={() => helicopterIframeRef.current?.focus()}
-          />
-        </div>
-      </div>
+      <NewEarthHelicopterBattle
+        language={language}
+        title={theme.title[language]}
+        colonyName={colonyName}
+        background={background}
+        helicopterStats={helicopterStats}
+        onClose={onClose}
+        onVictory={onVictory}
+        onDefeat={onDefeat}
+      />
     );
   }
 

@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef, useSyncExternalStore } from 'react';
+import Image from 'next/image';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Home, 
@@ -88,6 +89,18 @@ export type ConstructionType = 'forest' | 'factory' | 'school' | 'culture' | 'de
 type ColonySupplyId = 'materials' | 'biomass' | 'tech' | 'defense' | 'food' | 'meds';
 type ColonySupplies = Record<ColonySupplyId, number>;
 type ColonySearchId = 'land' | 'sea' | 'air';
+let colonySystemClockSnapshot = Date.now();
+const subscribeColonySystemClock = (onStoreChange: () => void) => {
+  colonySystemClockSnapshot = Date.now();
+  const interval = window.setInterval(() => {
+    colonySystemClockSnapshot = Date.now();
+    onStoreChange();
+  }, 1000);
+  return () => window.clearInterval(interval);
+};
+const getColonySystemClockSnapshot = () => colonySystemClockSnapshot;
+const getColonySystemServerClockSnapshot = () => 0;
+
 type ColonyExpeditionId = Exclude<ColonySearchId, 'air'>;
 type ActiveColonySearches = Record<string, ActiveColonySearch>;
 type SearchThreatBonus = Record<ColonyExpeditionId, number>;
@@ -266,6 +279,10 @@ interface PendingDefenseThreat {
 
 const MAX_PENDING_DEFENSE_THREATS = 6;
 const DEFENSE_THREAT_RESPONSE_SECONDS = 50;
+const dispatchNewEarthAchievementMetric = (detail: Record<string, unknown>) => {
+  if (typeof window === 'undefined') return;
+  window.dispatchEvent(new CustomEvent('qch:new-earth-achievement-metric', { detail }));
+};
 const DEFENSE_VICTORY_REWARD_BONUS_PERCENT = 30;
 const ROUTE4_SEARCH_SFX_BASE = '/assets/rota4/SFX_new_land';
 const ROUTE4_COLONIES_TAB_SFX = `${ROUTE4_SEARCH_SFX_BASE}/aba_colonys_click.ogg`;
@@ -887,7 +904,7 @@ const ColonyCardView = ({
   const backgroundImage = getCardBackgroundImage(card.rarity);
   const content = (
     <>
-      <img
+      <Image unoptimized width={800} height={600}
         src={backgroundImage}
         alt=""
         aria-hidden="true"
@@ -1122,7 +1139,7 @@ const CardDetailOverlay = ({
         exit={{ opacity: 0, scale: 0.94, y: 10 }}
         className={`relative w-full max-w-5xl overflow-hidden rounded-[2rem] border border-white/15 bg-zinc-950 shadow-[0_0_80px_rgba(34,211,238,0.12)] ${getCardStyle(card.rarity, cardClass)}`}
       >
-        <img src={modalBackgroundImage} alt="" aria-hidden="true" className="pointer-events-none absolute inset-0 z-0 h-full w-full object-cover opacity-90" />
+        <Image unoptimized width={800} height={600} src={modalBackgroundImage} alt="" aria-hidden="true" className="pointer-events-none absolute inset-0 z-0 h-full w-full object-cover opacity-90" />
         <div className="pointer-events-none absolute inset-0 z-0 bg-black/16" />
         <div className="pointer-events-none absolute inset-0 z-0 opacity-35 bg-[radial-gradient(circle_at_20%_0%,rgba(255,255,255,0.2),transparent_34%),radial-gradient(circle_at_80%_20%,rgba(45,212,191,0.18),transparent_30%)]" />
         <PremiumCanvasButton
@@ -1285,12 +1302,6 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
   setSelectedColonyId,
 }) => {
   const [activeColonyId, setActiveColonyId] = useState<string>('colony-1');
-
-  useEffect(() => {
-    if (selectedColonyId) {
-      setActiveColonyId(selectedColonyId);
-    }
-  }, [selectedColonyId]);
   const [activeView, setActiveView] = useState<'colony' | 'searches' | 'missions'>('colony');
   const [isLoaded, setIsLoaded] = useState(false);
   const [isSuppliesLoaded, setIsSuppliesLoaded] = useState(false);
@@ -1329,6 +1340,11 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
   const [activeDefenseThreat, setActiveDefenseThreat] = useState<PendingDefenseThreat | null>(null);
   const [showDefenseHangar, setShowDefenseHangar] = useState(false);
   const [defenseAlertTick, setDefenseAlertTick] = useState(0);
+  const colonySystemClock = useSyncExternalStore(
+    subscribeColonySystemClock,
+    getColonySystemClockSnapshot,
+    getColonySystemServerClockSnapshot
+  );
   const [battleCardCodexPage, setBattleCardCodexPage] = useState(0);
   const [selectedCard, setSelectedCard] = useState<{ card: ColonyCard; action: 'equip' | 'remove'; slot?: ColonyCardSlot | BattleCardSlot; blockedBy?: string } | null>(null);
   const [newEarthMissions, setNewEarthMissions] = useState<NewEarthMissionState>(() => createDefaultNewEarthMissionState());
@@ -1349,10 +1365,11 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
   const scheduledNewEarthMissionCycleBonusRef = useRef<number | null>(null);
   const paidNewEarthMissionCycleBonusRef = useRef<number | null>(null);
   const readyNewEarthMissionIdsRef = useRef<Set<string>>(new Set());
+  const countedNewEarthMissionCompletionIdsRef = useRef<Set<string>>(new Set());
   const readyNewEarthMissionAudioInitializedRef = useRef(false);
 
   const t = useCallback((en: string, pt: string) => language === 'pt' ? pt : en, [language]);
-  const effectiveActiveColonyId = activeColonyId ?? colonies[0]?.id ?? null;
+  const effectiveActiveColonyId = selectedColonyId || activeColonyId || colonies[0]?.id || null;
   const newEarthMissionContext = useMemo(() => {
     const unlockedArcadeIds = Array.from(getOwnedArcadeIdsFromCards(ownedCardIds));
     const ownedCardIdSet = new Set(ownedCardIds);
@@ -1756,6 +1773,7 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
   useEffect(() => {
     if (!isLoaded || !isCardLevelsLoaded) return;
     GameStorage.save(cardLevels, 'colony_card_levels');
+    window.dispatchEvent(new CustomEvent('qch:colony-card-levels-updated', { detail: cardLevels }));
   }, [cardLevels, isLoaded, isCardLevelsLoaded]);
 
   useEffect(() => {
@@ -1771,6 +1789,7 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
   useEffect(() => {
     if (!isLoaded || !isBattleLoadoutLoaded) return;
     GameStorage.save(battleLoadout, 'battle_cards_loadout');
+    window.dispatchEvent(new CustomEvent('qch:battle-loadout-updated', { detail: battleLoadout }));
   }, [battleLoadout, isLoaded, isBattleLoadoutLoaded]);
 
   useEffect(() => {
@@ -1877,13 +1896,18 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
   useEffect(() => {
     if (!isLoaded || !isNewEarthMissionsLoaded) return;
     if (isNewEarthMissionCycleFullyClaimed && !newEarthMissions.cycleRewardClaimed) return;
-    setNewEarthMissions(prev => {
-      const next = refreshNewEarthMissionBoard(prev, newEarthMissionContext);
-      if (next.cycle !== prev.cycle && prev.cycle > 0) {
-        playRoute4UiSfx(ROUTE4_QUESTS_RENEW_SFX);
-      }
-      return JSON.stringify(next) === JSON.stringify(prev) ? prev : next;
-    });
+
+    const refreshTimeout = window.setTimeout(() => {
+      setNewEarthMissions(prev => {
+        const next = refreshNewEarthMissionBoard(prev, newEarthMissionContext);
+        if (next.cycle !== prev.cycle && prev.cycle > 0) {
+          playRoute4UiSfx(ROUTE4_QUESTS_RENEW_SFX);
+        }
+        return JSON.stringify(next) === JSON.stringify(prev) ? prev : next;
+      });
+    }, 0);
+
+    return () => window.clearTimeout(refreshTimeout);
   }, [isLoaded, isNewEarthMissionsLoaded, isNewEarthMissionCycleFullyClaimed, newEarthMissions.cycleRewardClaimed, newEarthMissionContext]);
 
   useEffect(() => {
@@ -2011,37 +2035,41 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
   useEffect(() => {
     if (!isLoaded || !isNewEarthMissionsLoaded || !isCardLevelsLoaded) return;
 
-    setNewEarthMissions(prev => {
-      let changed = false;
-      const missions = prev.missions.map(mission => {
-        if (
-          mission.eventType !== 'card-upgrade' ||
-          mission.claimed ||
-          !mission.cardId ||
-          !mission.cardTargetLevel ||
-          getCardLevel(mission.cardId, cardLevels) < mission.cardTargetLevel
-        ) {
-          return mission;
-        }
+    const cardMissionTimeout = window.setTimeout(() => {
+      setNewEarthMissions(prev => {
+        let changed = false;
+        const missions = prev.missions.map(mission => {
+          if (
+            mission.eventType !== 'card-upgrade' ||
+            mission.claimed ||
+            !mission.cardId ||
+            !mission.cardTargetLevel ||
+            getCardLevel(mission.cardId, cardLevels) < mission.cardTargetLevel
+          ) {
+            return mission;
+          }
 
-        const completedMission = {
-          ...mission,
-          progress: mission.target,
-          completed: true,
+          const completedMission = {
+            ...mission,
+            progress: mission.target,
+            completed: true,
+          };
+          changed = changed || mission.progress !== completedMission.progress || !mission.completed;
+          return completedMission;
+        });
+
+        if (!changed) return prev;
+
+        return {
+          ...prev,
+          missions,
+          completedMissionIds: missions.filter(mission => mission.completed).map(mission => mission.id),
+          claimedMissionIds: missions.filter(mission => mission.claimed).map(mission => mission.id),
         };
-        changed = changed || mission.progress !== completedMission.progress || !mission.completed;
-        return completedMission;
       });
+    }, 0);
 
-      if (!changed) return prev;
-
-      return {
-        ...prev,
-        missions,
-        completedMissionIds: missions.filter(mission => mission.completed).map(mission => mission.id),
-        claimedMissionIds: missions.filter(mission => mission.claimed).map(mission => mission.id),
-      };
-    });
+    return () => window.clearTimeout(cardMissionTimeout);
   }, [
     cardLevels,
     isCardLevelsLoaded,
@@ -2062,6 +2090,16 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
             card.id === event.cardId ? { ...card, level: upgradedLevel } : card
           )),
         };
+      }
+      const newlyCompletedMissionIds = eventResult.completedMissionIds.filter(id => (
+        !countedNewEarthMissionCompletionIdsRef.current.has(id)
+      ));
+      if (newlyCompletedMissionIds.length > 0) {
+        newlyCompletedMissionIds.forEach(id => countedNewEarthMissionCompletionIdsRef.current.add(id));
+        dispatchNewEarthAchievementMetric({
+          type: 'new-earth-mission-completed',
+          amount: newlyCompletedMissionIds.length,
+        });
       }
       const normalized = normalizeNewEarthMissionState(
         eventResult.changed ? eventResult.state : prev,
@@ -2255,12 +2293,16 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
     if (!threat) return;
 
     const openedAt = Date.now();
-    setShowDefenseHangar(false);
-    setPendingDefenseThreats(prev => prev.map(item => (
-      item.id === threat.id ? { ...item, openedAt, expiresAt: undefined } : item
-    )));
-    onDefenseThreatAlertChange?.(null);
-    setActiveDefenseThreat({ ...threat, openedAt, expiresAt: undefined });
+    const openTimeout = window.setTimeout(() => {
+      setShowDefenseHangar(false);
+      setPendingDefenseThreats(prev => prev.map(item => (
+        item.id === threat.id ? { ...item, openedAt, expiresAt: undefined } : item
+      )));
+      onDefenseThreatAlertChange?.(null);
+      setActiveDefenseThreat({ ...threat, openedAt, expiresAt: undefined });
+    }, 0);
+
+    return () => window.clearTimeout(openTimeout);
   }, [activeDefenseThreat, onDefenseThreatAlertChange, openDefenseRequest, pendingDefenseThreats]);
 
   useEffect(() => {
@@ -2275,12 +2317,16 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
     ));
     if (!threat) return;
 
-    setPendingDefenseThreats(prev => prev.filter(item => item.id !== threat.id));
-    onDefenseThreatAlertChange?.(null);
-    setCardFeedback(language === 'pt'
-      ? 'Defesa abandonada. A equipe de busca foi derrotada.'
-      : 'Defense abandoned. The search team was defeated.'
-    );
+    const abandonTimeout = window.setTimeout(() => {
+      setPendingDefenseThreats(prev => prev.filter(item => item.id !== threat.id));
+      onDefenseThreatAlertChange?.(null);
+      setCardFeedback(language === 'pt'
+        ? 'Defesa abandonada. A equipe de busca foi derrotada.'
+        : 'Defense abandoned. The search team was defeated.'
+      );
+    }, 0);
+
+    return () => window.clearTimeout(abandonTimeout);
   }, [abandonDefenseRequest, language, onDefenseThreatAlertChange, pendingDefenseThreats]);
 
   useEffect(() => {
@@ -2396,6 +2442,7 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
   ), [battleStatTotals]);
   const battleCardCodexPageCount = Math.max(1, Math.ceil(ownedBattleCards.length / BATTLE_CARD_CODEX_PAGE_SIZE));
   const activeBattleCardCodexPage = Math.min(battleCardCodexPage, battleCardCodexPageCount - 1);
+  const missionRenewNow = colonySystemClock || defenseAlertTick;
   const visibleBattleCodexCards = useMemo(() => (
     ownedBattleCards.slice(
       activeBattleCardCodexPage * BATTLE_CARD_CODEX_PAGE_SIZE,
@@ -2436,11 +2483,6 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
   const getEffectiveConstructors = useCallback((colony: Colony) => (
     colony.constructors + ownedPassiveBonuses.constructorsAllColonies
   ), [ownedPassiveBonuses.constructorsAllColonies]);
-
-  useEffect(() => {
-    if (battleCardCodexPage < battleCardCodexPageCount) return;
-    setBattleCardCodexPage(Math.max(0, battleCardCodexPageCount - 1));
-  }, [battleCardCodexPage, battleCardCodexPageCount]);
 
   const equippedCards = useMemo(() => {
     if (!activeColony) return [];
@@ -2930,6 +2972,7 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
         const nextOwned = normalizeOwnedColonyCardIds([...ownedCardIds, card.id]);
         setOwnedCardIds(nextOwned);
         GameStorage.save(nextOwned, 'colony_cards_data');
+      window.dispatchEvent(new CustomEvent('qch:colony-cards-updated', { detail: nextOwned }));
         setCardEvent(card);
         playSfx?.('claim_card');
       } else {
@@ -3031,6 +3074,9 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
     }
     setPendingDefenseThreats(prev => prev.filter(threat => threat.id !== activeDefenseThreat.id));
     setActiveDefenseThreat(null);
+    if (summary?.perfect) {
+      dispatchNewEarthAchievementMetric({ type: 'perfect-search-defense', searchId: activeDefenseThreat.sourceSearchId, amount: 1 });
+    }
     recordNewEarthMissionProgress({ type: 'defense-victory' });
     recordNewEarthMissionProgress({ type: 'defense-kills', amount: kills });
     recordNewEarthMissionProgress({ type: 'defense-bosses', amount: Math.max(1, Math.floor(Number(summary?.bossesDefeated) || 1)) });
@@ -3039,6 +3085,7 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
       const nextOwned = normalizeOwnedColonyCardIds([...ownedCardIds, reward.id]);
       setOwnedCardIds(nextOwned);
       GameStorage.save(nextOwned, 'colony_cards_data');
+      window.dispatchEvent(new CustomEvent('qch:colony-cards-updated', { detail: nextOwned }));
       setLegendaryBattleCardPity(prev => (
         isBattleCard(reward) && reward.rarity !== 'legendary'
           ? prev + LEGENDARY_BATTLE_CARD_PITY_STEP
@@ -3062,7 +3109,7 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
       `Threat neutralized: ${xpTextEn}+${formatValue(battleQc)} QC`,
       `Ameaça neutralizada: ${xpTextPt}+${formatValue(battleQc)} QC`
     ));
-  }, [activeDefenseThreat, ownedCardIds, playSfx, onEarnQC, formatValue, horizonMaxLevel, recordNewEarthMissionProgress]);
+  }, [activeDefenseThreat, ownedCardIds, playSfx, onEarnQC, formatValue, horizonMaxLevel, recordNewEarthMissionProgress, t]);
 
   const resolveDefenseDefeat = useCallback(() => {
     const retryUntil = Date.now() + DEFENSE_THREAT_RESPONSE_SECONDS * 1000;
@@ -3145,6 +3192,7 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
     if (awardedCards.length > 0) {
       setOwnedCardIds(nextOwned);
       GameStorage.save(nextOwned, 'colony_cards_data');
+      window.dispatchEvent(new CustomEvent('qch:colony-cards-updated', { detail: nextOwned }));
       setCardEvent(awardedCards[awardedCards.length - 1]);
       playSfx?.('claim_card');
     }
@@ -3156,6 +3204,7 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
         : { ...prev, nextBattleIndex: Math.min(SEARCH_BATTLE_TOTAL - 1, battleIndex + 1) }
     ));
     setActiveSearchBattle(null);
+    dispatchNewEarthAchievementMetric({ type: 'direct-battle-victory', amount: 1 });
     recordNewEarthMissionProgress({ type: 'defense-victory' });
     recordNewEarthMissionProgress({ type: 'defense-kills', amount: kills });
     recordNewEarthMissionProgress({ type: 'defense-bosses', amount: Math.max(1, Math.floor(Number(summary?.bossesDefeated) || 1)) });
@@ -3262,7 +3311,7 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
     });
     setDirectBattleBriefing(null);
     setCardFeedback(t(`${directBattleBriefing.title} started`, `${directBattleBriefing.title} iniciada`));
-  }, [defenseBattleLevel, directBattleBriefing, playRandomBobbyBluePrepareForBattleSfx, t]);
+  }, [defenseBattleLevel, directBattleBriefing, t]);
 
   const upgradeSearch = useCallback((id: ColonyExpeditionId) => {
     const currentLevel = searchUpgradeLevels[id] || 0;
@@ -3647,7 +3696,7 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
                 >
                   <div className="relative flex min-h-[210px] items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-black/45">
                     <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(239,68,68,0.18),transparent_58%)]" />
-                    <img
+                    <Image unoptimized width={800} height={600}
                       src="/assets/rota4/battles/player/horizon/horizon.webp"
                       alt="Horizon"
                       className="relative z-10 max-h-[175px] w-auto object-contain drop-shadow-[0_0_28px_rgba(34,211,238,0.35)]"
@@ -4141,9 +4190,9 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
           </div>
           {newEarthMissions.renewAvailableAt && newEarthMissions.missions.every(mission => mission.claimed) && (
             <div className="mt-3 shrink-0 rounded-xl border border-amber-300/20 bg-amber-300/10 px-4 py-2 text-center font-mono text-[10px] uppercase tracking-[0.22em] text-amber-100">
-              {Date.now() >= newEarthMissions.renewAvailableAt
+              {missionRenewNow >= newEarthMissions.renewAvailableAt
                 ? t('Renewal available soon', 'Renovação disponível em instantes')
-                : `${t('Next assignments in', 'Próximas designações em')} ${formatSearchTime((newEarthMissions.renewAvailableAt - Date.now()) / 1000)}`}
+                : `${t('Next assignments in', 'Próximas designações em')} ${formatSearchTime((newEarthMissions.renewAvailableAt - missionRenewNow) / 1000)}`}
             </div>
           )}
         </div>
@@ -4659,3 +4708,5 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
     </div>
   );
 };
+
+

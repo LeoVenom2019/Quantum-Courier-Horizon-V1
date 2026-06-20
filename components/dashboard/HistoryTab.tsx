@@ -104,8 +104,9 @@ const HistoryTab = memo(function HistoryTab() {
     && MINI_GAMES_CONFIG.every(game => unlockedArcadeIds.has(game.id));
 
   useEffect(() => {
+    const creditsVideo = creditsVideoRef.current;
     return () => {
-      creditsVideoRef.current?.pause();
+      creditsVideo?.pause();
     };
   }, []);
 

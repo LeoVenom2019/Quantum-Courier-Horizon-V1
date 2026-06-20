@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useSyncExternalStore } from 'react';
+import Image from 'next/image';
 import { motion, AnimatePresence } from 'motion/react';
 import { Rocket, Settings, Trophy, Play, Music, Volume2, Globe, X, Timer, Trash2, ShieldCheck, Clock, Navigation, Database, Coffee, ArrowRight, ChevronRight, ChevronLeft, Radio, Sliders } from 'lucide-react';
 import { IntroNarrative } from '@/components/IntroNarrative';
@@ -51,6 +52,10 @@ const getLandingThemeForRouteTier = (routeTier: string): ThemeColor => {
 };
 
 const wait = (ms: number) => new Promise(resolve => window.setTimeout(resolve, ms));
+const subscribeClientReady = () => () => {};
+const getClientReadySnapshot = () => true;
+const getServerReadySnapshot = () => false;
+const useClientReady = () => useSyncExternalStore(subscribeClientReady, getClientReadySnapshot, getServerReadySnapshot);
 
 interface ConstellationStar {
   name: string;
@@ -82,18 +87,13 @@ const CONSTELLATIONS: { [key: string]: ConstellationStar[] } = {
 };
 
 const Satellite = () => {
-  const [isMounted, setIsMounted] = useState(false);
-  const [props, setProps] = useState({ y: 0, duration: 60, delay: 0, opacity: 0 });
-
-  useEffect(() => {
-    setProps({
-      y: Math.random() * 100,
-      duration: 60 + Math.random() * 120,
-      delay: Math.random() * 20,
-      opacity: 0.2 + Math.random() * 0.3
-    });
-    setIsMounted(true);
-  }, []);
+  const isMounted = useClientReady();
+  const [props] = useState(() => ({
+    y: Math.random() * 100,
+    duration: 60 + Math.random() * 120,
+    delay: Math.random() * 20,
+    opacity: 0.2 + Math.random() * 0.3
+  }));
 
   if (!isMounted) return null;
 
@@ -108,7 +108,7 @@ const Satellite = () => {
 };
 
 const StarField = ({ theme = 'cyan' }: { theme?: ThemeColor }) => {
-  const [isMounted, setIsMounted] = useState(false);
+  const isMounted = useClientReady();
   const [stars] = useState(() => {
     return Array.from({ length: 80 }).map((_, i) => ({
       id: i,
@@ -119,11 +119,6 @@ const StarField = ({ theme = 'cyan' }: { theme?: ThemeColor }) => {
       duration: getRandom(3, 7)
     }));
   });
-
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
-
   if (!isMounted) return <div className="absolute inset-0 bg-black" />;
 
   return (
@@ -151,7 +146,7 @@ const StarField = ({ theme = 'cyan' }: { theme?: ThemeColor }) => {
             scale: [1, 1.05, 1],
           }}
           transition={{
-            duration: 3 + Math.random() * 4,
+            duration: 3 + (i % 6) * 0.65,
             repeat: Infinity,
             ease: "easeInOut",
           }}
@@ -334,7 +329,7 @@ const SpaceShip = ({
 
         {/* Ship Asset */}
         <div className="relative overflow-visible">
-          <img 
+          <Image unoptimized width={800} height={600} 
             src={`${currentPath}?v=2`} 
             alt="Space Traffic"
             className="object-contain"
@@ -519,7 +514,7 @@ const MoonVisual = () => {
         }}
         className="relative z-20 w-72 h-72"
       >
-        <img 
+        <Image unoptimized width={800} height={600} 
           src="/cinematic_moon_asset_qch_1777340494996.webp" 
           alt="Moon"
           className="w-full h-full object-contain"
@@ -553,7 +548,7 @@ const EarthVisual = () => {
         }}
         className="relative z-20 w-80 h-80"
       >
-        <img 
+        <Image unoptimized width={800} height={600} 
           src="/cinematic_earth_asset_qch_1777340390078.webp" 
           alt="Earth"
           className="w-full h-full object-contain"
@@ -587,7 +582,7 @@ const SaturnVisual = () => {
         }}
         className="relative z-20 w-[450px] h-80"
       >
-        <img 
+        <Image unoptimized width={800} height={600} 
           src="/cinematic_saturn_asset_qch_1777340512619.webp" 
           alt="Saturn"
           className="w-full h-full object-contain"
@@ -620,7 +615,7 @@ const MuskVisual = () => (
       }}
       className="relative z-20 w-56 h-56"
     >
-      <img 
+      <Image unoptimized width={800} height={600} 
         src="/cinematic_x_asset_qch_1777340742793.webp" 
         alt="X Logo"
         className="w-full h-full object-contain"
@@ -649,7 +644,7 @@ const BlackHoleVisual = () => {
         }}
         className="relative z-20 w-full h-full p-10"
       >
-        <img 
+        <Image unoptimized width={800} height={600} 
           src="/cinematic_blackhole_asset_qch_1777340542328.webp" 
           alt="Black Hole"
           className="w-full h-full object-contain"
@@ -680,7 +675,7 @@ const SunVisual = () => (
       }}
       className="relative z-20 w-80 h-80"
     >
-      <img 
+      <Image unoptimized width={800} height={600} 
         src="/cinematic_sun_asset_qch_1777340630570.webp" 
         alt="Sun"
         className="w-full h-full object-contain"
@@ -709,7 +704,7 @@ const RobotVisual = () => (
       }}
       className="relative z-20 w-64 h-64"
     >
-      <img 
+      <Image unoptimized width={800} height={600} 
         src="/cinematic_robot_asset_qch_1777340647368.webp" 
         alt="Robot"
         className="w-full h-full object-contain"
@@ -739,7 +734,7 @@ const ChessBoardVisual = () => (
       }}
       className="relative z-20 w-80 h-80"
     >
-      <img 
+      <Image unoptimized width={800} height={600} 
         src="/cinematic_chessboard_asset_qch_1777340695618.webp" 
         alt="Chess Board"
         className="w-full h-full object-contain"
@@ -769,7 +764,7 @@ const AlienVisual = () => (
       }}
       className="relative z-20 w-80 h-80"
     >
-      <img 
+      <Image unoptimized width={800} height={600} 
         src="/cinematic_alien_asset_qch_1777340712376.webp" 
         alt="Alien"
         className="w-full h-full object-contain"
@@ -1041,31 +1036,22 @@ export default function GameHome() {
   const [achievementProgress, setAchievementProgress] = useState<{ [key: string]: number }>({});
   const [isShaking, setIsShaking] = useState(false);
 
-  const [isMounted, setIsMounted] = useState(false);
-  const [randomVisual, setRandomVisual] = useState<React.ReactNode | null>(null);
+  const isMounted = useClientReady();
+  const [randomVisualIndex] = useState(() => (Math.random() > 0.5 ? Math.floor(Math.random() * 9) : -1));
   const [continuePreload, setContinuePreload] = useState<AssetPreloadSummary | null>(null);
 
-  useEffect(() => {
-    if (view === 'landing') {
-      if (Math.random() > 0.5) {
-        const visuals = [
-          <EarthVisual key="earth" />,
-          <MoonVisual key="moon" />,
-          <SaturnVisual key="saturn" />,
-          <MuskVisual key="musk" />,
-          <BlackHoleVisual key="blackhole" />,
-          <SunVisual key="sun" />,
-          <RobotVisual key="robot" />,
-          <ChessBoardVisual key="chess" />,
-          <AlienVisual key="alien" />
-        ];
-        const randomIndex = Math.floor(Math.random() * visuals.length);
-        setRandomVisual(visuals[randomIndex]);
-      } else {
-        setRandomVisual(null);
-      }
-    }
-  }, [view]);
+  const landingVisuals = [
+    <EarthVisual key="earth" />,
+    <MoonVisual key="moon" />,
+    <SaturnVisual key="saturn" />,
+    <MuskVisual key="musk" />,
+    <BlackHoleVisual key="blackhole" />,
+    <SunVisual key="sun" />,
+    <RobotVisual key="robot" />,
+    <ChessBoardVisual key="chess" />,
+    <AlienVisual key="alien" />
+  ];
+  const randomVisual = view === 'landing' && randomVisualIndex >= 0 ? landingVisuals[randomVisualIndex] : null;
 
   // Jukebox Hook
   const jukeboxState = useJukebox();
@@ -1155,9 +1141,6 @@ export default function GameHome() {
       }
     }
 
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setIsMounted(true);
-    
     // Use a small timeout to avoid synchronous setState in effect lint error
     const timer = setTimeout(() => {
       const loadAllData = async () => {
@@ -1727,7 +1710,7 @@ export default function GameHome() {
                   className={`absolute -inset-2 rounded-full border-2 border-transparent ${landingLoaderRing[theme]}`}
                 />
                 <div className="h-20 w-20 overflow-hidden rounded-full bg-black">
-                  <img
+                  <Image unoptimized width={800} height={600}
                     src="/images/bobby_blue/bobby_loader.webp"
                     alt="Bobby Blue"
                     className="h-full w-full object-cover"

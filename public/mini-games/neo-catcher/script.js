@@ -584,11 +584,11 @@ function missItem(item) {
     createScorePopup(item.x, CANVAS_HEIGHT - 28, `-${damage} LIFE`, '#ff4b2b');
 
     if (gameState.health <= 0) {
-        useExtraLifeOrFinish();
+        applyExtraLifeOrFinish();
     }
 }
 
-function useExtraLifeOrFinish() {
+function applyExtraLifeOrFinish() {
     if (gameState.extraLives > 0) {
         gameState.extraLives--;
         gameState.health = EXTRA_LIFE_HEALTH;

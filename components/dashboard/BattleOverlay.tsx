@@ -1,6 +1,7 @@
 'use client';
 
 import React, { memo } from 'react';
+import Image from 'next/image';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Coins, 
@@ -463,7 +464,7 @@ const BattleOverlay = memo(({
                 </AnimatePresence>
 
                 <div className="relative w-48 h-48 flex items-center justify-center">
-                  <img 
+                  <Image unoptimized width={800} height={600} 
                     src={activeBattle.playerImage || '/images/battle/skyring.png'} 
                     alt="Skyring"
                     className="w-full h-full object-contain relative z-10 drop-shadow-[0_0_30px_rgba(6,182,212,0.8)]"
@@ -514,7 +515,7 @@ const BattleOverlay = memo(({
               <div className="relative">
                 <div className="absolute -inset-4 bg-red-500/20 blur-2xl rounded-full animate-pulse" />
                 <div className="relative w-48 h-48 flex items-center justify-center">
-                  <img 
+                  <Image unoptimized width={800} height={600} 
                     src={activeBattle.enemyImage || '/images/battle/enemy_alien.webp'} 
                     alt={activeBattle.enemyName}
                     className="w-full h-full object-contain relative z-10 drop-shadow-[0_0_30px_rgba(239,68,68,0.8)] scale-x-[-1]"
@@ -694,5 +695,7 @@ const BattleOverlay = memo(({
 
   return null;
 });
+
+BattleOverlay.displayName = 'BattleOverlay';
 
 export default BattleOverlay;

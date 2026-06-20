@@ -431,12 +431,12 @@ export const DashboardProvider = ({
     dispatch({ type: 'SET_COMBAT_DATA', payload: { hasWonEliminateEnemiesRoute3: won } });
   }, [dispatch]);
   
-  const earthRestoration = {
+  const earthRestoration = useMemo(() => ({
     atmosphere: earth.atmosphere,
     temperature: earth.temperature,
     hydrosphere: earth.hydrosphere,
     biosphere: earth.biosphere
-  };
+  }), [earth.atmosphere, earth.temperature, earth.hydrosphere, earth.biosphere]);
   const earthProjectBoostCount = earth.projectBoostCount;
   const earthPopulation = earth.population;
   
@@ -449,7 +449,7 @@ export const DashboardProvider = ({
   const [floatingRewards, setFloatingRewards] = React.useState<any[]>([]);
   
   
-  const [activeTab, setActiveTab] = React.useState<string>(() => {
+  const [requestedActiveTab, setActiveTab] = React.useState<string>(() => {
     if (progression.routeTier === 'Void') return 'void_aircraft';
     if (progression.routeTier === 'Earth') return 'colonies';
     return 'routes';
@@ -460,9 +460,7 @@ export const DashboardProvider = ({
     if (progression.routeTier === 'Earth') return 3;
     return 0;
   });
-
-  // Sincroniza a aba ativa quando o tier muda (importante para o carregamento inicial)
-  useEffect(() => {
+  const activeTab = useMemo(() => {
     const validTabsByTier: Record<string, string[]> = {
       Solar: ['routes', 'missions', 'aircraft', 'technology', 'upgrades', 'auto', 'mining', 'history', 'exit'],
       Interstellar: ['routes2', 'missions', 'aircraft', 'technology', 'upgrades', 'auto', 'mining', 'history', 'exit'],
@@ -476,11 +474,10 @@ export const DashboardProvider = ({
       Earth: 'colonies',
     };
     const routeTabs = validTabsByTier[progression.routeTier] || validTabsByTier.Solar;
-
-    if (!routeTabs.includes(activeTab)) {
-      setActiveTab(fallbackTabByTier[progression.routeTier] || 'routes');
-    }
-  }, [activeTab, progression.routeTier]);
+    return routeTabs.includes(requestedActiveTab)
+      ? requestedActiveTab
+      : (fallbackTabByTier[progression.routeTier] || 'routes');
+  }, [requestedActiveTab, progression.routeTier]);
 
   const t = useMemo(() => (key: string): string => {
     return (translations as any)[language]?.[key] || key;
@@ -574,7 +571,7 @@ export const DashboardProvider = ({
       dispatch({ type: 'COMPLETE_MISSION', payload: { id: missionId } });
       // playSfx('success'); // Removed: Causes unwanted noise on state hydration/mount
     }
-  }, [missions.completedInitialMissions, dispatch, playSfx]);
+  }, [missions.completedInitialMissions, dispatch]);
 
   const buyAutoTravelSlot = useCallback((routeId: string) => {
     const currentSlots = progression.autoTravelSlots[routeId] || 0;
@@ -614,7 +611,7 @@ export const DashboardProvider = ({
     playSfx('buying_iten');
     updateHistoryStats('spent', cost, progression.routeTier);
     addLog(t('autoTravelSlotPurchased'), 'success');
-  }, [progression, economy, dispatch, playSfx, addLog, getLocationMultiplier, getEconomicMultipliers, updateHistoryStats, t]);
+  }, [progression, economy, dispatch, playSfx, addLog, getLocationMultiplier, getEconomicMultipliers, updateHistoryStats, completeInitialMission, language, t]);
 
   const buyRoute = useCallback((route: any) => {
     if (economy.qc < (route.unlockCost || 0)) return;
@@ -845,7 +842,7 @@ export const DashboardProvider = ({
     updateHistoryStats('spent', cost, progression.routeTier);
     playSfx('buy');
     addLog(`${t('robotPurchased')} (${ore.name})`, 'success');
-  }, [mining.miningRobots, progression.routeTier, economy.qc, dispatch, playSfx, addLog, t, getEconomicMultipliers, updateHistoryStats]);
+  }, [mining.miningRobots, progression.routeTier, economy.qc, dispatch, playSfx, addLog, t, getEconomicMultipliers, updateHistoryStats, completeInitialMission]);
 
   const upgradeMiningRobot = useCallback((oreId: string) => {
     const ore = ORES_MAP.get(oreId);
@@ -1012,7 +1009,7 @@ export const DashboardProvider = ({
     } else {
       addLog(`Not enough QC for ${translateData(upgrade.name)} upgrade`, 'error');
     }
-  }, [progression.techLevels, progression.autoTravelSlots, progression.routeTier, economy.qc, getEconomicMultipliers, getLocationMultiplier, dispatch, playSfx, addLog, t, updateHistoryStats, translateData]);
+  }, [progression.techLevels, progression.autoTravelSlots, progression.routeTier, economy.qc, getEconomicMultipliers, getLocationMultiplier, dispatch, playSfx, addLog, updateHistoryStats, translateData, completeInitialMission]);
 
   const buyTech = useCallback((level: number) => {
     const tech = TECHNOLOGIES.find(t => t.tier === progression.routeTier && t.level === level);
@@ -1206,7 +1203,7 @@ export const DashboardProvider = ({
         dispatch({ type: 'UPDATE_MISSION', payload: { id: m.id, delta: packs } });
       }
     });
-  }, [mining.extractionPacks, dispatch, playSfx, addLog, t, formatValue, updateHistoryStats, missions]);
+  }, [mining.extractionPacks, mining.extractionCompressionLevels, progression.battleLevel, progression.routeTier, getEconomicMultipliers, dispatch, playSfx, addLog, t, formatValue, updateHistoryStats, missions]);
 
 
 
@@ -1413,13 +1410,13 @@ export const DashboardProvider = ({
     }));
 
     addLog(language === 'pt' ? 'Integridade da nave restaurada!' : 'Ship integrity restored!', 'success');
-  }, [voidBattleShipStats, combat.voidResources, getEffectiveVoidStats, addLog, language, playSfx, dispatch]);
+  }, [voidBattleShipStats, combat.voidResources, getEffectiveVoidStats, addLog, language, playSfx, dispatch, setVoidBattleShipStats]);
 
   const selectVoidBattle = useCallback((enemy: any) => {
     setActiveVoidBattle(enemy);
     setVoidBattleStatus('fighting');
     playSfx('kill_enemys_botton');
-  }, [playSfx]);
+  }, [playSfx, setVoidBattleStatus]);
 
   const startVoidBattle = useCallback(() => {
     setVoidBattleStatus('searching');
@@ -1493,7 +1490,7 @@ export const DashboardProvider = ({
       setVoidBattleStatus('choosing');
       playSfx('success');
     }, 2000);
-  }, [playSfx, progression.battleLevel]);
+  }, [playSfx, progression.battleLevel, setVoidBattleStatus]);
 
   const upgradeVoidBattleShip = useCallback((type: string) => {
     const currentLevel = voidBattleShipStats.upgrades[type as keyof typeof voidBattleShipStats.upgrades];
@@ -1548,7 +1545,7 @@ export const DashboardProvider = ({
     };
     playSfx(sfxMap[type] || 'buy');
     addLog(t('upgradeSuccess'), 'success');
-  }, [voidBattleShipStats, combat.voidResources, addLog, t, playSfx]);
+  }, [voidBattleShipStats, combat.voidResources, addLog, t, playSfx, dispatch, setVoidBattleShipStats]);
 
   const upgradeVoidBattleShipRarity = useCallback(() => {
     const rarities = ['common', 'rare', 'elite', 'legendary', 'mythic'];
@@ -1597,7 +1594,7 @@ export const DashboardProvider = ({
 
     playSfx('epic_battle_ship');
     addLog(t('rarityUpgraded'), 'success');
-  }, [voidBattleShipStats, combat.voidResources, addLog, t, playSfx]);
+  }, [voidBattleShipStats, combat.voidResources, addLog, t, playSfx, dispatch, setVoidBattleShipStats]);
 
   const startVoidMission = useCallback((aircraftId: string) => {
     const aircraft = VOID_AIRCRAFT.find(a => a.id === aircraftId);
@@ -1626,7 +1623,7 @@ export const DashboardProvider = ({
     };
     playSfx(sfxMap[aircraftId] || 'start_engine_1');
     addLog(language === 'pt' ? `${aircraft.name} enviada para busca!` : `${aircraft.name} sent for search!`, 'info');
-  }, [voidAircraftUpgrades, playSfx, addLog, language]);
+  }, [voidAircraftUpgrades, playSfx, addLog, language, dispatch]);
 
   const claimVoidAircraftMission = useCallback((aircraftId: string) => {
     const aircraft = VOID_AIRCRAFT.find(a => a.id === aircraftId);
@@ -1727,7 +1724,7 @@ export const DashboardProvider = ({
 
     playSfx('buy');
     addLog(t('constructionStarted'), 'success');
-  }, [combat.voidResources, t, playSfx, addLog]);
+  }, [combat.voidResources, t, playSfx, addLog, dispatch]);
 
   const speedUpVoidAircraft = useCallback((id: string) => {
     const speedUpCost = id === 'va-2' ? { energy: 10000, qc: 50000 } : { energy: 20000, qc: 100000 };
@@ -1748,7 +1745,7 @@ export const DashboardProvider = ({
 
     playSfx('success');
     addLog(t('constructionSpeedUp'), 'success');
-  }, [combat.voidResources, economy.qc, dispatch, t, playSfx, addLog]);
+  }, [combat.voidResources, economy.qc, dispatch, t, playSfx, addLog, unlockedVoidAircraft]);
 
   const toggleVoidAircraftAuto = useCallback((id: string) => {
     const isActivating = !voidAircraftAutoToggles[id];
@@ -1757,7 +1754,7 @@ export const DashboardProvider = ({
       payload: { aircraftId: id, active: isActivating }
     });
     playSfx(isActivating ? 'open_window' : 'close_window');
-  }, [voidAircraftAutoToggles, playSfx]);
+  }, [voidAircraftAutoToggles, playSfx, dispatch]);
 
   const buyVoidAircraftAuto = useCallback((id: string) => {
     const autoCost = { 'va-1': 50000, 'va-2': 75000, 'va-3': 100000 }[id as 'va-1' | 'va-2' | 'va-3'] || 0;
@@ -1783,7 +1780,7 @@ export const DashboardProvider = ({
 
     playSfx('buy');
     addLog(t('autoUnlocked'), 'success');
-  }, [economy.qc, dispatch, t, playSfx, addLog]);
+  }, [economy.qc, dispatch, t, playSfx, addLog, voidAircraftUpgrades]);
 
   const compactVoidResource = useCallback((resourceKey: string) => {
     const amount = (combat.voidResources as any)[resourceKey];
@@ -1795,7 +1792,7 @@ export const DashboardProvider = ({
     });
     setVoidCompactedResources((prev: any) => ({ ...prev, [resourceKey]: (prev[resourceKey] || 0) + 1 }));
     playSfx('target_up_2');
-  }, [combat.voidResources, setVoidCompactedResources, playSfx]);
+  }, [combat.voidResources, setVoidCompactedResources, playSfx, dispatch]);
 
   const sendCompactedToEarth = useCallback((resourceKey: string) => {
     const amount = (combat.voidCompactedResources as any)[resourceKey];
@@ -1834,7 +1831,7 @@ export const DashboardProvider = ({
 
     playSfx('buy');
     addLog(t('autoShipmentUnlocked'), 'success');
-  }, [economy.qc, combat.voidResources, dispatch, t, playSfx, addLog]);
+  }, [economy.qc, combat.voidResources, dispatch, t, playSfx, addLog, setVoidAutoShipmentUnlocked, setVoidAutoShipmentActive]);
 
   const donateToPOI = useCallback((poiId: string, resourceKey: string, amount: number) => {
     const poi = VOID_POIS.find(p => p.id === poiId);
@@ -1996,7 +1993,8 @@ export const DashboardProvider = ({
     t,
     translateData,
     getEconomicMultipliers,
-    updateHistoryStats
+    updateHistoryStats,
+    completeInitialMission
   ]);
 
   const buyAllUpgradesForShip = useCallback((locationId: string) => {
@@ -2455,8 +2453,34 @@ export const DashboardProvider = ({
     toggleFatigue,
     totalDeliveries,
     deliveriesByLocation,
-    combat.voidResources,
-    combat.voidCompactedResources
+    battleNotification,
+    buyAutoTravelSlot,
+    donateToTerraProject,
+    formatTime,
+    gameLogs,
+    getPOIProgress,
+    setAutoClaimMissions,
+    setEarthPopulation,
+    setHasWonEliminateEnemiesRoute3,
+    setMissionRewardLevel,
+    setRadarUnlocked,
+    setUnlockedVoidAircraft,
+    setVoidAircraftAutoToggles,
+    setVoidAircraftConstruction,
+    setVoidAircraftMissions,
+    setVoidAircraftUpgrades,
+    setVoidAutoShipmentActive,
+    setVoidAutoShipmentUnlocked,
+    setVoidBattleShipStats,
+    setVoidBattleStatus,
+    setVoidCompactedResources,
+    setVoidDonationModes,
+    setVoidPOIQCDonations,
+    setVoidWarProgress,
+    stopSfx,
+    toggleAutoSkipRandomBattles,
+    toggleAutoTravel,
+    totalProjectTerra,
   ]);
 
   return (

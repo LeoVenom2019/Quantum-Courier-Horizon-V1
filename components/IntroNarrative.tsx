@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
+import Image from 'next/image';
 import { motion, AnimatePresence } from 'motion/react';
 import { Language, t } from '@/lib/i18n';
 import { Rocket, ShieldCheck, ArrowRight, X, Sparkles } from 'lucide-react';
@@ -171,8 +172,7 @@ export const IntroNarrative = ({
   const { playSfx } = useSFX(sfxOn);
   const [index, setIndex] = useState(0);
   const [showPlayerId, setShowPlayerId] = useState(false);
-  const [isTyping, setIsTyping] = useState(true);
-  const [charCount, setCharCount] = useState(0);
+  const [typingState, setTypingState] = useState({ key: '', charCount: 0 });
   const [isLoading, setIsLoading] = useState(false);
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [loadingStatus, setLoadingStatus] = useState("");
@@ -184,35 +184,33 @@ export const IntroNarrative = ({
   const loadingUnsubscribeRef = useRef<(() => void) | null>(null);
 
   const currentText = STORY_TEXT[index] ? t(language, STORY_TEXT[index].en, STORY_TEXT[index].pt) : "";
+  const typingKey = `${index}:${language}`;
+  const charCount = typingState.key === typingKey ? typingState.charCount : 0;
+  const isTyping = index < STORY_TEXT.length && charCount < currentText.length;
   const displayedText = currentText.slice(0, charCount);
 
   useEffect(() => {
-    if (index < STORY_TEXT.length) {
-      setIsTyping(true);
-      setCharCount(0);
-    }
-  }, [index, language]);
+    if (index >= STORY_TEXT.length) return;
 
-  useEffect(() => {
-    if (index < STORY_TEXT.length) {
-      if (charCount < currentText.length) {
-        const timer = setTimeout(() => {
-          setCharCount(prev => prev + 1);
-        }, 30);
-        return () => clearTimeout(timer);
-      } else {
-        setIsTyping(false);
-        const nextTimer = setTimeout(() => {
-          if (index < STORY_TEXT.length - 1) {
-            setIndex(prev => prev + 1);
-          } else {
-            setShowPlayerId(true);
-          }
-        }, 3000);
-        return () => clearTimeout(nextTimer);
-      }
+    if (charCount < currentText.length) {
+      const timer = setTimeout(() => {
+        setTypingState(prev => ({
+          key: typingKey,
+          charCount: prev.key === typingKey ? prev.charCount + 1 : 1,
+        }));
+      }, 30);
+      return () => clearTimeout(timer);
     }
-  }, [index, charCount, currentText.length]);
+
+    const nextTimer = setTimeout(() => {
+      if (index < STORY_TEXT.length - 1) {
+        setIndex(prev => prev + 1);
+      } else {
+        setShowPlayerId(true);
+      }
+    }, 3000);
+    return () => clearTimeout(nextTimer);
+  }, [index, charCount, currentText.length, typingKey]);
 
   // Cleanup loading timeout on unmount
   useEffect(() => {
@@ -528,7 +526,7 @@ export const IntroNarrative = ({
                     className="absolute left-8 bottom-2 w-24 h-16 bg-gradient-to-br from-[#1e1e26] to-[#0a0a0f] border border-white/10 rounded-lg shadow-[0_10px_20px_rgba(0,0,0,0.4)] flex items-center justify-center overflow-hidden hover:scale-105 transition-all duration-500 cursor-default z-20 group"
                   >
                     <div className="absolute inset-0 bg-gradient-to-tr from-white/5 via-transparent to-transparent opacity-50" />
-                    <img 
+                    <Image unoptimized width={800} height={600} 
                       src="/images/ui/alien_wait.webp" 
                       alt="Alien Wait Badge" 
                       className="w-20 h-12 object-contain filter drop-shadow-[0_0_8px_rgba(0,0,0,0.5)] group-hover:drop-shadow-[0_0_12px_rgba(255,255,255,0.2)] transition-all"
@@ -635,7 +633,7 @@ export const IntroNarrative = ({
               }}
               className="relative w-96 h-96"
             >
-              <img 
+              <Image unoptimized width={800} height={600} 
                 src="/images/ui/alien_wait.webp" 
                 alt="Alien Easter Egg" 
                 className="w-full h-full object-contain drop-shadow-[0_0_30px_rgba(6,182,212,0.8)]"

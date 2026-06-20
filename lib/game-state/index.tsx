@@ -42,7 +42,9 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   // Auto-save: mantém uma ref do estado atual para ser acessível
   // nos setInterval sem stale closure
   const stateRef = useRef(state);
-  stateRef.current = state;
+  useEffect(() => {
+    stateRef.current = state;
+  }, [state]);
 
   return (
     <GameContext.Provider value={{ state, dispatch }}>

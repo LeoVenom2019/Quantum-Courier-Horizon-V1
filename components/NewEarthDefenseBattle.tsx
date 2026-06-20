@@ -5,7 +5,7 @@ import { X } from 'lucide-react';
 import { BattleShipComputedStats, getHorizonXpForNextLevel, MAX_HORIZON_LEVEL } from '@/lib/colony-cards';
 import { PremiumCanvasButton } from './ui/PremiumCanvasButton';
 
-type DefenseSpecialId = 'apocalypse-laser' | 'hellfire-barrage' | 'thor-oath' | 'special-slot-4';
+export type DefenseSpecialId = 'apocalypse-laser' | 'hellfire-barrage' | 'thor-oath' | 'special-slot-4';
 type EnemyKind = 'common-ship' | 'elite-ship' | 'boss-ship' | 'monster-1' | 'monster-2';
 type LaserState = 'idle' | 'charge' | 'firing' | 'collapse';
 type ThorPhase = 'idle' | 'prelude' | 'small' | 'big' | 'ending' | 'collapse';
@@ -13,6 +13,12 @@ type HellfireSequence = {
   active: boolean;
   remaining: number;
   waitingForImpact: boolean;
+};
+
+type SpecialHudSnapshot = {
+  now: number;
+  effectActive: boolean;
+  cooldowns: Record<string, number>;
 };
 
 const REGULAR_ENEMIES_BEFORE_FINAL_BOSS = 20;
@@ -41,6 +47,7 @@ export interface BattleResultSummary {
   xp: number;
   qc: number;
   levelUpSfxHandled?: boolean;
+  perfect?: boolean;
 }
 
 type EnemyStatus = {
@@ -514,7 +521,10 @@ const SPECIAL_LABEL: Record<DefenseSpecialId, Record<'en' | 'pt', string>> = {
 
 const HORIZON_LASER_DAMAGE_INTERVAL = 1000 / 3;
 const HORIZON_LASER_DAMAGE_RADIUS = 72;
-const HORIZON_LASER_DAMAGE_MULTIPLIER = 1.85;
+const HORIZON_LASER_DAMAGE_MULTIPLIER = 3.7;
+const HORIZON_LASER_FINAL_EXPLOSION_MULTIPLIER = 30;
+const HORIZON_BARRAGE_DAMAGE_MULTIPLIER = 3.6;
+const HORIZON_BARRAGE_AREA_DAMAGE_MULTIPLIER = 2;
 const HORIZON_SPECIAL_BASE_COOLDOWN = 60000;
 const HORIZON_SPECIAL_MIN_COOLDOWN = 3000;
 
@@ -913,6 +923,7 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
     result: '' as 'victory' | 'defeat' | '',
   });
   const [horizonHud, setHorizonHud] = useState({ level: horizonLevel, currentXp: horizonXp, nextXp: horizonNextXp });
+  const [specialHud, setSpecialHud] = useState<SpecialHudSnapshot>({ now: 0, effectActive: false, cooldowns: {} });
   const [result, setResult] = useState<'victory' | 'defeat' | ''>('');
   const [resultVisible, setResultVisible] = useState(false);
   const [resultBackground, setResultBackground] = useState('');
@@ -921,14 +932,18 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
   const difficultyLabel = getDefenseDifficultyLabel(currentDefenseBattleLevel, language);
 
   useEffect(() => {
-    setResultVisible(false);
-    if (!result) {
-      setResultBackground('');
-      return;
-    }
+    const timer = window.setTimeout(() => {
+      setResultVisible(false);
+      if (!result) {
+        setResultBackground('');
+        return;
+      }
 
-    setResultBackground(result === 'victory' ? pick(RESULT_VICTORY_BACKGROUNDS) : RESULT_DEFEAT_BACKGROUND);
-    setResultVisible(true);
+      setResultBackground(result === 'victory' ? pick(RESULT_VICTORY_BACKGROUNDS) : RESULT_DEFEAT_BACKGROUND);
+      setResultVisible(true);
+    }, 0);
+
+    return () => window.clearTimeout(timer);
   }, [result]);
 
   useEffect(() => {
@@ -1082,7 +1097,7 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
     state.cinematic = { active: false, target: '', x: WIDTH / 2, y: HEIGHT / 2, start: 0, duration: RESULT_MODAL_DELAY_MS };
     horizonProgressRef.current = { level: horizonLevel, currentXp: horizonXp, nextXp: horizonNextXp };
     levelUpSfxHandledRef.current = false;
-    setHorizonHud({ level: horizonLevel, currentXp: horizonXp, nextXp: horizonNextXp });
+    window.setTimeout(() => setHorizonHud({ level: horizonLevel, currentXp: horizonXp, nextXp: horizonNextXp }), 0);
     playLoopSound(AIRPLANE_PLAYER_ENGINE_SOUND, 0.42);
 
     const spawnFloat = (x: number, y: number, text: string, color: string, options?: { life?: number; size?: number; shadowColor?: string }) => {
@@ -1098,6 +1113,17 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
         size: options?.size ?? (text.includes('CRIT') ? 18 : 14),
         shadowColor: options?.shadowColor,
       });
+    };
+
+    const updateSpecialHud = (now: number) => {
+      const effectActive = state.laserState !== 'idle'
+        || state.hellfireSequence.active
+        || state.thorPhase !== 'idle'
+        || state.blizzard.active
+        || state.blizzard.coverAlpha > 0.01
+        || state.blizzardIceBlocks.length > 0
+        || state.blizzardShockwaves.length > 0;
+      setSpecialHud({ now, effectActive, cooldowns: { ...state.specialCooldowns } });
     };
 
     const awardHorizonXp = (amount: number) => {
@@ -2680,7 +2706,7 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
       const dy = targetY - startY;
       const length = Math.max(1, Math.sqrt(dx * dx + dy * dy));
       const speed = 7.1;
-      const damagePayload = createSpecialDamagePayload(1.8, { fire: 25 });
+      const damagePayload = createSpecialDamagePayload(HORIZON_BARRAGE_DAMAGE_MULTIPLIER, { fire: 25 });
       playSound(PLAYER_SOUNDS.hellfireShoot, 0.62);
       state.projectiles.push({
         id: state.nextId++,
@@ -2718,6 +2744,9 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
       if ((state.specialCooldowns[specialId] || 0) > now) return;
       if (anySpecialActive) return;
       state.specialCooldowns[specialId] = now + cooldown;
+      window.dispatchEvent(new CustomEvent('qch:new-earth-achievement-metric', {
+        detail: { type: 'special-used', specialId, amount: 1 },
+      }));
 
       if (specialId === 'apocalypse-laser') {
         const start = getLaserStart();
@@ -2906,6 +2935,25 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
         const end = getLaserEnd();
         state.laserImpactPos = end;
         state.laserShake = 26;
+        const finalExplosionRadius = 400;
+        const finalExplosionPayload = createSpecialDamagePayload(HORIZON_LASER_FINAL_EXPLOSION_MULTIPLIER);
+        state.enemies.forEach(enemy => {
+          const distance = Math.hypot(enemy.x - end.x, enemy.y - end.y);
+          if (enemy.hp <= 0 || distance > finalExplosionRadius + enemy.radius) return;
+          const baseDamage = finalExplosionPayload.crit
+            ? finalExplosionPayload.damage * shipStats.critMultiplier
+            : finalExplosionPayload.damage;
+          damageEnemyHull(enemy, baseDamage);
+          const elementalDamage = applyElementalDamage(enemy, finalExplosionPayload.elemental, now, isMonsterKind(enemy.kind));
+          const totalDamage = baseDamage + elementalDamage;
+          spawnFloat(
+            enemy.x + (Math.random() * 24 - 12),
+            enemy.y - 28,
+            `${finalExplosionPayload.crit ? 'CRIT ' : ''}${Math.round(totalDamage)} EXP`,
+            finalExplosionPayload.crit ? '#facc15' : '#f0abfc',
+            { life: 78, size: finalExplosionPayload.crit ? 23 : 18, shadowColor: 'rgba(240,171,252,0.75)' }
+          );
+        });
         state.shockwaves.push({ x: end.x, y: end.y, life: 1, maxRadius: 720, color: 'rgba(210,240,255,0.58)' });
         state.shockwaves.push({ x: end.x, y: end.y, life: 1, maxRadius: 520, color: 'rgba(34,211,238,0.72)' });
         for (let i = 0; i < 72; i++) {
@@ -4677,7 +4725,7 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
                 state.hellfireSequence.remaining -= 1;
                 state.hellfireSequence.waitingForImpact = false;
                 const explosionRadius = 140;
-                const areaDamage = shipStats.damage;
+                const areaDamage = shipStats.damage * HORIZON_BARRAGE_AREA_DAMAGE_MULTIPLIER;
                 state.enemies.forEach(otherEnemy => {
                   if (otherEnemy !== enemy && otherEnemy.hp > 0) {
                     const odx = otherEnemy.x - enemy.x;
@@ -4787,6 +4835,7 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
         return;
       }
 
+      updateSpecialHud(now);
       draw();
       setHud({ hp: p.hp, shield: p.shield, kills: state.regularEnemiesDefeated, earnedXp: state.earnedXp, earnedQc: state.earnedQc, enemies: state.enemies.length, ended: false, result: '' });
       rafRef.current = requestAnimationFrame(loop);
@@ -4801,7 +4850,7 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
       canvas?.removeEventListener('click', handleCanvasClick);
       stopAllBattleSounds();
     };
-  }, [shipStats, specials, horizonLevel, horizonMaxLevel, trinityShotEnabled, currentDefenseBattleLevel]);
+  }, [shipStats, specials, horizonLevel, horizonXp, horizonNextXp, horizonMaxLevel, trinityShotEnabled, currentDefenseBattleLevel]);
 
   const finishResult = () => {
     if (result === 'victory') {
@@ -4811,6 +4860,7 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
         xp: hud.earnedXp,
         qc: hud.earnedQc,
         levelUpSfxHandled: levelUpSfxHandledRef.current,
+        perfect: stateRef.current.player.hp >= shipStats.health && stateRef.current.player.shield >= shipStats.shield,
       });
       return;
     }
@@ -4822,25 +4872,16 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
   const safeHorizonMaxLevel = Math.max(1, Math.min(MAX_HORIZON_LEVEL, Math.floor(Number(horizonMaxLevel) || MAX_HORIZON_LEVEL)));
   const isHorizonAtMaxLevel = horizonHud.level >= safeHorizonMaxLevel || horizonHud.nextXp <= 0;
   const xpPercent = isHorizonAtMaxLevel ? 100 : Math.min(100, (horizonHud.currentXp / horizonHud.nextXp) * 100);
-  const specialHudNow = typeof performance !== 'undefined' ? performance.now() : Date.now();
-  const specialHudState = stateRef.current;
-  const specialEffectActive = specialHudState.laserState !== 'idle'
-    || specialHudState.hellfireSequence.active
-    || specialHudState.thorPhase !== 'idle'
-    || specialHudState.blizzard.active
-    || specialHudState.blizzard.coverAlpha > 0.01
-    || specialHudState.blizzardIceBlocks.length > 0
-    || specialHudState.blizzardShockwaves.length > 0;
   const getSpecialButtonState = (specialId?: DefenseSpecialId) => {
-    const remainingMs = specialId ? Math.max(0, (specialHudState.specialCooldowns[specialId] || 0) - specialHudNow) : 0;
+    const remainingMs = specialId ? Math.max(0, (specialHud.cooldowns[specialId] || 0) - specialHud.now) : 0;
     const cooldownSeconds = Math.ceil(remainingMs / 1000);
     return {
-      disabled: !specialId || specialEffectActive || remainingMs > 0,
+      disabled: !specialId || specialHud.effectActive || remainingMs > 0,
       label: !specialId
         ? t('Empty', 'Vazio')
         : remainingMs > 0
         ? `${cooldownSeconds}s`
-        : specialEffectActive
+        : specialHud.effectActive
           ? t('Active', 'Ativo')
           : t('Ready', 'Pronto'),
     };
@@ -5047,3 +5088,4 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
 };
 
 export default NewEarthDefenseBattle;
+

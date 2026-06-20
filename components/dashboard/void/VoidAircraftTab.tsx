@@ -466,4 +466,6 @@ const VoidAircraftTab = memo(() => {
   );
 });
 
+VoidAircraftTab.displayName = 'VoidAircraftTab';
+
 export default VoidAircraftTab;

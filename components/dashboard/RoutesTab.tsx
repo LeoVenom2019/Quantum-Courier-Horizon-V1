@@ -296,4 +296,6 @@ const RoutesTab = memo(() => {
   );
 });
 
+RoutesTab.displayName = 'RoutesTab';
+
 export default RoutesTab;

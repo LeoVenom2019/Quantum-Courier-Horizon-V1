@@ -1,9 +1,18 @@
 @import "tailwindcss";
 
+@font-face {
+  font-family: 'Caveat';
+  src: url('/fonts/Caveat-Bold.ttf') format('truetype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
 @theme {
   --font-orbitron: "Exo 2", sans-serif;
   --font-sans: "Inter", sans-serif;
   --font-title: "Audiowide", sans-serif;
+  --font-handwriting: "Caveat", cursive;
   --animate-gradient: gradient 2s linear infinite;
   --animate-scan: scan 2s infinite;
   --animate-gaming-rgb: gaming-rgb 3s linear infinite;

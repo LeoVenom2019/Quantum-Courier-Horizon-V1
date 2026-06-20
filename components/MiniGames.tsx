@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import Image from 'next/image';
 import { motion, AnimatePresence } from 'motion/react';
 import { Clock, Gamepad2, Play, Info, X, ChevronLeft, ChevronRight, Sparkles, Trophy } from 'lucide-react';
 import { MINI_GAMES_CONFIG } from '@/lib/mini-games-config';
@@ -146,16 +147,16 @@ export const MiniGames: React.FC<MiniGamesProps> = ({ onGameSelect, language, ar
     ? wildcardCards.findIndex(card => card.id === selectedWildcardCard.id)
     : -1;
 
-  const formatArcadePoints = (value: number) => (
+  const formatArcadePoints = React.useCallback((value: number) => (
     value > 0 ? value.toLocaleString(language === 'pt' ? 'pt-BR' : 'en-US') : '--'
-  );
+  ), [language]);
 
-  const formatArcadeTime = (seconds: number) => {
+  const formatArcadeTime = React.useCallback((seconds: number) => {
     if (!Number.isFinite(seconds) || seconds <= 0) return '--:--';
     const minutes = Math.floor(seconds / 60);
     const remainder = Math.floor(seconds % 60);
     return `${String(minutes).padStart(2, '0')}:${String(remainder).padStart(2, '0')}`;
-  };
+  }, []);
 
   const scorePanelItems = React.useMemo(() => (
     MINI_GAMES_CONFIG.map(game => {
@@ -175,7 +176,7 @@ export const MiniGames: React.FC<MiniGamesProps> = ({ onGameSelect, language, ar
         color: ARCADE_GLOW_THEMES[game.id]?.primary || '#22d3ee',
       };
     })
-  ), [arcadeScores, language]);
+  ), [arcadeScores, formatArcadePoints, formatArcadeTime, language]);
 
   React.useEffect(() => {
     const timer = window.setInterval(() => {
@@ -353,7 +354,7 @@ export const MiniGames: React.FC<MiniGamesProps> = ({ onGameSelect, language, ar
             contentClassName="gap-3 px-3 py-2"
           >
             <div className="relative h-12 w-9 overflow-hidden rounded-md border border-white/20 bg-black">
-              <img src={WILDCARD_ICON_SRC} alt="" className="h-full w-full object-cover" />
+              <Image unoptimized width={800} height={600} src={WILDCARD_ICON_SRC} alt="" className="h-full w-full object-cover" />
             </div>
             <div className="relative text-left">
               <p className="font-mono text-[8px] uppercase tracking-[0.28em] text-fuchsia-200">{language === 'pt' ? 'Cartas' : 'Cards'}</p>
@@ -398,7 +399,7 @@ export const MiniGames: React.FC<MiniGamesProps> = ({ onGameSelect, language, ar
 
       {/* Grid Container */}
       <div className="relative flex-1 overflow-hidden rounded-[1.75rem] border border-white/5 bg-black/70 pb-6 shadow-[inset_0_0_80px_rgba(0,0,0,0.72)]">
-        <img
+        <Image unoptimized width={800} height={600}
           src={ARCADE_BACKGROUND_SRC}
           alt=""
           aria-hidden="true"
@@ -506,7 +507,7 @@ export const MiniGames: React.FC<MiniGamesProps> = ({ onGameSelect, language, ar
             animate={{ opacity: 1, scale: 1 }}
             className="relative w-full max-w-5xl overflow-hidden rounded-3xl border border-fuchsia-300/35 bg-zinc-950/95 p-6 shadow-[0_0_70px_rgba(217,70,239,0.22)]"
           >
-            <img src="/assets/rota4/cards/window_bg_gamer.png" alt="" className="absolute inset-0 h-full w-full object-cover opacity-25" />
+            <Image unoptimized width={800} height={600} src="/assets/rota4/cards/window_bg_gamer.png" alt="" className="absolute inset-0 h-full w-full object-cover opacity-25" />
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_10%,rgba(34,211,238,0.18),transparent_32%),radial-gradient(circle_at_80%_20%,rgba(217,70,239,0.16),transparent_34%),linear-gradient(135deg,rgba(250,204,21,0.08),transparent_42%)]" />
             <div className="relative mb-5 flex items-start justify-between gap-4">
               <div>
@@ -580,13 +581,13 @@ export const MiniGames: React.FC<MiniGamesProps> = ({ onGameSelect, language, ar
                   >
                     {owned && (
                       <>
-                        <img src="/assets/rota4/cards/card_bg_gamer.png" alt="" className="absolute inset-0 h-full w-full object-cover opacity-20 group-hover:opacity-30 transition-opacity" />
+                        <Image unoptimized width={800} height={600} src="/assets/rota4/cards/card_bg_gamer.png" alt="" className="absolute inset-0 h-full w-full object-cover opacity-20 group-hover:opacity-30 transition-opacity" />
                         <div className="absolute inset-0 bg-fuchsia-300/10" />
                       </>
                     )}
                     <div className="flex gap-3 relative z-10">
                       <div className="h-28 w-20 shrink-0 overflow-hidden rounded-lg border border-white/15 bg-black">
-                        <img src={WILDCARD_CARD_BACKGROUND_SRC} alt="" className="h-full w-full object-cover" />
+                        <Image unoptimized width={800} height={600} src={WILDCARD_CARD_BACKGROUND_SRC} alt="" className="h-full w-full object-cover" />
                       </div>
                       <div className="min-w-0">
                         <p className="font-mono text-[9px] uppercase tracking-[0.26em] text-cyan-200">{owned ? (language === 'pt' ? 'Obtida' : 'Owned') : (language === 'pt' ? 'Bloqueada' : 'Locked')}</p>
@@ -624,7 +625,7 @@ export const MiniGames: React.FC<MiniGamesProps> = ({ onGameSelect, language, ar
                     exit={{ scale: 0.94, y: 12 }}
                     className="relative grid h-[min(720px,calc(100vh-2rem))] w-full max-w-5xl gap-8 overflow-hidden rounded-3xl border border-fuchsia-200/45 bg-zinc-950 p-6 pt-16 shadow-[0_0_80px_rgba(217,70,239,0.28)] md:grid-cols-[360px_minmax(0,1fr)] md:grid-rows-[1fr]"
                   >
-                    <img src="/assets/rota4/cards/window_bg_gamer.png" alt="" className="absolute inset-0 h-full w-full object-cover opacity-25" />
+                    <Image unoptimized width={800} height={600} src="/assets/rota4/cards/window_bg_gamer.png" alt="" className="absolute inset-0 h-full w-full object-cover opacity-25" />
                     <div className="absolute inset-0 bg-[radial-gradient(circle_at_25%_12%,rgba(34,211,238,0.18),transparent_34%),radial-gradient(circle_at_86%_20%,rgba(217,70,239,0.16),transparent_36%),linear-gradient(135deg,rgba(250,204,21,0.08),transparent_46%)]" />
                     {wildcardCards.length > 1 && (
                       <div className="absolute left-5 top-4 z-10 flex items-center gap-2 rounded-full border border-white/10 bg-black/65 p-1 shadow-[0_0_22px_rgba(0,0,0,0.35)]">
@@ -664,7 +665,7 @@ export const MiniGames: React.FC<MiniGamesProps> = ({ onGameSelect, language, ar
                     </PremiumCanvasButton>
 
                     <div className="relative self-center justify-self-start aspect-[2/3] w-full max-w-[320px] overflow-hidden rounded-[4%] border border-white/20 bg-black shadow-[0_0_48px_rgba(217,70,239,0.18)]">
-                      <img src={WILDCARD_CARD_BACKGROUND_SRC} alt="" className="absolute inset-0 h-full w-full object-cover" />
+                      <Image unoptimized width={800} height={600} src={WILDCARD_CARD_BACKGROUND_SRC} alt="" className="absolute inset-0 h-full w-full object-cover" />
                       <div className="absolute inset-[8%] rounded-[8%] bg-gradient-to-b from-black/8 via-black/10 to-black/38" />
                       <div className="absolute bottom-[24%] left-[11%] right-[18%] space-y-2">
                         <div className="inline-flex rounded-full border border-fuchsia-300/45 bg-zinc-950/88 px-2 py-0.5 font-mono text-[9px] uppercase tracking-widest text-fuchsia-100">

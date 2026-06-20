@@ -8,6 +8,7 @@ import {
   CheckCircle2, 
   Coins, 
   Sword, 
+  Shield,
   Bot, 
   Globe, 
   Cpu, 
@@ -113,7 +114,7 @@ export const AchievementsModal: React.FC<AchievementsModalProps> = ({
                           : 'bg-white/5 border-white/10 text-slate-600'
                       }`}>
                         {(() => {
-                          const icons: any = { CheckCircle2, Coins, Sword, Bot, Globe, Cpu, Skull, Rocket, TrendingUp, Zap, HistoryIcon };
+                          const icons: any = { CheckCircle2, Coins, Sword, Shield, Bot, Globe, Cpu, Skull, Rocket, TrendingUp, Zap, HistoryIcon };
                           const Icon = icons[achievement.icon] || Trophy;
                           return <Icon className="w-6 h-6" />;
                         })()}

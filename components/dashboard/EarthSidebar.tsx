@@ -93,6 +93,17 @@ const cleanEventText = (value: unknown) => String(value || '')
 const RECENT_EVENTS_LIMIT = 4;
 const COMMON_EVENT_VISIBLE_MS = 30 * 1000;
 const PERMANENT_EVENTS_PER_PAGE = 4;
+let currentTimestamp = 0;
+const subscribeToSecond = (onStoreChange: () => void) => {
+  currentTimestamp = Date.now();
+  const interval = window.setInterval(() => {
+    currentTimestamp = Date.now();
+    onStoreChange();
+  }, 1000);
+  return () => window.clearInterval(interval);
+};
+const getCurrentTimestamp = () => currentTimestamp;
+const getServerTimestamp = () => 0;
 
 interface EarthSidebarProps {
   earthReconstructionProgress: { [key: string]: number };
@@ -121,25 +132,14 @@ const EarthSidebar: React.FC<EarthSidebarProps> = ({
 }) => {
   const [showPermanentHistory, setShowPermanentHistory] = React.useState(false);
   const [permanentHistoryPage, setPermanentHistoryPage] = React.useState(0);
-  const [recentEventClock, setRecentEventClock] = React.useState(Date.now());
+  const recentEventClock = React.useSyncExternalStore(subscribeToSecond, getCurrentTimestamp, getServerTimestamp);
   const totalProgress = Object.values(earthReconstructionProgress).reduce((a, b: any) => a + (typeof b === 'number' ? b : 0), 0) / 5;
   const isComplete = totalProgress >= 100;
   
   // Safety check: ensure earthEvents is an array
-  const safeEarthEvents = Array.isArray(earthEvents) ? earthEvents : [];
-  React.useEffect(() => {
-    const hasVisibleCommonEvent = safeEarthEvents.some((event: any) => (
-      !event?.permanent
-      && !event?.isFixed
-      && (event?.importance || 'important') === 'important'
-      && typeof event?.timestamp === 'number'
-      && recentEventClock - event.timestamp < COMMON_EVENT_VISIBLE_MS
-    ));
-    if (!hasVisibleCommonEvent) return;
-
-    const interval = window.setInterval(() => setRecentEventClock(Date.now()), 1000);
-    return () => window.clearInterval(interval);
-  }, [recentEventClock, safeEarthEvents]);
+  const safeEarthEvents = React.useMemo(() => (
+    Array.isArray(earthEvents) ? earthEvents : []
+  ), [earthEvents]);
 
   const seenRecentArcadeKeys = new Set<string>();
   const isPermanentMilestone = (event: any) => (
