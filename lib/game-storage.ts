@@ -269,15 +269,24 @@ export const GameStorage = {
         return sanitizedLocalData;
       }
 
+      // FIX: Always try to resolve supplemental keys from the embedded main save BEFORE
+      // falling through to the cloud fetch. This is critical for import/restore flows
+      // where localStorage was just cleared: the main save is already written but the
+      // individual supplemental keys haven't been written yet (or were just cleared).
       if (isColonySupplementalKey) {
         const mainSaveRaw = localStorage.getItem(MAIN_SAVE_KEY);
         if (mainSaveRaw) {
-          const mainSave = sanitizeSave(JSON.parse(mainSaveRaw));
-          const supplemental = getSupplementalSaveFromMainSave(mainSave, key as ColonySaveStorageKey);
-          const merged = mergeSupplementalSaveValue(key as ColonySaveStorageKey, parsedLocalData, supplemental);
-          if (merged !== null && merged !== undefined) {
-            localStorage.setItem(key, JSON.stringify(merged));
-            return merged;
+          try {
+            const mainSave = sanitizeSave(JSON.parse(mainSaveRaw));
+            const supplemental = getSupplementalSaveFromMainSave(mainSave, key as ColonySaveStorageKey);
+            const merged = mergeSupplementalSaveValue(key as ColonySaveStorageKey, parsedLocalData, supplemental);
+            if (merged !== null && merged !== undefined) {
+              // Write resolved value back to localStorage so subsequent reads are fast
+              localStorage.setItem(key, JSON.stringify(merged));
+              return merged;
+            }
+          } catch {
+            // Corrupt main save - fall through to cloud fetch
           }
         }
       }

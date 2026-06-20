@@ -13,7 +13,7 @@ import { useSFX } from '@/hooks/useSFX';
 import { useSoundMaster } from '@/hooks/useSoundMaster';
 import { HorizonRadioModal } from '@/components/HorizonRadioModal';
 import { GameStorage } from '@/lib/game-storage';
-import { COLONY_SAVE_STORAGE_KEYS, SaveManager } from '@/lib/save-manager';
+import { COLONY_SAVE_STORAGE_KEYS, SaveManager, sanitizeSave } from '@/lib/save-manager';
 import { Language, t } from '@/lib/i18n';
 import { ThemeColor } from '@/lib/game-data';
 import {
@@ -1037,7 +1037,7 @@ export default function GameHome() {
   const [isShaking, setIsShaking] = useState(false);
 
   const isMounted = useClientReady();
-  const [randomVisualIndex] = useState(() => (Math.random() > 0.5 ? Math.floor(Math.random() * 9) : -1));
+  const [randomVisualIndex, setRandomVisualIndex] = useState(-1);
   const [continuePreload, setContinuePreload] = useState<AssetPreloadSummary | null>(null);
 
   const landingVisuals = [
@@ -1051,7 +1051,12 @@ export default function GameHome() {
     <ChessBoardVisual key="chess" />,
     <AlienVisual key="alien" />
   ];
-  const randomVisual = view === 'landing' && randomVisualIndex >= 0 ? landingVisuals[randomVisualIndex] : null;
+  useEffect(() => {
+    if (!isMounted) return;
+    setRandomVisualIndex(Math.random() > 0.5 ? Math.floor(Math.random() * landingVisuals.length) : -1);
+  }, [isMounted, landingVisuals.length]);
+
+  const randomVisual = isMounted && view === 'landing' && randomVisualIndex >= 0 ? landingVisuals[randomVisualIndex] : null;
 
   // Jukebox Hook
   const jukeboxState = useJukebox();
@@ -1343,13 +1348,26 @@ export default function GameHome() {
     reader.onload = async (e) => {
       try {
         const data = JSON.parse(e.target?.result as string);
-        if (data.time_travel_save) await GameStorage.save(data.time_travel_save, 'time_travel_save');
+        const importedMainSave = data.time_travel_save ? sanitizeSave(data.time_travel_save) : null;
+        if (!importedMainSave) return;
+
+        for (const key of resetStorageKeys) {
+          localStorage.removeItem(key);
+        }
+        sessionStorage.clear();
+
+        await GameStorage.save(importedMainSave, 'time_travel_save');
+
+        const embeddedStorage = importedMainSave.colony_system?.storage || {};
         for (const key of COLONY_SAVE_STORAGE_KEYS) {
           if (Object.prototype.hasOwnProperty.call(data, key)) {
             await GameStorage.save(data[key], key);
+          } else if (Object.prototype.hasOwnProperty.call(embeddedStorage, key)) {
+            await GameStorage.save(embeddedStorage[key], key);
           }
         }
-        if (data.qch_secret_alien_name_unlocked === true) {
+
+        if (data.qch_secret_alien_name_unlocked === true || importedMainSave.global?.secretAlienNameUnlocked === true) {
           localStorage.setItem('qch_secret_alien_name_unlocked', 'true');
         }
         

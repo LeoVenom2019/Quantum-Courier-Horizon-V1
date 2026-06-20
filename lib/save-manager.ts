@@ -187,6 +187,10 @@ const getHorizonLevelFromXp = (xp = 0) => {
 
 const getFlatOrStorageValue = (flatData: any, flatKey: string, storageKey: ColonySaveStorageKey, fallback: any) => {
   if (flatData?.[flatKey] !== undefined) return flatData[flatKey];
+  if (flatData?.storage && Object.prototype.hasOwnProperty.call(flatData.storage, storageKey)) {
+    return flatData.storage[storageKey];
+  }
+  if (flatData?._skipLocalStorage) return fallback;
   const stored = safeParseLocalStorage(storageKey);
   return stored !== undefined ? stored : fallback;
 };
@@ -829,13 +833,13 @@ export const SaveManager = {
   }
 };
 
-export const getDefaultSave = (): ModularSaveData => SaveManager.createSave({});
+export const getDefaultSave = (): ModularSaveData => SaveManager.createSave({ _skipLocalStorage: true });
 
 export const migrateSave = (rawData: any): ModularSaveData => {
   if (!rawData || typeof rawData !== 'object') return getDefaultSave();
 
   const defaultSave = getDefaultSave();
-  const modularCandidate = rawData.version ? rawData : SaveManager.createSave(rawData);
+  const modularCandidate = rawData.version ? rawData : SaveManager.createSave({ ...rawData, _skipLocalStorage: true });
   const migrated = deepMergeSave(defaultSave, modularCandidate);
   migrated.version = CURRENT_SAVE_VERSION;
 
@@ -888,8 +892,12 @@ export const sanitizeSave = (rawData: any): ModularSaveData => {
   save.earth_reconstruction.earthEvents = Array.isArray(save.earth_reconstruction.earthEvents) ? save.earth_reconstruction.earthEvents : [];
   save.earth_reconstruction.colonies = Array.isArray(save.earth_reconstruction.colonies) ? save.earth_reconstruction.colonies : [];
 
+  const existingStorage = isPlainObject(save.colony_system.storage) ? save.colony_system.storage : {};
+
   save.colony_system = createColonySystemSave({
     ...save.colony_system,
+    storage: existingStorage,
+    _skipLocalStorage: true,
     colonies: save.colony_system.colonies,
     colonyCardIds: save.colony_system.ownedCardIds,
     colonyCardLevels: save.colony_system.cardLevels,
