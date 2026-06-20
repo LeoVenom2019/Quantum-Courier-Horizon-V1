@@ -229,6 +229,11 @@ export const IntroNarrative = ({
   };
 
   const triggerAlienEasterEgg = () => {
+    try {
+      localStorage.setItem('qch_secret_alien_name_unlocked', 'true');
+    } catch {
+      // localStorage can be unavailable in restricted browser contexts.
+    }
     playSfx('alert_alert');
     setIsAlienEggActive(true);
     setTimeout(() => {

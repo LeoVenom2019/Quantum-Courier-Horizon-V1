@@ -640,6 +640,53 @@ const isColonyReadyForPopulation = (constructions: Construction[] = []) => (
   ))
 );
 
+const NEW_EARTH_OUTSIDE_COLONY_POPULATION_SHARE = 0.2;
+const NEW_EARTH_COLONY_POPULATION_WEIGHTS: Record<string, number> = {
+  'colony-1': 1.083,
+  'colony-2': 0.946,
+  'colony-3': 1.014,
+  'colony-4': 0.957,
+};
+
+const calculateColonyPopulationQuotas = (totalPopulation: number, colonies: Colony[]) => {
+  const safeTotalPopulation = Math.max(0, Math.floor(totalPopulation));
+  const colonialPopulationPool = Math.floor(safeTotalPopulation * (1 - NEW_EARTH_OUTSIDE_COLONY_POPULATION_SHARE));
+  const outsideBasePopulation = safeTotalPopulation - colonialPopulationPool;
+  const weightedColonies = colonies.map((colony, index) => ({
+    colony,
+    index,
+    weight: Math.max(0.001, NEW_EARTH_COLONY_POPULATION_WEIGHTS[colony.id] ?? 1),
+  }));
+  const totalWeight = weightedColonies.reduce((sum, item) => sum + item.weight, 0) || 1;
+  let assignedPopulation = 0;
+
+  const quotaEntries = weightedColonies.map(item => {
+    const exactQuota = colonialPopulationPool * (item.weight / totalWeight);
+    const population = Math.floor(exactQuota);
+    assignedPopulation += population;
+    return {
+      id: item.colony.id,
+      population,
+      remainder: exactQuota - population,
+      index: item.index,
+    };
+  });
+
+  let remainingPopulation = colonialPopulationPool - assignedPopulation;
+  quotaEntries
+    .sort((a, b) => (b.remainder - a.remainder) || (a.index - b.index))
+    .forEach(entry => {
+      if (remainingPopulation <= 0) return;
+      entry.population += 1;
+      remainingPopulation -= 1;
+    });
+
+  return {
+    outsideBasePopulation,
+    quotaByColonyId: new Map(quotaEntries.map(entry => [entry.id, entry.population])),
+  };
+};
+
 const COLONY_BLUEPRINTS: Array<{
   id: string;
   name: Record<'en' | 'pt', string>;
@@ -1779,11 +1826,14 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
   useEffect(() => {
     if (!isLoaded || !isHorizonXpLoaded) return;
     GameStorage.save(horizonXp, 'horizon_ship_xp');
+    window.dispatchEvent(new CustomEvent('qch:horizon-xp-updated', { detail: horizonXp }));
   }, [horizonXp, isLoaded, isHorizonXpLoaded]);
 
   useEffect(() => {
     if (!isLoaded || !isDefenseBattleLevelLoaded) return;
-    GameStorage.save(Math.max(1, Math.floor(defenseBattleLevel)), 'route4_defense_battle_level');
+    const nextDefenseBattleLevel = Math.max(1, Math.floor(defenseBattleLevel));
+    GameStorage.save(nextDefenseBattleLevel, 'route4_defense_battle_level');
+    window.dispatchEvent(new CustomEvent('qch:new-earth-defense-battle-level-updated', { detail: nextDefenseBattleLevel }));
   }, [defenseBattleLevel, isLoaded, isDefenseBattleLevelLoaded]);
 
   useEffect(() => {
@@ -2508,29 +2558,6 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
     return next;
   }, [activeColony, equippedCards, cardLevels, ownedPassiveBonuses.allSectorBonus]);
 
-  const getColonyEffectiveSectorScore = useCallback((colony: Colony) => {
-    const next = { ...DEFAULT_COLONY_SECTORS, ...(colony.sectors || {}) };
-    const allSectorBonus = allSectorBonusRef.current;
-    const currentCardLevels = cardLevelsRef.current;
-    if (allSectorBonus > 0) {
-      (Object.keys(next) as ColonySectorId[]).forEach(sector => {
-        next[sector] = Math.min(100, Math.max(0, next[sector] + allSectorBonus));
-      });
-    }
-
-    const colonyCards = (Object.values(colony.equippedCards || {})
-      .map(id => getCardById(id))
-      .filter(Boolean)
-      .filter(card => card && isPoliticalCard(card)) as ColonyCard[]);
-
-    colonyCards.forEach(card => {
-      getPoliticalEffects(card, currentCardLevels).forEach(effect => {
-        next[effect.sector] = Math.min(100, Math.max(0, next[effect.sector] + effect.value));
-      });
-    });
-
-    return (Object.values(next) as number[]).reduce((sum, value) => sum + value, 0);
-  }, []);
 
   // Construction Progress Logic
   useEffect(() => {
@@ -2621,64 +2648,30 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
     const syncAutomaticPopulation = () => {
       let nextEarthPopulation: number | null = null;
       setColonies(prevColonies => {
-        const habitableColonies = prevColonies.filter(colony => (
-          isColonyReadyForPopulation(colony.constructions)
-        ));
-        if (habitableColonies.length === 0) {
-          const lockedPopulation = prevColonies.reduce((sum, colony) => (
-            sum + Math.max(0, Math.floor(colony.population || 0))
-          ), 0);
-          if (lockedPopulation <= 0) return prevColonies;
-          nextEarthPopulation = Math.max(0, Math.floor(earthPopulationRef.current + lockedPopulation));
-          return prevColonies.map(colony => (
-            colony.population > 0
-              ? { ...colony, population: 0, isHabitable: isColonyReadyForPopulation(colony.constructions) }
-              : colony
-          ));
-        }
-
         const currentColonyPopulation = prevColonies.reduce((sum, colony) => sum + Math.max(0, Math.floor(colony.population || 0)), 0);
         const totalPopulation = Math.max(0, Math.floor(earthPopulationRef.current + currentColonyPopulation));
         if (totalPopulation <= 0) return prevColonies;
 
-        const ratioNoise = (Math.sin(totalPopulation * 0.00013 + habitableColonies.length * 7.17) + 1) / 2;
-        const colonialRatio = 0.7 + ratioNoise * 0.1;
-        const targetColonialPopulation = Math.floor(totalPopulation * colonialRatio);
-        const baseShareTotal = Math.floor(targetColonialPopulation * 0.8);
-        const bonusShareTotal = targetColonialPopulation - baseShareTotal;
-        const basePerColony = Math.floor(baseShareTotal / habitableColonies.length);
-        const scoreByColony = new Map(habitableColonies.map(colony => [
-          colony.id,
-          Math.max(1, getColonyEffectiveSectorScore(colony)),
-        ]));
-        const totalScore = Array.from(scoreByColony.values()).reduce((sum, score) => sum + score, 0) || 1;
-        let assignedColonialPopulation = 0;
+        const { outsideBasePopulation, quotaByColonyId } = calculateColonyPopulationQuotas(totalPopulation, prevColonies);
+        let reservedOutsideColoniesPopulation = outsideBasePopulation;
         let hasPopulationChanges = false;
 
         const nextColonies = prevColonies.map(colony => {
           const currentPopulation = Math.max(0, Math.floor(colony.population || 0));
-          if (!scoreByColony.has(colony.id)) {
-            if (currentPopulation <= 0 && colony.isHabitable === isColonyReadyForPopulation(colony.constructions)) return colony;
-            hasPopulationChanges = true;
-            return {
-              ...colony,
-              population: 0,
-              isHabitable: isColonyReadyForPopulation(colony.constructions),
-            };
+          const isHabitable = isColonyReadyForPopulation(colony.constructions);
+          const quotaPopulation = quotaByColonyId.get(colony.id) ?? 0;
+          const nextPopulation = isHabitable ? quotaPopulation : 0;
+
+          if (!isHabitable) {
+            reservedOutsideColoniesPopulation += quotaPopulation;
           }
 
-          const targetPopulation = basePerColony + Math.floor(bonusShareTotal * (scoreByColony.get(colony.id)! / totalScore));
-          const delta = targetPopulation - currentPopulation;
-          const migrationStep = Math.sign(delta) * Math.min(Math.abs(delta), Math.max(1, Math.ceil(Math.abs(delta) * 0.08)));
-          const nextPopulation = Math.max(0, currentPopulation + migrationStep);
-          assignedColonialPopulation += nextPopulation;
-          const isHabitable = isColonyReadyForPopulation(colony.constructions);
-          if (nextPopulation === colony.population && colony.isHabitable === isHabitable) return colony;
+          if (nextPopulation === currentPopulation && colony.isHabitable === isHabitable) return colony;
           hasPopulationChanges = true;
           return { ...colony, population: nextPopulation, isHabitable };
         });
 
-        nextEarthPopulation = Math.max(0, totalPopulation - assignedColonialPopulation);
+        nextEarthPopulation = Math.max(0, reservedOutsideColoniesPopulation);
         return hasPopulationChanges ? nextColonies : prevColonies;
       });
 
@@ -2691,7 +2684,7 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
     syncAutomaticPopulation();
     const interval = window.setInterval(syncAutomaticPopulation, 15000);
     return () => window.clearInterval(interval);
-  }, [getColonyEffectiveSectorScore, isLoaded, setColonies]);
+  }, [isLoaded, setColonies]);
 
   // Actions
   const equipCard = (card: ColonyCard): boolean => {

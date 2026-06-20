@@ -223,7 +223,7 @@ const TANK_SPRITES: Record<TankSpriteKind, TankSpriteConfig> = {
     bodyHeight: 39,
     turretWidth: 94,
     turretHeight: 33,
-    turretPivotX: 39,
+    turretPivotX: 33,
     turretPivotY: 16.5,
     turretAngleOffset: 0,
     barrelLength: 52,

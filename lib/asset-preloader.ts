@@ -334,6 +334,27 @@ const route4NewEarthWarInformationImages = [
   '/assets/rota4/war_informations/war_inf_4.webp',
 ];
 
+const route4NewEarthOtherImages = [
+  '/assets/rota4/colonys/others/eden_bg_in_new_land_window.webp',
+  '/assets/rota4/colonys/others/gaia_bg_in_new_land_window.webp',
+  '/assets/rota4/colonys/others/elysium_bg_in_new_land_window.webp',
+  '/assets/rota4/colonys/others/genesis_bg_in_new_land_window.webp',
+  '/assets/rota4/colonys/others/war_plans_bg_heli.webp',
+  '/assets/rota4/colonys/others/war_plans_bg_tank.webp',
+  '/assets/rota4/colonys/others/culture_eden_elysium.webp',
+  '/assets/rota4/colonys/others/culture_gaia_genesis.webp',
+  '/assets/rota4/colonys/others/economy_eden_elysium.webp',
+  '/assets/rota4/colonys/others/economy_gaia_genesis.webp',
+  '/assets/rota4/colonys/others/happy_eden_elysium.webp',
+  '/assets/rota4/colonys/others/happy_gaia_genesis.webp',
+  '/assets/rota4/colonys/others/health_eden_elysium.webp',
+  '/assets/rota4/colonys/others/health_gaia_genesis.webp',
+  '/assets/rota4/colonys/others/secure_eden_elysium.webp',
+  '/assets/rota4/colonys/others/secure_gaia_genesis.webp',
+  '/assets/rota4/colonys/others/tecnology_eden_elysium.webp',
+  '/assets/rota4/colonys/others/tecnology_gaia_genesis.webp',
+];
+
 const route4BattleImages = [
   ...route4BattleBackgroundImages,
   ...route4NewEarthSurfaceBattleBackgroundImages,
@@ -341,6 +362,7 @@ const route4BattleImages = [
   ...route4NewEarthAetherHelicopterImages,
   ...route4NewEarthEnemyChopterImages,
   ...route4NewEarthWarInformationImages,
+  ...route4NewEarthOtherImages,
   `${route4BattleBase}/player/horizon/horizon.webp`,
   `${route4BattleBase}/player/horizon/horizon_12pos_spritesheet.webp`,
   `${route4BattleBase}/enemys/air_ships/enemy_rt4.webp`,

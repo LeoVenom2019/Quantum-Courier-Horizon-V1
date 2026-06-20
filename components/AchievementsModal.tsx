@@ -90,6 +90,7 @@ export const AchievementsModal: React.FC<AchievementsModalProps> = ({
               {ACHIEVEMENTS.slice(page * 9, (page + 1) * 9).map((achievement) => {
                 if (!achievement || !achievement.id) return null;
                 const isUnlocked = unlockedAchievements.includes(achievement.id);
+                const isHiddenSecret = Boolean(achievement.secret && !isUnlocked);
                 const progress = achievementProgress[achievement.id] || 0;
                 const target = achievement.target || 1;
                 const percent = Math.min(100, (progress / target) * 100);
@@ -121,13 +122,13 @@ export const AchievementsModal: React.FC<AchievementsModalProps> = ({
                       </div>
                       <div className="flex-1 min-w-0">
                         <h4 className={`text-xs font-orbitron font-bold uppercase truncate ${isUnlocked ? 'text-white' : 'text-slate-500'}`}>
-                          {achievement.name}
+                          {isHiddenSecret ? '?' : achievement.name}
                         </h4>
                         <p className="text-[9px] text-slate-400 font-mono uppercase tracking-wider mt-1 line-clamp-2 leading-relaxed">
-                          {achievement.description}
+                          {isHiddenSecret ? '?' : achievement.description}
                         </p>
                         
-                        {!isUnlocked && achievement.type !== 'action' && (
+                        {!isUnlocked && !isHiddenSecret && achievement.type !== 'action' && (
                           <div className="mt-3 space-y-1">
                             <div className="flex justify-between text-[8px] font-mono text-slate-500 uppercase">
                               <span>{isPortuguese ? 'Progresso' : 'Progress'}</span>

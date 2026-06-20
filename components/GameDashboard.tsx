@@ -120,6 +120,7 @@ import {
   ARCADE_CARD_REWARD_RULES,
   BASE_BATTLE_SHIP_STATS,
   BATTLE_CARD_SLOTS,
+  MAX_COLONY_CARD_LEVEL,
   COLONY_CARD_CATALOG,
   ColonyCard,
   ColonyCardLevels,
@@ -543,6 +544,51 @@ const NEW_EARTH_TANK_PREVIEW_BACKGROUND = '/assets/rota4/new_land_assets/europea
 const NEW_EARTH_HELICOPTER_PREVIEW_BACKGROUND = '/assets/rota4/new_land_assets/forgotten_continent_new_land_system/forgotten_continent_background_1.webp';
 
 const NEW_EARTH_SECTOR_ORDER: ColonySectorId[] = ['culture', 'economy', 'health', 'happiness', 'security', 'technology'];
+
+const NEW_EARTH_OTHERS_ASSET_BASE = '/assets/rota4/colonys/others';
+
+const NEW_EARTH_COLONY_WINDOW_BACKGROUNDS: Record<string, string> = {
+  'colony-1': `${NEW_EARTH_OTHERS_ASSET_BASE}/genesis_bg_in_new_land_window.webp`,
+  'colony-2': `${NEW_EARTH_OTHERS_ASSET_BASE}/eden_bg_in_new_land_window.webp`,
+  'colony-3': `${NEW_EARTH_OTHERS_ASSET_BASE}/elysium_bg_in_new_land_window.webp`,
+  'colony-4': `${NEW_EARTH_OTHERS_ASSET_BASE}/gaia_bg_in_new_land_window.webp`,
+};
+
+const NEW_EARTH_WAR_PLAN_BACKGROUNDS: Record<NewEarthWarIntelKind, string> = {
+  helicopter: `${NEW_EARTH_OTHERS_ASSET_BASE}/war_plans_bg_heli.webp`,
+  tank: `${NEW_EARTH_OTHERS_ASSET_BASE}/war_plans_bg_tank.webp`,
+};
+
+const getNewEarthColonyBackgroundGroup = (colony?: Colony | null) => (
+  colony?.id === 'colony-2' || colony?.id === 'colony-3' ? 'eden_elysium' : 'gaia_genesis'
+);
+
+const NEW_EARTH_DISTRIBUTION_SECTOR_BACKGROUNDS: Record<ColonySectorId, Record<'eden_elysium' | 'gaia_genesis', string>> = {
+  culture: {
+    eden_elysium: `${NEW_EARTH_OTHERS_ASSET_BASE}/culture_eden_elysium.webp`,
+    gaia_genesis: `${NEW_EARTH_OTHERS_ASSET_BASE}/culture_gaia_genesis.webp`,
+  },
+  economy: {
+    eden_elysium: `${NEW_EARTH_OTHERS_ASSET_BASE}/economy_eden_elysium.webp`,
+    gaia_genesis: `${NEW_EARTH_OTHERS_ASSET_BASE}/economy_gaia_genesis.webp`,
+  },
+  health: {
+    eden_elysium: `${NEW_EARTH_OTHERS_ASSET_BASE}/health_eden_elysium.webp`,
+    gaia_genesis: `${NEW_EARTH_OTHERS_ASSET_BASE}/health_gaia_genesis.webp`,
+  },
+  happiness: {
+    eden_elysium: `${NEW_EARTH_OTHERS_ASSET_BASE}/happy_eden_elysium.webp`,
+    gaia_genesis: `${NEW_EARTH_OTHERS_ASSET_BASE}/happy_gaia_genesis.webp`,
+  },
+  security: {
+    eden_elysium: `${NEW_EARTH_OTHERS_ASSET_BASE}/secure_eden_elysium.webp`,
+    gaia_genesis: `${NEW_EARTH_OTHERS_ASSET_BASE}/secure_gaia_genesis.webp`,
+  },
+  technology: {
+    eden_elysium: `${NEW_EARTH_OTHERS_ASSET_BASE}/tecnology_eden_elysium.webp`,
+    gaia_genesis: `${NEW_EARTH_OTHERS_ASSET_BASE}/tecnology_gaia_genesis.webp`,
+  },
+};
 
 const getDistributionSectorStatus = (value: number, language: 'pt' | 'en') => {
   if (value > 100) return {
@@ -1210,6 +1256,8 @@ const DashboardContent = memo(({
   const [newEarthOwnedCardIds, setNewEarthOwnedCardIds] = useState<string[]>([]);
   const [newEarthBattleLoadout, setNewEarthBattleLoadout] = useState<Record<string, string>>({});
   const [newEarthAchievementMetrics, setNewEarthAchievementMetrics] = useState<NewEarthAchievementMetrics>(() => createDefaultNewEarthAchievementMetrics());
+  const [newEarthHorizonXp, setNewEarthHorizonXp] = useState(0);
+  const [newEarthDefenseBattleLevel, setNewEarthDefenseBattleLevel] = useState(1);
   const [selectedNewEarthColonyId, setSelectedNewEarthColonyId] = useState<string | null>(null);
   const [selectedNewEarthCardIndex, setSelectedNewEarthCardIndex] = useState<number | null>(null);
   const [newEarthMapFeedback, setNewEarthMapFeedback] = useState<string | null>(null);
@@ -1253,6 +1301,40 @@ const DashboardContent = memo(({
   useEffect(() => {
     preloadAssetGroupsPassive(getRecommendedAssetGroupsForRoute(routeTier));
   }, [routeTier]);
+  useEffect(() => {
+    let mounted = true;
+
+    GameStorage.load('horizon_ship_xp')
+      .then(saved => {
+        if (!mounted) return;
+        setNewEarthHorizonXp(safeMetricNumber(saved));
+      })
+      .catch(error => console.warn('Unable to load Horizon XP for achievements', error));
+
+    GameStorage.load('route4_defense_battle_level')
+      .then(saved => {
+        if (!mounted) return;
+        setNewEarthDefenseBattleLevel(Math.max(1, safeMetricNumber(saved) || 1));
+      })
+      .catch(error => console.warn('Unable to load New Earth battle level for achievements', error));
+
+    const handleHorizonXpUpdated = (event: Event) => {
+      const customEvent = event as CustomEvent<number>;
+      setNewEarthHorizonXp(safeMetricNumber(customEvent.detail));
+    };
+    const handleDefenseBattleLevelUpdated = (event: Event) => {
+      const customEvent = event as CustomEvent<number>;
+      setNewEarthDefenseBattleLevel(Math.max(1, safeMetricNumber(customEvent.detail) || 1));
+    };
+
+    window.addEventListener('qch:horizon-xp-updated', handleHorizonXpUpdated);
+    window.addEventListener('qch:new-earth-defense-battle-level-updated', handleDefenseBattleLevelUpdated);
+    return () => {
+      mounted = false;
+      window.removeEventListener('qch:horizon-xp-updated', handleHorizonXpUpdated);
+      window.removeEventListener('qch:new-earth-defense-battle-level-updated', handleDefenseBattleLevelUpdated);
+    };
+  }, []);
 
   useEffect(() => {
     let mounted = true;
@@ -3335,7 +3417,7 @@ const DashboardContent = memo(({
         },
         {
           name: { pt: 'Colônia Sobrevivente', en: 'Survivor Colony' },
-          desc: { pt: 'Uma pequena comunidade isolada foi descoberta e, depois de discussões políticas, resolveu se juntar a {colonyName}. +750 Comida e +10k Habitantes para a colônia.', en: 'A small isolated community was discovered and, after political discussions, decided to join {colonyName}. +750 Food and +10k population for the colony.' },
+          desc: { pt: 'Uma pequena comunidade isolada foi descoberta e, depois de discussões políticas, entrou no fluxo migratório de {colonyName}. +750 Comida e +10k População Mundial.', en: 'A small isolated community was discovered and, after political discussions, entered {colonyName}\'s migration flow. +750 Food and +10k World Population.' },
           impactType: 'colonySupply',
           impact: 4,
           supplies: { food: 750 },
@@ -3426,9 +3508,11 @@ const DashboardContent = memo(({
     }
 
     const source = eventSource as any;
-    const colonyPopulationCandidates = (coloniesRef.current || []).filter((colony: Colony) => colony.isHabitable || colony.population > 0);
-    const selectedResourceColony = source.colonyPopulation
-      ? (colonyPopulationCandidates.length > 0 ? colonyPopulationCandidates : (coloniesRef.current || []))[Math.floor(Math.random() * Math.max(1, (colonyPopulationCandidates.length > 0 ? colonyPopulationCandidates : (coloniesRef.current || [])).length))]
+    const colonyPopulationCandidates = source.colonyPopulation
+      ? (coloniesRef.current || []).filter((colony: Colony) => isNewEarthColonyUnlocked(colony))
+      : [];
+    const selectedResourceColony = colonyPopulationCandidates.length > 0
+      ? colonyPopulationCandidates[Math.floor(Math.random() * colonyPopulationCandidates.length)]
       : null;
     const selectedResourceColonyName = selectedResourceColony?.name || (language === 'pt' ? 'uma colônia pioneira' : 'a pioneer colony');
     const sourceDescription = language === 'pt' ? source.desc.pt : source.desc.en;
@@ -3484,16 +3568,8 @@ const DashboardContent = memo(({
         }
       }
 
-      if (source.colonyPopulation && selectedResourceColony) {
-        setColonies(prev => prev.map((colony: Colony) => (
-          colony.id === selectedResourceColony.id
-            ? {
-              ...colony,
-              population: colony.population + source.colonyPopulation,
-              maxPopulation: Math.max(colony.maxPopulation, colony.population + source.colonyPopulation),
-            }
-            : colony
-        )));
+      if (source.colonyPopulation) {
+        setEarthPopulation(prev => Math.max(0, Math.floor(prev + source.colonyPopulation)));
       }
 
       const impact = source.impact;
@@ -5725,6 +5801,10 @@ const DashboardContent = memo(({
   }, [routeTier, unlockedTechLevels, ownedShips, techLevels, miningRobots, miningRobotLevels, autoTravelSlots, historyStats, miningCompressionLevels, totalDeliveries]);
 
   const syncAchievements = useCallback(() => {
+    const ownedShipTypesForTier = (tier: 'Solar' | 'Interstellar' | 'Void') => (
+      SHIPS.filter(ship => ship.tier === tier && (ownedShips[tier + '-' + ship.level] || 0) > 0).length
+    );
+
     // 1. First Delivery
     updateAchievementProgress('first_delivery', totalDeliveries >= 1 ? 1 : 0, true);
 
@@ -5751,7 +5831,7 @@ const DashboardContent = memo(({
     updateAchievementProgress('tech_master', totalTechs, true);
 
     // 7. Ship Collector
-    const totalShips = Object.keys(ownedShips).length;
+    const totalShips = SHIPS.filter(ship => (ownedShips[ship.tier + '-' + ship.level] || 0) > 0).length;
     updateAchievementProgress('ship_collector', totalShips, true);
 
     // 8. Max Upgrade - IMPROVED
@@ -5769,7 +5849,15 @@ const DashboardContent = memo(({
     updateAchievementProgress('total_deliveries_10k', totalDeliveries, true);
 
     // 11. All Ships R1 & R2
-    const shipsR1R2 = Object.keys(ownedShips).filter(key => key.startsWith('Solar-') || key.startsWith('Interstellar-')).length;
+    const solarShipTypes = SHIPS.filter(ship => ship.tier === 'Solar').length;
+    const interstellarShipTypes = SHIPS.filter(ship => ship.tier === 'Interstellar').length;
+    const solarFleetProgress = routeTier === 'Interstellar' || routeTier === 'Void'
+      ? solarShipTypes
+      : ownedShipTypesForTier('Solar');
+    const interstellarFleetProgress = routeTier === 'Void'
+      ? interstellarShipTypes
+      : ownedShipTypesForTier('Interstellar');
+    const shipsR1R2 = solarFleetProgress + interstellarFleetProgress;
     updateAchievementProgress('all_ships_r1_r2', shipsR1R2, true);
 
     // 12. Total Missions
@@ -5800,12 +5888,16 @@ const DashboardContent = memo(({
     updateAchievementProgress('ne_genesis_builder_60', colonyBuildProgress('colony-1'), true);
     updateAchievementProgress('ne_elysium_builder_60', colonyBuildProgress('colony-3'), true);
     updateAchievementProgress('ne_gaia_builder_60', colonyBuildProgress('colony-4'), true);
+    const fullSectorScore = colonies.reduce((total, colony) => (
+      total + NEW_EARTH_SECTOR_ORDER.filter(sector => Number(colony.sectors?.[sector] ?? DEFAULT_COLONY_SECTORS[sector]) >= 100).length
+    ), 0);
+    updateAchievementProgress('ne_all_colony_sectors_100', fullSectorScore, true);
 
     updateAchievementProgress('ne_land_search_perfect_defenses_10', newEarthAchievementMetrics.perfectLandSearchDefenses, true);
     updateAchievementProgress('ne_sea_search_perfect_defenses_10', newEarthAchievementMetrics.perfectSeaSearchDefenses, true);
     updateAchievementProgress('ne_direct_battles_10', newEarthAchievementMetrics.directBattleVictories, true);
 
-    const savedHorizonProgress = getHorizonLevelFromXp(safeMetricNumber(localStorage.getItem('horizon_ship_xp')));
+    const savedHorizonProgress = getHorizonLevelFromXp(newEarthHorizonXp);
     updateAchievementProgress('ne_horizon_level_50', savedHorizonProgress.level, true);
     updateAchievementProgress('ne_horizon_level_100', savedHorizonProgress.level, true);
 
@@ -5821,8 +5913,8 @@ const DashboardContent = memo(({
       .filter((card): card is ColonyCard => Boolean(card));
     const horizonStats = calculateBattleShipStats(equippedCards, BASE_BATTLE_SHIP_STATS, newEarthCardLevels, savedHorizonProgress.level);
     updateAchievementProgress('ne_horizon_crit_90', horizonStats.critChance, true);
-    updateAchievementProgress('ne_horizon_stage_100', battleLevel, true);
-    updateAchievementProgress('ne_horizon_stage_200', battleLevel, true);
+    updateAchievementProgress('ne_horizon_stage_100', newEarthDefenseBattleLevel, true);
+    updateAchievementProgress('ne_horizon_stage_200', newEarthDefenseBattleLevel, true);
 
     updateAchievementProgress('ne_missions_10', newEarthAchievementMetrics.missionsCompleted, true);
     updateAchievementProgress('ne_missions_40', newEarthAchievementMetrics.missionsCompleted, true);
@@ -5831,15 +5923,26 @@ const DashboardContent = memo(({
     const politicalCards = COLONY_CARD_CATALOG.filter(isPoliticalCard);
     const battleCards = COLONY_CARD_CATALOG.filter(isBattleCard);
     const wildcardCards = COLONY_CARD_CATALOG.filter(isWildcardCard);
+    const collectibleCards = COLONY_CARD_CATALOG.filter(card => isPoliticalCard(card) || isBattleCard(card) || isWildcardCard(card));
+    const upgradeableCards = COLONY_CARD_CATALOG.filter(card => isPoliticalCard(card) || isBattleCard(card));
     const ownedPoliticalCount = politicalCards.filter(card => ownedCards.has(card.id)).length;
     const ownedBattleCount = battleCards.filter(card => ownedCards.has(card.id)).length;
     const ownedWildcardCount = wildcardCards.filter(card => ownedCards.has(card.id)).length;
+    const ownedCollectibleCount = collectibleCards.filter(card => ownedCards.has(card.id)).length;
+    const maxedMythicBattleCards = battleCards.filter(card => ownedCards.has(card.id) && card.rarity === 'mythic' && getCardLevel(card.id, newEarthCardLevels) >= MAX_COLONY_CARD_LEVEL).length;
+    const maxedMythicPoliticalCards = politicalCards.filter(card => ownedCards.has(card.id) && card.rarity === 'mythic' && getCardLevel(card.id, newEarthCardLevels) >= MAX_COLONY_CARD_LEVEL).length;
+    const maxedOwnedUpgradeableCards = upgradeableCards.filter(card => ownedCards.has(card.id) && getCardLevel(card.id, newEarthCardLevels) >= MAX_COLONY_CARD_LEVEL).length;
     updateAchievementProgress('ne_political_card_1', ownedPoliticalCount, true);
     updateAchievementProgress('ne_political_cards_all', politicalCards.length > 0 && ownedPoliticalCount >= politicalCards.length ? 1 : 0, true);
     updateAchievementProgress('ne_battle_card_1', ownedBattleCount, true);
     updateAchievementProgress('ne_battle_cards_all', battleCards.length > 0 && ownedBattleCount >= battleCards.length ? 1 : 0, true);
     updateAchievementProgress('ne_wildcard_1', ownedWildcardCount, true);
     updateAchievementProgress('ne_wildcards_all', wildcardCards.length > 0 && ownedWildcardCount >= wildcardCards.length ? 1 : 0, true);
+    updateAchievementProgress('ne_mythic_battle_card_maxed', maxedMythicBattleCards, true);
+    updateAchievementProgress('ne_mythic_political_card_maxed', maxedMythicPoliticalCards, true);
+    updateAchievementProgress('ne_all_cards_collected', collectibleCards.length > 0 && ownedCollectibleCount >= collectibleCards.length ? 1 : 0, true);
+    updateAchievementProgress('ne_all_cards_maxed', upgradeableCards.length > 0 && maxedOwnedUpgradeableCards >= upgradeableCards.length ? 1 : 0, true);
+    updateAchievementProgress('secret_alien_name', localStorage.getItem('qch_secret_alien_name_unlocked') === 'true' ? 1 : 0, true);
 
     const museumHas = (id: string) => Boolean(newEarthMuseumTreasures[id]);
     const rareFishFound = NEW_EARTH_RARE_FISH_TREASURES.filter(treasure => museumHas(treasure.id)).length;
@@ -5882,6 +5985,7 @@ const DashboardContent = memo(({
   }, [
     updateAchievementProgress,
     totalDeliveries,
+    routeTier,
     historyStats,
     miningRobots,
     isRoute2Unlocked,
@@ -5892,6 +5996,8 @@ const DashboardContent = memo(({
     earthReconstructionProgress,
     battleLevel,
     colonies,
+    newEarthHorizonXp,
+    newEarthDefenseBattleLevel,
     newEarthAchievementMetrics,
     newEarthBattleLoadout,
     newEarthCardLevels,
@@ -10311,8 +10417,14 @@ const DashboardContent = memo(({
                                             && Math.max(0, Number(newEarthDistributionSupplies[neededSupply]) || 0) >= NEW_EARTH_DISTRIBUTION_DONATION_COST;
                                           const sectorToneClass = getDistributionSectorToneClass(value);
                                           const sectorFillClass = getDistributionSectorFillClass(value);
+                                          const sectorBackgroundGroup = getNewEarthColonyBackgroundGroup(selectedDistributionColony);
+                                          const sectorBackground = NEW_EARTH_DISTRIBUTION_SECTOR_BACKGROUNDS[sector][sectorBackgroundGroup];
                                           return (
-                                            <div key={sector} className={`grid min-h-0 grid-rows-[auto_auto_auto] rounded-2xl border p-2.5 ${sectorToneClass}`}>
+                                            <div
+                                              key={sector}
+                                              className={`grid min-h-0 grid-rows-[auto_auto_auto] rounded-2xl border bg-cover bg-center p-2.5 ${sectorToneClass}`}
+                                              style={{ backgroundImage: `linear-gradient(90deg, rgba(6, 22, 18, 0.42), rgba(6, 22, 18, 0.32)), url(${sectorBackground})` }}
+                                            >
                                               <div className="flex items-start justify-between gap-2">
                                                 <div className="min-w-0">
                                                   <p className="truncate font-orbitron text-[12px] font-black uppercase tracking-[0.1em]">
@@ -10937,6 +11049,7 @@ const DashboardContent = memo(({
                                     {pageIntel.map(intel => {
                                       const collectedIntel = newEarthWarIntelCollection[intel.id];
                                       const recovered = Boolean(collectedIntel);
+                                      const warPlanBackground = NEW_EARTH_WAR_PLAN_BACKGROUNDS[intel.kind];
                                       return (
                                         <div
                                           key={intel.id}
@@ -10953,9 +11066,10 @@ const DashboardContent = memo(({
                                             setSelectedNewEarthWarIntel(collectedIntel);
                                             playSfx('view_card');
                                           }}
-                                          className={`relative h-full min-h-0 overflow-hidden rounded-xl border bg-slate-950/80 p-0 text-left transition ${recovered ? 'cursor-pointer border-slate-200/24 shadow-[0_0_22px_rgba(148,163,184,0.14)] hover:border-amber-200/45 hover:shadow-[0_0_26px_rgba(251,191,36,0.16)]' : 'border-white/10'}`}
+                                          className={`relative h-full min-h-0 overflow-hidden rounded-xl border bg-slate-950/80 bg-cover bg-center p-0 text-left transition ${recovered ? 'cursor-pointer border-slate-200/24 shadow-[0_0_22px_rgba(148,163,184,0.14)] hover:border-amber-200/45 hover:shadow-[0_0_26px_rgba(251,191,36,0.16)]' : 'border-white/10'}`}
+                                          style={{ backgroundImage: `url(${warPlanBackground})` }}
                                         >
-                                          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_25%_30%,rgba(248,250,252,0.09),transparent_50%),linear-gradient(135deg,rgba(15,23,42,0.94),rgba(0,0,0,0.72))]" />
+                                          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_25%_30%,rgba(248,250,252,0.08),transparent_50%),linear-gradient(135deg,rgba(15,23,42,0.52),rgba(0,0,0,0.58))]" />
                                           <div className="relative z-10 flex h-full min-h-0 items-stretch">
                                             <div className={`relative aspect-square h-full min-h-0 shrink-0 overflow-hidden ${recovered ? 'text-slate-50' : 'text-slate-400'}`}>
                                               {recovered && collectedIntel ? (
@@ -11128,7 +11242,10 @@ const DashboardContent = memo(({
                                     </div>
                                   </div>
 
-                                  <div className="flex min-h-0 flex-[0.92] flex-col overflow-hidden rounded-2xl border border-emerald-300/18 bg-black/32 p-4 text-center">
+                                  <div
+                                    className="flex min-h-0 flex-[0.92] flex-col overflow-hidden rounded-2xl border border-emerald-300/18 bg-black/32 bg-cover bg-center p-4 text-center"
+                                    style={NEW_EARTH_COLONY_WINDOW_BACKGROUNDS[selectedNewEarthColony.id] ? { backgroundImage: `linear-gradient(180deg, rgba(2, 6, 23, 0.44), rgba(2, 6, 23, 0.36)), url(${NEW_EARTH_COLONY_WINDOW_BACKGROUNDS[selectedNewEarthColony.id]})` } : undefined}
+                                  >
                                     <div className="flex min-h-0 flex-1 flex-col items-center justify-center">
                                       <h3 className="font-orbitron text-5xl font-black uppercase leading-none text-white">{selectedNewEarthColony.name}</h3>
                                       <p className="mt-7 font-mono text-sm font-black uppercase tracking-[0.34em] text-emerald-100/76">{language === 'pt' ? 'População' : 'Population'}</p>
@@ -11155,12 +11272,10 @@ const DashboardContent = memo(({
                                             aria-hidden="true"
                                             className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-72"
                                           />
-                                          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_52%,rgba(52,211,153,0.18),transparent_58%),linear-gradient(180deg,rgba(2,6,23,0.18),rgba(2,6,23,0.52))]" />
+                                          <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(2,6,23,0.18),rgba(2,6,23,0.52))]" />
                                           <motion.div
                                             key="genesis-tank-preview"
-                                            animate={{ y: [0, -3, 0, 2, 0] }}
-                                            transition={{ duration: 3.8, repeat: Infinity, ease: 'easeInOut' }}
-                                            className="relative z-10 h-[190px] w-[190px] drop-shadow-[0_0_22px_rgba(52,211,153,0.28)]"
+                                            className="relative z-10 h-[190px] w-[190px]"
                                           >
                                             <Image unoptimized width={800} height={600}
                                               src="/assets/rota4/colonys/genesis/aether_tank/1tank_player_body.webp"
@@ -11174,7 +11289,7 @@ const DashboardContent = memo(({
                                               aria-hidden="true"
                                               animate={{ rotate: [-4, 5, -4] }}
                                               transition={{ duration: 4.4, repeat: Infinity, ease: 'easeInOut' }}
-                                              className="absolute left-1/2 top-1/2 h-[156px] w-[156px] -translate-x-1/2 -translate-y-1/2 object-contain"
+                                              className="absolute left-[64%] top-[47%] h-[156px] w-[156px] -translate-x-1/2 -translate-y-1/2 object-contain"
                                             />
                                           </motion.div>
                                         </div>
@@ -11266,7 +11381,7 @@ const DashboardContent = memo(({
                                               repeat: Infinity,
                                               ease: 'easeInOut',
                                             }}
-                                            className="relative z-10 h-full max-h-[205px] w-full object-contain px-3 py-3 drop-shadow-[0_0_22px_rgba(34,211,238,0.34)]"
+                                            className="relative z-10 h-full max-h-[205px] w-full object-contain px-3 py-3"
                                           />
                                         </div>
                                         <div className="grid min-h-0 grid-rows-[70px_1fr] gap-2">
@@ -11352,13 +11467,13 @@ const DashboardContent = memo(({
                                           <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_48%,rgba(125,211,252,0.22),transparent_58%),linear-gradient(180deg,rgba(2,6,23,0.12),rgba(2,6,23,0.38))]" />
                                           <motion.div
                                             key="elysium-helicopter-preview"
-                                            animate={{ y: [0, -5, 0, 4, 0], rotate: [0, -0.8, 0, 0.8, 0] }}
+                                            animate={{ x: [0, -5, 3, 5, 0], y: [0, -5, 0, 4, 0], scale: [1, 1.025, 1, 0.985, 1] }}
                                             transition={{
                                               duration: 4.9,
                                               repeat: Infinity,
                                               ease: 'easeInOut',
                                             }}
-                                            className="relative z-10 h-full max-h-[205px] w-full px-3 py-3 drop-shadow-[0_0_22px_rgba(125,211,252,0.34)]"
+                                            className="relative z-10 h-full max-h-[205px] w-full px-3 py-3"
                                           >
                                             <div className="absolute left-1/2 top-1/2 h-[150px] w-[230px] -translate-x-1/2 -translate-y-1/2">
                                               <Image unoptimized width={800} height={600}
@@ -11377,7 +11492,7 @@ const DashboardContent = memo(({
                                               />
                                             </div>
                                             <motion.div
-                                              animate={{ y: [0, -3, 0, 2, 0] }}
+                                              animate={{ x: [0, 3, -2, 2, 0], y: [0, -3, 0, 2, 0], scale: [1, 1.04, 1, 0.98, 1] }}
                                               transition={{ duration: 3.2, repeat: Infinity, ease: 'easeInOut' }}
                                               className="absolute right-[11%] top-[60%] h-[32px] w-[41px]"
                                             >
@@ -11385,7 +11500,7 @@ const DashboardContent = memo(({
                                                 src="/assets/rota4/colonys/elysium/aether/drone_player.webp"
                                                 alt=""
                                                 aria-hidden="true"
-                                                className="absolute inset-0 h-full w-full object-contain drop-shadow-[0_0_28px_rgba(251,191,36,0.18)]"
+                                                className="absolute inset-0 h-full w-full object-contain"
                                               />
                                               {[
                                                 ['left-[16%]', 'top-[18%]'],

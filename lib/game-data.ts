@@ -568,6 +568,7 @@ export interface Achievement {
   type: 'accumulative' | 'action' | 'milestone';
   target: number;
   icon: string;
+  secret?: boolean;
 }
 
 export const ACHIEVEMENTS: Achievement[] = [
@@ -594,6 +595,7 @@ export const ACHIEVEMENTS: Achievement[] = [
   { id: 'ne_genesis_builder_60', name: 'Genesis Erguida', description: 'Construa todas as 60 construções de Genesis.', type: 'milestone', target: 60, icon: 'Globe' },
   { id: 'ne_elysium_builder_60', name: 'Elysium Erguida', description: 'Construa todas as 60 construções de Elysium.', type: 'milestone', target: 60, icon: 'Globe' },
   { id: 'ne_gaia_builder_60', name: 'Gaia Erguida', description: 'Construa todas as 60 construções de Gaia.', type: 'milestone', target: 60, icon: 'Globe' },
+  { id: 'ne_all_colony_sectors_100', name: 'Utopia das Quatro Colônias', description: 'Alcance 100 em todos os atributos das 4 colônias.', type: 'milestone', target: 24, icon: 'Globe' },
   { id: 'ne_land_search_perfect_defenses_10', name: 'Muralha Terrestre', description: 'Defenda perfeitamente as buscas terrestres por recursos 10 vezes.', type: 'accumulative', target: 10, icon: 'Shield' },
   { id: 'ne_sea_search_perfect_defenses_10', name: 'Escudo Aéreo-Marítimo', description: 'Defenda perfeitamente as buscas aéreas e marítimas por recursos 10 vezes.', type: 'accumulative', target: 10, icon: 'Shield' },
   { id: 'ne_direct_battles_10', name: 'Linha de Frente Horizon', description: 'Vença 10 batalhas diretas da Nova Terra.', type: 'accumulative', target: 10, icon: 'Sword' },
@@ -615,6 +617,11 @@ export const ACHIEVEMENTS: Achievement[] = [
   { id: 'ne_battle_cards_all', name: 'Arsenal Completo', description: 'Adquira todas as cartas de batalha.', type: 'milestone', target: 1, icon: 'Sword' },
   { id: 'ne_wildcard_1', name: 'Curinga Revelado', description: 'Adquira 1 carta curinga.', type: 'milestone', target: 1, icon: 'Zap' },
   { id: 'ne_wildcards_all', name: 'Baralho Impossível', description: 'Adquira todas as cartas curingas.', type: 'milestone', target: 1, icon: 'Zap' },
+  { id: 'ne_mythic_battle_card_maxed', name: 'Mito de Guerra', description: 'Melhore uma carta mítica de batalha ao máximo.', type: 'milestone', target: 1, icon: 'Sword' },
+  { id: 'ne_mythic_political_card_maxed', name: 'Mandato Mítico', description: 'Melhore uma carta mítica de política ao máximo.', type: 'milestone', target: 1, icon: 'CheckCircle2' },
+  { id: 'ne_all_cards_collected', name: 'Biblioteca Completa', description: 'Adquira todas as cartas do jogo.', type: 'milestone', target: 1, icon: 'Cpu' },
+  { id: 'ne_all_cards_maxed', name: 'Baralho Supremo', description: 'Melhore todas as cartas do jogo ao máximo.', type: 'milestone', target: 1, icon: 'Zap' },
+  { id: 'secret_alien_name', name: 'Contato Imediato', description: 'Descubra o evento secreto do nome Alien.', type: 'action', target: 1, icon: 'Skull', secret: true },
   { id: 'ne_rare_fish_1', name: 'Primeiro Peixe Raro', description: 'Encontre 1 peixe raro para o museu.', type: 'milestone', target: 1, icon: 'Globe' },
   { id: 'ne_rare_fish_all', name: 'Aquário Abissal', description: 'Encontre todos os peixes raros.', type: 'milestone', target: 1, icon: 'Globe' },
   { id: 'ne_relic_1', name: 'Primeira Relíquia', description: 'Encontre 1 relíquia para o museu.', type: 'milestone', target: 1, icon: 'HistoryIcon' },
