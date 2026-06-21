@@ -3,6 +3,7 @@
 import React, { useRef, useState, useEffect, memo, useCallback, useMemo } from 'react';
 import { motion } from 'motion/react';
 import { Shield, Target, MousePointer2, X } from 'lucide-react';
+import BattlePauseDialog from './BattlePauseDialog';
 
 export interface VoidBattleProjectile {
   id: string;
@@ -537,6 +538,8 @@ const VoidBattleArena = memo(function VoidBattleArena({
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [assetsLoaded, setAssetsLoaded] = useState(false);
   const [videoReady, setVideoReady] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
+  const isPausedRef = useRef(false);
   const battleAssetKey = JSON.stringify({
     locationId,
     routeTier,
@@ -833,6 +836,7 @@ const VoidBattleArena = memo(function VoidBattleArena({
   }, [onUpdateResources, addLog, t, playSfx, routeTier, playerShipStats.rarity]);
 
   const triggerAttack = useCallback((targetX: number, targetY: number) => {
+    if (isPausedRef.current) return;
     const s = gameRef.current;
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -908,6 +912,17 @@ const VoidBattleArena = memo(function VoidBattleArena({
     if (!ctx) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setIsPaused(prev => {
+          const next = !prev;
+          isPausedRef.current = next;
+          if (next) gameRef.current.keysPressed.clear();
+          return next;
+        });
+        return;
+      }
+      if (isPausedRef.current) return;
       const key = e.key.toLowerCase();
       gameRef.current.keysPressed.add(key);
       if (e.key.toLowerCase() === 'r') triggerAbility('shield');
@@ -918,6 +933,7 @@ const VoidBattleArena = memo(function VoidBattleArena({
       gameRef.current.keysPressed.delete(e.key.toLowerCase());
     };
     const handleMouseDown = (e: MouseEvent) => {
+      if (isPausedRef.current) return;
       const rect = canvas.getBoundingClientRect();
       const scaleX = canvas.width / rect.width;
       const scaleY = canvas.height / rect.height;
@@ -3076,6 +3092,20 @@ const VoidBattleArena = memo(function VoidBattleArena({
       window.removeEventListener('keyup', handleKeyUp);
     };
   }, [assetsLoaded, triggerAttack, onBattleEnd, playSfx, stopSfx, dimensions, routeTier, triggerAbility, playerShipStats, locationId, videoReady, showBossIntro, activeShipImage, addLog, initialEnemies, language, meteoriteQcValue, meteorQcValue]);
+  const handlePauseReturn = useCallback(() => {
+    isPausedRef.current = false;
+    setIsPaused(false);
+    gameRef.current.keysPressed.clear();
+    if (onExitBattle) {
+      onExitBattle();
+      return;
+    }
+    onBattleEnd('lost', {
+      reward: 0,
+      playerHp: 0,
+      playerShield: 0
+    });
+  }, [onBattleEnd, onExitBattle]);
 
   if (!assetsLoaded) {
     return (
@@ -3109,6 +3139,17 @@ const VoidBattleArena = memo(function VoidBattleArena({
           <X className="h-4 w-4" />
           {language === 'pt' ? 'Sair da Batalha' : 'Exit Battle'}
         </button>
+      )}
+
+      {isPaused && (
+        <BattlePauseDialog
+          language={language}
+          onContinue={() => {
+            isPausedRef.current = false;
+            setIsPaused(false);
+          }}
+          onReturn={handlePauseReturn}
+        />
       )}
 
       {showBossIntro && bossIntro && displayEnemy && (

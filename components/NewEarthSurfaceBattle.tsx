@@ -3,6 +3,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Crosshair, X } from 'lucide-react';
 import { PremiumCanvasButton } from './ui/PremiumCanvasButton';
+import BattlePauseDialog from './BattlePauseDialog';
 import { NewEarthHelicopterBattle } from './NewEarthHelicopterBattle';
 
 export type NewEarthSurfaceBattleSiteId = 'zona-glacial' | 'ruinas-europeias' | 'continente-esquecido';
@@ -489,6 +490,8 @@ export default function NewEarthSurfaceBattle({
   const onDefeatRef = useRef(onDefeat);
   const [result, setResult] = useState<'victory' | 'defeat' | ''>('');
   const [hud, setHud] = useState({ hp: 100, enemies: 0 });
+  const [isPaused, setIsPaused] = useState(false);
+  const isPausedRef = useRef(false);
   const theme = SITE_THEME[siteId];
   const tankSpeedBonus = tankStats?.speedBonus || 0;
   const tankShotDamageBonus = tankStats?.shotDamageBonus || 0;
@@ -503,6 +506,17 @@ export default function NewEarthSurfaceBattle({
     if (battleKind === 'helicopter') return;
     const movementKeys = new Set(['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright']);
     const down = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !result) {
+        event.preventDefault();
+        setIsPaused(prev => {
+          const next = !prev;
+          isPausedRef.current = next;
+          if (next) keysRef.current = {};
+          return next;
+        });
+        return;
+      }
+      if (isPausedRef.current) return;
       const key = event.key.toLowerCase();
       if (movementKeys.has(key)) event.preventDefault();
       keysRef.current[key] = true;
@@ -518,7 +532,7 @@ export default function NewEarthSurfaceBattle({
       window.removeEventListener('keydown', down);
       window.removeEventListener('keyup', up);
     };
-  }, [battleKind]);
+  }, [battleKind, result]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -1153,6 +1167,11 @@ export default function NewEarthSurfaceBattle({
     };
 
     const loop = (now: number) => {
+      if (isPausedRef.current) {
+        last = now;
+        raf = requestAnimationFrame(loop);
+        return;
+      }
       const dt = Math.min(32, now - last);
       last = now;
       const dtScale = dt / 16.67;
@@ -1693,6 +1712,14 @@ export default function NewEarthSurfaceBattle({
     };
   }, [background, battleKind, defenseBattleLevel, enemyCount, language, tankArmorReduction, tankShotDamageBonus, tankShotSpeedBonus, tankSpeedBonus, theme]);
 
+  const returnFromPause = () => {
+    isPausedRef.current = false;
+    setIsPaused(false);
+    keysRef.current = {};
+    setResult('defeat');
+    onDefeatRef.current();
+    onClose();
+  };
   const updateMouse = (event: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -1741,6 +1768,16 @@ export default function NewEarthSurfaceBattle({
         </div>
 
         <div className="relative flex min-h-0 flex-1 items-center justify-center bg-black">
+          {isPaused && (
+            <BattlePauseDialog
+              language={language}
+              onContinue={() => {
+                isPausedRef.current = false;
+                setIsPaused(false);
+              }}
+              onReturn={returnFromPause}
+            />
+          )}
           <canvas
             ref={canvasRef}
             width={WIDTH}
@@ -1749,7 +1786,7 @@ export default function NewEarthSurfaceBattle({
             onMouseDown={(event) => {
               event.preventDefault();
               updateMouse(event);
-              shotRequestedRef.current = true;
+              if (!isPausedRef.current) shotRequestedRef.current = true;
             }}
             className="block h-full max-h-full w-auto max-w-full cursor-crosshair"
           />
@@ -1789,4 +1826,3 @@ export default function NewEarthSurfaceBattle({
     </div>
   );
 }
-

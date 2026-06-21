@@ -6,6 +6,7 @@ import { X } from 'lucide-react';
 import { NEW_EARTH_SUBMARINE_DEPTH_STAGES } from '@/lib/new-earth-submarines';
 import { NEW_EARTH_TREASURES_BY_RARITY, type NewEarthTreasure } from '@/lib/new-earth-treasures';
 import { PremiumCanvasButton } from './ui/PremiumCanvasButton';
+import BattlePauseDialog from './BattlePauseDialog';
 
 export type UnderwaterBattleSiteId = 'oceano-abissal' | 'cemiterio-navios';
 const subscribeClientReady = () => () => {};
@@ -2105,6 +2106,8 @@ export default function NewEarthUnderwaterBattle({
   const [oxygenPercent, setOxygenPercent] = useState(100);
   const [currentDepthMeters, setCurrentDepthMeters] = useState(0);
   const [portalFeedback, setPortalFeedback] = useState<string | null>(null);
+  const [isPaused, setIsPaused] = useState(false);
+  const isPausedRef = useRef(false);
   const portalFeedbackRef = useRef<string | null>(null);
   const oxygenRemainingMsRef = useRef(0);
   const oxygenInitializedRef = useRef(false);
@@ -2181,6 +2184,7 @@ export default function NewEarthUnderwaterBattle({
   };
 
   const handleCanvasPointerDown = (event: React.PointerEvent<HTMLCanvasElement>) => {
+    if (isPausedRef.current) return;
     updateAimFromPointer(event);
     aimRef.current.clickQueued = true;
   };
@@ -2355,6 +2359,17 @@ export default function NewEarthUnderwaterBattle({
 
   useEffect(() => {
     const down = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && status !== 'defeat') {
+        event.preventDefault();
+        setIsPaused(prev => {
+          const next = !prev;
+          isPausedRef.current = next;
+          if (next) keysRef.current.clear();
+          return next;
+        });
+        return;
+      }
+      if (isPausedRef.current) return;
       if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' ', 'Spacebar'].includes(event.key)) {
         event.preventDefault();
       }
@@ -2367,7 +2382,7 @@ export default function NewEarthUnderwaterBattle({
       window.removeEventListener('keydown', down);
       window.removeEventListener('keyup', up);
     };
-  }, []);
+  }, [status]);
 
   useEffect(() => {
     if (!mounted) return;
@@ -2544,6 +2559,11 @@ export default function NewEarthUnderwaterBattle({
     };
 
     const loop = (time: number) => {
+      if (isPausedRef.current) {
+        lastTime = time;
+        frameRef.current = requestAnimationFrame(loop);
+        return;
+      }
       const state = stateRef.current;
       const delta = Math.min(40, time - lastTime);
       lastTime = time;
@@ -3286,6 +3306,14 @@ export default function NewEarthUnderwaterBattle({
   const formattedCurrentDepth = currentDepthMeters.toLocaleString(language === 'pt' ? 'pt-BR' : 'en-US');
   const formattedStageDepth = depthMeters.toLocaleString(language === 'pt' ? 'pt-BR' : 'en-US');
 
+  const returnFromPause = () => {
+    isPausedRef.current = false;
+    setIsPaused(false);
+    keysRef.current.clear();
+    setStatus('defeat');
+    onDefeat?.();
+    onClose();
+  };
   if (!mounted) return null;
 
   const overlay = (
@@ -3303,6 +3331,16 @@ export default function NewEarthUnderwaterBattle({
         </PremiumCanvasButton>
 
         <div className="relative aspect-video min-h-0 bg-black">
+          {isPaused && (
+            <BattlePauseDialog
+              language={language}
+              onContinue={() => {
+                isPausedRef.current = false;
+                setIsPaused(false);
+              }}
+              onReturn={returnFromPause}
+            />
+          )}
           <canvas
             ref={canvasRef}
             width={WIDTH}
@@ -3443,4 +3481,3 @@ export default function NewEarthUnderwaterBattle({
 
   return createPortal(overlay, document.body);
 }
-

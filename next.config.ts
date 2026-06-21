@@ -19,7 +19,7 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-  // output: 'standalone',
+  output: 'standalone',
   transpilePackages: ['motion'],
   async headers() {
     return [

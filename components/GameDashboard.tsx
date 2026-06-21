@@ -71,6 +71,30 @@ import {
   Pause,
   FileText
 } from 'lucide-react';
+
+const ROUTE2_TOTAL_DELIVERIES_REQUIREMENT = 1500;
+const ROUTE3_TOTAL_DELIVERIES_REQUIREMENT = 9999;
+const META_ACHIEVEMENTS_STORAGE_KEY = 'qch_meta_achievements';
+const SECRET_ALIEN_ACHIEVEMENT_ID = 'secret_alien_name';
+const SECRET_ALIEN_NAME_STORAGE_KEY = 'qch_secret_alien_name_unlocked';
+
+const normalizeAchievementMeta = (value: any) => ({
+  unlockedAchievements: Array.isArray(value?.unlockedAchievements)
+    ? value.unlockedAchievements.filter((id: unknown): id is string => typeof id === 'string')
+    : [],
+  achievementProgress: value?.achievementProgress && typeof value.achievementProgress === 'object'
+    ? Object.fromEntries(
+      Object.entries(value.achievementProgress)
+        .filter(([key, progress]) => typeof key === 'string' && Number.isFinite(Number(progress)))
+        .map(([key, progress]) => [key, Number(progress)])
+    )
+    : {},
+});
+
+const hasSecretAlienAchievement = (meta: { unlockedAchievements: string[]; achievementProgress: Record<string, number> }) => (
+  meta.unlockedAchievements.includes(SECRET_ALIEN_ACHIEVEMENT_ID)
+  || Number(meta.achievementProgress[SECRET_ALIEN_ACHIEVEMENT_ID] || 0) >= 1
+);
 import {
   ROUTES,
   UPGRADES,
@@ -5325,7 +5349,8 @@ const DashboardContent = memo(({
       return values[Math.min(level - 1, 9)] || 15000;
     };
 
-    const baseRewardValue = getMissionBaseValue(missionRewardLevelRef.current[currentTier] || 1) * (currentTier === 'Interstellar' ? 2.5 : 1) * getEconomicMultipliers().profit;
+    const route1RewardNerf = currentTier === 'Solar' ? 0.3 : 1;
+    const baseRewardValue = getMissionBaseValue(missionRewardLevelRef.current[currentTier] || 1) * route1RewardNerf * (currentTier === 'Interstellar' ? 1.5 : 1) * getEconomicMultipliers().profit;
 
 
     // Initial Missions for Route 1 Campaign only - Prioritized
@@ -5411,13 +5436,13 @@ const DashboardContent = memo(({
 
       if (roll < alienChance) {
         rarity = 'alien';
-        multiplier = routeTier === 'Solar' ? 50 : 150;
+        multiplier = routeTier === 'Solar' ? 50 : 75;
       } else if (roll < alienChance + mythicChance) {
         rarity = 'mythic';
-        multiplier = routeTier === 'Solar' ? 35 : 150;
+        multiplier = routeTier === 'Solar' ? 35 : 75;
       } else if (roll < alienChance + mythicChance + legendaryChance) {
         rarity = 'legendary';
-        multiplier = routeTier === 'Solar' ? 25 : 50;
+        multiplier = routeTier === 'Solar' ? 25 : 30;
       } else if (roll < alienChance + mythicChance + legendaryChance + rareChance) {
         rarity = 'rare';
         multiplier = 10;
@@ -5767,8 +5792,8 @@ const DashboardContent = memo(({
     const firstOre = solarOres[0];
     if ((miningCompressionLevels[firstOre.id] || 0) < 10) return false;
 
-    // 8. Total de entregas (3000)
-    if (totalDeliveries < 3000) return false;
+    // 8. Total de entregas
+    if (totalDeliveries < ROUTE2_TOTAL_DELIVERIES_REQUIREMENT) return false;
 
     // 9. 100 missÃµes concluídas
     if ((historyStats['Solar']?.missionsCompleted || 0) < 100) return false;
@@ -5823,8 +5848,8 @@ const DashboardContent = memo(({
     const firstOre = interstellarOres[0];
     if (firstOre && (miningCompressionLevels[firstOre.id] || 0) < 10) return false;
 
-    // 8. Total de entregas (9999)
-    if (totalDeliveries < 9999) return false;
+    // 8. Total de entregas
+    if (totalDeliveries < ROUTE3_TOTAL_DELIVERIES_REQUIREMENT) return false;
 
     // 9. 1000 missões concluídas (Aggregated)
     const aggregatedMissions = (solarStats.missionsCompleted || 0) + (interstellarStats.missionsCompleted || 0);
@@ -6251,6 +6276,17 @@ const DashboardContent = memo(({
     return () => clearInterval(saveInterval);
   }, [isLoaded, performSave]);
 
+  useEffect(() => {
+    if (!isLoaded) return;
+
+    const meta = normalizeAchievementMeta({ unlockedAchievements, achievementProgress });
+    GameStorage.save(meta, META_ACHIEVEMENTS_STORAGE_KEY).catch(() => {});
+
+    if (hasSecretAlienAchievement(meta)) {
+      localStorage.setItem(SECRET_ALIEN_NAME_STORAGE_KEY, 'true');
+    }
+  }, [isLoaded, unlockedAchievements, achievementProgress]);
+
   // Load save logic
   useEffect(() => {
     if (isLoaded) return;
@@ -6302,8 +6338,19 @@ const DashboardContent = memo(({
         } catch (e) {
           console.error('Failed to load save', e);
         }
+      } else {
+        const achievementMeta = normalizeAchievementMeta(await GameStorage.load(META_ACHIEVEMENTS_STORAGE_KEY));
+        if (achievementMeta.unlockedAchievements.length || Object.keys(achievementMeta.achievementProgress).length) {
+          dispatch({ type: 'SET_MISSIONS_DATA', payload: achievementMeta });
+
+          if (hasSecretAlienAchievement(achievementMeta)) {
+            localStorage.setItem(SECRET_ALIEN_NAME_STORAGE_KEY, 'true');
+          } else {
+            localStorage.removeItem(SECRET_ALIEN_NAME_STORAGE_KEY);
+          }
+        }
       }
-      // Sem save encontrado = novo jogo, INITIAL_STATE já está no Redux âœ…
+      // Sem save encontrado = novo jogo, INITIAL_STATE já está no Redux com meta-conquistas quando existirem.
 
       setIsLoaded(true);
     };
@@ -12542,7 +12589,7 @@ const DashboardContent = memo(({
                       { id: 'compressions', label: t('upgradeRefinedCompression'), progress: (Object.entries(miningCompressionLevels).filter(([id]) => ORES_MAP.get(id)?.tier === (isInterstellar ? 'Interstellar' : 'Solar')).reduce((acc, [, v]) => acc + v, 0) / (ORES.filter(o => o.tier === (isInterstellar ? 'Interstellar' : 'Solar')).length * 10)) * 100, current: Object.entries(miningCompressionLevels).filter(([id]) => ORES_MAP.get(id)?.tier === (isInterstellar ? 'Interstellar' : 'Solar')).reduce((acc, [, v]) => acc + v, 0), target: ORES.filter(o => o.tier === (isInterstellar ? 'Interstellar' : 'Solar')).length * 10 },
                       { id: 'missions', label: `${t('missions')} ${language === 'pt' ? 'Concluídas' : 'Completed'}`, progress: Math.min(100, (aggregatedMissions / (isInterstellar ? 1000 : 100)) * 100), current: aggregatedMissions, target: isInterstellar ? 1000 : 100 },
                       { id: 'qc', label: `${t('reachQC')} ${isInterstellar ? '999 trilhões' : '1 trilhão'} QC`, progress: Math.min(100, (aggregatedQC / (isInterstellar ? 999000000000000 : 1000000000000)) * 100), current: formatValue(aggregatedQC), target: formatValue(isInterstellar ? 999000000000000 : 1000000000000) },
-                      { id: 'deliveries', label: `${t('total')} ${isInterstellar ? 9999 : 3000} ${t('deliveries')}`, progress: Math.min(100, (aggregatedDeliveries / (isInterstellar ? 9999 : 3000)) * 100), current: aggregatedDeliveries, target: isInterstellar ? 9999 : 3000 },
+                      { id: 'deliveries', label: `${t('total')} ${isInterstellar ? ROUTE3_TOTAL_DELIVERIES_REQUIREMENT : ROUTE2_TOTAL_DELIVERIES_REQUIREMENT} ${t('deliveries')}`, progress: Math.min(100, (aggregatedDeliveries / (isInterstellar ? ROUTE3_TOTAL_DELIVERIES_REQUIREMENT : ROUTE2_TOTAL_DELIVERIES_REQUIREMENT)) * 100), current: aggregatedDeliveries, target: isInterstellar ? ROUTE3_TOTAL_DELIVERIES_REQUIREMENT : ROUTE2_TOTAL_DELIVERIES_REQUIREMENT },
                     ];
 
                   const allGoalsMet = goals.every(g => g.progress >= 99.9);

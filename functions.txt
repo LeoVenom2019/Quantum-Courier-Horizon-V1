@@ -1,14 +1,15 @@
 --- HORIZON_LASER_DAMAGE_MULTIPLIER ---
-const HORIZON_LASER_DAMAGE_MULTIPLIER = 1.85;
+const HORIZON_LASER_DAMAGE_MULTIPLIER = 3.7;
           const payload = createSpecialDamagePayload(HORIZON_LASER_DAMAGE_MULTIPLIER);
 
 --- createSpecialDamagePayload ---
       const payload = createSpecialDamagePayload(multiplier, { ice: 36 });
-      const payload = createSpecialDamagePayload(0.675, { ice: 44 });
+      const payload = createSpecialDamagePayload(1.0, { ice: 44 });
       const payload = createSpecialDamagePayload(multiplier, { electric: 44 });
     const createSpecialDamagePayload = (baseMultiplier: number, extraElemental: Partial<Projectile['elemental']> = {}) => {
           const payload = createSpecialDamagePayload(HORIZON_LASER_DAMAGE_MULTIPLIER);
-      const damagePayload = createSpecialDamagePayload(1.8, { fire: 25 });
+      const damagePayload = createSpecialDamagePayload(HORIZON_BARRAGE_DAMAGE_MULTIPLIER, { fire: 25 });
+        const finalExplosionPayload = createSpecialDamagePayload(HORIZON_LASER_FINAL_EXPLOSION_MULTIPLIER);
 
 --- Laser ---
     const updateLaserSpecial = (now: number) => {
@@ -43,6 +44,25 @@ const HORIZON_LASER_DAMAGE_MULTIPLIER = 1.85;
         const end = getLaserEnd();
         state.laserImpactPos = end;
         state.laserShake = 26;
+        const finalExplosionRadius = 400;
+        const finalExplosionPayload = createSpecialDamagePayload(HORIZON_LASER_FINAL_EXPLOSION_MULTIPLIER);
+        state.enemies.forEach(enemy => {
+          const distance = Math.hypot(enemy.x - end.x, enemy.y - end.y);
+          if (enemy.hp <= 0 || distance > finalExplosionRadius + enemy.radius) return;
+          const baseDamage = finalExplosionPayload.crit
+            ? finalExplosionPayload.damage * shipStats.critMultiplier
+            : finalExplosionPayload.damage;
+          damageEnemyHull(enemy, baseDamage);
+          const elementalDamage = applyElementalDamage(enemy, finalExplosionPayload.elemental, now, isMonsterKind(enemy.kind));
+          const totalDamage = baseDamage + elementalDamage;
+          spawnFloat(
+            enemy.x + (Math.random() * 24 - 12),
+            enemy.y - 28,
+            `${finalExplosionPayload.crit ? 'CRIT ' : ''}${Math.round(totalDamage)} EXP`,
+            finalExplosionPayload.crit ? '#facc15' : '#f0abfc',
+            { life: 78, size: finalExplosionPayload.crit ? 23 : 18, shadowColor: 'rgba(240,171,252,0.75)' }
+          );
+        });
         state.shockwaves.push({ x: end.x, y: end.y, life: 1, maxRadius: 720, color: 'rgba(210,240,255,0.58)' });
         state.shockwaves.push({ x: end.x, y: end.y, life: 1, maxRadius: 520, color: 'rgba(34,211,238,0.72)' });
         for (let i = 0; i < 72; i++) {
@@ -94,7 +114,7 @@ const HORIZON_LASER_DAMAGE_MULTIPLIER = 1.85;
           state.thorSmallTornados.forEach(tornado => {
             const hit = state.enemies.some(enemy => enemy.hp > 0 && isEnemyInThorTornado(enemy, tornado));
             if (hit) {
-              applyThorDamage(1.35, tornado.x, tornado.y, tornado.radius * 1.25, 'TORNADO', '#7dd3fc');
+              applyThorDamage(0.675, tornado.x, tornado.y, tornado.radius * 1.25, 'TORNADO', '#7dd3fc');
               spawnThorShockwave(tornado.x, tornado.y, 'rgba(125,211,252,0.8)', 130);
             }
           });
@@ -118,7 +138,7 @@ const HORIZON_LASER_DAMAGE_MULTIPLIER = 1.85;
           if (state.thorBigTornado) {
             const hit = state.enemies.some(enemy => enemy.hp > 0 && isEnemyInThorTornado(enemy, state.thorBigTornado as ThorTornado));
             if (hit) {
-              applyThorDamage(1.9, state.thorBigTornado.x, state.thorBigTornado.y, state.thorBigTornado.radius * 1.45, 'MEGA', '#fde68a');
+              applyThorDamage(0.95, state.thorBigTornado.x, state.thorBigTornado.y, state.thorBigTornado.radius * 1.45, 'MEGA', '#fde68a');
               spawnThorShockwave(state.thorBigTornado.x, state.thorBigTornado.y, 'rgba(253,230,138,0.82)', 190);
             }
           }
@@ -427,8 +447,10 @@ const HORIZON_LASER_DAMAGE_MULTIPLIER = 1.85;
 
 --- Hellfire Impact ---
       if (projectile.special === 'hellfire') {
+        projectile.special === 'hellfire' ? 'rgba(251,146,60,0.86)' : projectile.crit ? '#facc15' : projectile.color,
+        projectile.special === 'hellfire' ? 1.25 : projectile.crit ? 1.18 : 0.95,
       if (projectile.special === 'hellfire') {
-      const damagePayload = createSpecialDamagePayload(1.8, { fire: 25 });
+      const damagePayload = createSpecialDamagePayload(HORIZON_BARRAGE_DAMAGE_MULTIPLIER, { fire: 25 });
         damage: damagePayload.damage,
         crit: damagePayload.crit,
         elemental: damagePayload.elemental,

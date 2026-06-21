@@ -6,7 +6,7 @@ export const dynamic = 'force-dynamic';
 
 /**
  * Advanced Engine-Grade Save System API
- * 
+ *
  * Implements:
  * - Atomic Writes (Temp file + Rename)
  * - Corruption Detection (Lock files)
@@ -15,19 +15,19 @@ export const dynamic = 'force-dynamic';
  */
 
 const getSavePaths = () => {
-  const baseDir = process.env.LOCALAPPDATA || 
-    (process.platform === 'darwin' 
-      ? path.join(process.env.HOME || '', 'Library', 'Application Support') 
+  const baseDir = process.env.QCH_DATA_DIR || process.env.LOCALAPPDATA ||
+    (process.platform === 'darwin'
+      ? path.join(process.env.HOME || '', 'Library', 'Application Support')
       : path.join(process.env.HOME || '', '.local', 'share'));
-  
+
   // Professional Structure: QCH/SaveSystem/profiles/default
   const profileDir = path.join(baseDir, 'QCH', 'SaveSystem', 'profiles', 'default');
   const systemDir = path.join(baseDir, 'QCH', 'SaveSystem'); // For the lock file
-  
+
   if (!fs.existsSync(profileDir)) {
     fs.mkdirSync(profileDir, { recursive: true });
   }
-  
+
   return {
     profileDir,
     autoSave: path.join(profileDir, 'auto-save.json'),
@@ -39,7 +39,7 @@ const getSavePaths = () => {
 
 export async function POST(request: NextRequest) {
   const paths = getSavePaths();
-  
+
   try {
     const data = await request.json();
 
@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: true });
   } catch (error: any) {
     console.error('Advanced Save Error:', error);
-    
+
     try {
       const logDir = path.join(path.dirname(paths.profileDir), '..', 'Logs');
       if (!fs.existsSync(logDir)) fs.mkdirSync(logDir, { recursive: true });
@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
 
 export async function GET() {
   const paths = getSavePaths();
-  
+
   try {
     if (fs.existsSync(paths.lock)) {
       console.warn('SaveSystem: Lock detected! Restoring backup...');
@@ -107,7 +107,7 @@ export async function GET() {
 export async function DELETE() {
   const paths = getSavePaths();
   const requestId = Math.random().toString(36).substring(7);
-  
+
   try {
     console.log(`[SaveSystem][${requestId}] --- HARD RESET INITIATED ---`);
     const filesToRemove = [
@@ -116,7 +116,7 @@ export async function DELETE() {
       { name: 'Temporary', path: paths.temp },
       { name: 'Lock', path: paths.lock }
     ];
-    
+
     let deletedCount = 0;
     let errorCount = 0;
 
@@ -151,18 +151,18 @@ export async function DELETE() {
     }
 
     console.log(`[SaveSystem][${requestId}] --- HARD RESET COMPLETE (Deleted: ${deletedCount}, Errors: ${errorCount}) ---`);
-    
-    return NextResponse.json({ 
-      success: true, 
+
+    return NextResponse.json({
+      success: true,
       message: 'Hard reset complete',
       details: { deleted: deletedCount, errors: errorCount }
     });
   } catch (error: any) {
     console.error(`[SaveSystem][${requestId}] CRITICAL RESET ERROR:`, error);
-    return NextResponse.json({ 
-      success: false, 
+    return NextResponse.json({
+      success: false,
       error: error.message,
-      requestId 
+      requestId
     }, { status: 500 });
   }
 }

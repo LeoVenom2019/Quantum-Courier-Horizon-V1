@@ -12,3 +12,9 @@ Vorathon - Não usar essa pasta para upar no git hub da QCH/
 # Exclude HTML reference folder from Tailwind v4 scanner
 HTML QCH VERIFICAR/
 Essa pasta deve ser ignorada ao enviar para GITHUB/
+
+# Desktop packaging output
+dist-desktop/
+dist-desktop-test/
+
+efeitos/

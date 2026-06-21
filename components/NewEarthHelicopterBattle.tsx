@@ -1,8 +1,9 @@
 // @ts-nocheck
 'use client';
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { X } from 'lucide-react';
 import { PremiumCanvasButton } from './ui/PremiumCanvasButton';
+import BattlePauseDialog from './BattlePauseDialog';
 
 type NewEarthHelicopterBattleStats = {
   speedBonus: number;
@@ -37,6 +38,8 @@ export function NewEarthHelicopterBattle({
   const rootRef = useRef<HTMLDivElement | null>(null);
   const onVictoryRef = useRef(onVictory);
   const onDefeatRef = useRef(onDefeat);
+  const [isPaused, setIsPaused] = useState(false);
+  const isPausedRef = useRef(false);
   const speedBonus = helicopterStats?.speedBonus ?? 0;
   const gunDamageBonus = helicopterStats?.gunDamageBonus ?? 0;
   const missileDamageBonus = helicopterStats?.missileDamageBonus ?? 0;
@@ -2182,6 +2185,11 @@ export function NewEarthHelicopterBattle({
 
     // ─── GAME LOOP ────────────────────────────────────────────────────────────
     function loop(now) {
+      if (isPausedRef.current) {
+        last = now;
+        raf = requestAnimationFrame(loop);
+        return;
+      }
       const dt = Math.min(34, now - last);
       last = now;
       const dtScale = dt / 16.67;
@@ -2225,6 +2233,17 @@ export function NewEarthHelicopterBattle({
     const listenerOptions = { signal: listenerController.signal };
 
     window.addEventListener('keydown', ev => {
+      if (ev.key === 'Escape' && !lastResult) {
+        ev.preventDefault();
+        setIsPaused(prev => {
+          const next = !prev;
+          isPausedRef.current = next;
+          if (next) Object.keys(keys).forEach(key => { keys[key] = false; });
+          return next;
+        });
+        return;
+      }
+      if (isPausedRef.current) return;
       const k = ev.key.toLowerCase();
       if (movKeys.has(k)) ev.preventDefault();
       setInputKey(k, true);
@@ -2236,6 +2255,7 @@ export function NewEarthHelicopterBattle({
     }, listenerOptions);
     canvas.addEventListener('mousemove', updateMouse, listenerOptions);
     canvas.addEventListener('mousedown', ev => {
+      if (isPausedRef.current) return;
       ev.preventDefault(); canvas.focus(); updateMouse(ev);
       if (ev.button === 2) firePlayerMissile();
       else mouse.down = true;
@@ -2258,6 +2278,13 @@ export function NewEarthHelicopterBattle({
       stopAllLoops();
     };
   }, [armorReduction, background, continueLabel, gunDamageBonus, initialDrones, missileDamageBonus, speedBonus, startingMissiles]);
+
+  const returnFromPause = () => {
+    isPausedRef.current = false;
+    setIsPaused(false);
+    onDefeatRef.current();
+    onClose();
+  };
 
   return (
     <div ref={rootRef} className="fixed inset-0 z-[80] flex items-center justify-center bg-black/96 p-2 text-slate-100">
@@ -2290,6 +2317,16 @@ export function NewEarthHelicopterBattle({
         </header>
 
         <section className="relative flex min-h-0 flex-1 items-center justify-center bg-black">
+          {isPaused && (
+            <BattlePauseDialog
+              language={language}
+              onContinue={() => {
+                isPausedRef.current = false;
+                setIsPaused(false);
+              }}
+              onReturn={returnFromPause}
+            />
+          )}
           <canvas id="battle" width={1280} height={720} className="block h-full max-h-full max-w-full cursor-crosshair" />
           <div className="absolute inset-0 hidden items-center justify-center bg-black/75 p-6 [&.show]:flex" id="overlay">
             <div className="w-[min(580px,100%)] rounded-[20px] border border-white/15 bg-slate-950/95 p-8 text-center shadow-[0_0_40px_rgba(255,255,255,0.08)]">

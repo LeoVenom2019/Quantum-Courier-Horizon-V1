@@ -52,6 +52,37 @@ const getLandingThemeForRouteTier = (routeTier: string): ThemeColor => {
 };
 
 const wait = (ms: number) => new Promise(resolve => window.setTimeout(resolve, ms));
+const META_ACHIEVEMENTS_STORAGE_KEY = 'qch_meta_achievements';
+const SECRET_ALIEN_ACHIEVEMENT_ID = 'secret_alien_name';
+const SECRET_ALIEN_NAME_STORAGE_KEY = 'qch_secret_alien_name_unlocked';
+
+type AchievementMeta = {
+  unlockedAchievements: string[];
+  achievementProgress: Record<string, number>;
+};
+
+const normalizeAchievementMeta = (value: any): AchievementMeta => ({
+  unlockedAchievements: Array.isArray(value?.unlockedAchievements)
+    ? value.unlockedAchievements.filter((id: unknown): id is string => typeof id === 'string')
+    : [],
+  achievementProgress: value?.achievementProgress && typeof value.achievementProgress === 'object'
+    ? Object.fromEntries(
+      Object.entries(value.achievementProgress)
+        .filter(([key, progress]) => typeof key === 'string' && Number.isFinite(Number(progress)))
+        .map(([key, progress]) => [key, Number(progress)])
+    )
+    : {},
+});
+
+const hasSecretAlienAchievement = (meta: AchievementMeta) => (
+  meta.unlockedAchievements.includes(SECRET_ALIEN_ACHIEVEMENT_ID)
+  || Number(meta.achievementProgress[SECRET_ALIEN_ACHIEVEMENT_ID] || 0) >= 1
+);
+
+const getAchievementMetaFromSaveData = (data: any): AchievementMeta => normalizeAchievementMeta({
+  unlockedAchievements: data?.missions?.unlockedAchievements || data?.unlockedAchievements,
+  achievementProgress: data?.missions?.achievementProgress || data?.achievementProgress,
+});
 const subscribeClientReady = () => () => {};
 const getClientReadySnapshot = () => true;
 const getServerReadySnapshot = () => false;
@@ -1165,27 +1196,20 @@ export default function GameHome() {
             setLandingTheme(getLandingThemeForRouteTier(routeTier));
             setHasSave(true);
             
-            // Achievement states
-            if (data.missions?.unlockedAchievements) {
-              setUnlockedAchievements(data.missions.unlockedAchievements);
-            } else if (data.unlockedAchievements) {
-              setUnlockedAchievements(data.unlockedAchievements);
-            }
-            
-            if (data.missions?.achievementProgress) {
-              setAchievementProgress(data.missions.achievementProgress);
-            } else if (data.achievementProgress) {
-              setAchievementProgress(data.achievementProgress);
-            }
-            
-            if (data.unlockedAchievements) {
-              setUnlockedAchievements(data.unlockedAchievements);
-            }
-            if (data.achievementProgress) {
-              setAchievementProgress(data.achievementProgress);
-            }
+            const achievementMeta = getAchievementMetaFromSaveData(data);
+            setUnlockedAchievements(achievementMeta.unlockedAchievements);
+            setAchievementProgress(achievementMeta.achievementProgress);
+            GameStorage.save(achievementMeta, META_ACHIEVEMENTS_STORAGE_KEY).catch(() => {});
           } catch (e) {}
         } else {
+          const achievementMeta = normalizeAchievementMeta(await GameStorage.load(META_ACHIEVEMENTS_STORAGE_KEY));
+          setUnlockedAchievements(achievementMeta.unlockedAchievements);
+          setAchievementProgress(achievementMeta.achievementProgress);
+          if (hasSecretAlienAchievement(achievementMeta)) {
+            localStorage.setItem(SECRET_ALIEN_NAME_STORAGE_KEY, 'true');
+          } else {
+            localStorage.removeItem(SECRET_ALIEN_NAME_STORAGE_KEY);
+          }
           preloadAssetGroupsPassive(getRecommendedAssetGroupsForRoute('Solar'));
         }
 
@@ -1202,26 +1226,106 @@ export default function GameHome() {
   
 
 
-  const resetStorageKeys = ['time_travel_save', 'time_travel_save_backup_last_valid', 'time_travel_save_backup_corrupted', 'history_data', 'qch_settings', 'jukebox_settings', 'qch_secret_alien_name_unlocked', ...COLONY_SAVE_STORAGE_KEYS];
+  const resetStorageKeys = ['time_travel_save', 'time_travel_save_backup_last_valid', 'time_travel_save_backup_corrupted', 'history_data', 'qch_settings', 'jukebox_settings', SECRET_ALIEN_NAME_STORAGE_KEY, META_ACHIEVEMENTS_STORAGE_KEY, ...COLONY_SAVE_STORAGE_KEYS];
 
-  const clearProgressStorage = async (options?: { allowImmediateSave?: boolean }) => {
+  const deleteIndexedDbDatabase = (name: string) => new Promise<void>((resolve) => {
+    try {
+      const request = indexedDB.deleteDatabase(name);
+      request.onsuccess = () => resolve();
+      request.onerror = () => resolve();
+      request.onblocked = () => resolve();
+    } catch {
+      resolve();
+    }
+  });
+
+  const clearBrowserCaches = async () => {
+    if (typeof window === 'undefined') return;
+
+    const tasks: Promise<unknown>[] = [];
+
+    if ('caches' in window) {
+      tasks.push(
+        caches.keys().then(keys => Promise.all(keys.map(key => caches.delete(key))))
+      );
+    }
+
+    if ('indexedDB' in window) {
+      const indexedDbWithList = indexedDB as IDBFactory & {
+        databases?: () => Promise<Array<{ name?: string | null }>>;
+      };
+
+      if (indexedDbWithList.databases) {
+        tasks.push(
+          indexedDbWithList.databases().then(databases => Promise.all(
+            databases
+              .map(database => database.name)
+              .filter((name): name is string => Boolean(name))
+              .map(deleteIndexedDbDatabase)
+          ))
+        );
+      }
+    }
+
+    await Promise.allSettled(tasks);
+  };
+
+  const persistAchievementMeta = async (meta: AchievementMeta) => {
+    await GameStorage.save(meta, META_ACHIEVEMENTS_STORAGE_KEY);
+    if (hasSecretAlienAchievement(meta)) {
+      localStorage.setItem(SECRET_ALIEN_NAME_STORAGE_KEY, 'true');
+    } else {
+      localStorage.removeItem(SECRET_ALIEN_NAME_STORAGE_KEY);
+    }
+  };
+
+  const getCurrentAchievementMeta = async (): Promise<AchievementMeta> => {
+    const saved = await GameStorage.load('time_travel_save');
+    if (saved) {
+      try {
+        const data = SaveManager.loadSave(saved);
+        const saveMeta = getAchievementMetaFromSaveData(data);
+        if (saveMeta.unlockedAchievements.length || Object.keys(saveMeta.achievementProgress).length) {
+          return saveMeta;
+        }
+      } catch {}
+    }
+
+    const localMeta = normalizeAchievementMeta(await GameStorage.load(META_ACHIEVEMENTS_STORAGE_KEY));
+    if (localMeta.unlockedAchievements.length || Object.keys(localMeta.achievementProgress).length) {
+      return localMeta;
+    }
+
+    return normalizeAchievementMeta({ unlockedAchievements, achievementProgress });
+  };
+
+  const clearProgressStorage = async (options?: { allowImmediateSave?: boolean; preservedAchievements?: AchievementMeta }) => {
     GameStorage.markReset(10000);
     for (const key of resetStorageKeys) {
       await GameStorage.remove(key);
       localStorage.removeItem(key);
     }
+
+    await fetch(`/api/settings?t=${Date.now()}`, { method: 'DELETE', cache: 'no-store' }).catch(() => {});
+    await clearBrowserCaches();
+
     localStorage.clear();
     sessionStorage.clear();
+
+    if (options?.preservedAchievements) {
+      await persistAchievementMeta(options.preservedAchievements);
+    }
+
     GameStorage.markReset(options?.allowImmediateSave ? 0 : 10000);
   };
 
-  const resetLocalProgressState = (options?: { keepPlayerName?: boolean }) => {
+  const resetLocalProgressState = (options?: { keepPlayerName?: boolean; preservedAchievements?: AchievementMeta }) => {
     setHasSave(false);
     if (!options?.keepPlayerName) {
       setPlayerName('');
     }
-    setUnlockedAchievements([]);
-    setAchievementProgress({});
+    setUnlockedAchievements(options?.preservedAchievements?.unlockedAchievements || []);
+    setAchievementProgress(options?.preservedAchievements?.achievementProgress || {});
     setLandingTheme('cyan');
     updateSettings({
       masterMusicOn: true,
@@ -1293,14 +1397,18 @@ export default function GameHome() {
     }
   };
 
-  const handleResetProgress = async () => {
+  const handleResetProgress = async (mode: 'keep-achievements' | 'delete-all') => {
     try {
       playSfx('aba_click');
       setIsShaking(true);
       setTimeout(() => setIsShaking(false), 500);
 
-      await clearProgressStorage();
-      resetLocalProgressState();
+      const preservedAchievements = mode === 'keep-achievements'
+        ? await getCurrentAchievementMeta()
+        : undefined;
+
+      await clearProgressStorage({ preservedAchievements });
+      resetLocalProgressState({ preservedAchievements });
 
       // Close modals
       setShowResetConfirm(false);
@@ -1308,7 +1416,7 @@ export default function GameHome() {
       setPendingNewCampaignReset(false);
       setShowOptions(false);
       
-      console.log("Progress reset successfully without reload.");
+      console.log(`Progress reset successfully (${mode}).`);
     } catch (err) {
       console.error("Reset failed:", err);
       // Fallback only if critical failure
@@ -1323,7 +1431,7 @@ export default function GameHome() {
     const data = {
       time_travel_save: await GameStorage.load('time_travel_save'),
       ...Object.fromEntries(supplementalEntries),
-      qch_secret_alien_name_unlocked: localStorage.getItem('qch_secret_alien_name_unlocked') === 'true',
+      qch_secret_alien_name_unlocked: localStorage.getItem(SECRET_ALIEN_NAME_STORAGE_KEY) === 'true',
       export_date: new Date().toISOString(),
       version: '1.3'
     };
@@ -1368,7 +1476,7 @@ export default function GameHome() {
         }
 
         if (data.qch_secret_alien_name_unlocked === true || importedMainSave.global?.secretAlienNameUnlocked === true) {
-          localStorage.setItem('qch_secret_alien_name_unlocked', 'true');
+          localStorage.setItem(SECRET_ALIEN_NAME_STORAGE_KEY, 'true');
         }
         
         playSfx('click');
@@ -1939,18 +2047,27 @@ export default function GameHome() {
 
               <div className="space-y-4 text-center mb-8">
                 <p className="text-rose-400 font-orbitron text-base leading-relaxed">
-                  {tl('This will permanently delete all your progress, ships, and upgrades. This action cannot be undone.', 'Isso excluirá permanentemente todo o seu progresso, naves e melhorias. Esta ação não pode ser desfeita.')}
+                  {tl(
+                    'This will delete your current campaign, ships, upgrades, colonies, and cache data. Choose whether achievements should be preserved.',
+                    'Isso excluirá sua campanha atual, naves, melhorias, colônias e dados de cache. Escolha se as conquistas devem ser preservadas.'
+                  )}
                 </p>
               </div>
 
               <div className="flex flex-col gap-3">
-                <button 
-                  onClick={handleResetProgress}
+                <button
+                  onClick={() => handleResetProgress('keep-achievements')}
                   className="w-full py-4 bg-rose-600 text-white font-orbitron font-bold tracking-widest rounded-lg hover:bg-white hover:text-rose-600 transition-all uppercase"
                 >
-                  {tl('CONFIRM & RESET', 'CONFIRMAR E RESETAR')}
+                  {tl('RESET AND KEEP ACHIEVEMENTS', 'RESETAR E MANTER CONQUISTAS')}
                 </button>
-                <button 
+                <button
+                  onClick={() => handleResetProgress('delete-all')}
+                  className="w-full py-4 border border-rose-500/60 text-rose-300 font-orbitron font-bold tracking-widest rounded-lg hover:bg-rose-500/20 hover:text-white transition-all uppercase"
+                >
+                  {tl('DELETE EVERYTHING', 'APAGAR TUDO')}
+                </button>
+                <button
                   onClick={() => setShowResetConfirm(false)}
                   className="w-full py-3 text-white/40 font-orbitron text-base hover:text-white transition-colors uppercase"
                 >

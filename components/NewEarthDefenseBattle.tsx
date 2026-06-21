@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { X } from 'lucide-react';
 import { BattleShipComputedStats, getHorizonXpForNextLevel, MAX_HORIZON_LEVEL } from '@/lib/colony-cards';
 import { PremiumCanvasButton } from './ui/PremiumCanvasButton';
+import BattlePauseDialog from './BattlePauseDialog';
 
 export type DefenseSpecialId = 'apocalypse-laser' | 'hellfire-barrage' | 'thor-oath' | 'special-slot-4';
 type EnemyKind = 'common-ship' | 'elite-ship' | 'boss-ship' | 'monster-1' | 'monster-2';
@@ -927,6 +928,8 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
   const [result, setResult] = useState<'victory' | 'defeat' | ''>('');
   const [resultVisible, setResultVisible] = useState(false);
   const [resultBackground, setResultBackground] = useState('');
+  const [isPaused, setIsPaused] = useState(false);
+  const isPausedRef = useRef(false);
 
   const t = (en: string, pt: string) => language === 'pt' ? pt : en;
   const difficultyLabel = getDefenseDifficultyLabel(currentDefenseBattleLevel, language);
@@ -948,6 +951,17 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
 
   useEffect(() => {
     const down = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !result) {
+        event.preventDefault();
+        setIsPaused(prev => {
+          const next = !prev;
+          isPausedRef.current = next;
+          if (next) keysRef.current = {};
+          return next;
+        });
+        return;
+      }
+      if (isPausedRef.current) return;
       keysRef.current[event.key.toLowerCase()] = true;
       keysRef.current[event.code.toLowerCase()] = true;
       if ([' ', 'q', 'e', 'c', 'f'].includes(event.key.toLowerCase()) || ['keyc', 'keyf'].includes(event.code.toLowerCase())) event.preventDefault();
@@ -962,7 +976,7 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
       window.removeEventListener('keydown', down);
       window.removeEventListener('keyup', up);
     };
-  }, []);
+  }, [result]);
 
   useEffect(() => {
     const state = stateRef.current;
@@ -1130,7 +1144,8 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
       const safeAmount = Math.max(0, Math.floor(amount));
       if (safeAmount <= 0) return;
 
-      const safeHorizonMaxLevel = Math.max(1, Math.min(MAX_HORIZON_LEVEL, Math.floor(Number(horizonMaxLevel) || MAX_HORIZON_LEVEL)));
+
+  const safeHorizonMaxLevel = Math.max(1, Math.min(MAX_HORIZON_LEVEL, Math.floor(Number(horizonMaxLevel) || MAX_HORIZON_LEVEL)));
       let { level, currentXp, nextXp } = horizonProgressRef.current;
       if (level >= safeHorizonMaxLevel) {
         horizonProgressRef.current = { level: safeHorizonMaxLevel, currentXp: 0, nextXp: 0 };
@@ -4524,6 +4539,11 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
 
     const loop = () => {
       if (state.ended) return;
+      if (isPausedRef.current) {
+        draw();
+        rafRef.current = requestAnimationFrame(loop);
+        return;
+      }
       const now = performance.now();
       if (state.pendingResult) {
         draw();
@@ -4869,6 +4889,14 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
     }
   };
 
+  const returnFromPause = () => {
+    isPausedRef.current = false;
+    setIsPaused(false);
+    keysRef.current = {};
+    setResult('defeat');
+    onDefeat();
+    onClose();
+  };
   const safeHorizonMaxLevel = Math.max(1, Math.min(MAX_HORIZON_LEVEL, Math.floor(Number(horizonMaxLevel) || MAX_HORIZON_LEVEL)));
   const isHorizonAtMaxLevel = horizonHud.level >= safeHorizonMaxLevel || horizonHud.nextXp <= 0;
   const xpPercent = isHorizonAtMaxLevel ? 100 : Math.min(100, (horizonHud.currentXp / horizonHud.nextXp) * 100);
@@ -4933,6 +4961,16 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
 
         <div className="grid min-h-0 grid-cols-[minmax(0,1fr)_260px]">
           <div className="relative min-h-0 overflow-hidden bg-black">
+            {isPaused && (
+              <BattlePauseDialog
+                language={language}
+                onContinue={() => {
+                  isPausedRef.current = false;
+                  setIsPaused(false);
+                }}
+                onReturn={returnFromPause}
+              />
+            )}
             <canvas ref={canvasRef} width={WIDTH} height={HEIGHT} className="h-full w-full" />
             <div className="pointer-events-none absolute left-4 top-4 rounded-2xl border border-cyan-300/20 bg-black/55 px-4 py-3 backdrop-blur-md">
               <p className="font-mono text-[10px] uppercase tracking-[0.28em] text-cyan-200">{t('Objective', 'Objetivo')}</p>
@@ -5088,4 +5126,3 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
 };
 
 export default NewEarthDefenseBattle;
-
