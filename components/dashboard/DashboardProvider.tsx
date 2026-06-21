@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useMemo, ReactNode, useCallback, useState, useEffect } from 'react';
-import { SaveManager } from '../../lib/save-manager';
+import { COLONY_SAVE_STORAGE_KEYS, SaveManager, sanitizeSave } from '../../lib/save-manager';
 import { GameStorage } from '../../lib/game-storage';
 import { RouteStats } from '@/lib/game-state/types';
 
@@ -22,6 +22,72 @@ import { ROUTES, SHIPS, UPGRADES, VOID_AIRCRAFT, TECHNOLOGIES, VOID_POIS } from 
 
 
 import { ROUTES_MAP, EXTRACTION_PRODUCTION_COSTS, ORES_MAP, EXTRACTION_POINTS_MAP, UPGRADES_MAP, ROBOT_UPGRADES_MAP } from '@/lib/game-constants';
+
+const MAIN_SAVE_STORAGE_KEY = 'time_travel_save';
+const LEGACY_SAVE_SECRET_KEY = 73;
+const SAVE_EXPORT_FORMAT = 'qch-save-export';
+const SECRET_ALIEN_NAME_STORAGE_KEY = 'qch_secret_alien_name_unlocked';
+
+const isRecord = (value: unknown): value is Record<string, any> => (
+  Boolean(value) && typeof value === 'object' && !Array.isArray(value)
+);
+
+const decodeLegacyDatSave = (encryptedData: string) => {
+  const decoded = decodeURIComponent(escape(atob(encryptedData)));
+  const decrypted = decoded
+    .split('')
+    .map((char, index) => String.fromCharCode(char.charCodeAt(0) ^ (LEGACY_SAVE_SECRET_KEY + (index % 17))))
+    .join('');
+
+  return JSON.parse(decrypted);
+};
+
+const parseImportedSave = (fileContents: string) => {
+  try {
+    return JSON.parse(fileContents);
+  } catch {
+    return decodeLegacyDatSave(fileContents);
+  }
+};
+
+const buildSupplementalSaveEntries = (data: Record<string, any>, mainSave: any) => {
+  const embeddedStorage = isRecord(mainSave?.colony_system?.storage)
+    ? mainSave.colony_system.storage
+    : {};
+
+  return Object.fromEntries(
+    COLONY_SAVE_STORAGE_KEYS.map(key => [
+      key,
+      Object.prototype.hasOwnProperty.call(data, key) ? data[key] : embeddedStorage[key]
+    ])
+  );
+};
+
+const normalizeImportedSavePackage = (rawData: any) => {
+  const packageData = isRecord(rawData) ? rawData : {};
+  const mainSaveCandidate = packageData[MAIN_SAVE_STORAGE_KEY] ?? rawData;
+  const supplementalEntries = buildSupplementalSaveEntries(packageData, mainSaveCandidate);
+  const mainSave = sanitizeSave({
+    ...mainSaveCandidate,
+    colony_system: {
+      ...(isRecord(mainSaveCandidate?.colony_system) ? mainSaveCandidate.colony_system : {}),
+      storage: {
+        ...(isRecord(mainSaveCandidate?.colony_system?.storage) ? mainSaveCandidate.colony_system.storage : {}),
+        ...supplementalEntries,
+      },
+    },
+  });
+
+  return {
+    mainSave,
+    supplementalEntries: buildSupplementalSaveEntries(packageData, mainSave),
+    secretAlienNameUnlocked: Boolean(
+      packageData[SECRET_ALIEN_NAME_STORAGE_KEY]
+      ?? packageData.timeTravelSecretAlienNameUnlocked
+      ?? mainSave.global.secretAlienNameUnlocked
+    ),
+  };
+};
 
 const VOID_POI_RESOURCE_KEY_BY_NEED: Record<string, string> = {
   'Energia': 'energy',
@@ -2079,156 +2145,200 @@ export const DashboardProvider = ({
 
 
 
-  const exportGameData = React.useCallback(() => {
-    const saveData: any = {
-      // Economy
-      qc: economy.qc,
-      aetherion: economy.aetherion,
-      miningWaste: economy.miningWaste,
-      solarEnergy: economy.solarEnergy,
-      aetherionTubes: economy.aetherionTubes,
-      totalExtractionProfit: economy.totalExtractionProfit,
-
-      // Progression
-      routeTier: progression.routeTier,
-      unlockedRouteIds: progression.unlockedRouteIds,
-      ownedShips: progression.ownedShips,
-      techLevels: progression.techLevels,
-      unlockedTechLevels: progression.unlockedTechLevels,
-      autoTravelSlots: progression.autoTravelSlots,
-      shipLevel: progression.shipLevel,
-      shipXP: progression.shipXP,
-      battleLevel: progression.battleLevel,
-      radarLevel: progression.radarLevel,
-      privatePoliceLevel: progression.privatePoliceLevel,
-      doubleRouteLevel: progression.doubleRouteLevel,
-      doomPLevel: progression.doomPLevel,
-      captureLevel: progression.captureLevel,
-      extractionTechLevel: progression.extractionTechLevel,
-      solarMappingLevel: progression.solarMappingLevel,
-      warCoreLevel: progression.warCoreLevel,
-      battleShipUpgradeLevel: progression.battleShipUpgradeLevel,
-      route4Unlocked: progression.route4Unlocked,
-      gameTimeSeconds: progression.gameTimeSeconds,
-
-      // Mining
-      miningRobots: mining.miningRobots,
-      miningRobotLevels: mining.miningRobotLevels,
-      oresCollected: mining.oresCollected,
-      autoSellByOre: mining.autoSellByOre,
-      autoSellUnlockedByOre: mining.autoSellUnlockedByOre,
-      miningCompressionLevels: mining.miningCompressionLevels,
-      extractionPacks: mining.extractionPacks,
-      extractionRobotLevels: mining.extractionRobotLevels,
-      extractionProductionLevels: mining.extractionProductionLevels,
-      extractionAutoSell: mining.extractionAutoSell,
-      extractionAutoSellUnlocked: mining.extractionAutoSellUnlocked,
-      extractionCompressionLevels: mining.extractionCompressionLevels,
-      unlockedExtractionPoints: mining.unlockedExtractionPoints,
-
-      // Combat
-      voidBattleStatus: combat.voidBattleStatus,
-      voidBattleShipStats: combat.voidBattleShipStats,
-      isRetributionActive: combat.isRetributionActive,
-      isFatigueActive: combat.isFatigueActive,
-      voidResources: combat.voidResources,
-      voidCompactedResources: combat.voidCompactedResources,
-      voidPOIsInspiration: combat.voidPOIsInspiration,
-      voidPOIQCDonations: combat.voidPOIQCDonations,
-      isVoidWarActive: combat.isVoidWarActive,
-      voidWarProgress: combat.voidWarProgress,
-      robotRepairProgress: combat.robotRepairProgress,
-      isRobotRepaired: combat.isRobotRepaired,
-      unlockedVoidAircraft: combat.unlockedVoidAircraft,
-      voidAircraftMissions: combat.voidAircraftMissions,
-      voidAircraftUpgrades: combat.voidAircraftUpgrades,
-      voidAircraftConstruction: combat.voidAircraftConstruction,
-      voidAircraftAutoToggles: combat.voidAircraftAutoToggles,
-
-      // Missions
-      missions: missions.missions,
-      historyStats: missions.historyStats,
-      unlockedAchievements: missions.unlockedAchievements,
-      achievementProgress: missions.achievementProgress,
-      skillLendariaLevel: missions.skillLendariaLevel,
-      skillMiticaLevel: missions.skillMiticaLevel,
-      skillAlienLevel: missions.skillAlienLevel,
-      skillTempoDinheiroLevel: missions.skillTempoDinheiroLevel,
-      skillRobosOlimpicosLevel: missions.skillRobosOlimpicosLevel,
-      missionRewardLevel: missions.missionRewardLevel,
-      missionMythicBonus: missions.missionMythicBonus,
-      missionAlienBonus: missions.missionAlienBonus,
-      missionLegendaryBonus: missions.missionLegendaryBonus,
-      autoClaimMissions: missions.autoClaimMissions,
-      radarUnlocked: missions.radarUnlocked,
-      completedInitialMissions: missions.completedInitialMissions,
-      lastScanTime: missions.lastScanTime,
-
-      // Earth
-      earthPopulation: earth.population,
-      earthMaleRatio: earth.maleRatio,
-      earthBiodiversity: earth.biodiversity,
-      earthHealth: earth.health,
-      earthHappiness: earth.happiness,
-      earthSecurity: earth.security,
-      earthQualityOfLife: earth.qualityOfLife,
-      earthEvents: earth.events,
-      earthReconstructionProgress: earth.reconstructionProgress,
-      earthCouples: earth.couples,
-      earthBirthRegistry: earth.birthRegistry,
-      earthProjectBoostCount: earth.projectBoostCount,
-      atmosphere: earth.atmosphere,
-      temperature: earth.temperature,
-      hydrosphere: earth.hydrosphere,
-      biosphere: earth.biosphere,
-      colonies: colonies,
-
-      // Game
-      seenTutorials: game.state.system.seenTutorials,
+  const exportGameData = React.useCallback(async () => {
+    const persistedMainSave = sanitizeSave(await GameStorage.load(MAIN_SAVE_STORAGE_KEY));
+    const supplementalEntries = await Promise.all(
+      COLONY_SAVE_STORAGE_KEYS.map(async key => [
+        key,
+        (await GameStorage.load(key)) ?? persistedMainSave.colony_system.storage[key]
+      ] as const)
+    );
+    const supplementalStorage = Object.fromEntries(supplementalEntries);
+    const mainSave = sanitizeSave({
+      ...persistedMainSave,
+      global: {
+        ...persistedMainSave.global,
+        qc: economy.qc,
+        routeTier: progression.routeTier,
+        route4Unlocked: progression.route4Unlocked,
+        gameTimeSeconds: progression.gameTimeSeconds,
+        totalDeliveries: progression.totalDeliveries,
+        deliveriesByLocation: progression.deliveriesByLocation,
+        historyStats: missions.historyStats,
+        seenTutorials: game.state.system.seenTutorials,
+        completedInitialMissions: missions.completedInitialMissions,
+        missions: missions.missions,
+        autoClaimMissions: missions.autoClaimMissions,
+        missionMythicBonus: missions.missionMythicBonus,
+        missionAlienBonus: missions.missionAlienBonus,
+        missionLegendaryBonus: missions.missionLegendaryBonus,
+        missionRewardLevel: missions.missionRewardLevel,
+        radarUnlocked: missions.radarUnlocked,
+        lastScanTime: missions.lastScanTime,
+        unlockedAchievements: missions.unlockedAchievements,
+        achievementProgress: missions.achievementProgress,
+        aetherion: economy.aetherion,
+        miningWaste: economy.miningWaste,
+        solarEnergy: economy.solarEnergy,
+        aetherionTubes: economy.aetherionTubes,
+        hasSeenRoute2UnlockMessage: game.state.system.hasSeenRoute2UnlockMessage,
+        secretAlienNameUnlocked: typeof localStorage !== 'undefined' && localStorage.getItem(SECRET_ALIEN_NAME_STORAGE_KEY) === 'true',
+      },
+      routes: {
+        ...persistedMainSave.routes,
+        unlockedRouteIds: progression.unlockedRouteIds,
+        autoTravelSlots: progression.autoTravelSlots,
+        autoTravelActive,
+        autoTravelDesired,
+        doubleRouteLevel: progression.doubleRouteLevel,
+      },
+      ships: {
+        ...persistedMainSave.ships,
+        ownedShips: progression.ownedShips,
+        shipXP: progression.shipXP,
+        shipLevel: progression.shipLevel,
+      },
+      tech: {
+        ...persistedMainSave.tech,
+        techLevels: progression.techLevels,
+        unlockedTechLevels: progression.unlockedTechLevels,
+      },
+      mining: {
+        ...persistedMainSave.mining,
+        miningRobots: mining.miningRobots,
+        miningRobotLevels: mining.miningRobotLevels,
+        oresCollected: mining.oresCollected,
+        autoSellByOre: mining.autoSellByOre,
+        autoSellUnlockedByOre: mining.autoSellUnlockedByOre,
+        miningCompressionLevels: mining.miningCompressionLevels,
+      },
+      skills: {
+        ...persistedMainSave.skills,
+        skillLendariaLevel: missions.skillLendariaLevel,
+        skillMiticaLevel: missions.skillMiticaLevel,
+        skillAlienLevel: missions.skillAlienLevel,
+        skillTempoDinheiroLevel: missions.skillTempoDinheiroLevel,
+        skillRobosOlimpicosLevel: missions.skillRobosOlimpicosLevel,
+      },
+      extraction_interstellar: {
+        ...persistedMainSave.extraction_interstellar,
+        extractionTechLevel: progression.extractionTechLevel,
+        solarMappingLevel: progression.solarMappingLevel,
+        captureLevel: progression.captureLevel,
+        battleLevel: progression.battleLevel,
+        radarLevel: progression.radarLevel,
+        privatePoliceLevel: progression.privatePoliceLevel,
+        doomPLevel: progression.doomPLevel,
+        autoSkipRandomBattles: progression.autoSkipRandomBattles,
+        isRetributionActive: combat.isRetributionActive,
+        isFatigueActive: combat.isFatigueActive,
+        unlockedExtractionPoints: mining.unlockedExtractionPoints,
+        extractionPacks: mining.extractionPacks,
+        extractionRobotLevels: mining.extractionRobotLevels,
+        extractionProductionLevels: mining.extractionProductionLevels,
+        extractionCompressionLevels: mining.extractionCompressionLevels,
+        extractionAutoSell: mining.extractionAutoSell,
+        extractionAutoSellUnlocked: mining.extractionAutoSellUnlocked,
+        totalExtractionProfit: economy.totalExtractionProfit,
+      },
+      void_aircraft: {
+        ...persistedMainSave.void_aircraft,
+        isVoidWarActive: combat.isVoidWarActive,
+        voidWarProgress: combat.voidWarProgress,
+        voidResources: combat.voidResources,
+        voidCompactedResources: combat.voidCompactedResources,
+        voidDonationModes: combat.voidDonationModes,
+        voidAircraftMissions: combat.voidAircraftMissions,
+        voidAircraftUpgrades: combat.voidAircraftUpgrades,
+        voidAircraftAutoToggles: combat.voidAircraftAutoToggles,
+        voidBattleShipStats: combat.voidBattleShipStats,
+        voidPOIsInspiration: combat.voidPOIsInspiration,
+        voidPOIQCDonations: combat.voidPOIQCDonations,
+        hasWonEliminateEnemiesRoute3: combat.hasWonEliminateEnemiesRoute3,
+        robotRepairProgress: combat.robotRepairProgress,
+        isRobotRepaired: combat.isRobotRepaired,
+        battleShipUpgradeLevel: progression.battleShipUpgradeLevel,
+        warCoreLevel: progression.warCoreLevel,
+        voidAutoShipmentUnlocked: mining.voidAutoShipmentUnlocked,
+        voidAutoShipmentActive: mining.voidAutoShipmentActive,
+        unlockedVoidAircraft: combat.unlockedVoidAircraft,
+        voidAircraftConstruction: combat.voidAircraftConstruction,
+      },
+      earth_reconstruction: {
+        ...persistedMainSave.earth_reconstruction,
+        earthReconstructionProgress: earth.reconstructionProgress,
+        earthPopulation: earth.population,
+        earthMaleRatio: earth.maleRatio,
+        earthBiodiversity: earth.biodiversity,
+        earthHealth: earth.health,
+        earthHappiness: earth.happiness,
+        earthSecurity: earth.security,
+        earthQualityOfLife: earth.qualityOfLife,
+        earthCouples: earth.couples,
+        earthBirthRegistry: earth.birthRegistry,
+        earthProjectBoostCount: earth.projectBoostCount,
+        earthSeason: earth.season,
+        earthEvents: earth.events,
+        colonies,
+        atmosphere: earth.atmosphere,
+        temperature: earth.temperature,
+        hydrosphere: earth.hydrosphere,
+        biosphere: earth.biosphere,
+      },
+      colony_system: {
+        ...persistedMainSave.colony_system,
+        storage: supplementalStorage,
+      },
       arcadeScores: game.state.system.arcadeScores,
-      hasSeenRoute2UnlockMessage: game.state.system.hasSeenRoute2UnlockMessage
+    });
+    const data = {
+      export_format: SAVE_EXPORT_FORMAT,
+      export_date: new Date().toISOString(),
+      version: mainSave.version,
+      [MAIN_SAVE_STORAGE_KEY]: mainSave,
+      ...supplementalStorage,
+      [SECRET_ALIEN_NAME_STORAGE_KEY]: mainSave.global.secretAlienNameUnlocked,
     };
 
-    const modularSave = SaveManager.createSave(saveData);
-    const jsonString = JSON.stringify(modularSave, null, 2);
-    const SECRET_KEY = 73;
-    const xored = jsonString.split('').map((char, i) => String.fromCharCode(char.charCodeAt(0) ^ (SECRET_KEY + (i % 17)))).join('');
-    const encryptedData = btoa(unescape(encodeURIComponent(xored)));
-    const blob = new Blob([encryptedData], { type: 'text/plain' });
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `timetravel_save_${new Date().toISOString().split('T')[0]}.dat`;
+    link.download = `qch_save_${new Date().toISOString().split('T')[0]}.json`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
-  }, [economy, progression, mining, combat, missions, earth, game, colonies]);
-
+  }, [autoTravelActive, autoTravelDesired, colonies, combat, earth, economy, game.state.system, mining, missions, progression]);
   const importGameData = React.useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       try {
-        const encryptedData = e.target?.result as string;
-        const decoded = decodeURIComponent(escape(atob(encryptedData)));
-        const SECRET_KEY = 73;
-        const decrypted = decoded.split('').map((char, i) => String.fromCharCode(char.charCodeAt(0) ^ (SECRET_KEY + (i % 17)))).join('');
-        const rawData = JSON.parse(decrypted);
-        const structuredState = SaveManager.loadSave(rawData);
+        const fileContents = e.target?.result as string;
+        const rawData = parseImportedSave(fileContents);
+        const { mainSave, supplementalEntries, secretAlienNameUnlocked } = normalizeImportedSavePackage(rawData);
+        const structuredState = SaveManager.loadSave(mainSave);
         if (structuredState) {
+          if (typeof localStorage !== 'undefined') {
+            localStorage.setItem(SECRET_ALIEN_NAME_STORAGE_KEY, String(secretAlienNameUnlocked));
+          }
+          await GameStorage.save(mainSave, MAIN_SAVE_STORAGE_KEY);
+          await Promise.all(
+            COLONY_SAVE_STORAGE_KEYS.map(key => GameStorage.save(supplementalEntries[key], key))
+          );
           dispatch({ type: 'LOAD_SAVE', payload: structuredState });
-          GameStorage.save(rawData, 'time_travel_save');
           window.location.reload();
         }
       } catch (err) {
         console.error("Failed to import save:", err);
+      } finally {
+        event.target.value = '';
       }
     };
     reader.readAsText(file);
   }, [dispatch]);
-
   const value = useMemo(() => ({
     progression,
     economy,
