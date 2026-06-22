@@ -57,6 +57,10 @@ const UpgradesTab = memo(function UpgradesTab() {
   const manualSynthesisPulseRef = React.useRef(false);
 
   const isInterstellar = routeTier === 'Interstellar';
+  const tubeCapacity = isInterstellar ? 20 : 10;
+  const canCreateAetherionTube = miningWaste >= 2500 && solarEnergy >= 2500 && aetherionTubes < tubeCapacity;
+  const canConsumeAetherionTube = aetherionTubes > 0 && aetherion < 10000;
+  const canSynthesizeAetherion = canCreateAetherionTube || canConsumeAetherionTube;
   const themeAccent = isInterstellar ? 'text-orange-400' : 'text-cyan-400';
   const themeBorder = isInterstellar ? 'border-orange-500/20' : 'border-cyan-500/20';
   const themeBg = isInterstellar ? 'bg-orange-500/5' : 'bg-cyan-500/5';
@@ -81,12 +85,12 @@ const UpgradesTab = memo(function UpgradesTab() {
   }, []);
 
   const handleSynthesizeAetherion = React.useCallback(() => {
-    if (aetherionTubes > 0 && aetherion < 10000) {
+    if (canSynthesizeAetherion) {
       manualSynthesisPulseRef.current = true;
       triggerRhseLiquidMotion();
     }
     synthesizeAetherion();
-  }, [aetherion, aetherionTubes, synthesizeAetherion, triggerRhseLiquidMotion]);
+  }, [canSynthesizeAetherion, synthesizeAetherion, triggerRhseLiquidMotion]);
 
   React.useEffect(() => {
     const consumedTube = aetherionTubes < previousAetherionTubesRef.current;
@@ -314,17 +318,17 @@ const UpgradesTab = memo(function UpgradesTab() {
                   </div>
                 </div>
                 <div className="text-base font-mono font-bold text-white ml-2">
-                  {aetherionTubes} / {isInterstellar ? 20 : 10}
+                  {aetherionTubes} / {tubeCapacity}
                 </div>
               </div>
 
               <PremiumCanvasButton
                 onClick={handleSynthesizeAetherion}
-                tone={aetherionTubes > 0 ? (isInterstellar ? 'orange' : 'cyan') : 'steel'}
+                tone={canSynthesizeAetherion ? (isInterstellar ? 'orange' : 'cyan') : 'steel'}
                 className="h-11 min-w-[218px] px-5 text-[15px] font-bold uppercase tracking-widest"
-                contentClassName={`gap-2 ${aetherionTubes > 0 ? (isInterstellar ? 'text-orange-100' : 'text-cyan-100') : 'text-slate-500'}`}
+                contentClassName={`gap-2 ${canSynthesizeAetherion ? (isInterstellar ? 'text-orange-100' : 'text-cyan-100') : 'text-slate-500'}`}
               >
-                <RefreshCw className={`w-3 h-3 ${aetherionTubes > 0 ? 'animate-spin-slow' : ''}`} />
+                <RefreshCw className={`w-3 h-3 ${canSynthesizeAetherion ? 'animate-spin-slow' : ''}`} />
                 {language === 'pt' ? 'SINTETIZAR ÉTERION' : 'SYNTHESIZE AETHERION'}
               </PremiumCanvasButton>
             </div>
@@ -506,7 +510,7 @@ const UpgradesTab = memo(function UpgradesTab() {
               
               const multiplier = getLocationMultiplier(selectedUpgradeLocation);
               const multipliers = getEconomicMultipliers();
-              const cost = nextTier ? Math.floor(nextTier.cost * multiplier * multipliers.cost * (isInterstellar ? 1.5 : 1)) : 0;
+              const cost = nextTier ? Math.floor(nextTier.cost * multiplier * multipliers.cost * (isInterstellar ? 4.5 : 1)) : 0;
               const canAfford = qc >= cost;
               
               const maxLvl = upgrade.tiers[upgrade.tiers.length - 1].level;

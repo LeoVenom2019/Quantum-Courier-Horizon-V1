@@ -2,7 +2,25 @@ export const CURRENT_SAVE_VERSION = "1.3.0";
 
 const VALID_ROUTE_TIERS = new Set(['Solar', 'Interstellar', 'Void', 'Earth']);
 
-const hasArrayItems = (value: unknown) => Array.isArray(value) && value.length > 0;
+
+const hasColonyProgress = (value: unknown): boolean => (
+  Array.isArray(value) && value.some((colony: any) => {
+    const constructions = Array.isArray(colony?.constructions) ? colony.constructions : [];
+    const equippedCards = colony?.equippedCards && typeof colony.equippedCards === 'object' ? colony.equippedCards : {};
+
+    return (
+      Number(colony?.population || 0) > 0 ||
+      Number(colony?.age || 0) > 0 ||
+      Object.values(equippedCards).some(Boolean) ||
+      constructions.some((construction: any) => (
+        Number(construction?.level || 0) > 0 ||
+        Number(construction?.progress || 0) > 0 ||
+        Number(construction?.assignedConstructors || 0) > 0 ||
+        Boolean(construction?.isComplete)
+      ))
+    );
+  })
+);
 
 const hasRoute4SaveSignals = (data: any): boolean => {
   if (!data || typeof data !== 'object') return false;
@@ -10,37 +28,32 @@ const hasRoute4SaveSignals = (data: any): boolean => {
   const colonySystem = data.colony_system || {};
   const colonyStorage = colonySystem.storage || {};
   const earthReconstruction = data.earth_reconstruction || {};
+  const hasColonyActivity = (
+    hasColonyProgress(data.colonies) ||
+    hasColonyProgress(earthReconstruction.colonies) ||
+    hasColonyProgress(colonySystem.colonies) ||
+    hasColonyProgress(colonyStorage.colonies_data)
+  );
 
   return (
+    Boolean(data.route4Unlocked || data.global?.route4Unlocked) ||
     Number(data.earthPopulation || earthReconstruction.earthPopulation || 0) > 0 ||
-    Number(data.gameTimeSeconds || data.global?.gameTimeSeconds || 0) > 0 && (
-      hasArrayItems(data.colonies) ||
-      hasArrayItems(earthReconstruction.colonies) ||
-      hasArrayItems(colonySystem.colonies) ||
-      hasArrayItems(colonyStorage.colonies_data)
-    ) ||
-    hasArrayItems(data.colonies) ||
-    hasArrayItems(earthReconstruction.colonies) ||
-    hasArrayItems(colonySystem.colonies) ||
-    hasArrayItems(colonyStorage.colonies_data) ||
-    Boolean(colonySystem.newEarthMissions || colonyStorage.new_earth_missions) ||
-    Boolean(colonySystem.newEarthSubmarines || colonyStorage.new_earth_submarines) ||
-    Boolean(colonySystem.newEarthHelicopters || colonyStorage.new_earth_helicopters) ||
-    Boolean(colonySystem.newEarthTanks || colonyStorage.new_earth_tanks) ||
-    Boolean(colonySystem.newEarthSurfaceBattles || colonyStorage.new_earth_surface_battles) ||
-    Boolean(colonySystem.newEarthMuseumTreasures || colonyStorage.new_earth_museum_treasures) ||
-    Boolean(colonySystem.newEarthWarIntel || colonyStorage.new_earth_war_intel) ||
-    Boolean(colonySystem.newEarthAchievementMetrics || colonyStorage.new_earth_achievement_metrics)
+    hasColonyActivity
   );
 };
-
 const normalizeSavedRouteTier = (routeTier: unknown, data: any): 'Solar' | 'Interstellar' | 'Void' | 'Earth' => {
   const tier = typeof routeTier === 'string' && VALID_ROUTE_TIERS.has(routeTier)
     ? routeTier as 'Solar' | 'Interstellar' | 'Void' | 'Earth'
     : 'Solar';
 
-  if (tier === 'Solar' && hasRoute4SaveSignals(data)) {
+  const hasRoute4Signals = hasRoute4SaveSignals(data);
+
+  if (tier === 'Solar' && hasRoute4Signals) {
     return 'Earth';
+  }
+
+  if (tier === 'Earth' && !hasRoute4Signals) {
+    return 'Solar';
   }
 
   return tier;

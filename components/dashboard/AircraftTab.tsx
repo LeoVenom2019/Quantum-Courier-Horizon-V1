@@ -167,8 +167,8 @@ const AircraftTab = memo(({ renderBattleLevelTab }: { renderBattleLevelTab: () =
                             </span>
                           </div>
                         </div>
-                        <div className={`p-4 rounded-2xl bg-slate-900/80 border ${themeBorder} ${themeGlow} flex items-center justify-center overflow-hidden`}>
-                          <ShipVisual ship={currentShips[shipPageIndex]} className="w-12 h-12" />
+                        <div className={`h-[6.75rem] w-[6.75rem] p-3 rounded-2xl bg-slate-900/80 border ${themeBorder} ${themeGlow} flex items-center justify-center overflow-hidden`}>
+                          <ShipVisual ship={currentShips[shipPageIndex]} className="h-[5.25rem] w-[5.25rem]" />
                         </div>
                       </div>
 

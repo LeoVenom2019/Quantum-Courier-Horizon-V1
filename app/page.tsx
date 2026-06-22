@@ -13,6 +13,7 @@ import { useSFX } from '@/hooks/useSFX';
 import { useSoundMaster } from '@/hooks/useSoundMaster';
 import { HorizonRadioModal } from '@/components/HorizonRadioModal';
 import { GameStorage } from '@/lib/game-storage';
+import { useDispatch } from '@/lib/game-state';
 import { COLONY_SAVE_STORAGE_KEYS, SaveManager, sanitizeSave } from '@/lib/save-manager';
 import { Language, t } from '@/lib/i18n';
 import { ThemeColor } from '@/lib/game-data';
@@ -986,6 +987,8 @@ const MenuButton = ({ label, icon: Icon, onClick, disabled = false, theme = 'cya
 };
 
 export default function GameHome() {
+  const dispatch = useDispatch();
+
   useEffect(() => {
     const handleError = (event: ErrorEvent) => {
       // Prevent Next.js Error Overlay and browser default logging
@@ -1311,6 +1314,7 @@ export default function GameHome() {
 
     localStorage.clear();
     sessionStorage.clear();
+    GameStorage.markHardReset();
 
     if (options?.preservedAchievements) {
       await persistAchievementMeta(options.preservedAchievements);
@@ -1637,6 +1641,7 @@ export default function GameHome() {
             if (pendingNewCampaignReset) {
               const confirmedPlayerName = playerName;
               await clearProgressStorage({ allowImmediateSave: true });
+              dispatch({ type: 'RESET_GAME' });
               resetLocalProgressState({ keepPlayerName: true });
               setPlayerName(confirmedPlayerName);
               setPendingNewCampaignReset(false);
@@ -1676,6 +1681,8 @@ export default function GameHome() {
                 const techLevels = data.progression?.unlockedTechLevels || data.unlockedTechLevels || {};
                 setLandingTheme(getLandingThemeForRouteTier(routeTier));
               } catch (e) {}
+            } else {
+              setLandingTheme('cyan');
             }
           }}
           jukebox={jukeboxState}

@@ -74,6 +74,8 @@ const BattleOverlay = memo(({
   const battleRoute = ROUTES_MAP.get(activeBattle.routeId);
   if (battleRoute?.tier !== routeTier) return null;
 
+  const canSkipActiveBattle = String(activeBattle.deliveryId || '').startsWith('auto-');
+
   const cooldowns = {
     laser: 1000,
     plasma: 2000,
@@ -293,8 +295,9 @@ const BattleOverlay = memo(({
         disableMeteorEvent={String(activeBattle.deliveryId || '').startsWith('auto-')}
       />
 
-        {/* Skip Button during active combat */}
-        <div className="absolute top-6 right-6 z-[600]">
+        {/* Skip Button only for automatic delivery battles */}
+        {canSkipActiveBattle && (
+          <div className="absolute top-6 right-6 z-[600]">
           <button
             onClick={() => {
               const skipCost = routeTier === 'Interstellar' ? 40 : 10;
@@ -320,7 +323,8 @@ const BattleOverlay = memo(({
             </div>
             <span className="text-[10px] opacity-70">-{routeTier === 'Interstellar' ? 40 : 10} AE</span>
           </button>
-        </div>
+          </div>
+        )}
       </div>
     );
   }

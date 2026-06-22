@@ -1,6 +1,7 @@
 // lib/game-state/selectors.ts
 
 import { EXTRACTION_POINTS } from '@/lib/game-data';
+import { INTERSTELLAR_EXTRACTION_VALUE_MULTIPLIER } from '@/lib/game-constants';
 import { GameState } from './types';
 
 /**
@@ -13,7 +14,7 @@ export function calcExtractionSaleValue(
   state: Pick<GameState, 'mining' | 'progression'>
 ): number {
   const point = EXTRACTION_POINTS.find(p => p.id === pointId);
-  if (!point || packs < 1000) return 0;
+  if (!point || packs < 100) return 0;
 
   let value = packs * point.valuePerPack;
 
@@ -28,7 +29,7 @@ export function calcExtractionSaleValue(
     value *= compressionLevel * 2;
   }
 
-  return value;
+  return Math.floor(value * INTERSTELLAR_EXTRACTION_VALUE_MULTIPLIER);
 }
 
 /**

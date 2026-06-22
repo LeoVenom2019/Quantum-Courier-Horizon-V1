@@ -781,7 +781,12 @@ const preloadMedia = (src: string, kind: 'audio' | 'video') => {
   if (!isBrowser()) return Promise.resolve();
   return new Promise<void>((resolve, reject) => {
     const media = kind === 'audio' ? new Audio() : document.createElement('video');
+    const timeout = window.setTimeout(() => {
+      cleanup();
+      resolve();
+    }, 4500);
     const cleanup = () => {
+      window.clearTimeout(timeout);
       media.removeEventListener('canplaythrough', onReady);
       media.removeEventListener('loadedmetadata', onReady);
       media.removeEventListener('error', onError);

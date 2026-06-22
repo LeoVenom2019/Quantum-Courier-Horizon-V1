@@ -72,8 +72,10 @@ import {
   FileText
 } from 'lucide-react';
 
+const ROUTE2_MISSIONS_REQUIREMENT = 100;
+const ROUTE3_MISSIONS_REQUIREMENT = 500;
 const ROUTE2_TOTAL_DELIVERIES_REQUIREMENT = 1500;
-const ROUTE3_TOTAL_DELIVERIES_REQUIREMENT = 9999;
+const ROUTE3_TOTAL_DELIVERIES_REQUIREMENT = 5000;
 const META_ACHIEVEMENTS_STORAGE_KEY = 'qch_meta_achievements';
 const SECRET_ALIEN_ACHIEVEMENT_ID = 'secret_alien_name';
 const SECRET_ALIEN_NAME_STORAGE_KEY = 'qch_secret_alien_name_unlocked';
@@ -279,6 +281,10 @@ import { DashboardProvider, useDashboard } from './dashboard/DashboardProvider';
 import {
   EXTRACTION_PRODUCTION_VALUES,
   EXTRACTION_PRODUCTION_COSTS,
+  INTERSTELLAR_EXTRACTION_VALUE_MULTIPLIER,
+  MINING_VALUE_MULTIPLIER,
+  BATTLE_REWARD_VALUE_MULTIPLIER,
+  CAPTURE_BONUS_MULTIPLIER,
   VOID_WAR_START_LORE,
   SHIPS_ROUTE_3_STEPS,
   MISSION_RARITY_UPGRADE_COSTS,
@@ -1230,6 +1236,13 @@ const DashboardContent = memo(({
   const [arcadeCardReward, setArcadeCardReward] = useState<ColonyCard | null>(null);
   const [arcadeTabWarning, setArcadeTabWarning] = useState<string | null>(null);
   const [achievementNotification, setAchievementNotification] = useState<Achievement | null>(null);
+  const [deliveryBattleNotice, setDeliveryBattleNotice] = useState<{
+    id: number;
+    type: 'success' | 'error';
+    title: string;
+    message: string;
+    tier: 'Solar' | 'Interstellar' | 'Void' | 'Earth';
+  } | null>(null);
   const [showRoute3Ending, setShowRoute3Ending] = useState(false);
   const [route3EndingStep, setRoute3EndingStep] = useState(0);
   const [showVoidLore, setShowVoidLore] = useState(false);
@@ -4673,7 +4686,7 @@ const DashboardContent = memo(({
       voidAutoShipmentActive: voidAutoShipmentActiveRef.current,
     };
 
-    const modularSave = SaveManager.createSave(saveData);
+    const modularSave = SaveManager.createSave({ ...saveData, _skipLocalStorage: true });
     await GameStorage.save(modularSave, 'time_travel_save');
   }, [isLoaded, playerName, seenTutorials, autoClaimMissions, radarUnlocked]);
 
@@ -4786,6 +4799,28 @@ const DashboardContent = memo(({
 
     return value.toString();
   }, [formatNumbers]);
+
+
+  const applyMissionProgress = useCallback((type: 'delivery' | 'sell', key: number | string, count: number, tier: 'Solar' | 'Interstellar' | 'Void' | 'Earth') => {
+    if (count <= 0) return;
+
+    setMissions(prev => {
+      let changed = false;
+      const next = prev.map(m => {
+        if (m.completed || m.tier !== tier || m.type !== type) return m;
+        const matches = type === 'delivery'
+          ? m.shipLevel === Number(key)
+          : m.oreId === String(key);
+        if (!matches) return m;
+
+        const newCurrent = Math.min(m.target, m.current + count);
+        if (newCurrent === m.current && m.completed === (newCurrent >= m.target)) return m;
+        changed = true;
+        return { ...m, current: newCurrent, completed: newCurrent >= m.target };
+      });
+      return changed ? next : prev;
+    });
+  }, [setMissions]);
 
   // Extraction Points Logic
   const extractionTimersRef = useRef<{ [id: string]: number }>({});
@@ -4902,9 +4937,10 @@ const DashboardContent = memo(({
             saleValue *= multiplier;
           }
 
+          saleValue *= INTERSTELLAR_EXTRACTION_VALUE_MULTIPLIER;
+
           // Update mission progress
-          const sellKey = `sell-${id}`;
-          pendingMissionProgressRef.current[sellKey] = (pendingMissionProgressRef.current[sellKey] || 0) + currentPacks;
+          applyMissionProgress('sell', id, currentPacks, 'Interstellar');
 
           totalQcGained += saleValue;
           totalPacksSold += currentPacks;
@@ -4931,7 +4967,7 @@ const DashboardContent = memo(({
     }, 500); // Check every 500ms for more responsive automatic sales
 
     return () => clearInterval(interval);
-  }, [playSfx, routeTier, dispatch, getEconomicMultipliers, setTotalExtractionProfit]);
+  }, [playSfx, routeTier, dispatch, getEconomicMultipliers, setTotalExtractionProfit, applyMissionProgress]);
 
   useEffect(() => {
     if (!researchingExtractionPoint) return;
@@ -5012,9 +5048,10 @@ const DashboardContent = memo(({
     const totalMult = baseMult + winMult + lvlMult + shipMult + randomMult + encrenMult;
 
     const captureMultipliers = [1, 1.5, 2, 3, 4, 5, 6, 7, 8, 9, 10];
-    const captureMultiplier = routeTierRef.current === 'Interstellar' ? (captureMultipliers[captureLevelRef.current] || 1) : 1;
+    const rawCaptureMultiplier = captureMultipliers[captureLevelRef.current] || 1;
+    const captureMultiplier = routeTierRef.current === 'Interstellar' ? 1 + ((rawCaptureMultiplier - 1) * CAPTURE_BONUS_MULTIPLIER) : 1;
 
-    let qcReward = Math.floor(battle.reward * totalMult * captureMultiplier);
+    let qcReward = Math.floor(battle.reward * totalMult * captureMultiplier * BATTLE_REWARD_VALUE_MULTIPLIER);
 
     // Apply Level 30 reward: 25% extra QC
     if (isRetributionActiveRef.current && battleLevelRef.current >= 30 && routeTierRef.current === 'Interstellar') {
@@ -5023,8 +5060,8 @@ const DashboardContent = memo(({
 
     // CAP REWARDS: Limit QC to prevent Trillions
     if (routeTierRef.current === 'Interstellar') {
-      const maxRegular = 1000000000; // 1 Billion
-      const maxBoss = 5000000000;    // 5 Billion
+      const maxRegular = Math.floor(1000000000 * BATTLE_REWARD_VALUE_MULTIPLIER); // 3.5 Billion
+      const maxBoss = Math.floor(5000000000 * BATTLE_REWARD_VALUE_MULTIPLIER);    // 17.5 Billion
       const cap = battle.isBoss ? maxBoss : maxRegular;
       if (qcReward > cap) {
         qcReward = cap;
@@ -5523,10 +5560,10 @@ const DashboardContent = memo(({
 
             // Reduced targets by 50% for faster progression
             let baseTarget = currentTier === 'Interstellar' ? 15 : 10;
-            if (isExtraction) baseTarget = 500; // Extraction points sell in chunks of 100
+            if (isExtraction) baseTarget = 100;
 
             const reduction = skillRobosOlimpicosLevelRef.current[routeTier];
-            const target = Math.max(isExtraction ? 100 : 5, baseTarget - (isExtraction ? reduction * 20 : reduction));
+            const target = isExtraction ? 100 : Math.max(5, baseTarget - reduction);
 
             let rewardAetherion = 0;
             if (rarity === 'mythic') {
@@ -5794,12 +5831,12 @@ const DashboardContent = memo(({
 
     // 8. Total de entregas
     if (totalDeliveries < ROUTE2_TOTAL_DELIVERIES_REQUIREMENT) return false;
-
-    // 9. 100 missÃµes concluídas
-    if ((historyStats['Solar']?.missionsCompleted || 0) < 100) return false;
+    // 9. Missões concluídas
+    const completedUnclaimedSolarMissions = missions.filter(m => m.tier === 'Solar' && m.completed && !m.claimed).length;
+    if (((historyStats['Solar']?.missionsCompleted || 0) + completedUnclaimedSolarMissions) < ROUTE2_MISSIONS_REQUIREMENT) return false;
 
     return true;
-  }, [routeTier, unlockedTechLevels, ownedShips, techLevels, miningRobots, miningRobotLevels, autoTravelSlots, historyStats, miningCompressionLevels, totalDeliveries]);
+  }, [routeTier, unlockedTechLevels, ownedShips, techLevels, miningRobots, miningRobotLevels, autoTravelSlots, historyStats, miningCompressionLevels, totalDeliveries, missions]);
 
   const isRoute3Unlocked = useCallback(() => {
     if (routeTier === 'Void') return true;
@@ -5850,13 +5887,13 @@ const DashboardContent = memo(({
 
     // 8. Total de entregas
     if (totalDeliveries < ROUTE3_TOTAL_DELIVERIES_REQUIREMENT) return false;
-
-    // 9. 1000 missões concluídas (Aggregated)
-    const aggregatedMissions = (solarStats.missionsCompleted || 0) + (interstellarStats.missionsCompleted || 0);
-    if (aggregatedMissions < 1000) return false;
+    // 9. Missões concluídas (agregado Solar + Interstellar)
+    const completedUnclaimedMissions = missions.filter(m => (m.tier === 'Solar' || m.tier === 'Interstellar') && m.completed && !m.claimed).length;
+    const aggregatedMissions = (solarStats.missionsCompleted || 0) + (interstellarStats.missionsCompleted || 0) + completedUnclaimedMissions;
+    if (aggregatedMissions < ROUTE3_MISSIONS_REQUIREMENT) return false;
 
     return true;
-  }, [routeTier, unlockedTechLevels, ownedShips, techLevels, miningRobots, miningRobotLevels, autoTravelSlots, historyStats, miningCompressionLevels, totalDeliveries]);
+  }, [routeTier, unlockedTechLevels, ownedShips, techLevels, miningRobots, miningRobotLevels, autoTravelSlots, historyStats, miningCompressionLevels, totalDeliveries, missions]);
 
   const syncAchievements = useCallback(() => {
     const ownedShipTypesForTier = (tier: 'Solar' | 'Interstellar' | 'Void') => (
@@ -6339,6 +6376,7 @@ const DashboardContent = memo(({
           console.error('Failed to load save', e);
         }
       } else {
+        dispatch({ type: 'RESET_GAME' });
         const achievementMeta = normalizeAchievementMeta(await GameStorage.load(META_ACHIEVEMENTS_STORAGE_KEY));
         if (achievementMeta.unlockedAchievements.length || Object.keys(achievementMeta.achievementProgress).length) {
           dispatch({ type: 'SET_MISSIONS_DATA', payload: achievementMeta });
@@ -6611,7 +6649,7 @@ const DashboardContent = memo(({
     };
 
     try {
-      const modularSave = SaveManager.createSave(saveData);
+      const modularSave = SaveManager.createSave({ ...saveData, _skipLocalStorage: true });
       await GameStorage.save(modularSave, 'time_travel_save');
       onReturnToMenu();
     } catch (error) {
@@ -6642,8 +6680,66 @@ const DashboardContent = memo(({
       const isInterstellarLoop = routeTierRef.current === 'Interstellar';
       const isVoidLoop = routeTierRef.current === 'Void';
       const isEarthLoop = routeTierRef.current === 'Earth';
+      const processMiningTick = () => {
+        const nextOres = { ...oresCollectedRef.current };
+        let oresChanged = false;
+        let miningQcBonus = 0;
 
-      if (!isLoadedRef.current || isResettingRef.current || isTransitioningRef.current || showRoute2LoreRef.current || showVoidLoreRef.current || voidBattleStatusRef.current === 'fighting') return;
+        ORES.filter(o => o.tier === routeTierRef.current).forEach(ore => {
+          const robots = miningRobotsRef.current[ore.id] || 0;
+          if (robots > 0) {
+            const autoSellCostPerPack = (routeTierRef.current === 'Interstellar') ? 8 : 10;
+            if (aetherionRef.current >= autoSellCostPerPack && autoSellByOreRef.current[ore.id] && nextOres[ore.id] >= ore.packSize) {
+              let packs = Math.floor(nextOres[ore.id] / ore.packSize);
+              if (packs > 0) {
+                if (routeTierRef.current === 'Interstellar') packs = Math.min(5, packs);
+                aetherionRef.current = Math.max(0, aetherionRef.current - (packs * autoSellCostPerPack));
+                const compressionBonus = 1 + (miningCompressionLevelsRef.current[ore.id] || 0) * 0.5;
+                let value = Math.floor(ore.baseValue * ore.rarity * ore.packSize * getEconomicMultipliers().profit * compressionBonus);
+                if (routeTierRef.current === 'Interstellar') {
+                  let miningScale = 3.75 + Math.min(battleLevelRef.current, 55) * 0.1;
+                  if (battleLevelRef.current >= 40) {
+                    miningScale *= 5;
+                  }
+                  value *= miningScale;
+                }
+                miningQcBonus += value * packs * MINING_VALUE_MULTIPLIER;
+                const currentStats = historyStatsRef.current[routeTierRef.current];
+                historyStatsRef.current = { ...historyStatsRef.current, [routeTierRef.current]: { ...currentStats, autoMiningPacksSold: (currentStats.autoMiningPacksSold || 0) + packs } };
+                const wasteToAdd = packs * 300 * (routeTierRef.current === 'Interstellar' ? 1 + (extractionTechLevelRef.current * 0.1) : 1);
+                miningWasteRef.current = Math.min(7500, miningWasteRef.current + wasteToAdd);
+                nextOres[ore.id] -= packs * ore.packSize;
+                oresChanged = true;
+                if (activeTabRef.current === 'mining') {
+                  const rewardId = Math.random().toString(36).substr(2, 9);
+                  setFloatingRewards(prev => [...prev, { id: rewardId, amount: value * packs * MINING_VALUE_MULTIPLIER, x: window.innerWidth / 2, y: window.innerHeight / 2 }]);
+                  setTimeout(() => {
+                    setFloatingRewards(p => p.filter(r => r.id !== rewardId));
+                  }, 1000);
+                }
+                applyMissionProgress('sell', ore.id, packs, routeTierRef.current);
+              }
+            }
+          }
+        });
+
+        if (oresChanged) {
+          oresCollectedRef.current = nextOres;
+          dispatch({ type: 'SET_ORES_COLLECTED', payload: { ores: nextOres } });
+        }
+        if (miningQcBonus > 0) {
+          qcRef.current += miningQcBonus;
+          updateHistoryStats('acquired', miningQcBonus, routeTierRef.current, 'mining');
+        }
+      };
+
+      if (!isLoadedRef.current || isResettingRef.current) return;
+
+      const shouldPauseRouteSystems = isTransitioningRef.current || showRoute2LoreRef.current || showVoidLoreRef.current || voidBattleStatusRef.current === 'fighting';
+      if (shouldPauseRouteSystems) {
+        processMiningTick();
+        return;
+      }
 
       // 1. Handle Manual Deliveries
       const prev = activeDeliveriesRef.current;
@@ -6841,7 +6937,40 @@ const DashboardContent = memo(({
             lastRandomBattleTimeRef.current = nowTimestamp();
             updateHistoryStats('random_battle_found', 1, routeTierRef.current);
 
-            if (battleLevelRef.current >= 30 && routeTierRef.current === 'Interstellar') {
+            const skipCost = routeTierRef.current === 'Interstellar' ? 40 : 10;
+            if (isAuto && autoSkipRandomBattlesRef.current && aetherionRef.current >= skipCost) {
+              const victory = autoSkipBattle(battle, skipCost);
+              playSfx(victory ? 'radar_skip_victory' : 'radar_skip_defeat');
+
+              setDeliveryBattleNotice({
+                id: Date.now(),
+                type: victory ? 'success' : 'error',
+                title: victory
+                  ? (languageRef.current === 'pt' ? 'Batalha Automática Vencida' : 'Automatic Battle Won')
+                  : (languageRef.current === 'pt' ? 'Batalha Automática Perdida' : 'Automatic Battle Lost'),
+                message: victory
+                  ? (languageRef.current === 'pt'
+                    ? `A escolta venceu em ${route.destination}. -${skipCost} AE.`
+                    : `Escort won at ${route.destination}. -${skipCost} AE.`)
+                  : (languageRef.current === 'pt'
+                    ? `A escolta foi derrotada em ${route.destination}. -${skipCost} AE.`
+                    : `Escort was defeated at ${route.destination}. -${skipCost} AE.`),
+                tier: routeTierRef.current
+              });
+              window.setTimeout(() => setDeliveryBattleNotice(null), 3500);
+
+              if (!victory) {
+                setAutoTravelActive(prev => ({ ...prev, [routeId]: false }));
+                setAutoTravelProgress(prev => ({ ...prev, [routeId]: 0 }));
+              }
+
+              addLog(
+                victory
+                  ? (languageRef.current === 'pt' ? `Batalha automática vencida! (-${skipCost} Etérion)` : `Automatic battle won! (-${skipCost} Aetherion)`)
+                  : (languageRef.current === 'pt' ? `Batalha automática perdida! (-${skipCost} Etérion)` : `Automatic battle lost! (-${skipCost} Aetherion)`),
+                victory ? 'success' : 'error'
+              );
+            } else if (battleLevelRef.current >= 30 && routeTierRef.current === 'Interstellar') {
               const isVictory = Math.random() * 100 < winProb;
               if (isVictory) {
                 const results = resolveBattleVictory(battle);
@@ -6876,9 +7005,26 @@ const DashboardContent = memo(({
             } else {
               // Auto-Skip Logic
               const skipCost = routeTierRef.current === 'Interstellar' ? 40 : 10;
-              if (autoSkipRandomBattlesRef.current && aetherionRef.current >= skipCost) {
+              if (isAuto && autoSkipRandomBattlesRef.current && aetherionRef.current >= skipCost) {
                 const victory = autoSkipBattle(battle, skipCost);
-                playSfx(victory ? 'success' : 'error');
+                playSfx(victory ? 'radar_skip_victory' : 'radar_skip_defeat');
+
+                setDeliveryBattleNotice({
+                  id: Date.now(),
+                  type: victory ? 'success' : 'error',
+                  title: victory
+                    ? (languageRef.current === 'pt' ? 'Batalha Automática Vencida' : 'Automatic Battle Won')
+                    : (languageRef.current === 'pt' ? 'Batalha Automática Perdida' : 'Automatic Battle Lost'),
+                  message: victory
+                    ? (languageRef.current === 'pt'
+                      ? `A escolta venceu em ${route.destination}. -${skipCost} AE.`
+                      : `Escort won at ${route.destination}. -${skipCost} AE.`)
+                    : (languageRef.current === 'pt'
+                      ? `A escolta foi derrotada em ${route.destination}. -${skipCost} AE.`
+                      : `Escort was defeated at ${route.destination}. -${skipCost} AE.`),
+                  tier: routeTierRef.current
+                });
+                window.setTimeout(() => setDeliveryBattleNotice(null), 3500);
 
                 if (isAuto) {
                   if (!victory) {
@@ -6935,7 +7081,7 @@ const DashboardContent = memo(({
           const costIncreaseMultiplier = 1 + ((valueTier?.value || 0) * 0.1);
           const fuelCost = Math.floor(10 * costIncreaseMultiplier);
           const attemptCost = fuelCost * slots;
-          const aetherionTripCost = slots * (routeTierRef.current === 'Interstellar' ? 5 : 4);
+          const aetherionTripCost = slots * 2;
           if (aetherionRef.current >= aetherionTripCost && qcRef.current >= attemptCost) setAutoTravelActive(prev => ({ ...prev, [routeId]: true }));
         }
       });
@@ -6958,7 +7104,7 @@ const DashboardContent = memo(({
 
             if (currentProgress === 0) {
               const attemptCost = fuelCost * numSlots;
-              const aetherionTripCost = numSlots * (routeTierRef.current === 'Interstellar' ? 5 : 4);
+              const aetherionTripCost = numSlots * 2;
               const requiredLevel = route.requiredShipLevel;
               const totalOwned = ownedShipsRef.current[`${route.tier}-${requiredLevel}`] || 0;
               const manualInUse = activeDeliveriesRef.current.filter(d => d.shipLevel === requiredLevel && d.tier === route.tier && d.status === 'delivering').length;
@@ -7052,74 +7198,11 @@ const DashboardContent = memo(({
         completions.forEach(c => {
           const route = ROUTES_MAP.get(c.routeId);
           if (route) {
-            const shipLevelKey = `delivery-${route.requiredShipLevel}`;
-            pendingMissionProgressRef.current[shipLevelKey] = (pendingMissionProgressRef.current[shipLevelKey] || 0) + c.count;
+            applyMissionProgress('delivery', route.requiredShipLevel, c.count, route.tier);
           }
         });
       }
-
-      const nextOres = { ...oresCollectedRef.current };
-      let oresChanged = false;
-      let miningQcBonus = 0;
-
-      ORES.filter(o => o.tier === routeTierRef.current).forEach(ore => {
-        const robots = miningRobotsRef.current[ore.id] || 0;
-        if (robots > 0) {
-          const level = miningRobotLevelsRef.current[ore.id] || 1;
-          const upgrade = ROBOT_UPGRADES_MAP.get(level) || ROBOT_UPGRADES[0];
-          const totalRate = robots * (0.5 * upgrade.speedBonus * upgrade.efficiencyBonus * upgrade.productionBonus);
-          const currentAmount = nextOres[ore.id] || 0;
-          if (currentAmount < ore.packSize) {
-            const added = totalRate * 0.15;
-            const newAmount = Math.min(ore.packSize, currentAmount + added);
-            if (newAmount !== currentAmount) { nextOres[ore.id] = newAmount; oresChanged = true; }
-          }
-
-          const autoSellCostPerPack = (routeTierRef.current === 'Interstellar') ? 8 : 10;
-          if (aetherionRef.current >= autoSellCostPerPack && autoSellByOreRef.current[ore.id] && nextOres[ore.id] >= ore.packSize) {
-            let packs = Math.floor(nextOres[ore.id] / ore.packSize);
-            if (packs > 0) {
-              if (routeTierRef.current === 'Interstellar') packs = Math.min(5, packs);
-              aetherionRef.current = Math.max(0, aetherionRef.current - (packs * autoSellCostPerPack));
-              const compressionBonus = 1 + (miningCompressionLevelsRef.current[ore.id] || 0) * 0.5;
-              let value = Math.floor(ore.baseValue * ore.rarity * ore.packSize * getEconomicMultipliers().profit * compressionBonus);
-              if (routeTierRef.current === 'Interstellar') {
-                // Sincronizado com DashboardProvider (base 3.75 + Level * 0.1)
-                let miningScale = 3.75 + Math.min(battleLevelRef.current, 55) * 0.1;
-
-                // Aplica bônus de nível 40 (Why, so?)
-                if (battleLevelRef.current >= 40) {
-                  miningScale *= 5;
-                }
-
-                value *= miningScale;
-              }
-              miningQcBonus += value * packs;
-              const currentStats = historyStatsRef.current[routeTierRef.current];
-              historyStatsRef.current = { ...historyStatsRef.current, [routeTierRef.current]: { ...currentStats, autoMiningPacksSold: (currentStats.autoMiningPacksSold || 0) + packs } };
-              const wasteToAdd = packs * 300 * (routeTierRef.current === 'Interstellar' ? 1 + (extractionTechLevelRef.current * 0.1) : 1);
-              miningWasteRef.current = Math.min(7500, miningWasteRef.current + wasteToAdd);
-              nextOres[ore.id] -= packs * ore.packSize;
-              oresChanged = true;
-              if (activeTabRef.current === 'mining') {
-                const rewardId = Math.random().toString(36).substr(2, 9);
-                setFloatingRewards(prev => [...prev, { id: rewardId, amount: value * packs, x: window.innerWidth / 2, y: window.innerHeight / 2 }]);
-                setTimeout(() => {
-                  setFloatingRewards(p => p.filter(r => r.id !== rewardId));
-                }, 1000);
-              }
-              const sellKey = `sell-${ore.id}`;
-              pendingMissionProgressRef.current[sellKey] = (pendingMissionProgressRef.current[sellKey] || 0) + packs;
-            }
-          }
-        }
-      });
-
-      if (oresChanged) oresCollectedRef.current = nextOres;
-      if (miningQcBonus > 0) {
-        qcRef.current += miningQcBonus;
-        updateHistoryStats('acquired', miningQcBonus, routeTierRef.current, 'mining');
-      }
+      processMiningTick();
 
       const researching = researchingTechRef.current;
       if (researching) {
@@ -7150,7 +7233,6 @@ const DashboardContent = memo(({
       if (Math.abs(solarEnergyRef.current - lastFlushedSolarRef.current) > 0.01) { dispatch({ type: 'EARN_RESOURCES', payload: { solarEnergy: solarEnergyRef.current - lastFlushedSolarRef.current } }); lastFlushedSolarRef.current = solarEnergyRef.current; }
       if (Math.abs(aetherionTubesRef.current - lastFlushedTubesRef.current) > 0.01) { dispatch({ type: 'EARN_RESOURCES', payload: { aetherionTubes: aetherionTubesRef.current - lastFlushedTubesRef.current } }); lastFlushedTubesRef.current = aetherionTubesRef.current; }
       dispatch({ type: 'SET_HISTORY_STATS', payload: { stats: historyStatsRef.current } });
-      dispatch({ type: 'SET_ORES_COLLECTED', payload: { ores: oresCollectedRef.current } });
       setAutoTravelProgress({ ...autoTravelProgressRef.current });
 
 
@@ -7175,7 +7257,7 @@ const DashboardContent = memo(({
     }, 500);
 
     return () => { clearInterval(tick); clearInterval(flushInterval); };
-  }, [addLog, autoSkipBattle, claimMission, completeInitialMission, dispatch, formatValue, getEconomicMultipliers, incrementDeliveries, playSfx, resolveBattleDefeat, resolveBattleVictory, setActiveDeliveries, setAetherion, setAetherionTubes, setAutoTravelActive, setAutoTravelProgress, setBattleNotification, setDeliveriesByLocation, setFloatingRewards, setFoundBattle, setMissions, setResearchingTech, setTotalDeliveries, setUnderAttackBattle, t, updateHistoryStats]);
+  }, [addLog, applyMissionProgress, autoSkipBattle, claimMission, completeInitialMission, dispatch, formatValue, getEconomicMultipliers, incrementDeliveries, playSfx, resolveBattleDefeat, resolveBattleVictory, setActiveDeliveries, setAetherion, setAetherionTubes, setAutoTravelActive, setAutoTravelProgress, setBattleNotification, setDeliveriesByLocation, setFloatingRewards, setFoundBattle, setMissions, setResearchingTech, setTotalDeliveries, setUnderAttackBattle, t, updateHistoryStats]);
 
 
   // Tutorial Trigger
@@ -7272,7 +7354,7 @@ const DashboardContent = memo(({
     const multiplier = getLocationMultiplier(locationId);
     const multipliers = getEconomicMultipliers();
     let cost = Math.floor(nextTier.cost * multiplier * multipliers.cost);
-    if (routeTier === 'Interstellar') cost = Math.floor(cost * 1.5);
+    if (routeTier === 'Interstellar') cost = Math.floor(cost * 4.5);
 
     if (qc >= cost) {
       dispatch({ type: 'SPEND_QC', payload: { amount: cost } });
@@ -7333,12 +7415,6 @@ const DashboardContent = memo(({
       return;
     }
 
-    const aetherionRequired = (currentSlots + 1) * 2;
-    if (aetherion < aetherionRequired) {
-      playSfx('error');
-      addLog(`Need ${aetherionRequired} Aetherion for this slot`, 'error');
-      return;
-    }
 
     // TransaÃƒÂ§ÃƒÂ£o atÃƒÂ´mica: gasta QC e adiciona slot
     dispatch({ type: 'SPEND_QC', payload: { amount: cost } });
@@ -7348,7 +7424,7 @@ const DashboardContent = memo(({
     completeInitialMission('init_5');
     playSfx('buying_iten');
     addLog(`Auto-travel slot ${currentSlots + 1} purchased for ${route.name}`, 'success');
-  }, [dispatch, qc, aetherion, autoTravelSlots,
+  }, [dispatch, qc, autoTravelSlots,
     playSfx, addLog, getEconomicMultipliers, getLocationMultiplier, updateHistoryStats, routeTier, completeInitialMission]);
 
   const getAutoTravelColor = (level: number) => {
@@ -9742,6 +9818,33 @@ const DashboardContent = memo(({
                         {groupedDeliveries.length} LOC / {manualDeliveryCount}/25 HANGARS
                       </span>
                     </div>
+
+                    <AnimatePresence>
+                      {deliveryBattleNotice && deliveryBattleNotice.tier === routeTier && (
+                        <motion.div
+                          key={deliveryBattleNotice.id}
+                          initial={{ opacity: 0, x: -16, y: 12, scale: 0.96 }}
+                          animate={{ opacity: 1, x: 0, y: 0, scale: 1 }}
+                          exit={{ opacity: 0, x: -16, y: 12, scale: 0.96 }}
+                          className={`absolute bottom-4 left-4 z-30 max-w-[min(28rem,calc(100%-2rem))] rounded-xl border px-4 py-3 shadow-2xl backdrop-blur-md ${deliveryBattleNotice.type === 'success'
+                            ? 'border-emerald-400/40 bg-emerald-950/85 text-emerald-100 shadow-emerald-950/40'
+                            : 'border-red-400/40 bg-red-950/85 text-red-100 shadow-red-950/40'
+                          }`}
+                        >
+                          <div className="flex items-start gap-3">
+                            <div className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${deliveryBattleNotice.type === 'success' ? 'bg-emerald-300' : 'bg-red-300'} animate-pulse`} />
+                            <div className="min-w-0">
+                              <div className="font-orbitron text-[12px] font-black uppercase tracking-[0.18em]">
+                                {deliveryBattleNotice.title}
+                              </div>
+                              <div className="mt-1 font-mono text-[11px] uppercase tracking-[0.08em] opacity-80">
+                                {deliveryBattleNotice.message}
+                              </div>
+                            </div>
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
 
                     <div className="relative z-10 flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
                       {groupedDeliveries.length === 0 ? (
@@ -12566,8 +12669,10 @@ const DashboardContent = memo(({
                 {(() => {
                   const solarStats = historyStats['Solar'] || {};
                   const interstellarStats = historyStats['Interstellar'] || {};
-
-                  const aggregatedMissions = isInterstellar ? (solarStats.missionsCompleted || 0) + (interstellarStats.missionsCompleted || 0) : (solarStats.missionsCompleted || 0);
+                  const missionGoalTiers = isInterstellar ? ['Solar', 'Interstellar'] : ['Solar'];
+                  const completedUnclaimedGoalMissions = missions.filter(m => missionGoalTiers.includes(m.tier) && m.completed && !m.claimed).length;
+                  const aggregatedMissions = (isInterstellar ? (solarStats.missionsCompleted || 0) + (interstellarStats.missionsCompleted || 0) : (solarStats.missionsCompleted || 0)) + completedUnclaimedGoalMissions;
+                  const missionRequirement = isInterstellar ? ROUTE3_MISSIONS_REQUIREMENT : ROUTE2_MISSIONS_REQUIREMENT;
                   const aggregatedQC = isInterstellar ? (solarStats.qcTotalAcquired || 0) + (interstellarStats.qcTotalAcquired || 0) : (solarStats.qcTotalAcquired || 0);
                   const aggregatedDeliveries = isInterstellar ? (solarStats.deliveries || 0) + (interstellarStats.deliveries || 0) : (solarStats.deliveries || 0);
 
@@ -12587,7 +12692,7 @@ const DashboardContent = memo(({
                       { id: 'robots', label: t('buyAllRobots'), progress: (Object.entries(miningRobots).filter(([id]) => ORES_MAP.get(id)?.tier === (isInterstellar ? 'Interstellar' : 'Solar')).reduce((acc, [, v]) => acc + v, 0) / (ORES.filter(o => o.tier === (isInterstellar ? 'Interstellar' : 'Solar')).length * 5)) * 100, current: Object.entries(miningRobots).filter(([id]) => ORES_MAP.get(id)?.tier === (isInterstellar ? 'Interstellar' : 'Solar')).reduce((acc, [, v]) => acc + v, 0), target: ORES.filter(o => o.tier === (isInterstellar ? 'Interstellar' : 'Solar')).length * 5 },
                       { id: 'robotLevels', label: t('upgradeAllRobotsMax'), progress: (Object.entries(miningRobotLevels).filter(([id]) => ORES_MAP.get(id)?.tier === (isInterstellar ? 'Interstellar' : 'Solar')).reduce((acc, [, v]) => acc + v, 0) / (ORES.filter(o => o.tier === (isInterstellar ? 'Interstellar' : 'Solar')).length * 5)) * 100, current: Object.entries(miningRobotLevels).filter(([id]) => ORES_MAP.get(id)?.tier === (isInterstellar ? 'Interstellar' : 'Solar')).reduce((acc, [, v]) => acc + v, 0), target: ORES.filter(o => o.tier === (isInterstellar ? 'Interstellar' : 'Solar')).length * 5 },
                       { id: 'compressions', label: t('upgradeRefinedCompression'), progress: (Object.entries(miningCompressionLevels).filter(([id]) => ORES_MAP.get(id)?.tier === (isInterstellar ? 'Interstellar' : 'Solar')).reduce((acc, [, v]) => acc + v, 0) / (ORES.filter(o => o.tier === (isInterstellar ? 'Interstellar' : 'Solar')).length * 10)) * 100, current: Object.entries(miningCompressionLevels).filter(([id]) => ORES_MAP.get(id)?.tier === (isInterstellar ? 'Interstellar' : 'Solar')).reduce((acc, [, v]) => acc + v, 0), target: ORES.filter(o => o.tier === (isInterstellar ? 'Interstellar' : 'Solar')).length * 10 },
-                      { id: 'missions', label: `${t('missions')} ${language === 'pt' ? 'Concluídas' : 'Completed'}`, progress: Math.min(100, (aggregatedMissions / (isInterstellar ? 1000 : 100)) * 100), current: aggregatedMissions, target: isInterstellar ? 1000 : 100 },
+                      { id: 'missions', label: `${t('missions')} ${language === 'pt' ? 'Concluídas' : 'Completed'}`, progress: Math.min(100, (aggregatedMissions / missionRequirement) * 100), current: aggregatedMissions, target: missionRequirement },
                       { id: 'qc', label: `${t('reachQC')} ${isInterstellar ? '999 trilhões' : '1 trilhão'} QC`, progress: Math.min(100, (aggregatedQC / (isInterstellar ? 999000000000000 : 1000000000000)) * 100), current: formatValue(aggregatedQC), target: formatValue(isInterstellar ? 999000000000000 : 1000000000000) },
                       { id: 'deliveries', label: `${t('total')} ${isInterstellar ? ROUTE3_TOTAL_DELIVERIES_REQUIREMENT : ROUTE2_TOTAL_DELIVERIES_REQUIREMENT} ${t('deliveries')}`, progress: Math.min(100, (aggregatedDeliveries / (isInterstellar ? ROUTE3_TOTAL_DELIVERIES_REQUIREMENT : ROUTE2_TOTAL_DELIVERIES_REQUIREMENT)) * 100), current: aggregatedDeliveries, target: isInterstellar ? ROUTE3_TOTAL_DELIVERIES_REQUIREMENT : ROUTE2_TOTAL_DELIVERIES_REQUIREMENT },
                     ];
@@ -12924,7 +13029,7 @@ const DashboardContent = memo(({
                     <div className="text-base text-blue-100 leading-relaxed font-inter font-medium drop-shadow-md space-y-3">
                       <p className="text-blue-400 font-bold">Doom Protocol!</p>
                       <p>Um sistema de intervenção tática projetado para garantir superioridade em combate automático.</p>
-                      <p>Ao contratar unidades especializadas, você aumenta drasticamente suas chances de vitória em confrontos pelo cosmos — seja em encontros aleatórios automáticos ou ao pular batalhas de radar.</p>
+                      <p>Ao contratar unidades especializadas, você aumenta drasticamente suas chances de vitória em confrontos automáticos pelo cosmos.</p>
                       <p className="pt-2 border-t border-white/10">
                         <span className="text-purple-400 font-bold">O excesso de eficiência é recompensado:</span><br />
                         Toda chance de vitória que ultrapassar 100% é convertida em bônus adicionais sobre os recursos conquistados (apenas em resoluções automáticas).
@@ -13169,44 +13274,6 @@ const DashboardContent = memo(({
                       {language === 'pt' ? 'Atacar' : 'Attack'}
                     </button>
                   </div>
-
-                  <button
-                    onClick={() => {
-                      const skipCost = routeTier === 'Interstellar' ? 40 : 10;
-                      if (aetherion >= skipCost) {
-                        const victory = autoSkipBattle(foundBattle, skipCost);
-                        const notificationTitle = victory
-                          ? (language === 'pt' ? 'Radar Skip Vitória' : 'Radar Skip Victory')
-                          : (language === 'pt' ? 'Radar Skip Derrota' : 'Radar Skip Defeat');
-                        const notificationMessage = victory
-                          ? (language === 'pt'
-                            ? `Batalha de radar pulada com sucesso. -${skipCost} AE.`
-                            : `Radar battle skipped successfully. -${skipCost} AE.`)
-                          : (language === 'pt'
-                            ? `Batalha de radar pulada: derrota. -${skipCost} AE.`
-                            : `Radar battle skipped: defeat. -${skipCost} AE.`);
-
-                        setBattleNotification({
-                          title: notificationTitle,
-                          message: notificationMessage,
-                          type: victory ? 'success' : 'error',
-                          tier: routeTier
-                        });
-                        playSfx(victory ? 'radar_skip_victory' : 'radar_skip_defeat');
-                        addLog(notificationMessage, victory ? 'success' : 'error');
-                        setTimeout(() => setBattleNotification(null), 2500);
-                        setFoundBattle(null);
-                      }
-                    }}
-                    disabled={aetherion < (routeTier === 'Interstellar' ? 40 : 10)}
-                    className={`py-3 rounded-xl border font-black transition-all uppercase text-[14px] ${aetherion >= (routeTier === 'Interstellar' ? 40 : 10)
-                        ? 'bg-orange-600/20 text-orange-400 border-orange-500/40 hover:bg-orange-600/30'
-                        : 'bg-white/5 border-white/10 text-slate-600 cursor-not-allowed'
-                      }`}
-                  >
-                    {language === 'pt' ? 'Pular Batalha' : 'Skip Battle'}
-                    <span className="ml-1 text-[10px] opacity-70">(-{routeTier === 'Interstellar' ? 40 : 10} AE)</span>
-                  </button>
                 </div>
               </div>
             </motion.div>

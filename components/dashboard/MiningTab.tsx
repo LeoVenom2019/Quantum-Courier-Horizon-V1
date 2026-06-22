@@ -4,7 +4,7 @@ import React, { memo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Lock, Cpu, TrendingUp, Coins, Zap, Package, BarChart3, Gauge } from 'lucide-react';
 import { ORES, ROBOT_UPGRADES } from '@/lib/game-data';
-import { ROBOT_UPGRADES_MAP } from '@/lib/game-constants';
+import { MINING_VALUE_MULTIPLIER, ROBOT_UPGRADES_MAP } from '@/lib/game-constants';
 import { useDashboard } from './DashboardProvider';
 import { PremiumCanvasButton } from '../ui/PremiumCanvasButton';
 
@@ -48,7 +48,6 @@ const MiningTab = memo(() => {
     buyMiningCompression,
     buyAutoSell,
     toggleAutoSell,
-    sellExtractionPointPacks,
     getEconomicMultipliers
   } = useDashboard();
 
@@ -168,21 +167,22 @@ const MiningTab = memo(() => {
       upgrade,
     } = getOreStats(ore);
 
-    const packProgress = Math.min(ore.packSize, amount >= ore.packSize ? ore.packSize : (amount % ore.packSize));
-    const packPercent = Math.floor(amount >= ore.packSize ? 100 : (packProgress / ore.packSize) * 100);
+    const packRemainder = amount % ore.packSize;
+    const packProgress = amount > 0 && packRemainder === 0 ? ore.packSize : packRemainder;
+    const packPercent = Math.floor((packProgress / ore.packSize) * 100);
     const compressionBonus = compressionLevel * 20;
     const compressionMultiplier = 1 + compressionLevel * 0.2;
     const routeMiningScale = isInterstellar
       ? (3.75 + Math.min(battleLevel, 55) * 0.1) * (battleLevel >= 40 ? 5 : 1)
       : 1;
     const basePackValue = Math.floor(ore.baseValue * ore.rarity * ore.packSize * getEconomicMultipliers().profit * routeMiningScale);
-    const finalPackValue = Math.floor(basePackValue * compressionMultiplier);
+    const finalPackValue = Math.floor(basePackValue * compressionMultiplier * MINING_VALUE_MULTIPLIER);
     const currentSellValue = finalPackValue * packs;
     const productionPerSecond = robots * (0.5 * upgrade.speedBonus * upgrade.efficiencyBonus * upgrade.productionBonus);
     const productionPerMinute = productionPerSecond * 60;
     const remainingToPack = Math.max(0, ore.packSize - packProgress);
     const secondsToNextPack = productionPerSecond > 0 ? Math.ceil(remainingToPack / productionPerSecond) : null;
-    const canSell = isInterstellar ? packs >= 100 : packs > 0;
+    const canSell = packs > 0;
     const mineralVideoSrc = isInterstellar
       ? INTERSTELLAR_MINERAL_VIDEOS[ore.id] || `/videos/mining/${ore.id}.webm`
       : SOLAR_MINERAL_VIDEOS[ore.id] || `/videos/mining/${ore.id}.webm`;
@@ -337,7 +337,7 @@ const MiningTab = memo(() => {
               </PremiumCanvasButton>
 
               <PremiumCanvasButton
-                onClick={(e) => isInterstellar ? sellExtractionPointPacks(ore.id, e) : sellOrePack(ore.id, e)}
+                onClick={(e) => sellOrePack(ore.id, e)}
                 disabled={!canSell}
                 tone={canSell ? 'amber' : 'steel'}
                 className="mt-auto h-24 w-full px-4 text-left"
@@ -348,7 +348,7 @@ const MiningTab = memo(() => {
                   <span className="font-orbitron text-[14px] font-black uppercase tracking-[0.22em]">{t('sellPacks')}</span>
                 </span>
                 <span className="font-mono text-[13px] font-black">
-                  {isInterstellar ? (packs >= 100 ? `${packs} PKS` : 'MIN. 100') : (packs > 0 ? `${packs} PKS` : '---')}
+                  {packs > 0 ? `${packs} PKS` : '---'}
                 </span>
               </PremiumCanvasButton>
             </div>

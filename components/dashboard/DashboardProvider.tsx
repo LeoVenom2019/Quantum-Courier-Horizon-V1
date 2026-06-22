@@ -18,13 +18,14 @@ import {
 } from '@/lib/game-state/index';
 import { useSFX } from '../../hooks/useSFX';
 import { dashboardTranslations as translations } from '@/lib/i18n/dashboard-translations';
-import { ROUTES, SHIPS, UPGRADES, VOID_AIRCRAFT, TECHNOLOGIES, VOID_POIS } from '@/lib/game-data';
+import { ROUTES, SHIPS, UPGRADES, VOID_AIRCRAFT, TECHNOLOGIES, VOID_POIS, ORES } from '@/lib/game-data';
 
 
-import { ROUTES_MAP, EXTRACTION_PRODUCTION_COSTS, ORES_MAP, EXTRACTION_POINTS_MAP, UPGRADES_MAP, ROBOT_UPGRADES_MAP } from '@/lib/game-constants';
+import { ROUTES_MAP, EXTRACTION_PRODUCTION_COSTS, ORES_MAP, EXTRACTION_POINTS_MAP, UPGRADES_MAP, ROBOT_UPGRADES_MAP, INTERSTELLAR_EXTRACTION_VALUE_MULTIPLIER, MINING_VALUE_MULTIPLIER, BATTLE_REWARD_VALUE_MULTIPLIER } from '@/lib/game-constants';
 
 const MAIN_SAVE_STORAGE_KEY = 'time_travel_save';
 const LEGACY_SAVE_SECRET_KEY = 73;
+const RHSE_TUBE_COST = 2500;
 const SAVE_EXPORT_FORMAT = 'qch-save-export';
 const SECRET_ALIEN_NAME_STORAGE_KEY = 'qch_secret_alien_name_unlocked';
 
@@ -425,6 +426,68 @@ export const DashboardProvider = ({
   React.useEffect(() => { miningRef.current = mining; }, [mining]);
   React.useEffect(() => { earthRef.current = earth; }, [earth]);
 
+  // Mining production lives here because MiningTab consumes this provider directly.
+  // Do not move passive ore generation back to GameDashboard's delivery loop; that can
+  // overwrite oresCollected with stale refs and freeze Chapter 1/2 mining progress.
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      const currentMining = miningRef.current;
+      const currentProgression = progressionRef.current;
+      const tier = currentProgression.routeTier;
+
+      if (tier !== 'Solar' && tier !== 'Interstellar') return;
+
+      const nextOres = { ...currentMining.oresCollected };
+      let changed = false;
+
+      ORES.filter(ore => ore.tier === tier).forEach(ore => {
+        const robots = currentMining.miningRobots[ore.id] || 0;
+        if (robots <= 0) return;
+
+        const level = currentMining.miningRobotLevels[ore.id] || 1;
+        const upgrade = ROBOT_UPGRADES_MAP.get(level) || ROBOT_UPGRADES_MAP.get(1);
+        if (!upgrade) return;
+
+        const productionPerSecond = robots * (0.5 * upgrade.speedBonus * upgrade.efficiencyBonus * upgrade.productionBonus);
+        nextOres[ore.id] = (nextOres[ore.id] || 0) + productionPerSecond * 0.5;
+        changed = true;
+      });
+
+      if (changed) {
+        dispatch({ type: 'SET_ORES_COLLECTED', payload: { ores: nextOres } });
+      }
+    }, 500);
+
+    return () => window.clearInterval(interval);
+  }, [dispatch]);
+
+  // RHSE tube synthesis must live in the provider too; UpgradesTab consumes this
+  // state directly, so leaving it only in GameDashboard can strand full resources.
+  useEffect(() => {
+    const currentEconomy = economyRef.current;
+    const currentTier = progressionRef.current.routeTier;
+    const tubeCapacity = currentTier === 'Interstellar' ? 20 : 10;
+    const tubeRoom = tubeCapacity - (currentEconomy.aetherionTubes || 0);
+
+    if (tubeRoom <= 0) return;
+
+    const resourceBatches = Math.floor(Math.min(
+      (currentEconomy.miningWaste || 0) / RHSE_TUBE_COST,
+      (currentEconomy.solarEnergy || 0) / RHSE_TUBE_COST
+    ));
+    const tubesToCreate = Math.min(tubeRoom, resourceBatches);
+
+    if (tubesToCreate <= 0) return;
+
+    dispatch({
+      type: 'SET_RESOURCES',
+      payload: {
+        miningWaste: Math.max(0, currentEconomy.miningWaste - (RHSE_TUBE_COST * tubesToCreate)),
+        solarEnergy: Math.max(0, currentEconomy.solarEnergy - (RHSE_TUBE_COST * tubesToCreate)),
+        aetherionTubes: currentEconomy.aetherionTubes + tubesToCreate,
+      }
+    });
+  }, [economy.miningWaste, economy.solarEnergy, economy.aetherionTubes, progression.routeTier, dispatch]);
   // Redux-backed setters defined as stable callbacks
   const setVoidBattleStatus = useCallback((status: any) => dispatch({ type: 'SET_VOID_BATTLE_STATUS', payload: { status } }), [dispatch]);
   
@@ -621,7 +684,7 @@ export const DashboardProvider = ({
       // Lucro Geral: Reduzido em 75% conforme plano Ninja
       profitMult = (2.5 + (Math.min(lvl, 55) / 55) * 3.5) * 0.25;
       // Lucro de Batalha: Foco principal, mantendo o multiplicador original alto
-      const battleProfitMult = (2.5 + (Math.min(lvl, 55) / 55) * 3.5);
+      const battleProfitMult = (2.5 + (Math.min(lvl, 55) / 55) * 3.5) * BATTLE_REWARD_VALUE_MULTIPLIER;
       // Custo: Mantido para manter o desafio
       costMult = 3 + (Math.min(lvl, 55) / 55) * 5;
       
@@ -659,15 +722,6 @@ export const DashboardProvider = ({
       return;
     }
 
-    const aetherionRequired = (currentSlots + 1) * 200;
-    if (economy.aetherion < aetherionRequired) {
-      playSfx('error');
-      const msg = language === 'pt' 
-        ? `Necessário ${aetherionRequired} Etérion para este slot (Possui: ${Math.floor(economy.aetherion)})` 
-        : `Need ${aetherionRequired} Aetherion for this slot (Have: ${Math.floor(economy.aetherion)})`;
-      addLog(msg, 'error');
-      return;
-    }
 
     dispatch({ type: 'SPEND_QC', payload: { amount: cost } });
     if (routeId === 'terra') {
@@ -677,7 +731,7 @@ export const DashboardProvider = ({
     playSfx('buying_iten');
     updateHistoryStats('spent', cost, progression.routeTier);
     addLog(t('autoTravelSlotPurchased'), 'success');
-  }, [progression, economy, dispatch, playSfx, addLog, getLocationMultiplier, getEconomicMultipliers, updateHistoryStats, completeInitialMission, language, t]);
+  }, [progression, economy, dispatch, playSfx, addLog, getLocationMultiplier, getEconomicMultipliers, updateHistoryStats, completeInitialMission, t]);
 
   const buyRoute = useCallback((route: any) => {
     if (economy.qc < (route.unlockCost || 0)) return;
@@ -1016,6 +1070,8 @@ export const DashboardProvider = ({
       value *= miningScale;
     }
 
+    value = Math.floor(value * MINING_VALUE_MULTIPLIER);
+
     if (event && activeTab === 'mining') {
       const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
       const newFloatingReward = {
@@ -1060,7 +1116,7 @@ export const DashboardProvider = ({
     const multiplier = getLocationMultiplier(locationId);
     const multipliers = getEconomicMultipliers();
     let cost = Math.floor(nextTier.cost * multiplier * multipliers.cost);
-    if (progression.routeTier === 'Interstellar') cost = Math.floor(cost * 1.5);
+    if (progression.routeTier === 'Interstellar') cost = Math.floor(cost * 4.5);
     
     if (economy.qc >= cost) {
       dispatch({ type: 'SPEND_QC', payload: { amount: cost } });
@@ -1253,7 +1309,7 @@ export const DashboardProvider = ({
       value *= multiplier;
     }
 
-    value = Math.floor(value);
+    value = Math.floor(value * INTERSTELLAR_EXTRACTION_VALUE_MULTIPLIER);
     dispatch({ type: 'EARN_QC', payload: { amount: value, source: 'extraction' } });
     dispatch({ type: 'SELL_EXTRACTION_PACKS', payload: { pointId: id, packs, value } });
     
@@ -2107,7 +2163,26 @@ export const DashboardProvider = ({
   ]);
 
   const synthesizeAetherion = useCallback(() => {
+    const tubeCapacity = progression.routeTier === 'Interstellar' ? 20 : 10;
+    const canCreateTube =
+      economy.miningWaste >= RHSE_TUBE_COST &&
+      economy.solarEnergy >= RHSE_TUBE_COST &&
+      economy.aetherionTubes < tubeCapacity;
+
     if (economy.aetherionTubes <= 0) {
+      if (canCreateTube) {
+        dispatch({
+          type: 'SET_RESOURCES',
+          payload: {
+            miningWaste: economy.miningWaste - RHSE_TUBE_COST,
+            solarEnergy: economy.solarEnergy - RHSE_TUBE_COST,
+            aetherionTubes: economy.aetherionTubes + 1,
+          }
+        });
+        playSfx('serve_glass');
+        return;
+      }
+
       playSfx('low_to_upgrade');
       return;
     }
@@ -2121,7 +2196,7 @@ export const DashboardProvider = ({
     dispatch({ type: 'SYNTHESIZE_AETHERION' });
     playSfx('serve_glass');
     addLog(`${t('aetherionSynthesized')} (Fadiga)`, 'success');
-  }, [economy.aetherionTubes, economy.aetherion, dispatch, playSfx, t, addLog, language]);
+  }, [economy.aetherionTubes, economy.aetherion, economy.miningWaste, economy.solarEnergy, progression.routeTier, dispatch, playSfx, t, addLog, language]);
 
   const pauseMusicForRoute4Credits = useCallback(() => {
     jukebox?.stop?.({ rememberPreference: false });

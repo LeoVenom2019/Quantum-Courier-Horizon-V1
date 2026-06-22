@@ -4,10 +4,21 @@ import React, { memo } from 'react';
 import { motion } from 'motion/react';
 import { Cpu, Lock, Check, Zap, Rocket, Search, ChevronRight, ChevronLeft, TrendingUp, Coins } from 'lucide-react';
 import { TECHNOLOGIES, SHIPS, EXTRACTION_POINTS } from '@/lib/game-data';
-import { EXTRACTION_PRODUCTION_COSTS } from '@/lib/game-constants';
+import { EXTRACTION_PRODUCTION_COSTS, INTERSTELLAR_EXTRACTION_VALUE_MULTIPLIER } from '@/lib/game-constants';
 import { INTERSTELLAR_EXTRACTION_POINT_BACKGROUNDS, INTERSTELLAR_TECHNOLOGY_BACKGROUNDS, SOLAR_TECHNOLOGY_BACKGROUNDS } from '@/lib/ui-backgrounds';
 import { useDashboard } from './DashboardProvider';
 import { PremiumCanvasButton } from '../ui/PremiumCanvasButton';
+
+const formatCompactValue = (value: number) => {
+  const safeValue = Math.max(0, Math.floor(value || 0));
+  const absValue = Math.abs(safeValue);
+
+  if (absValue >= 1000000000000) return `${(safeValue / 1000000000000).toFixed(1).replace(/\.0$/, '')}T`;
+  if (absValue >= 1000000000) return `${(safeValue / 1000000000).toFixed(1).replace(/\.0$/, '')}B`;
+  if (absValue >= 1000000) return `${(safeValue / 1000000).toFixed(1).replace(/\.0$/, '')}M`;
+  if (absValue >= 1000) return `${(safeValue / 1000).toFixed(1).replace(/\.0$/, '')}K`;
+  return String(safeValue);
+};
 
 const TechnologyTab = memo(() => {
   const { 
@@ -140,6 +151,11 @@ const TechnologyTab = memo(() => {
               const extractionBackgroundImage = point.tier === 'Interstellar'
                 ? INTERSTELLAR_EXTRACTION_POINT_BACKGROUNDS[point.id]
                 : undefined;
+              const salePreviewPacks = Math.max(packs, 100);
+              const extractionCompressionMultiplier = 1 + compLevel * 0.4;
+              const level40Multiplier = progression.battleLevel >= 40 && routeTier === 'Interstellar' ? 5 : 1;
+              const extractionSaleValue = Math.floor(point.valuePerPack * salePreviewPacks * getEconomicMultipliers().profit * level40Multiplier * extractionCompressionMultiplier * INTERSTELLAR_EXTRACTION_VALUE_MULTIPLIER);
+              const extractionSaleLabel = `${formatCompactValue(extractionSaleValue)} QC`;
 
               return (
                 <div
@@ -243,7 +259,7 @@ const TechnologyTab = memo(() => {
                           contentClassName={`flex-col gap-1 ${packs >= 100 ? 'text-emerald-300' : 'text-slate-500'}`}
                         >
                           <Coins className="w-4 h-4" />
-                          <span className="text-[10px] font-bold">{packs >= 100 ? t('sell') : 'MIN. 100'}</span>
+                          <span className="text-[10px] font-bold">{extractionSaleLabel}</span>
                         </PremiumCanvasButton>
                       </div>
                     </div>

@@ -273,9 +273,14 @@ export const IntroNarrative = ({
     loadingUnsubscribeRef.current = subscribeAssetPreloader(updateLoadingState);
 
     try {
-      await preloadAssetGroups(groups);
+      await Promise.race([
+        preloadAssetGroups(groups),
+        new Promise(resolve => window.setTimeout(resolve, 5000)),
+      ]);
       if (loadingRunRef.current !== runId) return;
       updateLoadingState();
+      setLoadingStatus(t(language, "Ready.", "Pronto."));
+      setLoadingProgress(100);
       await onComplete();
     } catch {
       if (loadingRunRef.current !== runId) return;
@@ -286,6 +291,7 @@ export const IntroNarrative = ({
       if (loadingRunRef.current === runId) {
         loadingUnsubscribeRef.current?.();
         loadingUnsubscribeRef.current = null;
+        setIsLoading(false);
       }
     }
   };
@@ -311,7 +317,7 @@ export const IntroNarrative = ({
       {/* Scanline overlay */}
       <div className="absolute inset-0 pointer-events-none bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.1)_50%),linear-gradient(90deg,rgba(255,0,0,0.03),rgba(0,255,0,0.01),rgba(0,0,255,0.03))] bg-[length:100%_4px,3px_100%] z-10" />
 
-      <div className="max-w-4xl w-full flex flex-col items-center relative z-20">
+      <div className="w-full max-w-[1280px] flex flex-col items-center relative z-20">
         <AnimatePresence mode="wait">
           {!showPlayerId ? (
             <motion.div 
@@ -326,7 +332,7 @@ export const IntroNarrative = ({
                 x: { duration: 0.3, repeat: 1 }
               }}
               exit={{ opacity: 0 }}
-              className="flex flex-col items-center text-center"
+              className="flex w-full flex-col items-center text-center"
             >
               <BobbyBlueCharacter 
                 variant={index === 0 ? 'glitch' : 'intro'} 

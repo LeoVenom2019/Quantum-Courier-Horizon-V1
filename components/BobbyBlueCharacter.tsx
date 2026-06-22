@@ -43,7 +43,7 @@ export const BobbyBlueCharacter = ({
       className={`relative ${className}`}
     >
       {/* Cinematic Frame */}
-      <div className={`relative mx-auto ${isGameIntro ? 'w-[min(86vw,560px)] aspect-video' : 'w-64 h-64 md:w-80 md:h-80'}`}>
+      <div className={`relative mx-auto ${isGameIntro ? 'w-[min(92vw,1280px)] aspect-video' : 'w-64 h-64 md:w-80 md:h-80'}`}>
         {/* Outer Ring Decoration */}
         <div className="absolute -inset-4 border border-cyan-500/10 rounded-full animate-[spin_20s_linear_infinite] pointer-events-none" />
         <div className="absolute -inset-8 border border-cyan-500/5 rounded-full animate-[spin_30s_linear_infinite_reverse] pointer-events-none" />

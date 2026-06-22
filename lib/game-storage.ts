@@ -12,6 +12,7 @@ import { COLONY_SAVE_STORAGE_KEYS, sanitizeSave, validateSave, type ColonySaveSt
 const MAIN_SAVE_KEY = 'time_travel_save';
 const LAST_VALID_BACKUP_KEY = 'time_travel_save_backup_last_valid';
 const CORRUPTED_BACKUP_KEY = 'time_travel_save_backup_corrupted';
+const HARD_RESET_MARKER_KEY = 'qch_hard_reset_at';
 const isDev = () => typeof process !== 'undefined' && process.env?.NODE_ENV !== 'production';
 const devLog = (...args: any[]) => {
   if (isDev()) console.info('[GameStorage]', ...args);
@@ -172,6 +173,26 @@ export const GameStorage = {
     } catch {}
   },
 
+
+  markHardReset: (): void => {
+    try {
+      localStorage.setItem(HARD_RESET_MARKER_KEY, String(Date.now()));
+    } catch {}
+  },
+
+  clearHardReset: (): void => {
+    try {
+      localStorage.removeItem(HARD_RESET_MARKER_KEY);
+    } catch {}
+  },
+
+  hasHardReset: (): boolean => {
+    try {
+      return Boolean(localStorage.getItem(HARD_RESET_MARKER_KEY));
+    } catch {
+      return false;
+    }
+  },
   /**
    * Saves data to storage (localStorage + AppData Background).
    * @param data The data object to be saved.
@@ -196,6 +217,7 @@ export const GameStorage = {
 
       if (key === MAIN_SAVE_KEY && validateSave(dataToPersist)) {
         writeJson(LAST_VALID_BACKUP_KEY, dataToPersist);
+        GameStorage.clearHardReset();
       }
 
       if (COLONY_SAVE_STORAGE_KEYS.includes(key as ColonySaveStorageKey)) {
@@ -289,13 +311,22 @@ export const GameStorage = {
             // Corrupt main save - fall through to cloud fetch
           }
         }
+
+        if (serializedData && !mainSaveRaw) {
+          devLog(`Ignoring orphan supplemental save for ${key}; main save is missing`);
+        }
       }
 
-      if (serializedData) {
+      if (serializedData && !isColonySupplementalKey) {
         return parsedLocalData;
       }
 
       if (key === MAIN_SAVE_KEY) {
+        if (GameStorage.hasHardReset()) {
+          devLog('hard reset marker present; skipping AppData fallback');
+          return null;
+        }
+
         devLog(`LocalStorage empty for ${key}, checking AppData fallback...`);
         const response = await fetch(`/api/save?key=${key}&t=${Date.now()}`, { cache: 'no-store' });
         if (response.ok) {
@@ -310,6 +341,11 @@ export const GameStorage = {
       }
 
       if (isColonySupplementalKey) {
+        if (GameStorage.hasHardReset()) {
+          devLog('hard reset marker present; skipping supplemental AppData fallback');
+          return null;
+        }
+
         const response = await fetch(`/api/save?key=time_travel_save&t=${Date.now()}`, { cache: 'no-store' });
         if (response.ok) {
           const result = await response.json();
@@ -386,6 +422,7 @@ export const GameStorage = {
 
       // If it's the main save, also clear from AppData backend
       if (key === MAIN_SAVE_KEY) {
+        GameStorage.markHardReset();
         await fetch(`/api/save?t=${Date.now()}`, {
           method: 'DELETE',
           cache: 'no-store'

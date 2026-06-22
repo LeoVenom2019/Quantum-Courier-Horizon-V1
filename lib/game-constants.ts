@@ -18,6 +18,11 @@ export const TECHNOLOGIES_MAP = new Map(TECHNOLOGIES.map(t => [`${t.tier}-${t.le
 export const EXTRACTION_PRODUCTION_VALUES = [1, 2, 4, 6, 8, 10, 15];
 export const EXTRACTION_PRODUCTION_COSTS = [0, 1000000, 4000000, 10000000, 30000000, 50000000, 500000000];
 
+export const INTERSTELLAR_EXTRACTION_VALUE_MULTIPLIER = 0.05;
+export const MINING_VALUE_MULTIPLIER = 0.5;
+export const BATTLE_REWARD_VALUE_MULTIPLIER = 3.5;
+export const CAPTURE_BONUS_MULTIPLIER = 0.5;
+
 export const ROUTE_3_END_STEPS = [
   { text: { en: 'The Void is silent, but it is not empty. Prepare your fleet.', pt: 'O Vazio é silencioso, mas não está vazio. Prepare sua frota.' }, type: 'info' },
   { text: { en: 'I detect massive energy spikes. Something is coming.', pt: 'Detecto picos massivos de energia. Algo está vindo.' }, type: 'info' }
