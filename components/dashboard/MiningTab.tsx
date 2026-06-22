@@ -200,6 +200,7 @@ const MiningTab = memo(() => {
     return (
       <div
         key={ore.id}
+        data-floating-reward-source={`mining-${ore.id}`}
         className={`glass-panel relative flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border p-4 transition-all duration-500 ${themeGlow} ${themeBg}`}
       >
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/[0.03] via-transparent to-black/35" />

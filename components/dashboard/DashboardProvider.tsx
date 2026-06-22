@@ -4,6 +4,7 @@ import React, { createContext, useContext, useMemo, ReactNode, useCallback, useS
 import { COLONY_SAVE_STORAGE_KEYS, SaveManager, sanitizeSave } from '../../lib/save-manager';
 import { GameStorage } from '../../lib/game-storage';
 import { RouteStats } from '@/lib/game-state/types';
+import { createFloatingReward } from '@/lib/floating-rewards';
 
 import { 
   useEconomy, 
@@ -890,27 +891,17 @@ export const DashboardProvider = ({
       dispatch({ type: 'SPEND_AETHERION', payload: { amount: autoClaimCost } });
     }
 
-    // Trigger floating money animation
-    let x = typeof window !== 'undefined' ? window.innerWidth / 2 : 0;
-    let y = typeof window !== 'undefined' ? window.innerHeight / 2 : 0;
-    
-    if (event) {
-      const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
-      x = rect.left + rect.width / 2;
-      y = rect.top;
-    }
-
-    const newFloatingReward = {
-      id: Math.random().toString(36).substr(2, 9),
+    const newFloatingReward = createFloatingReward({
       amount: mission.reward,
-      x,
-      y
-    };
+      source: event?.currentTarget.closest('[data-floating-reward-source]') || event?.currentTarget,
+      sourceSelector: `[data-floating-reward-source="mission-${missionId}"]`,
+      sourceType: 'mission',
+    });
     setFloatingRewards(prev => [...prev, newFloatingReward]);
     
     setTimeout(() => {
       setFloatingRewards(prev => prev.filter(r => r.id !== newFloatingReward.id));
-    }, 1000);
+    }, 1100);
 
     if (mission.type === 'initial') {
       const newCompleted = [...missions.completedInitialMissions, missionId];
@@ -1073,18 +1064,26 @@ export const DashboardProvider = ({
     value = Math.floor(value * MINING_VALUE_MULTIPLIER);
 
     if (event && activeTab === 'mining') {
-      const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
-      const newFloatingReward = {
-        id: Math.random().toString(36).substr(2, 9),
+      const newFloatingReward = createFloatingReward({
         amount: value,
-        x: rect.left + rect.width / 2,
-        y: rect.top
-      };
+        source: event.currentTarget.closest('[data-floating-reward-source]') || event.currentTarget,
+        sourceSelector: `[data-floating-reward-source="mining-${oreId}"]`,
+        sourceType: 'mining',
+      });
       setFloatingRewards(prev => [...prev, newFloatingReward]);
+      setTimeout(() => {
+        setFloatingRewards(prev => prev.filter(r => r.id !== newFloatingReward.id));
+      }, 1100);
       playSfx('cash_register');
     }
 
+    const wasteToAdd = packs * 300 * (progression.routeTier === 'Interstellar' ? 1 + (progression.extractionTechLevel * 0.1) : 1);
+    const miningWasteDelta = Math.max(0, Math.min(7500, economy.miningWaste + wasteToAdd) - economy.miningWaste);
+
     dispatch({ type: 'EARN_QC', payload: { amount: value, source: 'mining' } });
+    if (miningWasteDelta > 0) {
+      dispatch({ type: 'EARN_RESOURCES', payload: { miningWaste: miningWasteDelta } });
+    }
     updateHistoryStats('earned', value, progression.routeTier);
     dispatch({ type: 'UPDATE_HISTORY', payload: { tier: progression.routeTier, field: 'qcFromMining', amount: value } });
     dispatch({ type: 'SET_ORES_COLLECTED', payload: { ores: { ...mining.oresCollected, [oreId]: mining.oresCollected[oreId] - (packs * ore.packSize) } } });
@@ -1095,7 +1094,7 @@ export const DashboardProvider = ({
         dispatch({ type: 'UPDATE_MISSION', payload: { id: m.id, delta: packs } });
       }
     });
-  }, [mining, progression.routeTier, progression.battleLevel, activeTab, getEconomicMultipliers, dispatch, playSfx, setFloatingRewards, updateHistoryStats, missions]);
+  }, [mining, progression.routeTier, progression.battleLevel, progression.extractionTechLevel, economy.miningWaste, activeTab, getEconomicMultipliers, dispatch, playSfx, setFloatingRewards, updateHistoryStats, missions]);
 
   const buyUpgrade = useCallback((locationId: string, upgrade: any) => {
     const locationTech = progression.techLevels[locationId] || { engine: 0, ai: 0, value: 0, rare: 0 };
@@ -1316,6 +1315,19 @@ export const DashboardProvider = ({
     updateHistoryStats('acquired', value, 'Interstellar', 'extraction');
     dispatch({ type: 'UPDATE_HISTORY', payload: { tier: 'Interstellar', field: 'manualExtractionPacksSold', amount: packs } });
 
+    if (event) {
+      const newFloatingReward = createFloatingReward({
+        amount: value,
+        source: event.currentTarget.closest('[data-floating-reward-source]') || event.currentTarget,
+        sourceSelector: `[data-floating-reward-source="extraction-${id}"]`,
+        sourceType: 'extraction',
+      });
+      setFloatingRewards(prev => [...prev, newFloatingReward]);
+      setTimeout(() => {
+        setFloatingRewards(prev => prev.filter(r => r.id !== newFloatingReward.id));
+      }, 1100);
+    }
+
     playSfx('cash_register');
     addLog(`${t('extractionSold')}: +${formatValue(value)} QC`, 'success');
 
@@ -1325,7 +1337,7 @@ export const DashboardProvider = ({
         dispatch({ type: 'UPDATE_MISSION', payload: { id: m.id, delta: packs } });
       }
     });
-  }, [mining.extractionPacks, mining.extractionCompressionLevels, progression.battleLevel, progression.routeTier, getEconomicMultipliers, dispatch, playSfx, addLog, t, formatValue, updateHistoryStats, missions]);
+  }, [mining.extractionPacks, mining.extractionCompressionLevels, progression.battleLevel, progression.routeTier, getEconomicMultipliers, dispatch, playSfx, addLog, t, formatValue, updateHistoryStats, missions, setFloatingRewards]);
 
 
 

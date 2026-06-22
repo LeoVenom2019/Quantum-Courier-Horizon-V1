@@ -203,6 +203,7 @@ const MissionsTab = memo(() => {
               <motion.div
                 key={mission.id || `mission-${index}`}
                 id={`mission-${mission.id}`}
+                data-floating-reward-source={`mission-${mission.id}`}
                 layout
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}

@@ -8,6 +8,7 @@ import { IntroNarrative } from '@/components/IntroNarrative';
 import { GameDashboard } from '@/components/GameDashboard';
 import { AchievementsModal } from '@/components/AchievementsModal';
 import { Jukebox } from '@/components/Jukebox';
+import { SplashScreen } from '@/components/SplashScreen';
 import { useJukebox } from '@/hooks/useJukebox';
 import { useSFX } from '@/hooks/useSFX';
 import { useSoundMaster } from '@/hooks/useSoundMaster';
@@ -1066,6 +1067,7 @@ export default function GameHome() {
   const [hasSave, setHasSave] = useState(false);
   const [showAchievements, setShowAchievements] = useState(false);
   const [showJukeboxModal, setShowJukeboxModal] = useState(false);
+  const [showSplash, setShowSplash] = useState(true);
   const [unlockedAchievements, setUnlockedAchievements] = useState<string[]>([]);
   const [achievementProgress, setAchievementProgress] = useState<{ [key: string]: number }>({});
   const [isShaking, setIsShaking] = useState(false);
@@ -1133,7 +1135,7 @@ export default function GameHome() {
 
     const bgm = bgmRef.current;
 
-    if (view === 'landing' && masterMusicOn && !jukeboxState.isPlaying && audioUnlocked) {
+    if (view === 'landing' && !showSplash && masterMusicOn && !jukeboxState.isPlaying && audioUnlocked) {
       // Fade in
       bgm.play().catch((err) => console.warn('Audio play blocked:', err));
       let vol = bgm.volume;
@@ -1157,7 +1159,7 @@ export default function GameHome() {
       }, 80);
       return () => clearInterval(fadeOut);
     }
-  }, [view, masterMusicOn, masterMusicVolume, jukeboxState.isPlaying, audioUnlocked]);
+  }, [view, showSplash, masterMusicOn, masterMusicVolume, jukeboxState.isPlaying, audioUnlocked]);
 
   // Cleanup ao desmontar
   useEffect(() => {
@@ -1635,6 +1637,10 @@ export default function GameHome() {
       transition={{ duration: 0.4 }}
       className={`relative min-h-screen w-full flex flex-col ${view === 'game' ? 'items-stretch justify-start' : 'items-start justify-center pl-12 md:pl-24'} bg-[#050510] overflow-hidden `}
     >
+      <AnimatePresence>
+        {showSplash && <SplashScreen onComplete={() => setShowSplash(false)} />}
+      </AnimatePresence>
+
       {view === 'narrative' ? (
         <IntroNarrative 
           onComplete={async () => {
@@ -2140,3 +2146,4 @@ export default function GameHome() {
     </motion.main>
   );
 }
+

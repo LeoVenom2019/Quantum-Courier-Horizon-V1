@@ -160,6 +160,7 @@ const TechnologyTab = memo(() => {
               return (
                 <div
                   key={point.id}
+                  data-floating-reward-source={`extraction-${point.id}`}
                   className={`glass-panel p-4 rounded-2xl border transition-all duration-500 flex flex-col h-full relative overflow-hidden bg-cover bg-center bg-no-repeat ${isResearched ? 'neon-border-orange bg-orange-500/5' : 'border-white/10 bg-orange-900/5'}`}
                   style={extractionBackgroundImage ? { backgroundImage: `url('${extractionBackgroundImage}')` } : undefined}
                 >

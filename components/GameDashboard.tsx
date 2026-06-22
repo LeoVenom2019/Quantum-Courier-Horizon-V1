@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo, memo } from 'react';
 import Image from 'next/image';
 import { motion, AnimatePresence } from 'motion/react';
+import { createFloatingReward } from '@/lib/floating-rewards';
 import {
   Rocket,
   TrendingUp,
@@ -4910,6 +4911,7 @@ const DashboardContent = memo(({
       let totalQcGained = 0;
       let totalPacksSold = 0;
       let hasSold = false;
+      let firstSoldPointId: string | null = null;
       const next = { ...extractionPacksRef.current };
 
       // Check each unlocked point for auto-sell
@@ -4945,6 +4947,7 @@ const DashboardContent = memo(({
           totalQcGained += saleValue;
           totalPacksSold += currentPacks;
           next[id] = 0;
+          if (!firstSoldPointId) firstSoldPointId = id;
           hasSold = true;
         }
       });
@@ -4957,6 +4960,18 @@ const DashboardContent = memo(({
         dispatch({ type: 'EARN_QC', payload: { amount: totalQcGained, source: 'extraction' } });
         qcRef.current += totalQcGained;
         setTotalExtractionProfit(prev => prev + totalQcGained);
+
+        if (totalQcGained > 0) {
+          const newFloatingReward = createFloatingReward({
+            amount: totalQcGained,
+            sourceSelector: firstSoldPointId ? `[data-floating-reward-source="extraction-${firstSoldPointId}"]` : undefined,
+            sourceType: 'extraction',
+          });
+          setFloatingRewards(prev => [...prev, newFloatingReward]);
+          window.setTimeout(() => {
+            setFloatingRewards(prev => prev.filter(reward => reward.id !== newFloatingReward.id));
+          }, 1100);
+        }
 
         // Update history stats
         dispatch({ type: 'UPDATE_HISTORY', payload: { tier: 'Interstellar', field: 'qcFromExtraction', amount: totalQcGained } });
@@ -5110,6 +5125,18 @@ const DashboardContent = memo(({
     updateHistoryStats('acquired', qcReward, routeTierRef.current, 'battle');
     updateHistoryStats('battle_win', 1, routeTierRef.current);
 
+    if (qcReward > 0) {
+      const newFloatingReward = createFloatingReward({
+        amount: qcReward,
+        sourceSelector: '[data-floating-reward-source="battle"]',
+        sourceType: 'battle',
+      });
+      setFloatingRewards(prev => [...prev, newFloatingReward]);
+      window.setTimeout(() => {
+        setFloatingRewards(prev => prev.filter(reward => reward.id !== newFloatingReward.id));
+      }, 1100);
+    }
+
     const xpText = xpReward > 0 ? `, +${formatValue(xpReward)} XP` : '';
     const bonusText = bonusMultiplier > 1 ? ` (+${Math.round((bonusMultiplier - 1) * 100)}% BONUS)` : '';
 
@@ -5120,7 +5147,7 @@ const DashboardContent = memo(({
     );
 
     return { qcReward, xpReward, aetherionReward };
-  }, [language, formatValue, addXP, updateHistoryStats, addLog, getEconomicMultipliers, setQc, setAetherion]);
+  }, [language, formatValue, addXP, updateHistoryStats, addLog, getEconomicMultipliers, setQc, setAetherion, setFloatingRewards]);
   const resolveBattleDefeat = useCallback((battle: Battle) => {
     addLog(t('defeatShipDestroyed'), 'error');
   }, [addLog, t]);
@@ -5648,33 +5675,17 @@ const DashboardContent = memo(({
 
     // Trigger floating money animation if event provided or if on missions tab
     if (event || activeTabRef.current === 'missions') {
-      let x = window.innerWidth / 2;
-      let y = window.innerHeight / 2;
-
-      if (event) {
-        const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
-        x = rect.left + rect.width / 2;
-        y = rect.top;
-      } else {
-        const element = document.getElementById(`mission-${missionId}`);
-        if (element) {
-          const rect = element.getBoundingClientRect();
-          x = rect.left + rect.width / 2;
-          y = rect.top;
-        }
-      }
-
-      const newFloatingReward = {
-        id: Math.random().toString(36).substr(2, 9),
+      const newFloatingReward = createFloatingReward({
         amount: mission.reward,
-        x,
-        y
-      };
+        source: event?.currentTarget.closest('[data-floating-reward-source]') || event?.currentTarget,
+        sourceSelector: `[data-floating-reward-source="mission-${missionId}"]`,
+        sourceType: 'mission',
+      });
       setFloatingRewards(prev => [...prev, newFloatingReward]);
 
       setTimeout(() => {
         setFloatingRewards(prev => prev.filter(r => r.id !== newFloatingReward.id));
-      }, 1000);
+      }, 1100);
     }
 
     if (mission.type === 'initial') {
@@ -5769,21 +5780,21 @@ const DashboardContent = memo(({
     if (source === 'manual') dispatch({ type: 'UPDATE_HISTORY', payload: { tier, field: 'manualDeliveries', amount: count } });
     if (source === 'auto') dispatch({ type: 'UPDATE_HISTORY', payload: { tier, field: 'autoDeliveries', amount: count } });
 
-    // RHSE Solar Energy
+    // RHSE Solar Energy must be committed immediately; keeping it only in refs can
+    // be overwritten by unrelated state syncs before the flush interval runs.
     const mappingBonus = 1 + (solarMappingLevel * 0.1);
     const energyToAdd = count * 50 * (routeTier === 'Interstellar' ? mappingBonus : 1);
-    solarEnergyRef.current = Math.min(7500, solarEnergyRef.current + energyToAdd);
+    const previousSolarEnergy = solarEnergyRef.current;
+    const nextSolarEnergy = Math.min(7500, previousSolarEnergy + energyToAdd);
+    const solarDelta = nextSolarEnergy - previousSolarEnergy;
+
+    if (solarDelta > 0) {
+      solarEnergyRef.current = nextSolarEnergy;
+      lastFlushedSolarRef.current = nextSolarEnergy;
+      dispatch({ type: 'EARN_RESOURCES', payload: { solarEnergy: solarDelta } });
+    }
   }, [routeTier, solarMappingLevel, dispatch]);
 
-
-  // RHSE Tube Generation Logic: 2500 Waste + 2500 Solar = 1 Tube
-  useEffect(() => {
-    if (miningWasteRef.current >= 2500 && solarEnergyRef.current >= 2500) {
-      miningWasteRef.current -= 2500;
-      solarEnergyRef.current -= 2500;
-      aetherionTubesRef.current = Math.min(isInterstellar ? 20 : 10, aetherionTubesRef.current + 1);
-    }
-  }, [miningWaste, solarEnergy, routeTier, isInterstellar]);
 
   const isRoute2Unlocked = useCallback(() => {
     if (routeTier === 'Interstellar' || routeTier === 'Void') return true;
@@ -6707,15 +6718,26 @@ const DashboardContent = memo(({
                 const currentStats = historyStatsRef.current[routeTierRef.current];
                 historyStatsRef.current = { ...historyStatsRef.current, [routeTierRef.current]: { ...currentStats, autoMiningPacksSold: (currentStats.autoMiningPacksSold || 0) + packs } };
                 const wasteToAdd = packs * 300 * (routeTierRef.current === 'Interstellar' ? 1 + (extractionTechLevelRef.current * 0.1) : 1);
-                miningWasteRef.current = Math.min(7500, miningWasteRef.current + wasteToAdd);
+                const previousMiningWaste = miningWasteRef.current;
+                const nextMiningWaste = Math.min(7500, previousMiningWaste + wasteToAdd);
+                const miningWasteDelta = nextMiningWaste - previousMiningWaste;
+                if (miningWasteDelta > 0) {
+                  miningWasteRef.current = nextMiningWaste;
+                  lastFlushedWasteRef.current = nextMiningWaste;
+                  dispatch({ type: 'EARN_RESOURCES', payload: { miningWaste: miningWasteDelta } });
+                }
                 nextOres[ore.id] -= packs * ore.packSize;
                 oresChanged = true;
                 if (activeTabRef.current === 'mining') {
-                  const rewardId = Math.random().toString(36).substr(2, 9);
-                  setFloatingRewards(prev => [...prev, { id: rewardId, amount: value * packs * MINING_VALUE_MULTIPLIER, x: window.innerWidth / 2, y: window.innerHeight / 2 }]);
+                  const newFloatingReward = createFloatingReward({
+                    amount: value * packs * MINING_VALUE_MULTIPLIER,
+                    sourceSelector: `[data-floating-reward-source="mining-${ore.id}"]`,
+                    sourceType: 'mining',
+                  });
+                  setFloatingRewards(prev => [...prev, newFloatingReward]);
                   setTimeout(() => {
-                    setFloatingRewards(p => p.filter(r => r.id !== rewardId));
-                  }, 1000);
+                    setFloatingRewards(p => p.filter(r => r.id !== newFloatingReward.id));
+                  }, 1100);
                 }
                 applyMissionProgress('sell', ore.id, packs, routeTierRef.current);
               }
@@ -7183,6 +7205,18 @@ const DashboardContent = memo(({
           }
         });
 
+        if (totalRewardBatch > 0) {
+          const firstCompletion = completions[0];
+          const newFloatingReward = createFloatingReward({
+            amount: totalRewardBatch,
+            sourceSelector: firstCompletion ? `[data-floating-reward-source="delivery-${firstCompletion.routeId}"]` : undefined,
+            sourceType: 'delivery',
+          });
+          setFloatingRewards(prev => [...prev, newFloatingReward]);
+          window.setTimeout(() => {
+            setFloatingRewards(prev => prev.filter(reward => reward.id !== newFloatingReward.id));
+          }, 1100);
+        }
         qcRef.current += totalRewardBatch;
         const manualCount = completions.filter(c => c.isManual).reduce((acc, curr) => acc + curr.count, 0);
         const autoCount = completions.filter(c => !c.isManual).reduce((acc, curr) => acc + curr.count, 0);
@@ -9146,14 +9180,14 @@ const DashboardContent = memo(({
         {floatingRewards.map(reward => (
           <motion.div
             key={reward.id}
-            initial={{ opacity: 0, scale: 0.5, x: reward.x - 20, y: reward.y }}
+            initial={{ opacity: 0, scale: 0.55, x: reward.x - 20, y: reward.y - 12 }}
             animate={{
               opacity: [0, 1, 1, 0],
-              scale: [0.5, 1.2, 1, 0.8],
-              x: [reward.x - 20, reward.x - 20, typeof window !== 'undefined' ? window.innerWidth - 100 : 1000],
-              y: [reward.y, reward.y - 100, 40]
+              scale: [0.55, 1.15, 0.9, 0.35],
+              x: [reward.x - 20, reward.x - 20, ((reward.x + (reward.targetX ?? (typeof window !== 'undefined' ? window.innerWidth - 100 : 1000))) / 2) - 34, (reward.targetX ?? (typeof window !== 'undefined' ? window.innerWidth - 100 : 1000)) - 20],
+              y: [reward.y - 12, reward.y - 54, Math.min(reward.y - 80, (reward.targetY ?? 40) + 42), (reward.targetY ?? 40) - 8]
             }}
-            transition={{ duration: 1, times: [0, 0.2, 0.8, 1], ease: "easeInOut" }}
+            transition={{ duration: 1.05, times: [0, 0.18, 0.72, 1], ease: "easeInOut" }}
             className="fixed z-[9999] pointer-events-none flex flex-col items-center"
           >
             <div className="flex items-center gap-1 bg-yellow-500 text-black px-3 py-1 rounded-full font-orbitron font-bold shadow-[0_0_20px_rgba(234,179,8,0.6)]">
@@ -9717,7 +9751,7 @@ const DashboardContent = memo(({
                   </div>
                 )}
 
-                <div className="flex items-center gap-2">
+                <div data-qc-total-target className="flex items-center gap-2">
                   <Database className={`w-4 h-4 ${themeText}`} />
                   <span className={`text-2xl font-orbitron font-bold ${isInterstellar ? 'neon-text-orange' : 'neon-text-cyan'}`}>
                     {formatValue(qc)} <span className={`text-[14px] ${isInterstellar ? 'text-orange-500/60' : 'text-cyan-500/60'}`}>QC</span>
@@ -9914,7 +9948,7 @@ const DashboardContent = memo(({
                               const isCombat = group.status === 'combat';
 
                               return (
-                                <div key={group.routeId} className={`glass-panel border rounded-lg p-3 transition-all relative overflow-hidden group ${isCombat ? 'neon-border-red bg-red-500/5' : isInterstellar ? 'neon-border-orange hover:bg-white/5' : 'neon-border-cyan hover:bg-white/5'}`}>
+                                <div key={group.routeId} data-floating-reward-source={`delivery-${group.routeId}`} className={`glass-panel border rounded-lg p-3 transition-all relative overflow-hidden group ${isCombat ? 'neon-border-red bg-red-500/5' : isInterstellar ? 'neon-border-orange hover:bg-white/5' : 'neon-border-cyan hover:bg-white/5'}`}>
                                   <div className="flex gap-4 relative z-10">
                                     {/* Left Side: Ship PNG */}
                                     <div className="relative w-24 h-24 flex-shrink-0 bg-black/40 rounded-lg border border-white/5 overflow-hidden flex items-center justify-center p-2">
@@ -13463,9 +13497,6 @@ export const GameDashboard = memo((props: GameDashboardProps) => {
 GameDashboard.displayName = 'GameDashboard';
 
 export default GameDashboard;
-
-
-
 
 
 
