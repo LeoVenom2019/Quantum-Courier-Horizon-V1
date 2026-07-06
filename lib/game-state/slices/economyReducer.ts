@@ -1,6 +1,7 @@
 // lib/game-state/slices/economyReducer.ts
 
 import { EconomyState, GameAction } from '../types';
+import { normalizeGameNumber } from '../numbers';
 
 export const initialEconomyState: EconomyState = {
   qc: 100, // Initial starting QC for new campaign
@@ -14,10 +15,10 @@ export const initialEconomyState: EconomyState = {
 export function economyReducer(state: EconomyState = initialEconomyState, action: GameAction): EconomyState {
   switch (action.type) {
     case 'EARN_QC':
-      return { ...state, qc: (state.qc || 0) + (action.payload.amount || 0) };
+      return { ...state, qc: normalizeGameNumber(state.qc) + normalizeGameNumber(action.payload.amount) };
 
     case 'SPEND_QC':
-      return { ...state, qc: Math.max(0, (state.qc || 0) - (action.payload.amount || 0)) };
+      return { ...state, qc: Math.max(0, normalizeGameNumber(state.qc) - normalizeGameNumber(action.payload.amount)) };
 
     case 'EARN_AETHERION':
       return { ...state, aetherion: Math.min(10000, (state.aetherion || 0) + (action.payload.amount || 0)) };
@@ -35,7 +36,7 @@ export function economyReducer(state: EconomyState = initialEconomyState, action
       };
 
     case 'SET_QC':
-      return { ...state, qc: action.payload.amount };
+      return { ...state, qc: normalizeGameNumber(action.payload.amount) };
 
     case 'SET_AETHERION':
       return { ...state, aetherion: Math.min(10000, action.payload.amount) };
@@ -52,15 +53,9 @@ export function economyReducer(state: EconomyState = initialEconomyState, action
     case 'SELL_EXTRACTION_PACKS':
       return {
         ...state,
-        qc: (state.qc || 0) + (action.payload.value || 0),
-        totalExtractionProfit: (state.totalExtractionProfit || 0) + (action.payload.value || 0),
+        totalExtractionProfit: normalizeGameNumber(state.totalExtractionProfit) + normalizeGameNumber(action.payload.value),
       };
 
-    case 'SELL_ORE':
-      return { ...state, qc: (state.qc || 0) + (action.payload.value || 0) };
-
-    case 'BATTLE_WON':
-      return { ...state, qc: (state.qc || 0) + (action.payload.reward || 0) };
 
     case 'SYNTHESIZE_AETHERION': {
       if (state.aetherionTubes <= 0) return state;

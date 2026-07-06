@@ -1,6 +1,7 @@
 // lib/game-state/slices/missionsReducer.ts
 
 import { MissionsState, GameAction } from '../types';
+import { normalizeGameNumber } from '../numbers';
 
 export const initialMissionsState: MissionsState = {
   missions: [],
@@ -58,6 +59,7 @@ export function missionsReducer(state: MissionsState = initialMissionsState, act
 
     case 'UPDATE_HISTORY': {
       const { tier, field, amount } = action.payload;
+      const safeAmount = normalizeGameNumber(amount);
       const stats = state.historyStats[tier] || {
         deliveries: 0, manualDeliveries: 0, autoDeliveries: 0, qcFromDeliveries: 0,
         qcFromMining: 0, qcFromExtraction: 0, qcSpent: 0, qcTotalAcquired: 0,
@@ -72,7 +74,7 @@ export function missionsReducer(state: MissionsState = initialMissionsState, act
           ...state.historyStats,
           [tier]: {
             ...stats,
-            [field]: ((stats[field as keyof typeof stats] as number) || 0) + amount
+            [field]: normalizeGameNumber(stats[field as keyof typeof stats]) + safeAmount
           }
         }
       };

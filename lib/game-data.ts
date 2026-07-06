@@ -1135,11 +1135,11 @@ export const UPGRADES: Upgrade[] = [
     name: 'Entrega Missão Especial',
     category: 'Raro',
     tiers: [
-      { level: 1, name: 'Missão Secreta', cost: 20000, bonus: '10% Chance (10x)', value: 0.10 },
-      { level: 2, name: 'Missão Ultra Secreta', cost: 200000, bonus: '15% Chance (10x)', value: 0.15 },
-      { level: 3, name: 'Missão Matrix', cost: 2000000, bonus: '20% Chance (10x)', value: 0.20 },
-      { level: 4, name: 'Missão X', cost: 20000000, bonus: '25% Chance (10x)', value: 0.25 },
-      { level: 5, name: 'Missão Tesla Musk MAX', cost: 200000000, bonus: '35% Chance (10x)', value: 0.35 },
+      { level: 1, name: 'Missão Secreta', cost: 20000, bonus: '10% Chance (5x)', value: 0.10 },
+      { level: 2, name: 'Missão Ultra Secreta', cost: 200000, bonus: '15% Chance (5x)', value: 0.15 },
+      { level: 3, name: 'Missão Matrix', cost: 2000000, bonus: '20% Chance (5x)', value: 0.20 },
+      { level: 4, name: 'Missão X', cost: 20000000, bonus: '25% Chance (5x)', value: 0.25 },
+      { level: 5, name: 'Missão Tesla Musk MAX', cost: 200000000, bonus: '35% Chance (5x)', value: 0.35 },
     ]
   }
 ];

@@ -5,6 +5,7 @@ import { motion } from 'motion/react';
 import { Shield, Zap, ArrowRight, Package, Coins, Compass as CompassIcon, Rocket } from 'lucide-react';
 import { ROUTES, SHIPS } from '@/lib/game-data';
 import { UPGRADES_MAP, ROUTES_MAP } from '@/lib/game-constants';
+import { getDeliveryFuelCost } from '@/lib/economy-balance';
 import { useDashboard } from './DashboardProvider';
 
 const RoutesTab = memo(() => {
@@ -89,8 +90,7 @@ const RoutesTab = memo(() => {
           const locationTech = techLevels[route.id] || { engine: 0, ai: 0, value: 0, rare: 0 };
           const valueUpgrade = UPGRADES_MAP.get('value')!;
           const valueTier = valueUpgrade.tiers.find((t: any) => t.level === locationTech.value);
-          const costIncreaseMultiplier = 1 + ((valueTier?.value || 0) * 0.1);
-          const fuelCost = Math.floor(10 * costIncreaseMultiplier);
+          const fuelCost = getDeliveryFuelCost(route, valueTier?.value || 0, qc);
           const canAffordFuel = qc >= fuelCost;
           const conditionsMet = isRouteUnlocked(route);
           const canAffordUnlock = qc >= (route.unlockCost || 0);

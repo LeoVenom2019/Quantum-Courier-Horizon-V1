@@ -3,7 +3,6 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo, memo } from 'react';
 import Image from 'next/image';
 import { motion, AnimatePresence } from 'motion/react';
-import { createFloatingReward } from '@/lib/floating-rewards';
 import {
   Rocket,
   TrendingUp,
@@ -126,6 +125,15 @@ import { useSFX } from '@/hooks/useSFX';
 import { GameStorage } from '@/lib/game-storage';
 import { SaveManager } from '@/lib/save-manager';
 import { useEconomy, useDispatch, useProgression, useMining, useCombat, useMissions, useEarth, useGame, useSystem } from '@/lib/game-state/index';
+import { normalizeGameNumber } from '@/lib/game-state/numbers';
+import {
+  BOSS_ENCOUNTER_COOLDOWN_MS,
+  getDeliveryFuelCost,
+  getLocationCostMultiplier,
+  getMissionRarityMultiplier,
+  getMissionRewardUpgradeCost,
+  getSolarMissionRewardCap,
+} from '@/lib/economy-balance';
 import {
   EarthState,
   CombatState,
@@ -316,6 +324,8 @@ import {
 const NEW_EARTH_YEAR_SECONDS = 1200;
 const NEW_EARTH_MONTHS_PER_YEAR = 12;
 const NEW_EARTH_MONTH_SECONDS = NEW_EARTH_YEAR_SECONDS / NEW_EARTH_MONTHS_PER_YEAR;
+
+type QcSource = 'delivery' | 'mining' | 'battle' | 'mission' | 'extraction' | 'tutorial';
 
 const getNewEarthCalendar = (seconds: number) => {
   const totalMonths = Math.floor(Math.max(0, seconds) / NEW_EARTH_MONTH_SECONDS);
@@ -1223,7 +1233,6 @@ const DashboardContent = memo(({
     addLog, gameLogs,
     seenTutorials, completeTutorial,
     showRoute2Goals, setShowRoute2Goals,
-    floatingRewards, setFloatingRewards,
     autoSkipRandomBattles, toggleAutoSkipRandomBattles,
     totalProjectTerra: dashboardTotalProjectTerra
   } = useDashboard();
@@ -1746,6 +1755,7 @@ const DashboardContent = memo(({
   const pendingHistoryRef = React.useRef(false);
   const lastScanTimeRef = React.useRef(lastScanTime);
   const lastRandomBattleTimeRef = React.useRef(0);
+  const lastBossBattleTimeRef = React.useRef(0);
   const unlockedAchievementsRef = React.useRef(unlockedAchievements);
   const achievementProgressRef = React.useRef(achievementProgress);
   const missionsRef = React.useRef<Mission[]>([]);
@@ -1810,6 +1820,46 @@ const DashboardContent = memo(({
   const lastFlushedSolarRef = React.useRef(solarEnergy);
   const lastFlushedTubesRef = React.useRef(aetherionTubes);
 
+  const creditQc = useCallback((amount: unknown, source: QcSource) => {
+    const safeAmount = normalizeGameNumber(amount);
+    if (safeAmount <= 0) return 0;
+
+    qcRef.current += safeAmount;
+    lastFlushedQcRef.current += safeAmount;
+    dispatch({ type: 'EARN_QC', payload: { amount: safeAmount, source } });
+
+    return safeAmount;
+  }, [dispatch]);
+
+  const spendQc = useCallback((amount: unknown) => {
+    const safeAmount = normalizeGameNumber(amount);
+    if (safeAmount <= 0) return 0;
+
+    const spent = Math.min(qcRef.current, safeAmount);
+    qcRef.current = Math.max(0, qcRef.current - spent);
+    lastFlushedQcRef.current -= spent;
+    dispatch({ type: 'SPEND_QC', payload: { amount: spent } });
+
+    return spent;
+  }, [dispatch]);
+
+  const setQcBalance = useCallback((amount: unknown) => {
+    const safeAmount = Math.max(0, normalizeGameNumber(amount));
+
+    qcRef.current = safeAmount;
+    lastFlushedQcRef.current = safeAmount;
+    dispatch({ type: 'SET_QC', payload: { amount: safeAmount } });
+  }, [dispatch]);
+
+  const syncCreditedQcRef = useCallback((amount: unknown) => {
+    const safeAmount = normalizeGameNumber(amount);
+    if (safeAmount <= 0) return 0;
+
+    qcRef.current += safeAmount;
+    lastFlushedQcRef.current += safeAmount;
+
+    return safeAmount;
+  }, []);
   // Optimization Refs
   const isLoadedRef = React.useRef(isLoaded);
 
@@ -1836,20 +1886,39 @@ const DashboardContent = memo(({
 
   // 1. Economy & Resources
   useEffect(() => {
-    qcRef.current = qc;
-    lastFlushedQcRef.current = qc;
-    aetherionRef.current = aetherion;
-    lastFlushedAetherionRef.current = aetherion;
-    miningWasteRef.current = miningWaste;
-    lastFlushedWasteRef.current = miningWaste;
-    solarEnergyRef.current = solarEnergy;
-    lastFlushedSolarRef.current = solarEnergy;
-    aetherionTubesRef.current = aetherionTubes;
-    lastFlushedTubesRef.current = aetherionTubes;
+    const syncBufferedValue = (
+      liveRef: React.MutableRefObject<number>,
+      flushedRef: React.MutableRefObject<number>,
+      storeValue: number
+    ) => {
+      const pendingDelta = liveRef.current - flushedRef.current;
+      const nextStoreValue = normalizeGameNumber(storeValue);
+      flushedRef.current = nextStoreValue;
+      liveRef.current = Math.abs(pendingDelta) > 0.01
+        ? nextStoreValue + pendingDelta
+        : nextStoreValue;
+    };
+
+    syncBufferedValue(qcRef, lastFlushedQcRef, qc);
+    syncBufferedValue(aetherionRef, lastFlushedAetherionRef, aetherion);
+    syncBufferedValue(miningWasteRef, lastFlushedWasteRef, miningWaste);
+    syncBufferedValue(solarEnergyRef, lastFlushedSolarRef, solarEnergy);
+    syncBufferedValue(aetherionTubesRef, lastFlushedTubesRef, aetherionTubes);
     voidResourcesRef.current = voidResources;
     voidCompactedResourcesRef.current = voidCompactedResources;
     totalExtractionProfitRef.current = totalExtractionProfit;
   }, [qc, aetherion, miningWaste, solarEnergy, aetherionTubes, voidResources, voidCompactedResources, totalExtractionProfit]);
+
+  // 1b. Mission Claim Sync: listen for claims made via DashboardProvider
+  // to keep qcRef in sync before the async flush loop can overwrite it.
+  useEffect(() => {
+    const handleMissionClaimed = (e: Event) => {
+      const { amount } = (e as CustomEvent<{ amount: number }>).detail;
+      syncCreditedQcRef(amount);
+    };
+    window.addEventListener('qch:mission-claimed', handleMissionClaimed);
+    return () => window.removeEventListener('qch:mission-claimed', handleMissionClaimed);
+  }, [syncCreditedQcRef]);
 
   // 2. Progression & Technology
   useEffect(() => {
@@ -2052,12 +2121,10 @@ const DashboardContent = memo(({
 
   const setRouteTier = useCallback((tier: 'Solar' | 'Interstellar' | 'Void' | 'Earth') => {
     if (tier === 'Earth' && routeTierRef.current !== 'Earth') {
-      qcRef.current = 0;
-      lastFlushedQcRef.current = 0;
-      dispatch({ type: 'SET_QC', payload: { amount: 0 } });
+      setQcBalance(0);
     }
     dispatch({ type: 'ADVANCE_ROUTE_TIER', payload: { tier } });
-  }, [dispatch]);
+  }, [dispatch, setQcBalance]);
 
   const setRoute4Unlocked = useCallback((val: boolean) => {
     if (val) dispatch({ type: 'UNLOCK_ROUTE4' });
@@ -2385,13 +2452,13 @@ const DashboardContent = memo(({
       },
     });
     setNewEarthSubmarines(nextState);
-    dispatch({ type: 'SPEND_QC', payload: { amount: cost } });
+    spendQc(cost);
     GameStorage.save(nextState, NEW_EARTH_SUBMARINES_STORAGE_KEY).catch(error => {
       console.warn('Unable to save New Earth submarine upgrade', error);
     });
     setNewEarthMapFeedback(null);
     playSfx('level_up');
-  }, [dispatch, language, newEarthSubmarines, playSfx]);
+  }, [language, newEarthSubmarines, playSfx, spendQc]);
 
   const upgradeNewEarthHelicopter = useCallback((colonyId: NewEarthHelicopterColonyId, upgradeId: NewEarthHelicopterUpgradeId) => {
     const currentLevel = newEarthHelicopters[colonyId][upgradeId] || 0;
@@ -2419,13 +2486,13 @@ const DashboardContent = memo(({
       },
     });
     setNewEarthHelicopters(nextState);
-    dispatch({ type: 'SPEND_QC', payload: { amount: cost } });
+    spendQc(cost);
     GameStorage.save(nextState, NEW_EARTH_HELICOPTERS_STORAGE_KEY).catch(error => {
       console.warn('Unable to save New Earth helicopter upgrade', error);
     });
     setNewEarthMapFeedback(null);
     playSfx('level_up');
-  }, [dispatch, language, newEarthHelicopters, playRandomNewEarthAccessDenied, playSfx]);
+  }, [language, newEarthHelicopters, playRandomNewEarthAccessDenied, playSfx, spendQc]);
   const upgradeNewEarthTank = useCallback((colonyId: NewEarthTankColonyId, upgradeId: NewEarthTankUpgradeId) => {
     const currentLevel = newEarthTanks[colonyId][upgradeId] || 0;
     if (currentLevel >= MAX_NEW_EARTH_TANK_UPGRADE_LEVEL) {
@@ -2452,24 +2519,24 @@ const DashboardContent = memo(({
       },
     });
     setNewEarthTanks(nextState);
-    dispatch({ type: 'SPEND_QC', payload: { amount: cost } });
+    spendQc(cost);
     GameStorage.save(nextState, NEW_EARTH_TANKS_STORAGE_KEY).catch(error => {
       console.warn('Unable to save New Earth tank upgrade', error);
     });
     setNewEarthMapFeedback(null);
     playSfx('level_up');
-  }, [dispatch, language, newEarthTanks, playRandomNewEarthAccessDenied, playSfx]);
+  }, [language, newEarthTanks, playRandomNewEarthAccessDenied, playSfx, spendQc]);
 
 
   const setQc = useCallback((val: number | ((prev: number) => number)) => {
     const nextVal = typeof val === 'function' ? val(qcRef.current) : val;
-    qcRef.current = nextVal;
-    dispatch({ type: 'SET_QC', payload: { amount: nextVal } });
-  }, [dispatch]);
+    setQcBalance(nextVal);
+  }, [setQcBalance]);
 
   const setAetherion = useCallback((val: number | ((prev: number) => number)) => {
     const nextVal = typeof val === 'function' ? val(aetherionRef.current) : val;
     aetherionRef.current = nextVal;
+    lastFlushedAetherionRef.current = nextVal;
     dispatch({ type: 'SET_AETHERION', payload: { amount: nextVal } });
   }, [dispatch]);
 
@@ -2482,18 +2549,21 @@ const DashboardContent = memo(({
   const setMiningWaste = useCallback((val: number | ((prev: number) => number)) => {
     const nextVal = typeof val === 'function' ? val(miningWasteRef.current) : val;
     miningWasteRef.current = nextVal;
+    lastFlushedWasteRef.current = nextVal;
     dispatch({ type: 'SET_RESOURCES', payload: { miningWaste: nextVal } });
   }, [dispatch]);
 
   const setSolarEnergy = useCallback((val: number | ((prev: number) => number)) => {
     const nextVal = typeof val === 'function' ? val(solarEnergyRef.current) : val;
     solarEnergyRef.current = nextVal;
+    lastFlushedSolarRef.current = nextVal;
     dispatch({ type: 'SET_RESOURCES', payload: { solarEnergy: nextVal } });
   }, [dispatch]);
 
   const setAetherionTubes = useCallback((val: number | ((prev: number) => number)) => {
     const nextVal = typeof val === 'function' ? val(aetherionTubesRef.current) : val;
     aetherionTubesRef.current = nextVal;
+    lastFlushedTubesRef.current = nextVal;
     dispatch({ type: 'SET_RESOURCES', payload: { aetherionTubes: nextVal } });
   }, [dispatch]);
 
@@ -4285,7 +4355,7 @@ const DashboardContent = memo(({
 
     if (payload.type === 'qc' && Number(payload.amount) > 0) {
       const amount = Math.max(0, Math.floor(Number(payload.amount)));
-      dispatch({ type: 'EARN_QC', payload: { amount, source: 'battle' } });
+      creditQc(amount, 'battle');
       return;
     }
 
@@ -4317,7 +4387,7 @@ const DashboardContent = memo(({
         })
         .catch(error => console.warn('Failed to persist underwater treasure reward', error));
     }
-  }, [activeUnderwaterBattle?.colonyId, activeUnderwaterBattle?.siteId, dispatch, recordSubmarineMissionProgress]);
+  }, [activeUnderwaterBattle?.colonyId, activeUnderwaterBattle?.siteId, creditQc, recordSubmarineMissionProgress]);
   const awardNewEarthSupplies = useCallback((supplies: Partial<Record<NewEarthSupplyId, number>>) => {
     const normalized = Object.entries(supplies).reduce<Partial<Record<NewEarthSupplyId, number>>>((acc, [key, value]) => {
       const amount = Math.max(0, Math.floor(Number(value) || 0));
@@ -4544,7 +4614,7 @@ const DashboardContent = memo(({
 
   const handleSkillUpgrade = (cost: number, setter: (val: number) => void, level: number, name: string) => {
     if (qc >= cost) {
-      setQc(prev => prev - cost);
+      spendQc(cost);
       setter(level + 1);
       playSfx('level_up');
       addLog(`${t('upgraded')} ${name} ${t('toLevel')} ${level + 1}`, 'success');
@@ -4776,15 +4846,7 @@ const DashboardContent = memo(({
     return { profit: profitMult, battleProfit: 1, cost: costMult };
   }, []);
 
-  const getMissionUpgradeCost = useCallback((level: number, tier: string) => {
-    if (tier === 'Solar') {
-      const costs = [2500, 15000, 100000, 500000, 2500000, 10000000, 40000000, 150000000, 500000000, 2000000000];
-      return costs[level] || 2000000000;
-    } else {
-      const costs = [1000000, 10000000, 20000000, 30000000, 40000000, 75000000, 150000000, 200000000, 500000000, 1000000000];
-      return costs[level] || 1000000000;
-    }
-  }, []);
+  const getMissionUpgradeCost = useCallback((level: number, tier: string) => getMissionRewardUpgradeCost(level, tier), []);
 
   const formatValue = useCallback((value: number) => {
     if (value === undefined || value === null) return '0';
@@ -4957,21 +5019,10 @@ const DashboardContent = memo(({
         extractionPacksRef.current = next;
         dispatch({ type: 'SET_EXTRACTION_DATA', payload: { packs: next } });
 
-        dispatch({ type: 'EARN_QC', payload: { amount: totalQcGained, source: 'extraction' } });
-        qcRef.current += totalQcGained;
-        setTotalExtractionProfit(prev => prev + totalQcGained);
+        const extractionReward = normalizeGameNumber(totalQcGained);
+        creditQc(extractionReward, 'extraction');
+        setTotalExtractionProfit(prev => prev + extractionReward);
 
-        if (totalQcGained > 0) {
-          const newFloatingReward = createFloatingReward({
-            amount: totalQcGained,
-            sourceSelector: firstSoldPointId ? `[data-floating-reward-source="extraction-${firstSoldPointId}"]` : undefined,
-            sourceType: 'extraction',
-          });
-          setFloatingRewards(prev => [...prev, newFloatingReward]);
-          window.setTimeout(() => {
-            setFloatingRewards(prev => prev.filter(reward => reward.id !== newFloatingReward.id));
-          }, 1100);
-        }
 
         // Update history stats
         dispatch({ type: 'UPDATE_HISTORY', payload: { tier: 'Interstellar', field: 'qcFromExtraction', amount: totalQcGained } });
@@ -4982,7 +5033,7 @@ const DashboardContent = memo(({
     }, 500); // Check every 500ms for more responsive automatic sales
 
     return () => clearInterval(interval);
-  }, [playSfx, routeTier, dispatch, getEconomicMultipliers, setTotalExtractionProfit, applyMissionProgress]);
+  }, [playSfx, routeTier, dispatch, getEconomicMultipliers, setTotalExtractionProfit, applyMissionProgress, creditQc]);
 
   useEffect(() => {
     if (!researchingExtractionPoint) return;
@@ -5111,11 +5162,7 @@ const DashboardContent = memo(({
     battle.xpReward = xpReward;
     battle.aetherionReward = aetherionReward;
 
-    setQc(prev => {
-      const next = prev + qcReward;
-      qcRef.current = next;
-      return next;
-    });
+    creditQc(qcReward, 'battle');
     setAetherion(prev => {
       const next = Math.min(10000, prev + aetherionReward);
       aetherionRef.current = next;
@@ -5125,17 +5172,6 @@ const DashboardContent = memo(({
     updateHistoryStats('acquired', qcReward, routeTierRef.current, 'battle');
     updateHistoryStats('battle_win', 1, routeTierRef.current);
 
-    if (qcReward > 0) {
-      const newFloatingReward = createFloatingReward({
-        amount: qcReward,
-        sourceSelector: '[data-floating-reward-source="battle"]',
-        sourceType: 'battle',
-      });
-      setFloatingRewards(prev => [...prev, newFloatingReward]);
-      window.setTimeout(() => {
-        setFloatingRewards(prev => prev.filter(reward => reward.id !== newFloatingReward.id));
-      }, 1100);
-    }
 
     const xpText = xpReward > 0 ? `, +${formatValue(xpReward)} XP` : '';
     const bonusText = bonusMultiplier > 1 ? ` (+${Math.round((bonusMultiplier - 1) * 100)}% BONUS)` : '';
@@ -5147,7 +5183,7 @@ const DashboardContent = memo(({
     );
 
     return { qcReward, xpReward, aetherionReward };
-  }, [language, formatValue, addXP, updateHistoryStats, addLog, getEconomicMultipliers, setQc, setAetherion, setFloatingRewards]);
+  }, [language, formatValue, addXP, updateHistoryStats, addLog, getEconomicMultipliers, creditQc, setAetherion]);
   const resolveBattleDefeat = useCallback((battle: Battle) => {
     addLog(t('defeatShipDestroyed'), 'error');
   }, [addLog, t]);
@@ -5330,7 +5366,8 @@ const DashboardContent = memo(({
         let bossChance = 0.10 + (battleLevel >= 15 ? 0.10 : 0);
         if (battleLevel >= 45 && routeTier === 'Interstellar') bossChance += 0.25;
 
-        const isBoss = Math.random() < bossChance;
+        const bossCooldownReady = nowTimestamp() - lastBossBattleTimeRef.current >= BOSS_ENCOUNTER_COOLDOWN_MS;
+        const isBoss = bossCooldownReady && Math.random() < bossChance;
         const isElite = !isBoss && enemyTier > 10;
         const enemyType = isBoss ? 'Boss' : (isElite ? 'Elite' : (enemyTier > 5 ? 'Alien' : (Math.random() > 0.5 ? 'Pirate' : 'Alien')));
 
@@ -5382,6 +5419,7 @@ const DashboardContent = memo(({
           isBoss: isBoss
         };
 
+        if (isBoss) lastBossBattleTimeRef.current = nowTimestamp();
         setFoundBattle(battle);
         setScanResult(null);
       } else {
@@ -5415,6 +5453,7 @@ const DashboardContent = memo(({
 
     const route1RewardNerf = currentTier === 'Solar' ? 0.3 : 1;
     const baseRewardValue = getMissionBaseValue(missionRewardLevelRef.current[currentTier] || 1) * route1RewardNerf * (currentTier === 'Interstellar' ? 1.5 : 1) * getEconomicMultipliers().profit;
+    const missionRewardCap = getSolarMissionRewardCap(currentTier, unlockedRouteIdsRef.current);
 
 
     // Initial Missions for Route 1 Campaign only - Prioritized
@@ -5500,13 +5539,13 @@ const DashboardContent = memo(({
 
       if (roll < alienChance) {
         rarity = 'alien';
-        multiplier = routeTier === 'Solar' ? 50 : 75;
+        multiplier = currentTier === 'Solar' ? 50 : 150;
       } else if (roll < alienChance + mythicChance) {
         rarity = 'mythic';
-        multiplier = routeTier === 'Solar' ? 35 : 75;
+        multiplier = currentTier === 'Solar' ? 35 : 150;
       } else if (roll < alienChance + mythicChance + legendaryChance) {
         rarity = 'legendary';
-        multiplier = routeTier === 'Solar' ? 25 : 30;
+        multiplier = currentTier === 'Solar' ? 25 : 50;
       } else if (roll < alienChance + mythicChance + legendaryChance + rareChance) {
         rarity = 'rare';
         multiplier = 10;
@@ -5514,6 +5553,7 @@ const DashboardContent = memo(({
         rarity = 'common';
         multiplier = 1;
       }
+      multiplier = getMissionRarityMultiplier(rarity, currentTier);
 
       const type = Math.random() > 0.5 ? 'delivery' : 'sell';
 
@@ -5527,7 +5567,7 @@ const DashboardContent = memo(({
           const exists = currentMissions.some(m => m.type === 'delivery' && m.shipLevel === ship.level && !m.completed);
 
           if (!exists) {
-            const reward = Math.floor(baseRewardValue * multiplier * (0.8 + Math.random() * 0.4));
+            const reward = Math.floor(Math.min(missionRewardCap, baseRewardValue * multiplier * (0.8 + Math.random() * 0.4)));
 
             // Rebalanced XP rewards based on rarity
             const rewardXP = rarity === 'mythic' ? (Math.floor(Math.random() * (40 - 20 + 1)) + 20) : 0;
@@ -5536,7 +5576,7 @@ const DashboardContent = memo(({
 
             // Reduced targets by 50% for faster progression
             const baseTarget = currentTier === 'Interstellar' ? 20 : 20;
-            const reduction = skillTempoDinheiroLevelRef.current[routeTier];
+            const reduction = skillTempoDinheiroLevelRef.current[currentTier];
             const target = Math.max(5, baseTarget - reduction);
 
             let rewardAetherion = 0;
@@ -5580,7 +5620,7 @@ const DashboardContent = memo(({
           const exists = currentMissions.some(m => m.type === 'sell' && m.oreId === item.id && !m.completed);
 
           if (!exists) {
-            const reward = Math.floor(baseRewardValue * multiplier * (0.8 + Math.random() * 0.4));
+            const reward = Math.floor(Math.min(missionRewardCap, baseRewardValue * multiplier * (0.8 + Math.random() * 0.4)));
 
             // Rebalanced XP rewards based on rarity
             const rewardXP = rarity === 'mythic' ? (Math.floor(Math.random() * (40 - 20 + 1)) + 20) : 0;
@@ -5589,7 +5629,7 @@ const DashboardContent = memo(({
             let baseTarget = currentTier === 'Interstellar' ? 15 : 10;
             if (isExtraction) baseTarget = 100;
 
-            const reduction = skillRobosOlimpicosLevelRef.current[routeTier];
+            const reduction = skillRobosOlimpicosLevelRef.current[currentTier];
             const target = isExtraction ? 100 : Math.max(5, baseTarget - reduction);
 
             let rewardAetherion = 0;
@@ -5662,6 +5702,7 @@ const DashboardContent = memo(({
   const claimMission = useCallback((missionId: string, event?: React.MouseEvent, isAuto: boolean = false) => {
     const mission = missionsRef.current.find(m => m.id === missionId);
     if (!mission || !mission.completed || mission.claimed) return;
+    const rewardAmount = normalizeGameNumber(mission.reward);
 
     if (isAuto) {
       const autoClaimCost = (routeTierRef.current === 'Interstellar') ? 2 : 1;
@@ -5673,20 +5714,6 @@ const DashboardContent = memo(({
       dispatch({ type: 'SPEND_AETHERION', payload: { amount: autoClaimCost } });
     }
 
-    // Trigger floating money animation if event provided or if on missions tab
-    if (event || activeTabRef.current === 'missions') {
-      const newFloatingReward = createFloatingReward({
-        amount: mission.reward,
-        source: event?.currentTarget.closest('[data-floating-reward-source]') || event?.currentTarget,
-        sourceSelector: `[data-floating-reward-source="mission-${missionId}"]`,
-        sourceType: 'mission',
-      });
-      setFloatingRewards(prev => [...prev, newFloatingReward]);
-
-      setTimeout(() => {
-        setFloatingRewards(prev => prev.filter(r => r.id !== newFloatingReward.id));
-      }, 1100);
-    }
 
     if (mission.type === 'initial') {
       const newCompleted = [...completedInitialMissionsRef.current, missionId];
@@ -5694,7 +5721,7 @@ const DashboardContent = memo(({
       dispatch({ type: 'SET_COMPLETED_INITIAL_MISSIONS', payload: { missionIds: newCompleted } });
     }
 
-    dispatch({ type: 'EARN_QC', payload: { amount: mission.reward, source: 'mission' } });
+    creditQc(rewardAmount, 'mission');
     if (mission.rewardAetherion) {
       dispatch({ type: 'EARN_AETHERION', payload: { amount: mission.rewardAetherion } });
     }
@@ -5703,8 +5730,8 @@ const DashboardContent = memo(({
     }
 
     dispatch({ type: 'UPDATE_HISTORY', payload: { tier: mission.tier, field: 'missionsCompleted', amount: 1 } });
-    dispatch({ type: 'UPDATE_HISTORY', payload: { tier: mission.tier, field: 'qcFromMissions', amount: mission.reward } });
-    dispatch({ type: 'UPDATE_HISTORY', payload: { tier: mission.tier, field: 'qcTotalAcquired', amount: mission.reward } });
+    dispatch({ type: 'UPDATE_HISTORY', payload: { tier: mission.tier, field: 'qcFromMissions', amount: rewardAmount } });
+    dispatch({ type: 'UPDATE_HISTORY', payload: { tier: mission.tier, field: 'qcTotalAcquired', amount: rewardAmount } });
 
     dispatch({ type: 'CLAIM_MISSION', payload: { id: missionId } });
 
@@ -5714,11 +5741,11 @@ const DashboardContent = memo(({
 
     const xpText = mission.rewardXP ? `, +${mission.rewardXP} XP` : '';
     const aetherionText = mission.rewardAetherion ? `, +${mission.rewardAetherion} Aetherion` : '';
-    addLog(`${t('missionReward')}: +${formatValue(mission.reward)} QC${xpText}${aetherionText}`, 'success');
+    addLog(`${t('missionReward')}: +${formatValue(rewardAmount)} QC${xpText}${aetherionText}`, 'success');
 
     // Trigger mission generation after state update
     setTimeout(() => generateMissions(), 100);
-  }, [dispatch, t, playSfx, addLog, generateMissions, formatValue, setFloatingRewards]);
+  }, [creditQc, dispatch, t, playSfx, addLog, generateMissions, formatValue]);
 
 
   useEffect(() => {
@@ -5759,11 +5786,7 @@ const DashboardContent = memo(({
   const currentShips = SHIPS.filter(s => s.tier === routeTier);
   const currentOres = ORES.filter(o => o.tier === routeTier);
 
-  const getLocationMultiplier = useCallback((locationId: string) => {
-    const routeIndex = ROUTES.findIndex(r => r.id === locationId);
-    const base = routeTier === 'Interstellar' ? 1.5 : 1.1;
-    return Math.pow(base, routeIndex >= 0 ? routeIndex % 9 : 0);
-  }, [routeTier]);
+  const getLocationMultiplier = useCallback((locationId: string) => getLocationCostMultiplier(locationId, routeTier), [routeTier]);
 
 
   const fileInputRef = React.useRef<HTMLInputElement>(null);
@@ -6123,7 +6146,7 @@ const DashboardContent = memo(({
 
   const startVoidTransition = () => {
     // Reset progress for Route 3
-    setQc(0);
+    setQcBalance(0);
     setAetherion(0);
     setMiningWaste(0);
     setSolarEnergy(0);
@@ -6215,7 +6238,7 @@ const DashboardContent = memo(({
     setTimeout(() => {
       playSfx('warp');
       setRouteTier('Interstellar');
-      setQc(0); // Ensure QC starts at 0 for Route 2
+      setQcBalance(0); // Ensure QC starts at 0 for Route 2
       dispatch({ type: 'SET_TECH_LEVELS', payload: { techLevels: { 'alpha-centauri': { engine: 0, ai: 0, value: 0, rare: 0 } } } });
       dispatch({ type: 'SET_UNLOCKED_ROUTES', payload: { routeIds: ['alpha-centauri'] } });
       dispatch({ type: 'SET_AUTO_TRAVEL_SLOTS', payload: { slots: {} } });
@@ -6277,7 +6300,7 @@ const DashboardContent = memo(({
       return;
     }
 
-    dispatch({ type: 'SPEND_QC', payload: { amount: boostCost } });
+    spendQc(boostCost);
     updateHistoryStats('spent', boostCost, routeTier);
     dispatch({ type: 'UNLOCK_TECH_LEVEL', payload: { tier: researchingTech.tier, level: researchingTech.level } });
 
@@ -6444,8 +6467,7 @@ const DashboardContent = memo(({
     const locationTech = techLevelsRef.current[route.id] || { engine: 0, ai: 0, value: 0, rare: 0 };
     const valueUpgrade = UPGRADES_MAP.get('value')!;
     const valueTier = valueUpgrade.tiers.find(t => t.level === locationTech.value);
-    const costIncreaseMultiplier = 1 + ((valueTier?.value || 0) * 0.1);
-    const fuelCost = (qcRef.current === 0 && route.requiredShipLevel === 1) || route.tier === 'Interstellar' ? 0 : Math.floor(10 * costIncreaseMultiplier);
+    const fuelCost = getDeliveryFuelCost(route, valueTier?.value || 0, qcRef.current);
 
     if (qcRef.current < fuelCost) {
       addLog(`Insufficient QC for fuel to ${route.name}`, 'error');
@@ -6507,7 +6529,7 @@ const DashboardContent = memo(({
 
     const status = 'delivering';
 
-    setQc(c => c - fuelCost);
+    spendQc(fuelCost);
     updateHistoryStats('spent', fuelCost, route.tier);
     performSave().catch(e => console.error("[Save] Failed:", e));
     completeInitialMission('init_4');
@@ -6527,7 +6549,7 @@ const DashboardContent = memo(({
     ]);
     addLog(`Ship launched to ${route.name}`, 'info');
     return true;
-  }, [playSfx, addLog, updateHistoryStats, completeInitialMission, language, performSave, setActiveDeliveries, setQc, t]);
+  }, [playSfx, addLog, updateHistoryStats, completeInitialMission, language, performSave, setActiveDeliveries, spendQc, t]);
 
 
 
@@ -6705,7 +6727,7 @@ const DashboardContent = memo(({
               if (packs > 0) {
                 if (routeTierRef.current === 'Interstellar') packs = Math.min(5, packs);
                 aetherionRef.current = Math.max(0, aetherionRef.current - (packs * autoSellCostPerPack));
-                const compressionBonus = 1 + (miningCompressionLevelsRef.current[ore.id] || 0) * 0.5;
+                const compressionBonus = 1 + (miningCompressionLevelsRef.current[ore.id] || 0) * 0.2;
                 let value = Math.floor(ore.baseValue * ore.rarity * ore.packSize * getEconomicMultipliers().profit * compressionBonus);
                 if (routeTierRef.current === 'Interstellar') {
                   let miningScale = 3.75 + Math.min(battleLevelRef.current, 55) * 0.1;
@@ -6728,17 +6750,6 @@ const DashboardContent = memo(({
                 }
                 nextOres[ore.id] -= packs * ore.packSize;
                 oresChanged = true;
-                if (activeTabRef.current === 'mining') {
-                  const newFloatingReward = createFloatingReward({
-                    amount: value * packs * MINING_VALUE_MULTIPLIER,
-                    sourceSelector: `[data-floating-reward-source="mining-${ore.id}"]`,
-                    sourceType: 'mining',
-                  });
-                  setFloatingRewards(prev => [...prev, newFloatingReward]);
-                  setTimeout(() => {
-                    setFloatingRewards(p => p.filter(r => r.id !== newFloatingReward.id));
-                  }, 1100);
-                }
                 applyMissionProgress('sell', ore.id, packs, routeTierRef.current);
               }
             }
@@ -6750,7 +6761,7 @@ const DashboardContent = memo(({
           dispatch({ type: 'SET_ORES_COLLECTED', payload: { ores: nextOres } });
         }
         if (miningQcBonus > 0) {
-          qcRef.current += miningQcBonus;
+          creditQc(miningQcBonus, 'mining');
           updateHistoryStats('acquired', miningQcBonus, routeTierRef.current, 'mining');
         }
       };
@@ -6904,7 +6915,8 @@ const DashboardContent = memo(({
             let bossChance = 0.10 + (battleLevelRef.current >= 15 ? 0.10 : 0);
             if (battleLevelRef.current >= 45 && routeTierRef.current === 'Interstellar') bossChance += 0.25;
 
-            const isBoss = Math.random() < bossChance;
+            const bossCooldownReady = nowTimestamp() - lastBossBattleTimeRef.current >= BOSS_ENCOUNTER_COOLDOWN_MS;
+            const isBoss = bossCooldownReady && Math.random() < bossChance;
             const isElite = !isBoss && enemyTier > 10;
             const enemyType = isBoss ? 'Boss' : (isElite ? 'Elite' : (enemyTier > 5 ? 'Alien' : (Math.random() > 0.5 ? 'Pirate' : 'Alien')));
 
@@ -6957,6 +6969,7 @@ const DashboardContent = memo(({
             };
 
             lastRandomBattleTimeRef.current = nowTimestamp();
+            if (isBoss) lastBossBattleTimeRef.current = nowTimestamp();
             updateHistoryStats('random_battle_found', 1, routeTierRef.current);
 
             const skipCost = routeTierRef.current === 'Interstellar' ? 40 : 10;
@@ -7100,8 +7113,7 @@ const DashboardContent = memo(({
           const locationTech = techLevelsRef.current[route.id] || { engine: 0, ai: 0, value: 0, rare: 0 };
           const valueUpgrade = UPGRADES_MAP.get('value')!;
           const valueTier = valueUpgrade.tiers.find(v => v.level === locationTech.value);
-          const costIncreaseMultiplier = 1 + ((valueTier?.value || 0) * 0.1);
-          const fuelCost = Math.floor(10 * costIncreaseMultiplier);
+          const fuelCost = getDeliveryFuelCost(route, valueTier?.value || 0, qcRef.current);
           const attemptCost = fuelCost * slots;
           const aetherionTripCost = slots * 2;
           if (aetherionRef.current >= aetherionTripCost && qcRef.current >= attemptCost) setAutoTravelActive(prev => ({ ...prev, [routeId]: true }));
@@ -7121,8 +7133,7 @@ const DashboardContent = memo(({
             const numSlots = autoTravelSlotsRef.current[routeId] || 0;
             const valueUpgrade = UPGRADES_MAP.get('value')!;
             const valueTier = valueUpgrade.tiers.find(t => t.level === locationTech.value);
-            const costIncreaseMultiplier = 1 + ((valueTier?.value || 0) * 0.1);
-            const fuelCost = Math.floor(10 * costIncreaseMultiplier);
+            const fuelCost = getDeliveryFuelCost(route, valueTier?.value || 0, qcRef.current);
 
             if (currentProgress === 0) {
               const attemptCost = fuelCost * numSlots;
@@ -7142,7 +7153,7 @@ const DashboardContent = memo(({
               const shipsAvailable = (manualInUse + otherAutoInUse + numSlots) <= totalOwned;
 
               if (canAfford && shipsAvailable) {
-                qcRef.current -= attemptCost;
+                spendQc(attemptCost);
                 aetherionRef.current = Math.max(0, aetherionRef.current - aetherionTripCost);
                 updateHistoryStats('spent', attemptCost, routeTierRef.current);
                 nextAutoProgress[routeId] = 0.01;
@@ -7206,18 +7217,8 @@ const DashboardContent = memo(({
         });
 
         if (totalRewardBatch > 0) {
-          const firstCompletion = completions[0];
-          const newFloatingReward = createFloatingReward({
-            amount: totalRewardBatch,
-            sourceSelector: firstCompletion ? `[data-floating-reward-source="delivery-${firstCompletion.routeId}"]` : undefined,
-            sourceType: 'delivery',
-          });
-          setFloatingRewards(prev => [...prev, newFloatingReward]);
-          window.setTimeout(() => {
-            setFloatingRewards(prev => prev.filter(reward => reward.id !== newFloatingReward.id));
-          }, 1100);
+          creditQc(totalRewardBatch, 'delivery');
         }
-        qcRef.current += totalRewardBatch;
         const manualCount = completions.filter(c => c.isManual).reduce((acc, curr) => acc + curr.count, 0);
         const autoCount = completions.filter(c => !c.isManual).reduce((acc, curr) => acc + curr.count, 0);
         if (manualCount > 0) incrementDeliveries('manual', manualCount);
@@ -7260,7 +7261,12 @@ const DashboardContent = memo(({
     const flushInterval = setInterval(() => {
       if (!isLoadedRef.current || isResettingRef.current) return;
       const currentQc = qcRef.current;
-      if (Math.abs(currentQc - lastFlushedQcRef.current) > 0.01) { dispatch({ type: 'EARN_QC', payload: { amount: currentQc - lastFlushedQcRef.current, source: 'delivery' } }); lastFlushedQcRef.current = currentQc; }
+      // Temporary QC fallback during migration: only flushes legacy direct qcRef deltas.
+      const pendingQcDelta = currentQc - lastFlushedQcRef.current;
+      if (Math.abs(pendingQcDelta) > 0.01) {
+        dispatch({ type: 'EARN_QC', payload: { amount: pendingQcDelta, source: 'delivery' } });
+        lastFlushedQcRef.current = currentQc;
+      }
       const currentAetherion = aetherionRef.current;
       if (Math.abs(currentAetherion - lastFlushedAetherionRef.current) > 0.01) { dispatch({ type: 'EARN_AETHERION', payload: { amount: currentAetherion - lastFlushedAetherionRef.current } }); lastFlushedAetherionRef.current = currentAetherion; }
       if (Math.abs(miningWasteRef.current - lastFlushedWasteRef.current) > 0.01) { dispatch({ type: 'EARN_RESOURCES', payload: { miningWaste: miningWasteRef.current - lastFlushedWasteRef.current } }); lastFlushedWasteRef.current = miningWasteRef.current; }
@@ -7291,7 +7297,7 @@ const DashboardContent = memo(({
     }, 500);
 
     return () => { clearInterval(tick); clearInterval(flushInterval); };
-  }, [addLog, applyMissionProgress, autoSkipBattle, claimMission, completeInitialMission, dispatch, formatValue, getEconomicMultipliers, incrementDeliveries, playSfx, resolveBattleDefeat, resolveBattleVictory, setActiveDeliveries, setAetherion, setAetherionTubes, setAutoTravelActive, setAutoTravelProgress, setBattleNotification, setDeliveriesByLocation, setFloatingRewards, setFoundBattle, setMissions, setResearchingTech, setTotalDeliveries, setUnderAttackBattle, t, updateHistoryStats]);
+  }, [addLog, applyMissionProgress, autoSkipBattle, claimMission, completeInitialMission, dispatch, formatValue, getEconomicMultipliers, incrementDeliveries, playSfx, resolveBattleDefeat, resolveBattleVictory, creditQc, spendQc, setActiveDeliveries, setAetherion, setAetherionTubes, setAutoTravelActive, setAutoTravelProgress, setBattleNotification, setDeliveriesByLocation, setFoundBattle, setMissions, setResearchingTech, setTotalDeliveries, setUnderAttackBattle, t, updateHistoryStats]);
 
 
   // Tutorial Trigger
@@ -7355,7 +7361,7 @@ const DashboardContent = memo(({
 
     const cost = route.unlockCost || 0;
     if (qc >= cost) {
-      dispatch({ type: 'SPEND_QC', payload: { amount: cost } });
+      spendQc(cost);
       dispatch({ type: 'UNLOCK_ROUTE', payload: { routeId: route.id } });
       updateHistoryStats('spent', cost, route.tier);
 
@@ -7391,7 +7397,7 @@ const DashboardContent = memo(({
     if (routeTier === 'Interstellar') cost = Math.floor(cost * 4.5);
 
     if (qc >= cost) {
-      dispatch({ type: 'SPEND_QC', payload: { amount: cost } });
+      spendQc(cost);
       dispatch({ type: 'UPGRADE_TECH', payload: { locationId, category: upgrade.id.toLowerCase() } });
       updateHistoryStats('spent', cost, routeTier);
 
@@ -7451,15 +7457,15 @@ const DashboardContent = memo(({
 
 
     // TransaÃƒÂ§ÃƒÂ£o atÃƒÂ´mica: gasta QC e adiciona slot
-    dispatch({ type: 'SPEND_QC', payload: { amount: cost } });
+    spendQc(cost);
     dispatch({ type: 'BUY_AUTO_SLOT', payload: { routeId } });
     updateHistoryStats('spent', cost, routeTier);
 
     completeInitialMission('init_5');
     playSfx('buying_iten');
     addLog(`Auto-travel slot ${currentSlots + 1} purchased for ${route.name}`, 'success');
-  }, [dispatch, qc, autoTravelSlots,
-    playSfx, addLog, getEconomicMultipliers, getLocationMultiplier, updateHistoryStats, routeTier, completeInitialMission]);
+  }, [qc, autoTravelSlots,
+    playSfx, addLog, getEconomicMultipliers, getLocationMultiplier, updateHistoryStats, routeTier, completeInitialMission, spendQc, dispatch]);
 
   const getAutoTravelColor = (level: number) => {
     switch (level) {
@@ -7885,9 +7891,10 @@ const DashboardContent = memo(({
       return;
     }
 
+    const isOpeningInvasionBattle = voidWarAlertActive && !hasWonEliminateEnemiesRoute3;
     const locId = forcedLocationId !== undefined
       ? forcedLocationId
-      : (voidWarAlertActive ? (1 + Math.floor(randomUnit() * 9)) : 0);
+      : (isOpeningInvasionBattle ? 0 : (voidWarAlertActive ? (1 + Math.floor(randomUnit() * 9)) : 0));
     const locKey = locId === 0 ? 'zero' : locId;
     const sectorBossNames = [
       'Devorador Alpha',
@@ -7909,10 +7916,10 @@ const DashboardContent = memo(({
       playSfx('bip_scanner');
     }
 
-    if (warType || isFirstInvasionBattle) {
+    if (warType || isFirstInvasionBattle || isOpeningInvasionBattle) {
       // Direct battle for Void War
-      const actualWarType = isFirstInvasionBattle ? 'boss' : warType;
-      if (isFirstInvasionBattle) setIsFirstInvasionBattle(false);
+      const actualWarType = (isFirstInvasionBattle || isOpeningInvasionBattle) ? 'boss' : warType;
+      if (isFirstInvasionBattle || isOpeningInvasionBattle) setIsFirstInvasionBattle(false);
 
       let type: 'Padrão' | 'Elite' | 'Boss';
       let stats;
@@ -8208,7 +8215,7 @@ const DashboardContent = memo(({
       return;
     }
 
-    setQc(prev => prev - cost);
+    spendQc(cost);
     setVoidPOIQCDonations((prev: Record<string, number>) => ({
       ...prev,
       [poiId]: currentDonations + 1
@@ -8894,9 +8901,10 @@ const DashboardContent = memo(({
                 <div className="mt-8 pt-8 border-t border-red-500/20 relative z-10">
                   <button
                     onClick={() => {
-                      setIsVoidWarActive(true);
+                      setVoidWarAlertActive(true);
+                      setIsFirstInvasionBattle(true);
                       setShowBattleShipUpgradeModal(false);
-                      addLog(language === 'pt' ? 'GUERRA DO VAZIO INICIADA! O destino da Terra está em suas mãos.' : 'VOID WAR STARTED! The fate of Earth is in your hands.', 'error');
+                      addLog(language === 'pt' ? 'Defesa inicial liberada: elimine o Boss Zero antes dos setores.' : 'Initial defense unlocked: eliminate Boss Zero before the sectors.', 'error');
                       playSfx('warning');
                     }}
                     className="w-full py-5 bg-gradient-to-r from-red-700 to-red-500 text-white font-orbitron font-black text-xl rounded-2xl shadow-[0_0_50px_rgba(220,38,38,0.3)] hover:shadow-[0_0_60px_rgba(220,38,38,0.5)] active:scale-95 transition-all uppercase tracking-[0.3em] flex items-center justify-center gap-4 animate-pulse-glow"
@@ -9175,35 +9183,6 @@ const DashboardContent = memo(({
 
   return (
     <div className={`min-h-screen ${isInterstellar ? 'bg-[#100505]' : 'bg-[#050510]'} text-slate-200 font-inter selection:bg-cyan-500/30 overflow-hidden relative`}>
-      {/* Floating Rewards Animation */}
-      <AnimatePresence>
-        {floatingRewards.map(reward => (
-          <motion.div
-            key={reward.id}
-            initial={{ opacity: 0, scale: 0.55, x: reward.x - 20, y: reward.y - 12 }}
-            animate={{
-              opacity: [0, 1, 1, 0],
-              scale: [0.55, 1.15, 0.9, 0.35],
-              x: [reward.x - 20, reward.x - 20, ((reward.x + (reward.targetX ?? (typeof window !== 'undefined' ? window.innerWidth - 100 : 1000))) / 2) - 34, (reward.targetX ?? (typeof window !== 'undefined' ? window.innerWidth - 100 : 1000)) - 20],
-              y: [reward.y - 12, reward.y - 54, Math.min(reward.y - 80, (reward.targetY ?? 40) + 42), (reward.targetY ?? 40) - 8]
-            }}
-            transition={{ duration: 1.05, times: [0, 0.18, 0.72, 1], ease: "easeInOut" }}
-            className="fixed z-[9999] pointer-events-none flex flex-col items-center"
-          >
-            <div className="flex items-center gap-1 bg-yellow-500 text-black px-3 py-1 rounded-full font-orbitron font-bold shadow-[0_0_20px_rgba(234,179,8,0.6)]">
-              <Coins className="w-4 h-4" />
-              <span>+{formatValue(reward.amount)}</span>
-            </div>
-            <motion.div
-              animate={{ y: [0, -10, 0], opacity: [1, 0] }}
-              transition={{ duration: 0.5, repeat: Infinity }}
-              className="text-yellow-400 text-[14px] font-mono font-bold mt-1"
-            >
-              $$$
-            </motion.div>
-          </motion.div>
-        ))}
-      </AnimatePresence>
 
       {activeUnderwaterBattle && activeUnderwaterBattleColony && (
         <NewEarthUnderwaterBattle
@@ -9300,7 +9279,7 @@ const DashboardContent = memo(({
               colonyId: activeSurfaceBattle.colonyId,
               battleKind: activeSurfaceBattle.battleKind,
             });
-            dispatch({ type: 'EARN_QC', payload: { amount: reward, source: 'battle' } });
+            creditQc(reward, 'battle');
             updateHistoryStats('acquired', reward, routeTierRef.current, 'battle');
             updateHistoryStats('battle_win', 1, routeTierRef.current);
             const intelTotal = intelKind === 'tank' ? NEW_EARTH_TANK_WAR_INTEL.length : NEW_EARTH_HELICOPTER_WAR_INTEL.length;
@@ -12909,8 +12888,7 @@ const DashboardContent = memo(({
                       setIsLoaded(false);
 
                       // 1. Zerar todos os refs ANTES de qualquer outra coisa
-                      qcRef.current = 100;
-                      lastFlushedQcRef.current = 100;
+                      setQcBalance(100);
                       aetherionRef.current = 0;
                       lastFlushedAetherionRef.current = 0;
                       miningWasteRef.current = 0;
@@ -13497,10 +13475,4 @@ export const GameDashboard = memo((props: GameDashboardProps) => {
 GameDashboard.displayName = 'GameDashboard';
 
 export default GameDashboard;
-
-
-
-
-
-
 

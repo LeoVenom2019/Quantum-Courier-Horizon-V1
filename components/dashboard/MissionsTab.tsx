@@ -52,10 +52,10 @@ const MissionsTab = memo(() => {
   const getRarityLabel = (rarity: Mission['rarity']) => {
     const isSolar = routeTier === 'Solar';
     switch (rarity) {
-      case 'rare': return { label: t('rare'), color: 'text-blue-400', mult: '10x' };
-      case 'legendary': return { label: t('legendary'), color: 'text-orange-400', mult: isSolar ? '25x' : '50x' };
-      case 'mythic': return { label: t('mythic'), color: 'text-slate-300', mult: isSolar ? '35x' : '150x' };
-      case 'alien': return { label: t('alien'), color: 'text-green-400', mult: isSolar ? '50x' : '150x' };
+      case 'rare': return { label: t('rare'), color: 'text-blue-400', mult: '3x' };
+      case 'legendary': return { label: t('legendary'), color: 'text-orange-400', mult: isSolar ? '5x' : '50x' };
+      case 'mythic': return { label: t('mythic'), color: 'text-slate-300', mult: isSolar ? '6.5x' : '150x' };
+      case 'alien': return { label: t('alien'), color: 'text-green-400', mult: isSolar ? '8x' : '150x' };
       default: return { label: t('common'), color: 'text-slate-400', mult: '1x' };
     }
   };

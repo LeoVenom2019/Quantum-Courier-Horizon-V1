@@ -4,7 +4,8 @@ import React, { createContext, useContext, useMemo, ReactNode, useCallback, useS
 import { COLONY_SAVE_STORAGE_KEYS, SaveManager, sanitizeSave } from '../../lib/save-manager';
 import { GameStorage } from '../../lib/game-storage';
 import { RouteStats } from '@/lib/game-state/types';
-import { createFloatingReward } from '@/lib/floating-rewards';
+import { normalizeGameNumber } from '@/lib/game-state/numbers';
+import { getDeliveryFuelCost, getLocationCostMultiplier, getMiningProductionBase, getMissionRewardUpgradeCost } from '@/lib/economy-balance';
 
 import { 
   useEconomy, 
@@ -193,8 +194,6 @@ interface DashboardContextType {
   setColonies: React.Dispatch<React.SetStateAction<any[]>>;
   
   // Effects
-  floatingRewards: any[];
-  setFloatingRewards: React.Dispatch<React.SetStateAction<any[]>>;
   claimMission: (missionId: string, event?: React.MouseEvent, isAuto?: boolean) => void;
   getMissionUpgradeCost: (level: number, tier: string) => number;
   
@@ -449,7 +448,8 @@ export const DashboardProvider = ({
         const upgrade = ROBOT_UPGRADES_MAP.get(level) || ROBOT_UPGRADES_MAP.get(1);
         if (!upgrade) return;
 
-        const productionPerSecond = robots * (0.5 * upgrade.speedBonus * upgrade.efficiencyBonus * upgrade.productionBonus);
+        const productionBase = getMiningProductionBase(tier, level);
+        const productionPerSecond = robots * (productionBase * upgrade.speedBonus * upgrade.efficiencyBonus * upgrade.productionBonus);
         nextOres[ore.id] = (nextOres[ore.id] || 0) + productionPerSecond * 0.5;
         changed = true;
       });
@@ -576,9 +576,6 @@ export const DashboardProvider = ({
 
   const [battleNotification, setBattleNotification] = React.useState<{ message: string, type: 'success' | 'error', tier: string, title?: string } | null>(null);
 
-  const [floatingRewards, setFloatingRewards] = React.useState<any[]>([]);
-  
-  
   const [requestedActiveTab, setActiveTab] = React.useState<string>(() => {
     if (progression.routeTier === 'Void') return 'void_aircraft';
     if (progression.routeTier === 'Earth') return 'colonies';
@@ -671,10 +668,7 @@ export const DashboardProvider = ({
     return data[language] || data['en'] || Object.values(data)[0] || '';
   }, [language]);
 
-  const getLocationMultiplier = useCallback((locationId: string) => {
-    const tech = progression.unlockedTechLevels[locationId] || 0;
-    return 1 + (tech * 0.1);
-  }, [progression.unlockedTechLevels]);
+  const getLocationMultiplier = useCallback((locationId: string) => getLocationCostMultiplier(locationId, progression.routeTier), [progression.routeTier]);
 
   const getEconomicMultipliers = useCallback(() => {
     let costMult = 1;
@@ -746,8 +740,7 @@ export const DashboardProvider = ({
     const locationTech = progression.techLevels[route.id] || { engine: 0, ai: 0, value: 0, rare: 0 };
     const valueUpgrade = UPGRADES_MAP.get('value')!;
     const valueTier = valueUpgrade.tiers.find(t => t.level === locationTech.value);
-    const costIncreaseMultiplier = 1 + ((valueTier?.value || 0) * 0.1);
-    const fuelCost = (economy.qc === 0 && route.requiredShipLevel === 1) || route.tier === 'Interstellar' ? 0 : Math.floor(10 * costIncreaseMultiplier);
+    const fuelCost = getDeliveryFuelCost(route, valueTier?.value || 0, economy.qc);
 
     if (economy.qc < fuelCost) {
       addLog(`Insufficient QC for fuel to ${route.name}`, 'error');
@@ -857,10 +850,7 @@ export const DashboardProvider = ({
     }
   }, [progression.autoSkipRandomBattles, dispatch, playSfx]);
 
-  const getMissionUpgradeCost = useCallback((level: number, tier: string) => {
-    const base = tier === 'Interstellar' ? 100000 : 5000;
-    return base * Math.pow(2, level);
-  }, []);
+  const getMissionUpgradeCost = useCallback((level: number, tier: string) => getMissionRewardUpgradeCost(level, tier), []);
 
   const setMissionRewardLevel = useCallback((val: Record<string, number> | ((prev: Record<string, number>) => Record<string, number>)) => {
     const nextVal = typeof val === 'function' ? val(missions.missionRewardLevel) : val;
@@ -880,6 +870,7 @@ export const DashboardProvider = ({
   const claimMission = useCallback((missionId: string, event?: React.MouseEvent, isAuto: boolean = false) => {
     const mission = missions.missions.find(m => m.id === missionId);
     if (!mission || !mission.completed || mission.claimed) return;
+    const rewardAmount = normalizeGameNumber(mission.reward);
 
     if (isAuto) {
       const autoClaimCost = (progression.routeTier === 'Interstellar') ? 200 : 100;
@@ -891,24 +882,18 @@ export const DashboardProvider = ({
       dispatch({ type: 'SPEND_AETHERION', payload: { amount: autoClaimCost } });
     }
 
-    const newFloatingReward = createFloatingReward({
-      amount: mission.reward,
-      source: event?.currentTarget.closest('[data-floating-reward-source]') || event?.currentTarget,
-      sourceSelector: `[data-floating-reward-source="mission-${missionId}"]`,
-      sourceType: 'mission',
-    });
-    setFloatingRewards(prev => [...prev, newFloatingReward]);
-    
-    setTimeout(() => {
-      setFloatingRewards(prev => prev.filter(r => r.id !== newFloatingReward.id));
-    }, 1100);
 
     if (mission.type === 'initial') {
       const newCompleted = [...missions.completedInitialMissions, missionId];
       dispatch({ type: 'SET_COMPLETED_INITIAL_MISSIONS', payload: { missionIds: newCompleted } });
     }
 
-    dispatch({ type: 'EARN_QC', payload: { amount: mission.reward, source: 'mission' } });
+    dispatch({ type: 'EARN_QC', payload: { amount: rewardAmount, source: 'mission' } });
+
+    // Notify GameDashboard's game loop to sync its qcRef immediately,
+    // preventing the async flush interval from overwriting this reward.
+    window.dispatchEvent(new CustomEvent('qch:mission-claimed', { detail: { amount: rewardAmount } }));
+
     if (mission.rewardAetherion) {
       dispatch({ type: 'EARN_AETHERION', payload: { amount: mission.rewardAetherion } });
     }
@@ -917,16 +902,17 @@ export const DashboardProvider = ({
     }
 
     dispatch({ type: 'UPDATE_HISTORY', payload: { tier: mission.tier, field: 'missionsCompleted', amount: 1 } });
-    dispatch({ type: 'UPDATE_HISTORY', payload: { tier: mission.tier, field: 'qcFromMissions', amount: mission.reward } });
-    dispatch({ type: 'UPDATE_HISTORY', payload: { tier: mission.tier, field: 'qcTotalAcquired', amount: mission.reward } });
+    dispatch({ type: 'UPDATE_HISTORY', payload: { tier: mission.tier, field: 'qcFromMissions', amount: rewardAmount } });
+    dispatch({ type: 'UPDATE_HISTORY', payload: { tier: mission.tier, field: 'qcTotalAcquired', amount: rewardAmount } });
 
     dispatch({ type: 'CLAIM_MISSION', payload: { id: missionId } });
     
     if (!isAuto) {
       playSfx('success');
-      addLog(`${t('missionClaimed')}: +${formatValue(mission.reward)} QC`, 'success');
+      addLog(`${t('missionClaimed')}: +${formatValue(rewardAmount)} QC`, 'success');
     }
   }, [missions, progression.routeTier, economy.aetherion, dispatch, addLog, t, formatValue, playSfx]);
+
 
   const buyMiningRobot = useCallback((oreId: string) => {
     const ore = ORES_MAP.get(oreId);
@@ -1064,16 +1050,6 @@ export const DashboardProvider = ({
     value = Math.floor(value * MINING_VALUE_MULTIPLIER);
 
     if (event && activeTab === 'mining') {
-      const newFloatingReward = createFloatingReward({
-        amount: value,
-        source: event.currentTarget.closest('[data-floating-reward-source]') || event.currentTarget,
-        sourceSelector: `[data-floating-reward-source="mining-${oreId}"]`,
-        sourceType: 'mining',
-      });
-      setFloatingRewards(prev => [...prev, newFloatingReward]);
-      setTimeout(() => {
-        setFloatingRewards(prev => prev.filter(r => r.id !== newFloatingReward.id));
-      }, 1100);
       playSfx('cash_register');
     }
 
@@ -1094,7 +1070,7 @@ export const DashboardProvider = ({
         dispatch({ type: 'UPDATE_MISSION', payload: { id: m.id, delta: packs } });
       }
     });
-  }, [mining, progression.routeTier, progression.battleLevel, progression.extractionTechLevel, economy.miningWaste, activeTab, getEconomicMultipliers, dispatch, playSfx, setFloatingRewards, updateHistoryStats, missions]);
+  }, [mining, progression.routeTier, progression.battleLevel, progression.extractionTechLevel, economy.miningWaste, activeTab, getEconomicMultipliers, dispatch, playSfx, updateHistoryStats, missions]);
 
   const buyUpgrade = useCallback((locationId: string, upgrade: any) => {
     const locationTech = progression.techLevels[locationId] || { engine: 0, ai: 0, value: 0, rare: 0 };
@@ -1315,18 +1291,6 @@ export const DashboardProvider = ({
     updateHistoryStats('acquired', value, 'Interstellar', 'extraction');
     dispatch({ type: 'UPDATE_HISTORY', payload: { tier: 'Interstellar', field: 'manualExtractionPacksSold', amount: packs } });
 
-    if (event) {
-      const newFloatingReward = createFloatingReward({
-        amount: value,
-        source: event.currentTarget.closest('[data-floating-reward-source]') || event.currentTarget,
-        sourceSelector: `[data-floating-reward-source="extraction-${id}"]`,
-        sourceType: 'extraction',
-      });
-      setFloatingRewards(prev => [...prev, newFloatingReward]);
-      setTimeout(() => {
-        setFloatingRewards(prev => prev.filter(r => r.id !== newFloatingReward.id));
-      }, 1100);
-    }
 
     playSfx('cash_register');
     addLog(`${t('extractionSold')}: +${formatValue(value)} QC`, 'success');
@@ -1337,7 +1301,7 @@ export const DashboardProvider = ({
         dispatch({ type: 'UPDATE_MISSION', payload: { id: m.id, delta: packs } });
       }
     });
-  }, [mining.extractionPacks, mining.extractionCompressionLevels, progression.battleLevel, progression.routeTier, getEconomicMultipliers, dispatch, playSfx, addLog, t, formatValue, updateHistoryStats, missions, setFloatingRewards]);
+  }, [mining.extractionPacks, mining.extractionCompressionLevels, progression.battleLevel, progression.routeTier, getEconomicMultipliers, dispatch, playSfx, addLog, t, formatValue, updateHistoryStats, missions]);
 
 
 
@@ -2592,7 +2556,7 @@ export const DashboardProvider = ({
     synthesizeAetherion, buyTech, researchPoint, buyShip, 
     setExtractionTechLevel, setSolarMappingLevel, setDoubleRouteLevel, setDoomPLevel, 
     isRoute2Unlocked, isRoute3Unlocked, getMissionUpgradeCost, claimMission,
-    floatingRewards, setFloatingRewards, sellOrePack,
+    sellOrePack,
     upgradeExtractionRobot, upgradeExtractionProduction,
     boostResearchExtractionPoint,
     upgradeExtractionCompression, buyExtractionAutoSell, toggleExtractionAutoSell,
@@ -2641,7 +2605,7 @@ export const DashboardProvider = ({
     setExtractionTechLevel, setSolarMappingLevel, setDoubleRouteLevel, setDoomPLevel, 
     isRoute2Unlocked, isRoute3Unlocked, translateData, getEconomicMultipliers, getLocationMultiplier,
     updateHistoryStats, buyRoute, launchRoute, completeInitialMission, getMissionUpgradeCost, claimMission,
-    floatingRewards, sellOrePack, upgradeExtractionRobot, upgradeExtractionProduction,
+    sellOrePack, upgradeExtractionRobot, upgradeExtractionProduction,
     upgradeExtractionCompression, buyExtractionAutoSell, toggleExtractionAutoSell,
     sellExtractionPointPacks,
     showRoute2Goals,

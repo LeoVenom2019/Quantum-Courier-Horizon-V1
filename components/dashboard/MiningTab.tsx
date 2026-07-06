@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Lock, Cpu, TrendingUp, Coins, Zap, Package, BarChart3, Gauge } from 'lucide-react';
 import { ORES, ROBOT_UPGRADES } from '@/lib/game-data';
 import { MINING_VALUE_MULTIPLIER, ROBOT_UPGRADES_MAP } from '@/lib/game-constants';
+import { getMiningProductionBase } from '@/lib/economy-balance';
 import { useDashboard } from './DashboardProvider';
 import { PremiumCanvasButton } from '../ui/PremiumCanvasButton';
 
@@ -178,7 +179,8 @@ const MiningTab = memo(() => {
     const basePackValue = Math.floor(ore.baseValue * ore.rarity * ore.packSize * getEconomicMultipliers().profit * routeMiningScale);
     const finalPackValue = Math.floor(basePackValue * compressionMultiplier * MINING_VALUE_MULTIPLIER);
     const currentSellValue = finalPackValue * packs;
-    const productionPerSecond = robots * (0.5 * upgrade.speedBonus * upgrade.efficiencyBonus * upgrade.productionBonus);
+    const productionBase = getMiningProductionBase(routeTier as any, level);
+    const productionPerSecond = robots * (productionBase * upgrade.speedBonus * upgrade.efficiencyBonus * upgrade.productionBonus);
     const productionPerMinute = productionPerSecond * 60;
     const remainingToPack = Math.max(0, ore.packSize - packProgress);
     const secondsToNextPack = productionPerSecond > 0 ? Math.ceil(remainingToPack / productionPerSecond) : null;
