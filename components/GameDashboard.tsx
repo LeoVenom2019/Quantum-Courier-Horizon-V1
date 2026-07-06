@@ -7822,6 +7822,16 @@ const DashboardContent = memo(({
         setIsRepairingRobot(false);
         playSfx('success');
         addLog(language === 'pt' ? 'Sistemas do RobÃ´ Restaurados!' : 'Robot systems fully restored!', 'success');
+        if (hasWonEliminateEnemiesRoute3Ref.current && !isVoidWarActiveRef.current) {
+          setVoidWarProgress({ currentSector: 0, currentBattle: 0 });
+          setIsVoidWarActive(true);
+          addLog(
+            language === 'pt'
+              ? 'Bobby Blue restaurado. A sequência dos setores do Vazio foi liberada.'
+              : 'Bobby Blue restored. The Void sector sequence is now unlocked.',
+            'success'
+          );
+        }
         clearInterval(interval);
       }
     }, 100);
@@ -10268,6 +10278,7 @@ const DashboardContent = memo(({
                     setVoidWarProgress={setVoidWarProgress}
                     voidWarProgress={voidWarProgress}
                     setShowVoidWarMap={setShowVoidWarMap}
+                    startVoidBattleOverride={startVoidBattle}
                   />
                 )}
 

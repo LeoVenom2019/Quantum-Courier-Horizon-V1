@@ -310,7 +310,7 @@ export const IntroNarrative = ({
   };
 
   return (
-    <div className="fixed inset-0 z-[100] bg-[#020208] flex items-center justify-center p-8 md:p-24 overflow-hidden">
+    <div className="fixed inset-0 z-[100] bg-[#020208] flex items-center justify-center overflow-hidden px-4 py-4 md:px-10 md:py-6">
       <SpaceAmbience isPlaying={true} volume={0.2} />
       <StarBackground />
       
@@ -332,12 +332,12 @@ export const IntroNarrative = ({
                 x: { duration: 0.3, repeat: 1 }
               }}
               exit={{ opacity: 0 }}
-              className="flex w-full flex-col items-center text-center"
+              className="flex max-h-[calc(100vh-2rem)] w-full flex-col items-center justify-center text-center md:max-h-[calc(100vh-3rem)]"
             >
               <BobbyBlueCharacter 
                 variant={index === 0 ? 'glitch' : 'intro'} 
                 isSpeaking={isTyping} 
-                className="mb-8"
+                className="mb-4 w-full shrink-0"
               />
               
               <div className="min-h-[120px] flex items-center justify-center px-8 w-full">

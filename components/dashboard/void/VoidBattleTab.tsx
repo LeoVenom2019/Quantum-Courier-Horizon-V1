@@ -366,7 +366,14 @@ const VoidBattleTab = memo(function VoidBattleTab({
                setIsShaking(false);
                setIsFlashingRed(false);
                setVoidWarRobotSpeaking(false);
-               addLog(language === 'pt' ? 'Inimigos eliminados! A estrutura está segura.' : 'Enemies eliminated! The structure is safe.', 'success');
+               dispatch({ type: 'SET_COMBAT_DATA', payload: { voidWarProgress: { currentSector: 0, currentBattle: 0 } } });
+               setShowRobotModal(true);
+               addLog(
+                 language === 'pt'
+                   ? 'Boss Zero eliminado! Conserte Bobby Blue para liberar a sequência dos setores.'
+                   : 'Boss Zero eliminated! Repair Bobby Blue to unlock the sector sequence.',
+                 'success'
+               );
              }
 
              if (isVoidWarActive) {
