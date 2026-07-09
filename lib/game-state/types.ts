@@ -82,6 +82,8 @@ export interface Battle {
   isAutoSkipped?: boolean;
   playerImage?: string;
   enemyImage?: string;
+  playerSpriteSheet?: import('@/lib/battle-sprites').BattleSpriteSheet;
+  enemySpriteSheet?: import('@/lib/battle-sprites').BattleSpriteSheet;
   playerDps?: number;
   enemyDps?: number;
   isBoss?: boolean;

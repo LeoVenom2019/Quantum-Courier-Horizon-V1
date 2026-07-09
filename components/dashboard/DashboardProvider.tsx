@@ -426,19 +426,21 @@ export const DashboardProvider = ({
   React.useEffect(() => { miningRef.current = mining; }, [mining]);
   React.useEffect(() => { earthRef.current = earth; }, [earth]);
 
-  // Mining production lives here because MiningTab consumes this provider directly.
-  // Do not move passive ore generation back to GameDashboard's delivery loop; that can
-  // overwrite oresCollected with stale refs and freeze Chapter 1/2 mining progress.
+  // Mining production and auto-sell live here because MiningTab consumes this provider directly.
+  // Keeping both in one loop prevents GameDashboard's legacy refs from overwriting ore changes.
   useEffect(() => {
     const interval = window.setInterval(() => {
       const currentMining = miningRef.current;
       const currentProgression = progressionRef.current;
+      const currentEconomy = economyRef.current;
       const tier = currentProgression.routeTier;
 
       if (tier !== 'Solar' && tier !== 'Interstellar') return;
 
       const nextOres = { ...currentMining.oresCollected };
       let changed = false;
+      let currentAetherion = currentEconomy.aetherion || 0;
+      let currentMiningWaste = currentEconomy.miningWaste || 0;
 
       ORES.filter(ore => ore.tier === tier).forEach(ore => {
         const robots = currentMining.miningRobots[ore.id] || 0;
@@ -452,6 +454,53 @@ export const DashboardProvider = ({
         const productionPerSecond = robots * (productionBase * upgrade.speedBonus * upgrade.efficiencyBonus * upgrade.productionBonus);
         nextOres[ore.id] = (nextOres[ore.id] || 0) + productionPerSecond * 0.5;
         changed = true;
+
+        const autoSellCostPerPack = tier === 'Interstellar' ? 8 : 10;
+        const packsAvailable = Math.floor((nextOres[ore.id] || 0) / ore.packSize);
+        const affordablePacks = Math.floor(currentAetherion / autoSellCostPerPack);
+        let packsToSell = Math.min(packsAvailable, affordablePacks);
+        if (tier === 'Interstellar') packsToSell = Math.min(5, packsToSell);
+
+        if (currentMining.autoSellUnlockedByOre[ore.id] && currentMining.autoSellByOre[ore.id] && packsToSell > 0) {
+          const aetherionCost = packsToSell * autoSellCostPerPack;
+          currentAetherion = Math.max(0, currentAetherion - aetherionCost);
+
+          const compressionBonus = 1 + (currentMining.miningCompressionLevels[ore.id] || 0) * 0.2;
+          const profitMultiplier = tier === 'Interstellar'
+            ? (2.5 + (Math.min(currentProgression.battleLevel, 55) / 55) * 3.5) * 0.25
+            : 1;
+          let valuePerPack = Math.floor(ore.baseValue * ore.rarity * ore.packSize * profitMultiplier * compressionBonus);
+          if (tier === 'Interstellar') {
+            let miningScale = 3.75 + Math.min(currentProgression.battleLevel, 55) * 0.1;
+            if (currentProgression.battleLevel >= 40) {
+              miningScale *= 5;
+            }
+            valuePerPack *= miningScale;
+          }
+          const value = Math.floor(valuePerPack * packsToSell * MINING_VALUE_MULTIPLIER);
+
+          const wasteToAdd = packsToSell * 300 * (tier === 'Interstellar' ? 1 + (currentProgression.extractionTechLevel * 0.1) : 1);
+          const nextMiningWaste = Math.min(7500, currentMiningWaste + wasteToAdd);
+          const miningWasteDelta = nextMiningWaste - currentMiningWaste;
+          currentMiningWaste = nextMiningWaste;
+
+          nextOres[ore.id] -= packsToSell * ore.packSize;
+          dispatch({ type: 'SPEND_AETHERION', payload: { amount: aetherionCost } });
+          window.dispatchEvent(new CustomEvent('qch:aetherion-changed', { detail: { aetherionDelta: -aetherionCost } }));
+          dispatch({ type: 'EARN_QC', payload: { amount: value, source: 'mining' } });
+          if (miningWasteDelta > 0) {
+            dispatch({ type: 'EARN_RESOURCES', payload: { miningWaste: miningWasteDelta } });
+          }
+          dispatch({ type: 'UPDATE_HISTORY', payload: { tier, field: 'qcFromMining', amount: value } });
+          dispatch({ type: 'UPDATE_HISTORY', payload: { tier, field: 'qcTotalAcquired', amount: value } });
+          dispatch({ type: 'UPDATE_HISTORY', payload: { tier, field: 'autoMiningPacksSold', amount: packsToSell } });
+
+          missions.missions.forEach(m => {
+            if (m.type === 'sell' && m.oreId === ore.id && !m.completed) {
+              dispatch({ type: 'UPDATE_MISSION', payload: { id: m.id, delta: packsToSell } });
+            }
+          });
+        }
       });
 
       if (changed) {
@@ -460,8 +509,7 @@ export const DashboardProvider = ({
     }, 500);
 
     return () => window.clearInterval(interval);
-  }, [dispatch]);
-
+  }, [dispatch, missions.missions]);
   // RHSE tube synthesis must live in the provider too; UpgradesTab consumes this
   // state directly, so leaving it only in GameDashboard can strand full resources.
   useEffect(() => {
@@ -614,6 +662,9 @@ export const DashboardProvider = ({
     setGameLogs(prev => [{ id: Math.random().toString(36).substr(2, 9), message, type }, ...prev].slice(0, 12));
   }, []);
 
+  const notifyAetherionChanged = useCallback((detail: { aetherionDelta?: number; aetherionTubesDelta?: number }) => {
+    window.dispatchEvent(new CustomEvent('qch:aetherion-changed', { detail }));
+  }, []);
   const formatValue = useMemo(() => (val: number): string => {
     if (val === undefined || val === null || isNaN(val)) return '0';
     if (val >= 1e12) return (val / 1e12).toFixed(2) + 'T';
@@ -873,13 +924,14 @@ export const DashboardProvider = ({
     const rewardAmount = normalizeGameNumber(mission.reward);
 
     if (isAuto) {
-      const autoClaimCost = (progression.routeTier === 'Interstellar') ? 200 : 100;
+      const autoClaimCost = (progression.routeTier === 'Interstellar') ? 2 : 1;
       if (economy.aetherion < autoClaimCost) {
         dispatch({ type: 'TOGGLE_AUTO_CLAIM' });
         addLog(t('insufficientAetherion'), 'error');
         return;
       }
       dispatch({ type: 'SPEND_AETHERION', payload: { amount: autoClaimCost } });
+      notifyAetherionChanged({ aetherionDelta: -autoClaimCost });
     }
 
 
@@ -896,6 +948,7 @@ export const DashboardProvider = ({
 
     if (mission.rewardAetherion) {
       dispatch({ type: 'EARN_AETHERION', payload: { amount: mission.rewardAetherion } });
+      notifyAetherionChanged({ aetherionDelta: mission.rewardAetherion });
     }
     if (mission.rewardXP) {
       dispatch({ type: 'ADD_SHIP_XP', payload: { amount: mission.rewardXP } });
@@ -911,7 +964,7 @@ export const DashboardProvider = ({
       playSfx('success');
       addLog(`${t('missionClaimed')}: +${formatValue(rewardAmount)} QC`, 'success');
     }
-  }, [missions, progression.routeTier, economy.aetherion, dispatch, addLog, t, formatValue, playSfx]);
+  }, [missions, progression.routeTier, economy.aetherion, dispatch, addLog, t, formatValue, playSfx, notifyAetherionChanged]);
 
 
   const buyMiningRobot = useCallback((oreId: string) => {
@@ -1012,10 +1065,11 @@ export const DashboardProvider = ({
 
     dispatch({ type: 'SPEND_QC', payload: { amount: cost } });
     dispatch({ type: 'SET_AUTO_SELL_UNLOCKED_BY_ORE', payload: { unlocked: { ...mining.autoSellUnlockedByOre, [oreId]: true } } });
+    dispatch({ type: 'SET_AUTO_SELL_BY_ORE', payload: { autoSell: { ...mining.autoSellByOre, [oreId]: true } } });
     updateHistoryStats('spent', cost, progression.routeTier);
     playSfx('buy');
     addLog(`${t('autoSellUnlocked')} ${ore.name}!`, 'success');
-  }, [mining.autoSellUnlockedByOre, progression.routeTier, economy.qc, dispatch, playSfx, addLog, t, getEconomicMultipliers, updateHistoryStats]);
+  }, [mining.autoSellUnlockedByOre, mining.autoSellByOre, progression.routeTier, economy.qc, dispatch, playSfx, addLog, t, getEconomicMultipliers, updateHistoryStats]);
 
   const toggleAutoSell = useCallback((oreId: string) => {
     const isActivating = !mining.autoSellByOre[oreId];
@@ -2170,9 +2224,10 @@ export const DashboardProvider = ({
     }
 
     dispatch({ type: 'SYNTHESIZE_AETHERION' });
+    notifyAetherionChanged({ aetherionDelta: 1000, aetherionTubesDelta: -1 });
     playSfx('serve_glass');
     addLog(`${t('aetherionSynthesized')} (Fadiga)`, 'success');
-  }, [economy.aetherionTubes, economy.aetherion, economy.miningWaste, economy.solarEnergy, progression.routeTier, dispatch, playSfx, t, addLog, language]);
+  }, [economy.aetherionTubes, economy.aetherion, economy.miningWaste, economy.solarEnergy, progression.routeTier, dispatch, playSfx, t, addLog, language, notifyAetherionChanged]);
 
   const pauseMusicForRoute4Credits = useCallback(() => {
     jukebox?.stop?.({ rememberPreference: false });

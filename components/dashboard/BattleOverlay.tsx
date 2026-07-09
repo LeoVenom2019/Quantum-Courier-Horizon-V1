@@ -236,7 +236,7 @@ const BattleOverlay = memo(({
 
     const enemies: VoidBattleEnemy[] = [{
       id: `solar-enemy-${activeBattle.id}`,
-      type: activeBattle.isBoss ? 'Boss' : 'Padrão',
+      type: activeBattle.isBoss ? 'Boss' : (activeBattle.enemyType === 'Elite' ? 'Elite' : 'Padrão'),
       name: activeBattle.enemyName,
       hp: activeBattle.enemyHp,
       maxHp: activeBattle.enemyMaxHp,
@@ -246,7 +246,8 @@ const BattleOverlay = memo(({
       qc: activeBattle.reward,
       x: 85,
       y: 50,
-      image: activeBattle.enemyImage || ''
+      image: activeBattle.enemyImage || '',
+      spriteSheet: activeBattle.enemySpriteSheet
     }];
 
     return (
@@ -258,6 +259,7 @@ const BattleOverlay = memo(({
         routeTier={routeTier}
         locationId={0}
         activeShipImage={activeBattle.playerImage}
+        activeShipSpriteSheet={activeBattle.playerSpriteSheet}
         battleLevel={battleLevel}
         onBattleEnd={(status, result) => {
           if (status === 'won') {

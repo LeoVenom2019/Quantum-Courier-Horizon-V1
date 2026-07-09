@@ -117,6 +117,8 @@ const AutoTab = memo(() => {
         const slots = autoTravelSlots[route.id] || 0;
         const isActive = autoTravelActive[route.id];
         const isDesired = autoTravelDesired[route.id];
+        const requiredAetherion = slots * 2;
+        const isAetherionInsufficient = isDesired && !isActive && slots > 0 && aetherion < 2;
         const progress = autoTravelProgress[route.id] || 0;
         const locationTech = techLevels[route.id] || { engine: 0, ai: 0, value: 0, rare: 0 };
         const ship = SHIPS.find((s: any) => s.level === route.requiredShipLevel && s.tier === route.tier);
@@ -195,7 +197,7 @@ const AutoTab = memo(() => {
                     >
                       {isDesired ? t('on').toUpperCase() : t('off').toUpperCase()}
                     </PremiumCanvasButton>
-                    {isDesired && !isActive && (
+                    {isAetherionInsufficient && (
                       <span className="text-[6px] text-red-400 font-mono uppercase tracking-tighter">
                         {t('insufficientAetherion')}
                       </span>
@@ -203,7 +205,7 @@ const AutoTab = memo(() => {
                   </div>
                   <div className="flex flex-col items-end gap-1">
                     <span className="text-[7px] font-mono text-slate-400 uppercase tracking-tighter">
-                      {slots * 2} {t('aetherion')} / {t('trip')}
+                      {requiredAetherion} {t('aetherion')} / {t('trip')}
                     </span>
                     {isActive && (
                       <span className={`text-[14px] font-mono ${isInterstellar ? 'text-orange-400' : 'text-cyan-400'}`}>{locationTech.engine >= 5 ? 'MAX' : `${Math.floor(progress)}%`}</span>

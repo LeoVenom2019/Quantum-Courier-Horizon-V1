@@ -18,6 +18,7 @@ export type SFXType =
   | 'enemy_explosion' // Explosão de inimigo em batalha
   | 'level_up'        // Melhoria de nave ou nível
   | 'shoot_player'    // Tiro do jogador
+  | 'player_airship_effect_sound' // Motor da nave do jogador na batalha do Cap 3
   | 'shoot_enemy'     // Tiro do inimigo
   | 'saving_robot_event' // Evento de conserto do robô (21s)
   | 'low_to_upgrade'    // Falha ao tentar melhorar sem recursos
@@ -96,6 +97,7 @@ const SFX_PATHS: Partial<Record<string, string>> = {
   enemy_explosion: '/audio/sfx/enemy_explosion.ogg',
   level_up: '/audio/sfx/level_up.ogg',
   shoot_player: '/audio/sfx/shoot_player.ogg',
+  player_airship_effect_sound: '/audio/sfx/player_airship_effect_sound.ogg',
   shoot_enemy: '/audio/sfx/shoot_enemy.ogg',
   saving_robot_event: '/audio/sfx/saving_robot_event.ogg',
   low_to_upgrade: '/audio/sfx/low_to_upgrade.ogg',

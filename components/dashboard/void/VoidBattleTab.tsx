@@ -941,7 +941,7 @@ const VoidBattleTab = memo(function VoidBattleTab({
                     disabled={isMax || !canAfford || isVoidWarActive || voidWarAlertActive}
                     disabledVisual={isMax ? 'tone' : 'muted'}
                     tone={isMax ? 'green' : (canAfford && !isVoidWarActive && !voidWarAlertActive) ? 'red' : 'steel'}
-                    className={`h-full min-h-[86px] p-2.5 text-left ${
+                    className={`h-full min-h-[86px] p-3 text-left ${
                       isMax ? 'shadow-[0_0_24px_rgba(74,222,128,0.18),inset_0_0_18px_rgba(16,185,129,0.12)]' :
                       (canAfford && !isVoidWarActive && !voidWarAlertActive) ? '' :
                       'grayscale'
@@ -950,31 +950,31 @@ const VoidBattleTab = memo(function VoidBattleTab({
                   >
                     <div className="flex justify-between items-start">
                       <div className={`p-1.5 rounded-lg border ${isMax ? 'bg-emerald-400/10 border-emerald-300/30 shadow-[0_0_12px_rgba(52,211,153,0.25)]' : 'bg-red-500/10 border-red-500/20'}`}>
-                        <upg.icon className={`w-3.5 h-3.5 ${isMax ? 'text-emerald-300' : 'text-red-400'}`} />
+                        <upg.icon className={`w-4 h-4 ${isMax ? 'text-emerald-300' : 'text-red-400'}`} />
                       </div>
                       {isMax ? (
                         <div className="flex items-center gap-1.5 rounded-md border border-emerald-300/40 bg-emerald-300/10 px-2 py-1 shadow-[0_0_14px_rgba(74,222,128,0.22)]">
                           <Star className="h-3 w-3 fill-emerald-300 text-emerald-200" />
-                          <span className="font-orbitron text-[10px] font-black uppercase tracking-[0.22em] text-emerald-100 drop-shadow-[0_0_8px_rgba(110,231,183,0.8)]">MAX</span>
+                          <span className="font-orbitron text-[12px] font-black uppercase tracking-[0.14em] text-emerald-100 drop-shadow-[0_0_8px_rgba(110,231,183,0.8)]">MAX</span>
                         </div>
                       ) : (
-                        <div className="text-[9px] font-mono text-red-500/60 font-bold">LVL {level}/{maxLevel}</div>
+                        <div className="text-[13px] font-mono text-red-400/90 font-bold leading-none">LVL {level}/{maxLevel}</div>
                       )}
                     </div>
                     <div className="mt-1.5">
-                      <h4 className={`text-[11px] font-orbitron font-bold uppercase tracking-wider line-clamp-1 ${isMax ? 'text-emerald-50 drop-shadow-[0_0_8px_rgba(110,231,183,0.5)]' : 'text-white'}`}>{upg.name}</h4>
-                      <p className={`text-[9px] uppercase tracking-widest ${isMax ? 'text-emerald-200/60' : 'text-white/40'}`}>{upg.desc}</p>
+                      <h4 className={`text-[14px] font-orbitron font-bold uppercase leading-tight tracking-[0.06em] line-clamp-1 ${isMax ? 'text-emerald-50 drop-shadow-[0_0_8px_rgba(110,231,183,0.5)]' : 'text-white'}`}>{upg.name}</h4>
+                      <p className={`text-[12px] uppercase leading-tight tracking-[0.08em] ${isMax ? 'text-emerald-200/65' : 'text-white/50'}`}>{upg.desc}</p>
                     </div>
                     {isMax ? (
                       <div className="mt-1.5 pt-1.5 border-t border-emerald-300/20">
-                        <div className="flex items-center justify-between text-[8px] uppercase tracking-[0.22em]">
+                        <div className="flex items-center justify-between text-[10px] uppercase tracking-[0.1em]">
                           <span className="text-emerald-200/70">{language === 'pt' ? 'Melhoria completa' : 'Upgrade complete'}</span>
                           <span className="text-emerald-300 font-orbitron font-black">5/5</span>
                         </div>
                       </div>
                     ) : cost && (
                       <div className="mt-1.5 pt-1.5 border-t border-white/5 grid grid-cols-1 gap-1">
-                        <div className="flex justify-between text-[8px] uppercase tracking-widest">
+                        <div className="flex justify-between text-[11px] uppercase tracking-[0.08em]">
                           <span className={(combat.voidResources?.tech || 0) >= cost.tech ? 'text-cyan-400' : 'text-red-400'}>{cost.tech} Tech</span>
                           <span className={(combat.voidResources?.energy || 0) >= cost.energy ? 'text-yellow-400' : 'text-red-400'}>{cost.energy} En</span>
                         </div>
@@ -1002,8 +1002,8 @@ const VoidBattleTab = memo(function VoidBattleTab({
                 contentClassName="text-white"
               >
                 <div className="flex flex-col items-center">
-                  <span className="text-[14px]">{t('repair')}</span>
-                  <span className="text-[8px] text-white/40 group-hover:text-white/60">
+                  <span className="text-[16px] leading-tight">{t('repair')}</span>
+                  <span className="text-[10px] leading-tight text-white/40 group-hover:text-white/60">
                     {stats.hp < getEffectiveVoidStats(stats).maxHp ? '1.5k Ener | 1.5k Tech' : '1k Ener | 1k Tech'}
                   </span>
                 </div>

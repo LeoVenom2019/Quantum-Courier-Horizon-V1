@@ -1,0 +1,372 @@
+{
+  "version": 1,
+  "columns": 8,
+  "rows": 4,
+  "frameCount": 32,
+  "sheets": {
+    "sheet_01_motion_2x": {
+      "image": "/images/battle/standard_ship/sheet_01_motion_2x_spritesheet_8x4.webp",
+      "frameWidth": 603,
+      "frameHeight": 400,
+      "columns": 8,
+      "rows": 4,
+      "frameCount": 32,
+      "width": 4824,
+      "height": 1600,
+      "frames": [
+        {
+          "index": 0,
+          "frame": 1,
+          "name": "standard_ship_motion_sheet_01_r01_c01_frame_01_original_2x.webp",
+          "x": 0,
+          "y": 0,
+          "width": 603,
+          "height": 400,
+          "column": 0,
+          "row": 0
+        },
+        {
+          "index": 1,
+          "frame": 2,
+          "name": "standard_ship_motion_sheet_01_r01_c01_frame_02_motion_2x.webp",
+          "x": 603,
+          "y": 0,
+          "width": 603,
+          "height": 400,
+          "column": 1,
+          "row": 0
+        },
+        {
+          "index": 2,
+          "frame": 3,
+          "name": "standard_ship_motion_sheet_01_r01_c02_frame_03_original_2x.webp",
+          "x": 1206,
+          "y": 0,
+          "width": 603,
+          "height": 400,
+          "column": 2,
+          "row": 0
+        },
+        {
+          "index": 3,
+          "frame": 4,
+          "name": "standard_ship_motion_sheet_01_r01_c02_frame_04_motion_2x.webp",
+          "x": 1809,
+          "y": 0,
+          "width": 603,
+          "height": 400,
+          "column": 3,
+          "row": 0
+        },
+        {
+          "index": 4,
+          "frame": 5,
+          "name": "standard_ship_motion_sheet_01_r01_c03_frame_05_original_2x.webp",
+          "x": 2412,
+          "y": 0,
+          "width": 603,
+          "height": 400,
+          "column": 4,
+          "row": 0
+        },
+        {
+          "index": 5,
+          "frame": 6,
+          "name": "standard_ship_motion_sheet_01_r01_c03_frame_06_motion_2x.webp",
+          "x": 3015,
+          "y": 0,
+          "width": 603,
+          "height": 400,
+          "column": 5,
+          "row": 0
+        },
+        {
+          "index": 6,
+          "frame": 7,
+          "name": "standard_ship_motion_sheet_01_r01_c04_frame_07_original_2x.webp",
+          "x": 3618,
+          "y": 0,
+          "width": 603,
+          "height": 400,
+          "column": 6,
+          "row": 0
+        },
+        {
+          "index": 7,
+          "frame": 8,
+          "name": "standard_ship_motion_sheet_01_r01_c04_frame_08_motion_2x.webp",
+          "x": 4221,
+          "y": 0,
+          "width": 603,
+          "height": 400,
+          "column": 7,
+          "row": 0
+        },
+        {
+          "index": 8,
+          "frame": 9,
+          "name": "standard_ship_motion_sheet_01_r02_c01_frame_09_original_2x.webp",
+          "x": 0,
+          "y": 400,
+          "width": 603,
+          "height": 400,
+          "column": 0,
+          "row": 1
+        },
+        {
+          "index": 9,
+          "frame": 10,
+          "name": "standard_ship_motion_sheet_01_r02_c01_frame_10_motion_2x.webp",
+          "x": 603,
+          "y": 400,
+          "width": 603,
+          "height": 400,
+          "column": 1,
+          "row": 1
+        },
+        {
+          "index": 10,
+          "frame": 11,
+          "name": "standard_ship_motion_sheet_01_r02_c02_frame_11_original_2x.webp",
+          "x": 1206,
+          "y": 400,
+          "width": 603,
+          "height": 400,
+          "column": 2,
+          "row": 1
+        },
+        {
+          "index": 11,
+          "frame": 12,
+          "name": "standard_ship_motion_sheet_01_r02_c02_frame_12_motion_2x.webp",
+          "x": 1809,
+          "y": 400,
+          "width": 603,
+          "height": 400,
+          "column": 3,
+          "row": 1
+        },
+        {
+          "index": 12,
+          "frame": 13,
+          "name": "standard_ship_motion_sheet_01_r02_c03_frame_13_original_2x.webp",
+          "x": 2412,
+          "y": 400,
+          "width": 603,
+          "height": 400,
+          "column": 4,
+          "row": 1
+        },
+        {
+          "index": 13,
+          "frame": 14,
+          "name": "standard_ship_motion_sheet_01_r02_c03_frame_14_motion_2x.webp",
+          "x": 3015,
+          "y": 400,
+          "width": 603,
+          "height": 400,
+          "column": 5,
+          "row": 1
+        },
+        {
+          "index": 14,
+          "frame": 15,
+          "name": "standard_ship_motion_sheet_01_r02_c04_frame_15_original_2x.webp",
+          "x": 3618,
+          "y": 400,
+          "width": 603,
+          "height": 400,
+          "column": 6,
+          "row": 1
+        },
+        {
+          "index": 15,
+          "frame": 16,
+          "name": "standard_ship_motion_sheet_01_r02_c04_frame_16_motion_2x.webp",
+          "x": 4221,
+          "y": 400,
+          "width": 603,
+          "height": 400,
+          "column": 7,
+          "row": 1
+        },
+        {
+          "index": 16,
+          "frame": 17,
+          "name": "standard_ship_motion_sheet_01_r03_c01_frame_17_original_2x.webp",
+          "x": 0,
+          "y": 800,
+          "width": 603,
+          "height": 400,
+          "column": 0,
+          "row": 2
+        },
+        {
+          "index": 17,
+          "frame": 18,
+          "name": "standard_ship_motion_sheet_01_r03_c01_frame_18_motion_2x.webp",
+          "x": 603,
+          "y": 800,
+          "width": 603,
+          "height": 400,
+          "column": 1,
+          "row": 2
+        },
+        {
+          "index": 18,
+          "frame": 19,
+          "name": "standard_ship_motion_sheet_01_r03_c02_frame_19_original_2x.webp",
+          "x": 1206,
+          "y": 800,
+          "width": 603,
+          "height": 400,
+          "column": 2,
+          "row": 2
+        },
+        {
+          "index": 19,
+          "frame": 20,
+          "name": "standard_ship_motion_sheet_01_r03_c02_frame_20_motion_2x.webp",
+          "x": 1809,
+          "y": 800,
+          "width": 603,
+          "height": 400,
+          "column": 3,
+          "row": 2
+        },
+        {
+          "index": 20,
+          "frame": 21,
+          "name": "standard_ship_motion_sheet_01_r03_c03_frame_21_original_2x.webp",
+          "x": 2412,
+          "y": 800,
+          "width": 603,
+          "height": 400,
+          "column": 4,
+          "row": 2
+        },
+        {
+          "index": 21,
+          "frame": 22,
+          "name": "standard_ship_motion_sheet_01_r03_c03_frame_22_motion_2x.webp",
+          "x": 3015,
+          "y": 800,
+          "width": 603,
+          "height": 400,
+          "column": 5,
+          "row": 2
+        },
+        {
+          "index": 22,
+          "frame": 23,
+          "name": "standard_ship_motion_sheet_01_r03_c04_frame_23_original_2x.webp",
+          "x": 3618,
+          "y": 800,
+          "width": 603,
+          "height": 400,
+          "column": 6,
+          "row": 2
+        },
+        {
+          "index": 23,
+          "frame": 24,
+          "name": "standard_ship_motion_sheet_01_r03_c04_frame_24_motion_2x.webp",
+          "x": 4221,
+          "y": 800,
+          "width": 603,
+          "height": 400,
+          "column": 7,
+          "row": 2
+        },
+        {
+          "index": 24,
+          "frame": 25,
+          "name": "standard_ship_motion_sheet_01_r04_c01_frame_25_original_2x.webp",
+          "x": 0,
+          "y": 1200,
+          "width": 603,
+          "height": 400,
+          "column": 0,
+          "row": 3
+        },
+        {
+          "index": 25,
+          "frame": 26,
+          "name": "standard_ship_motion_sheet_01_r04_c01_frame_26_motion_2x.webp",
+          "x": 603,
+          "y": 1200,
+          "width": 603,
+          "height": 400,
+          "column": 1,
+          "row": 3
+        },
+        {
+          "index": 26,
+          "frame": 27,
+          "name": "standard_ship_motion_sheet_01_r04_c02_frame_27_original_2x.webp",
+          "x": 1206,
+          "y": 1200,
+          "width": 603,
+          "height": 400,
+          "column": 2,
+          "row": 3
+        },
+        {
+          "index": 27,
+          "frame": 28,
+          "name": "standard_ship_motion_sheet_01_r04_c02_frame_28_motion_2x.webp",
+          "x": 1809,
+          "y": 1200,
+          "width": 603,
+          "height": 400,
+          "column": 3,
+          "row": 3
+        },
+        {
+          "index": 28,
+          "frame": 29,
+          "name": "standard_ship_motion_sheet_01_r04_c03_frame_29_original_2x.webp",
+          "x": 2412,
+          "y": 1200,
+          "width": 603,
+          "height": 400,
+          "column": 4,
+          "row": 3
+        },
+        {
+          "index": 29,
+          "frame": 30,
+          "name": "standard_ship_motion_sheet_01_r04_c03_frame_30_motion_2x.webp",
+          "x": 3015,
+          "y": 1200,
+          "width": 603,
+          "height": 400,
+          "column": 5,
+          "row": 3
+        },
+        {
+          "index": 30,
+          "frame": 31,
+          "name": "standard_ship_motion_sheet_01_r04_c04_frame_31_original_2x.webp",
+          "x": 3618,
+          "y": 1200,
+          "width": 603,
+          "height": 400,
+          "column": 6,
+          "row": 3
+        },
+        {
+          "index": 31,
+          "frame": 32,
+          "name": "standard_ship_motion_sheet_01_r04_c04_frame_32_motion_2x.webp",
+          "x": 4221,
+          "y": 1200,
+          "width": 603,
+          "height": 400,
+          "column": 7,
+          "row": 3
+        }
+      ]
+    }
+  }
+}

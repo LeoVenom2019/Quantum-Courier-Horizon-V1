@@ -4,6 +4,7 @@ import React, { useRef, useState, useEffect, memo, useCallback, useMemo } from '
 import { motion } from 'motion/react';
 import { Shield, Target, MousePointer2, X } from 'lucide-react';
 import BattlePauseDialog from './BattlePauseDialog';
+import type { BattleSpriteSheet } from '@/lib/battle-sprites';
 
 export interface VoidBattleProjectile {
   id: string;
@@ -40,6 +41,7 @@ export interface VoidBattleEnemy {
   vx?: number;
   vy?: number;
   image: string;
+  spriteSheet?: BattleSpriteSheet;
   assetBaseName?: string;
   enemyColor?: string;
   isExploding?: boolean;
@@ -311,6 +313,7 @@ export interface VoidBattleArenaProps {
   battleLevel?: number;
   enemyQueue?: VoidBattleEnemy[];
   activeShipImage?: string;
+  activeShipSpriteSheet?: BattleSpriteSheet;
   onExitBattle?: () => void;
   meteoriteRewardValue?: number;
   disableMeteorEvent?: boolean;
@@ -354,6 +357,43 @@ const SOLAR_AMBIENT_PARTICLES = Array.from({ length: 54 }, (_, i) => ({
   hue: i % 4
 }));
 
+
+const getSpriteFrameIndex = (
+  sheet: BattleSpriteSheet,
+  now: number,
+  state: 'neutral' | 'up' | 'down' | 'forward' | 'backward' = 'neutral',
+) => {
+  if (sheet.directional) {
+    const row = Math.floor(now / 520) % sheet.rows;
+    const frameByState = state === 'up' ? 2 : state === 'down' ? 6 : state === 'forward' ? 4 : 0;
+    return row * sheet.columns + frameByState;
+  }
+
+  const fps = sheet.fps || 12;
+  return Math.floor(now / (1000 / fps)) % sheet.frameCount;
+};
+
+const drawSpriteSheetFrame = (
+  ctx: CanvasRenderingContext2D,
+  image: HTMLImageElement,
+  sheet: BattleSpriteSheet,
+  frameIndex: number,
+  x: number,
+  y: number,
+  width: number,
+  flipX = false,
+) => {
+  const frame = Math.max(0, Math.min(sheet.frameCount - 1, frameIndex));
+  const sx = (frame % sheet.columns) * sheet.frameWidth;
+  const sy = Math.floor(frame / sheet.columns) * sheet.frameHeight;
+  const height = sheet.frameHeight * (width / sheet.frameWidth);
+
+  ctx.save();
+  ctx.translate(x, y);
+  if (flipX) ctx.scale(-1, 1);
+  ctx.drawImage(image, sx, sy, sheet.frameWidth, sheet.frameHeight, -width / 2, -height / 2, width, height);
+  ctx.restore();
+};
 const VoidBattleArena = memo(function VoidBattleArena({
   initialEnemies,
   playerShipStats,
@@ -372,6 +412,7 @@ const VoidBattleArena = memo(function VoidBattleArena({
   battleLevel,
   enemyQueue,
   activeShipImage,
+  activeShipSpriteSheet,
   onExitBattle,
   meteoriteRewardValue = 0,
   disableMeteorEvent = false
@@ -428,7 +469,7 @@ const VoidBattleArena = memo(function VoidBattleArena({
     isGroupBattle: battleIsGroupBattle,
     playerImage: routeTier === 'Void'
       ? (playerShipStats.rarity === 'mythic' ? '/assets/rota3/void/mitic_eclipse/mitic_eclipse_neutral.webp' : '/images/ships/battle/player-battle.webp')
-      : (activeShipImage || '/images/battle/standard_ship.webp'),
+      : (activeShipSpriteSheet?.image || activeShipImage || '/images/battle/standard_ship.webp'),
     playerHp: playerShipStats.hp,
     playerMaxHp: playerShipStats.maxHp,
     playerShield: playerShipStats.shield,
@@ -544,11 +585,13 @@ const VoidBattleArena = memo(function VoidBattleArena({
     locationId,
     routeTier,
     activeShipImage: activeShipImage || '',
+    activeShipSpriteSheet: activeShipSpriteSheet ? `${activeShipSpriteSheet.image}:${activeShipSpriteSheet.frameWidth}x${activeShipSpriteSheet.frameHeight}` : '',
     playerRarity: playerShipStats.rarity || 'common',
     enemies: [...battleEnemies, ...battleEnemyQueue].map(enemy => ({
       id: enemy.id,
       type: enemy.type,
       image: enemy.image,
+      spriteSheet: enemy.spriteSheet ? `${enemy.spriteSheet.image}:${enemy.spriteSheet.frameWidth}x${enemy.spriteSheet.frameHeight}` : '',
       assetBaseName: enemy.assetBaseName || '',
     })),
   });
@@ -591,10 +634,10 @@ const VoidBattleArena = memo(function VoidBattleArena({
     const isVoid = routeTier === 'Void';
 
     const imagesToLoad: { id: string, src: string, fallback?: string }[] = [
-      { id: 'player_neutral', src: isVoid ? (isMythic ? '/assets/rota3/void/mitic_eclipse/mitic_eclipse_neutral.webp' : '/images/ships/battle/player_battle_neutral.webp') : (activeShipImage || '/images/battle/standard_ship.webp') },
-      { id: 'player_up', src: isVoid ? (isMythic ? '/assets/rota3/void/mitic_eclipse/mitic_eclipse_up.webp' : '/images/ships/battle/player_battle_up.webp') : (activeShipImage || '/images/battle/standard_ship.webp') },
-      { id: 'player_down', src: isVoid ? (isMythic ? '/assets/rota3/void/mitic_eclipse/mitic_eclipse_down.webp' : '/images/ships/battle/player_battle_down.webp') : (activeShipImage || '/images/battle/standard_ship.webp') },
-      { id: 'player_forward', src: isVoid ? (isMythic ? '/assets/rota3/void/mitic_eclipse/mitic_eclipse_forward.webp' : '/images/ships/battle/player_battle_neutral.webp') : (activeShipImage || '/images/battle/standard_ship.webp') },
+      { id: 'player_neutral', src: isVoid ? (isMythic ? '/assets/rota3/void/mitic_eclipse/mitic_eclipse_neutral.webp' : '/images/ships/battle/player_battle_neutral.webp') : (activeShipSpriteSheet?.image || activeShipImage || '/images/battle/standard_ship.webp') },
+      { id: 'player_up', src: isVoid ? (isMythic ? '/assets/rota3/void/mitic_eclipse/mitic_eclipse_up.webp' : '/images/ships/battle/player_battle_up.webp') : (activeShipSpriteSheet?.image || activeShipImage || '/images/battle/standard_ship.webp') },
+      { id: 'player_down', src: isVoid ? (isMythic ? '/assets/rota3/void/mitic_eclipse/mitic_eclipse_down.webp' : '/images/ships/battle/player_battle_down.webp') : (activeShipSpriteSheet?.image || activeShipImage || '/images/battle/standard_ship.webp') },
+      { id: 'player_forward', src: isVoid ? (isMythic ? '/assets/rota3/void/mitic_eclipse/mitic_eclipse_forward.webp' : '/images/ships/battle/player_battle_neutral.webp') : (activeShipSpriteSheet?.image || activeShipImage || '/images/battle/standard_ship.webp') },
       { id: 'solar_background_1', src: '/assets/rota1/battle/layer_background1.webp' },
       { id: 'interstellar_background_1', src: '/assets/rota2/battle/layer_background1.webp' },
       {
@@ -649,13 +692,13 @@ const VoidBattleArena = memo(function VoidBattleArena({
           );
         }
       } else {
-        // For Solar and Interstellar, use the ship image directly for all states
+        const enemySpriteImage = e.spriteSheet?.image || e.image;
         imagesToLoad.push(
-          { id: `${e.id}_neutral`, src: e.image },
-          { id: `${e.id}_up`, src: e.image },
-          { id: `${e.id}_down`, src: e.image },
-          { id: `${e.id}_forward`, src: e.image },
-          { id: `${e.id}_backward`, src: e.image }
+          { id: `${e.id}_neutral`, src: enemySpriteImage },
+          { id: `${e.id}_up`, src: enemySpriteImage },
+          { id: `${e.id}_down`, src: enemySpriteImage },
+          { id: `${e.id}_forward`, src: enemySpriteImage },
+          { id: `${e.id}_backward`, src: enemySpriteImage }
         );
       }
     });
@@ -668,7 +711,7 @@ const VoidBattleArena = memo(function VoidBattleArena({
     return () => {
       cancelled = true;
     };
-  }, [activeShipImage, battleAssetKey, battleEnemies, battleEnemyQueue, locationId, playerShipStats.rarity, routeTier]);
+  }, [activeShipImage, activeShipSpriteSheet, battleAssetKey, battleEnemies, battleEnemyQueue, locationId, playerShipStats.rarity, routeTier]);
 
   // Load and Prepare Video Background
   useEffect(() => {
@@ -715,6 +758,24 @@ const VoidBattleArena = memo(function VoidBattleArena({
       };
     }
   }, [locationId, initialEnemies, routeTier, playSfx, stopSfx]);
+
+  useEffect(() => {
+    const engineSfx = 'player_airship_effect_sound';
+
+    if (routeTier !== 'Void' || !assetsLoaded || showBossIntro || isPaused) {
+      stopSfx(engineSfx);
+      return;
+    }
+
+    playSfx(engineSfx, {
+      loop: true,
+      volume: 0.45,
+      category: 'player',
+      exclusiveKey: 'void-player-airship-engine'
+    });
+
+    return () => stopSfx(engineSfx);
+  }, [assetsLoaded, isPaused, playSfx, routeTier, showBossIntro, stopSfx]);
 
   // Ability Handlers
   const bezier = (p0: number, p1: number, p2: number, t: number) => {
@@ -2630,9 +2691,22 @@ const VoidBattleArena = memo(function VoidBattleArena({
           if (isSkyring && routeTier !== 'Void') {
             imgW *= 1.20;
           }
-
-          const imgH = pImg.height * (imgW / pImg.width);
-          ctx.drawImage(pImg, (s.playerX / 100) * cWidth - imgW/2, (s.playerY / 100) * cHeight - imgH/2, imgW, imgH);
+          if (activeShipSpriteSheet && routeTier !== 'Void') {
+            const playerState = activePlayerId.replace('player_', '') as 'neutral' | 'up' | 'down' | 'forward' | 'backward';
+            imgW *= activeShipSpriteSheet.scale || 1;
+            drawSpriteSheetFrame(
+              ctx,
+              pImg,
+              activeShipSpriteSheet,
+              getSpriteFrameIndex(activeShipSpriteSheet, now, playerState),
+              (s.playerX / 100) * cWidth,
+              (s.playerY / 100) * cHeight,
+              imgW,
+            );
+          } else {
+            const imgH = pImg.height * (imgW / pImg.width);
+            ctx.drawImage(pImg, (s.playerX / 100) * cWidth - imgW/2, (s.playerY / 100) * cHeight - imgH/2, imgW, imgH);
+          }
           ctx.restore();
         }
       } else {
@@ -2749,12 +2823,25 @@ const VoidBattleArena = memo(function VoidBattleArena({
                 ctx.drawImage(eImg, x - imgW/2, y - imgH/2, imgW, imgH);
               }
             } else {
-              // PNG Original para Rotas 1 e 2
-              const imgW = 110;
-              const imgH = eImg.height * (imgW / eImg.width);
+              const enemySheet = enemy.spriteSheet;
+              const imgW = 110 * (enemySheet?.scale || 1);
               ctx.save();
               ctx.translate(x, y);
-              ctx.drawImage(eImg, -imgW/2, -imgH/2, imgW, imgH);
+              if (enemySheet) {
+                const enemyState = spriteSuffix.replace('_', '') as 'neutral' | 'up' | 'down' | 'forward' | 'backward';
+                drawSpriteSheetFrame(
+                  ctx,
+                  eImg,
+                  enemySheet,
+                  getSpriteFrameIndex(enemySheet, now, enemyState),
+                  0,
+                  0,
+                  imgW,
+                );
+              } else {
+                const imgH = eImg.height * (imgW / eImg.width);
+                ctx.drawImage(eImg, -imgW/2, -imgH/2, imgW, imgH);
+              }
               ctx.restore();
             }
           } else if (enemy.hp > 0) {
@@ -3091,7 +3178,8 @@ const VoidBattleArena = memo(function VoidBattleArena({
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
-  }, [assetsLoaded, triggerAttack, onBattleEnd, playSfx, stopSfx, dimensions, routeTier, triggerAbility, playerShipStats, locationId, videoReady, showBossIntro, activeShipImage, addLog, initialEnemies, language, meteoriteQcValue, meteorQcValue]);
+  }, [assetsLoaded, triggerAttack, onBattleEnd, playSfx, stopSfx, dimensions, routeTier, triggerAbility, playerShipStats, locationId, videoReady, showBossIntro, activeShipImage,
+  activeShipSpriteSheet, addLog, initialEnemies, language, meteoriteQcValue, meteorQcValue]);
   const handlePauseReturn = useCallback(() => {
     isPausedRef.current = false;
     setIsPaused(false);

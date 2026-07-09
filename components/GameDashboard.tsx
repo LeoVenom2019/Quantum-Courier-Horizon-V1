@@ -260,6 +260,12 @@ import VoidMap from './dashboard/VoidMap';
 import MissionsTab from './dashboard/MissionsTab';
 import { ROUTE_THEMES, ARCADE_THEMES, getRandomTrackForRoute } from '@/lib/music-data';
 import { getRecommendedAssetGroupsForRoute, preloadAssetGroupPassive, preloadAssetGroupsPassive } from '@/lib/asset-preloader';
+import {
+  getCap12PlayerSprite,
+  getEnemyTypeForRarity,
+  rollCap12EnemyRarity,
+  selectCap12EnemySprite,
+} from '@/lib/battle-sprites';
 import { ACTIVE_DELIVERY_BACKGROUNDS, SCIFI_TEXTURE_BACKGROUND } from '@/lib/ui-backgrounds';
 import RoutesTab from './dashboard/RoutesTab';
 import AutoTab from './dashboard/AutoTab';
@@ -326,6 +332,34 @@ const NEW_EARTH_MONTHS_PER_YEAR = 12;
 const NEW_EARTH_MONTH_SECONDS = NEW_EARTH_YEAR_SECONDS / NEW_EARTH_MONTHS_PER_YEAR;
 
 type QcSource = 'delivery' | 'mining' | 'battle' | 'mission' | 'extraction' | 'tutorial';
+
+const createEmptyRouteStats = (): RouteStats => ({
+  deliveries: 0,
+  manualDeliveries: 0,
+  autoDeliveries: 0,
+  qcFromDeliveries: 0,
+  qcFromMining: 0,
+  qcFromExtraction: 0,
+  qcSpent: 0,
+  qcTotalAcquired: 0,
+  missionsCompleted: 0,
+  qcFromMissions: 0,
+  qcFromTutorial: 0,
+  randomBattlesFound: 0,
+  radarBattlesFound: 0,
+  manualMiningPacksSold: 0,
+  autoMiningPacksSold: 0,
+  manualExtractionPacksSold: 0,
+  autoExtractionPacksSold: 0,
+  qcFromBattles: 0,
+  battlesWon: 0,
+  perfectDeliveries: 0,
+});
+
+const withRouteStatsDefaults = (stats?: Partial<RouteStats>): RouteStats => ({
+  ...createEmptyRouteStats(),
+  ...(stats || {}),
+});
 
 const getNewEarthCalendar = (seconds: number) => {
   const totalMonths = Math.floor(Math.max(0, seconds) / NEW_EARTH_MONTH_SECONDS);
@@ -1688,6 +1722,7 @@ const DashboardContent = memo(({
   const autoTravelActiveRef = React.useRef(autoTravelActive);
   const autoTravelDesiredRef = React.useRef(autoTravelDesired);
   const autoTravelProgressRef = React.useRef(autoTravelProgress);
+  const autoTravelInFlightSlotsRef = React.useRef<Record<string, number>>({});
   const autoTravelSlotsRef = React.useRef(autoTravelSlots);
   const totalDeliveriesRef = React.useRef(totalDeliveries);
   const deliveriesByLocationRef = React.useRef(deliveriesByLocation);
@@ -1860,6 +1895,26 @@ const DashboardContent = memo(({
 
     return safeAmount;
   }, []);
+
+  const syncAetherionDeltaRef = useCallback((detail: { aetherionDelta?: number; aetherionTubesDelta?: number }) => {
+    const aetherionDelta = normalizeGameNumber(detail.aetherionDelta || 0);
+    if (Math.abs(aetherionDelta) > 0.01) {
+      const previous = aetherionRef.current;
+      const next = Math.min(10000, Math.max(0, previous + aetherionDelta));
+      const appliedDelta = next - previous;
+      aetherionRef.current = next;
+      lastFlushedAetherionRef.current += appliedDelta;
+    }
+
+    const tubesDelta = normalizeGameNumber(detail.aetherionTubesDelta || 0);
+    if (Math.abs(tubesDelta) > 0.01) {
+      const previous = aetherionTubesRef.current;
+      const next = Math.max(0, previous + tubesDelta);
+      const appliedDelta = next - previous;
+      aetherionTubesRef.current = next;
+      lastFlushedTubesRef.current += appliedDelta;
+    }
+  }, []);
   // Optimization Refs
   const isLoadedRef = React.useRef(isLoaded);
 
@@ -1919,6 +1974,14 @@ const DashboardContent = memo(({
     window.addEventListener('qch:mission-claimed', handleMissionClaimed);
     return () => window.removeEventListener('qch:mission-claimed', handleMissionClaimed);
   }, [syncCreditedQcRef]);
+
+  useEffect(() => {
+    const handleAetherionChanged = (e: Event) => {
+      syncAetherionDeltaRef((e as CustomEvent<{ aetherionDelta?: number; aetherionTubesDelta?: number }>).detail || {});
+    };
+    window.addEventListener('qch:aetherion-changed', handleAetherionChanged);
+    return () => window.removeEventListener('qch:aetherion-changed', handleAetherionChanged);
+  }, [syncAetherionDeltaRef]);
 
   // 2. Progression & Technology
   useEffect(() => {
@@ -2237,7 +2300,189 @@ const DashboardContent = memo(({
   }, [routeTier]);
 
   const { playSfx, stopSfx } = useSFX(sfxOn);
+  const route2IntroAudioRef = React.useRef<HTMLAudioElement | null>(null);
+  const route2IntroFadeRef = React.useRef<number | null>(null);
+  const route3IntroAudioRef = React.useRef<HTMLAudioElement | null>(null);
+  const route3IntroFadeRef = React.useRef<number | null>(null);
 
+  const fadeOutRoute2IntroMusic = useCallback((duration = 1400) => {
+    if (typeof window === 'undefined') return;
+    const audio = route2IntroAudioRef.current;
+    if (!audio) return;
+
+    if (route2IntroFadeRef.current !== null) {
+      window.clearInterval(route2IntroFadeRef.current);
+      route2IntroFadeRef.current = null;
+    }
+
+    if (audio.paused || audio.volume <= 0) {
+      audio.pause();
+      audio.currentTime = 0;
+      audio.volume = 0;
+      return;
+    }
+
+    const startVolume = audio.volume;
+    const startedAt = Date.now();
+    route2IntroFadeRef.current = window.setInterval(() => {
+      const elapsed = Date.now() - startedAt;
+      const progress = Math.min(1, elapsed / duration);
+      audio.volume = Math.max(0, startVolume * (1 - progress));
+
+      if (progress >= 1) {
+        if (route2IntroFadeRef.current !== null) {
+          window.clearInterval(route2IntroFadeRef.current);
+          route2IntroFadeRef.current = null;
+        }
+        audio.pause();
+        audio.currentTime = 0;
+        audio.volume = 0;
+      }
+    }, 50);
+  }, []);
+
+  const playRoute2IntroMusic = useCallback(() => {
+    if (typeof window === 'undefined' || !musicOn) return;
+
+    if (route2IntroFadeRef.current !== null) {
+      window.clearInterval(route2IntroFadeRef.current);
+      route2IntroFadeRef.current = null;
+    }
+
+    const audio = route2IntroAudioRef.current || new Audio('/audio/themes/intro_cap_02.ogg');
+    route2IntroAudioRef.current = audio;
+    audio.loop = false;
+    audio.currentTime = 0;
+    audio.volume = 0;
+
+    const targetVolume = Math.min(0.8, Math.max(0.18, Number(jukebox?.volume ?? 0.5) * 0.95));
+    audio.play().catch((error: unknown) => {
+      if (error instanceof DOMException && (error.name === 'AbortError' || error.name === 'NotAllowedError')) return;
+      console.warn('[Route2Intro] Playback failed:', error);
+    });
+
+    const startedAt = Date.now();
+    route2IntroFadeRef.current = window.setInterval(() => {
+      const progress = Math.min(1, (Date.now() - startedAt) / 1200);
+      audio.volume = targetVolume * progress;
+      if (progress >= 1 && route2IntroFadeRef.current !== null) {
+        window.clearInterval(route2IntroFadeRef.current);
+        route2IntroFadeRef.current = null;
+      }
+    }, 50);
+  }, [jukebox?.volume, musicOn]);
+
+  const resumeRouteMusicAfterRoute2Cancel = useCallback(() => {
+    if (!musicOn) return;
+    const theme = ROUTE_THEMES[routeTier];
+    if (theme?.playlist?.length) {
+      window.setTimeout(() => jukebox.playPlaylist(theme.playlist, { loop: false, rememberPreference: false }), 250);
+    }
+  }, [jukebox, musicOn, routeTier]);
+
+  useEffect(() => {
+    if (!showRoute2Confirm) return;
+
+    jukebox.stop({ rememberPreference: false });
+    playRoute2IntroMusic();
+
+    return () => {
+      fadeOutRoute2IntroMusic();
+    };
+  }, [fadeOutRoute2IntroMusic, jukebox, playRoute2IntroMusic, showRoute2Confirm]);
+
+
+  const fadeOutRoute3IntroMusic = useCallback((duration = 1400) => {
+    if (typeof window === 'undefined') return;
+    const audio = route3IntroAudioRef.current;
+    if (!audio) return;
+
+    if (route3IntroFadeRef.current !== null) {
+      window.clearInterval(route3IntroFadeRef.current);
+      route3IntroFadeRef.current = null;
+    }
+
+    if (audio.paused || audio.volume <= 0) {
+      audio.pause();
+      audio.currentTime = 0;
+      audio.volume = 0;
+      return;
+    }
+
+    const startVolume = audio.volume;
+    const startedAt = Date.now();
+    route3IntroFadeRef.current = window.setInterval(() => {
+      const elapsed = Date.now() - startedAt;
+      const progress = Math.min(1, elapsed / duration);
+      audio.volume = Math.max(0, startVolume * (1 - progress));
+
+      if (progress >= 1) {
+        if (route3IntroFadeRef.current !== null) {
+          window.clearInterval(route3IntroFadeRef.current);
+          route3IntroFadeRef.current = null;
+        }
+        audio.pause();
+        audio.currentTime = 0;
+        audio.volume = 0;
+      }
+    }, 50);
+  }, []);
+
+  const playRoute3IntroMusic = useCallback(() => {
+    if (typeof window === 'undefined' || !musicOn) return;
+
+    if (route3IntroFadeRef.current !== null) {
+      window.clearInterval(route3IntroFadeRef.current);
+      route3IntroFadeRef.current = null;
+    }
+
+    const audio = route3IntroAudioRef.current || new Audio('/audio/themes/intro_cap_03.ogg');
+    route3IntroAudioRef.current = audio;
+    audio.loop = false;
+    audio.currentTime = 0;
+    audio.volume = 0;
+
+    const targetVolume = Math.min(0.8, Math.max(0.18, Number(jukebox?.volume ?? 0.5) * 0.95));
+    audio.play().catch((error: unknown) => {
+      if (error instanceof DOMException && (error.name === 'AbortError' || error.name === 'NotAllowedError')) return;
+      console.warn('[Route3Intro] Playback failed:', error);
+    });
+
+    const startedAt = Date.now();
+    route3IntroFadeRef.current = window.setInterval(() => {
+      const progress = Math.min(1, (Date.now() - startedAt) / 1200);
+      audio.volume = targetVolume * progress;
+      if (progress >= 1 && route3IntroFadeRef.current !== null) {
+        window.clearInterval(route3IntroFadeRef.current);
+        route3IntroFadeRef.current = null;
+      }
+    }, 50);
+  }, [jukebox?.volume, musicOn]);
+
+  const resumeRouteMusicAfterRoute3Cancel = useCallback(() => {
+    if (!musicOn) return;
+    const theme = ROUTE_THEMES[routeTier];
+    if (theme?.playlist?.length) {
+      window.setTimeout(() => jukebox.playPlaylist(theme.playlist, { loop: false, rememberPreference: false }), 250);
+    }
+  }, [jukebox, musicOn, routeTier]);
+
+  useEffect(() => {
+    if (!showRoute3Confirm) return;
+
+    jukebox.stop({ rememberPreference: false });
+    playRoute3IntroMusic();
+
+    return () => {
+      fadeOutRoute3IntroMusic();
+    };
+  }, [fadeOutRoute3IntroMusic, jukebox, playRoute3IntroMusic, showRoute3Confirm]);
+  useEffect(() => {
+    if (!musicOn) {
+      fadeOutRoute2IntroMusic(700);
+      fadeOutRoute3IntroMusic(700);
+    }
+  }, [fadeOutRoute2IntroMusic, fadeOutRoute3IntroMusic, musicOn]);
   const launchArcadeGame = useCallback(async (id: string) => {
     if (!isArcadeUnlocked) return;
     arcadeRewardSessionRef.current[id] = { guaranteedAwarded: false, chanceRolled: false };
@@ -4563,43 +4808,40 @@ const DashboardContent = memo(({
     tier: string,
     source?: 'delivery' | 'mining' | 'battle' | 'mission' | 'extraction' | 'tutorial'
   ) => {
-    const current = historyStatsRef.current[tier];
-    if (!current) return;
-
-    const next = { ...current };
+    const safeAmount = normalizeGameNumber(amount);
+    const next = withRouteStatsDefaults(historyStatsRef.current[tier]);
 
     if (type === 'acquired') {
-      next.qcTotalAcquired += amount;
-      if (source === 'delivery') next.qcFromDeliveries += amount;
-      if (source === 'mining') next.qcFromMining += amount;
-      if (source === 'battle') next.qcFromBattles += amount;
-      if (source === 'mission') next.qcFromMissions += amount;
-      if (source === 'extraction') next.qcFromExtraction += amount;
-      if (source === 'tutorial') next.qcFromTutorial += amount;
+      next.qcTotalAcquired = normalizeGameNumber(next.qcTotalAcquired) + safeAmount;
+      if (source === 'delivery') next.qcFromDeliveries = normalizeGameNumber(next.qcFromDeliveries) + safeAmount;
+      if (source === 'mining') next.qcFromMining = normalizeGameNumber(next.qcFromMining) + safeAmount;
+      if (source === 'battle') next.qcFromBattles = normalizeGameNumber(next.qcFromBattles) + safeAmount;
+      if (source === 'mission') next.qcFromMissions = normalizeGameNumber(next.qcFromMissions) + safeAmount;
+      if (source === 'extraction') next.qcFromExtraction = normalizeGameNumber(next.qcFromExtraction) + safeAmount;
+      if (source === 'tutorial') next.qcFromTutorial = normalizeGameNumber(next.qcFromTutorial) + safeAmount;
     } else if (type === 'spent') {
-      next.qcSpent += amount;
+      next.qcSpent = normalizeGameNumber(next.qcSpent) + safeAmount;
     } else if (type === 'mission_complete') {
-      next.missionsCompleted += 1;
+      next.missionsCompleted = normalizeGameNumber(next.missionsCompleted) + 1;
     } else if (type === 'battle_win') {
-      next.battlesWon += 1;
+      next.battlesWon = normalizeGameNumber(next.battlesWon) + 1;
     } else if (type === 'manual_mining') {
-      next.manualMiningPacksSold = (next.manualMiningPacksSold || 0) + amount;
+      next.manualMiningPacksSold = normalizeGameNumber(next.manualMiningPacksSold) + safeAmount;
     } else if (type === 'auto_mining') {
-      next.autoMiningPacksSold = (next.autoMiningPacksSold || 0) + amount;
+      next.autoMiningPacksSold = normalizeGameNumber(next.autoMiningPacksSold) + safeAmount;
     } else if (type === 'manual_extraction') {
-      next.manualExtractionPacksSold = (next.manualExtractionPacksSold || 0) + amount;
+      next.manualExtractionPacksSold = normalizeGameNumber(next.manualExtractionPacksSold) + safeAmount;
     } else if (type === 'auto_extraction') {
-      next.autoExtractionPacksSold = (next.autoExtractionPacksSold || 0) + amount;
+      next.autoExtractionPacksSold = normalizeGameNumber(next.autoExtractionPacksSold) + safeAmount;
     } else if (type === 'perfect_delivery') {
-      next.perfectDeliveries = (next.perfectDeliveries || 0) + amount;
+      next.perfectDeliveries = normalizeGameNumber(next.perfectDeliveries) + safeAmount;
     } else if (type === 'random_battle_found') {
-      next.randomBattlesFound = (next.randomBattlesFound || 0) + amount;
+      next.randomBattlesFound = normalizeGameNumber(next.randomBattlesFound) + safeAmount;
     }
 
     historyStatsRef.current = { ...historyStatsRef.current, [tier]: next };
     pendingHistoryRef.current = true;
   }, []);
-
   // Bug #2: Throttled History Flush (3s)
   useEffect(() => {
     if (!isLoaded) return;
@@ -5281,6 +5523,7 @@ const DashboardContent = memo(({
       if (!isVictory) {
         autoTravelActiveRef.current = { ...autoTravelActiveRef.current, [routeId]: false };
         autoTravelProgressRef.current = { ...autoTravelProgressRef.current, [routeId]: 0 };
+        autoTravelInFlightSlotsRef.current = { ...autoTravelInFlightSlotsRef.current, [routeId]: 0 };
         setAutoTravelActive(prev => ({ ...prev, [routeId]: false }));
         setAutoTravelProgress(prev => ({ ...prev, [routeId]: 0 }));
         const route = ROUTES_MAP.get(routeId);
@@ -5362,14 +5605,16 @@ const DashboardContent = memo(({
         const minLvl = Math.max(1, Math.floor(battleLevel * 0.9));
         const maxLvl = Math.max(1, Math.ceil(battleLevel * 1.1));
         const enemyTier = Math.min(20, Math.floor(Math.random() * (maxLvl - minLvl + 1)) + minLvl);
-
-        let bossChance = 0.10 + (battleLevel >= 15 ? 0.10 : 0);
-        if (battleLevel >= 45 && routeTier === 'Interstellar') bossChance += 0.25;
-
         const bossCooldownReady = nowTimestamp() - lastBossBattleTimeRef.current >= BOSS_ENCOUNTER_COOLDOWN_MS;
-        const isBoss = bossCooldownReady && Math.random() < bossChance;
-        const isElite = !isBoss && enemyTier > 10;
-        const enemyType = isBoss ? 'Boss' : (isElite ? 'Elite' : (enemyTier > 5 ? 'Alien' : (Math.random() > 0.5 ? 'Pirate' : 'Alien')));
+        const enemyRarity = rollCap12EnemyRarity({
+          battleLevel,
+          enemyTier,
+          routeTier,
+          bossCooldownReady,
+        });
+        const isBoss = enemyRarity === 'boss';
+        const isElite = enemyRarity === 'elite';
+        const enemyType = getEnemyTypeForRarity(enemyRarity);
 
         const enemyHp = (50 + (enemyTier * 60) + Math.floor(Math.random() * 50)) * (isBoss ? 10 : (isElite ? 5 : 1));
         let playerHp = 100 + (battleLevel * 150);
@@ -5390,14 +5635,16 @@ const DashboardContent = memo(({
         const multipliers = getEconomicMultipliers();
         const rewardMultiplier = isBoss ? 6 : (isElite ? 3 : 1);
         const result = (Math.random() * 100 < totalWinProb) ? 'victory' : 'defeat';
+        const playerSpriteSheet = getCap12PlayerSprite(battleLevel);
+        const enemySpriteSheet = selectCap12EnemySprite(enemyRarity);
 
         const battle: Battle = {
           id: Math.random().toString(36).substr(2, 9),
           routeId: routeId,
           deliveryId: targetId,
-          enemyName: isBoss ? (language === 'pt' ? 'Nave Mae (BOSS)' : 'MOTHER SHIP (BOSS)') : (isElite ? (language === 'pt' ? 'Cruzador de Elite' : 'Elite Cruiser') : enemyTier > 5 ? (language === 'pt' ? 'Cruzador Alienigena' : 'Alien Cruiser') : (enemyType === 'Pirate' ? (language === 'pt' ? 'Pirata Espacial' : 'Space Pirate') : (language === 'pt' ? 'Batedor Alienigena' : 'Alien Scout'))),
+          enemyName: isBoss ? (language === 'pt' ? 'Nave Mae (BOSS)' : 'MOTHER SHIP (BOSS)') : (isElite ? (language === 'pt' ? 'Cruzador de Elite' : 'Elite Cruiser') : enemyRarity === 'alien' ? (language === 'pt' ? 'Cruzador Alienigena' : 'Alien Cruiser') : (language === 'pt' ? 'Inimigo Comum' : 'Common Enemy')),
           enemyType: enemyType,
-          enemyColor: isBoss ? '#ff0000' : (isElite ? '#f59e0b' : enemyTier > 5 ? '#a855f7' : enemyColors[Math.floor(Math.random() * enemyColors.length)]),
+          enemyColor: isBoss ? '#ff0000' : (isElite ? '#f59e0b' : enemyRarity === 'alien' ? '#a855f7' : enemyColors[Math.floor(Math.random() * enemyColors.length)]),
           enemyMaxHp: enemyHp,
           enemyHp: enemyHp,
           playerMaxHp: playerHp,
@@ -5412,8 +5659,10 @@ const DashboardContent = memo(({
           enemyTier: enemyTier,
           predeterminedResult: result,
           isCinematicFinished: false,
-          playerImage: battleLevel >= 25 ? '/images/battle/skyring.webp' : '/images/battle/standard_ship.webp',
-          enemyImage: isBoss ? '/images/battle/enemy_boss.webp' : (isElite ? '/images/battle/enemy_elite.webp' : (enemyTier > 5 ? '/images/battle/enemy_alien.webp' : '/images/battle/enemy_raider.webp')),
+          playerImage: playerSpriteSheet.image,
+          enemyImage: enemySpriteSheet.image,
+          playerSpriteSheet,
+          enemySpriteSheet,
           playerDps: playerDps,
           enemyDps: (10 + enemyTier * 5) / 2,
           isBoss: isBoss
@@ -5797,14 +6046,17 @@ const DashboardContent = memo(({
 
   const isSpeedMode = false;
 
-  const incrementDeliveries = useCallback((source: 'manual' | 'auto', count: number = 1) => {
-    const tier = routeTier;
-    dispatch({ type: 'UPDATE_HISTORY', payload: { tier, field: 'deliveries', amount: count } });
-    if (source === 'manual') dispatch({ type: 'UPDATE_HISTORY', payload: { tier, field: 'manualDeliveries', amount: count } });
-    if (source === 'auto') dispatch({ type: 'UPDATE_HISTORY', payload: { tier, field: 'autoDeliveries', amount: count } });
+  const incrementDeliveries = useCallback((source: 'manual' | 'auto', count: number = 1, tierOverride?: string) => {
+    const tier = tierOverride || routeTier;
+    const safeCount = normalizeGameNumber(count);
+    const next = withRouteStatsDefaults(historyStatsRef.current[tier]);
+    next.deliveries = normalizeGameNumber(next.deliveries) + safeCount;
+    if (source === 'manual') next.manualDeliveries = normalizeGameNumber(next.manualDeliveries) + safeCount;
+    if (source === 'auto') next.autoDeliveries = normalizeGameNumber(next.autoDeliveries) + safeCount;
+    historyStatsRef.current = { ...historyStatsRef.current, [tier]: next };
+    pendingHistoryRef.current = true;
 
-    // RHSE Solar Energy must be committed immediately; keeping it only in refs can
-    // be overwritten by unrelated state syncs before the flush interval runs.
+    // RHSE Solar Energy must be committed immediately; keeping it only in refs can    // be overwritten by unrelated state syncs before the flush interval runs.
     const mappingBonus = 1 + (solarMappingLevel * 0.1);
     const energyToAdd = count * 50 * (routeTier === 'Interstellar' ? mappingBonus : 1);
     const previousSolarEnergy = solarEnergyRef.current;
@@ -6714,58 +6966,8 @@ const DashboardContent = memo(({
       const isVoidLoop = routeTierRef.current === 'Void';
       const isEarthLoop = routeTierRef.current === 'Earth';
       const processMiningTick = () => {
-        const nextOres = { ...oresCollectedRef.current };
-        let oresChanged = false;
-        let miningQcBonus = 0;
-
-        ORES.filter(o => o.tier === routeTierRef.current).forEach(ore => {
-          const robots = miningRobotsRef.current[ore.id] || 0;
-          if (robots > 0) {
-            const autoSellCostPerPack = (routeTierRef.current === 'Interstellar') ? 8 : 10;
-            if (aetherionRef.current >= autoSellCostPerPack && autoSellByOreRef.current[ore.id] && nextOres[ore.id] >= ore.packSize) {
-              let packs = Math.floor(nextOres[ore.id] / ore.packSize);
-              if (packs > 0) {
-                if (routeTierRef.current === 'Interstellar') packs = Math.min(5, packs);
-                aetherionRef.current = Math.max(0, aetherionRef.current - (packs * autoSellCostPerPack));
-                const compressionBonus = 1 + (miningCompressionLevelsRef.current[ore.id] || 0) * 0.2;
-                let value = Math.floor(ore.baseValue * ore.rarity * ore.packSize * getEconomicMultipliers().profit * compressionBonus);
-                if (routeTierRef.current === 'Interstellar') {
-                  let miningScale = 3.75 + Math.min(battleLevelRef.current, 55) * 0.1;
-                  if (battleLevelRef.current >= 40) {
-                    miningScale *= 5;
-                  }
-                  value *= miningScale;
-                }
-                miningQcBonus += value * packs * MINING_VALUE_MULTIPLIER;
-                const currentStats = historyStatsRef.current[routeTierRef.current];
-                historyStatsRef.current = { ...historyStatsRef.current, [routeTierRef.current]: { ...currentStats, autoMiningPacksSold: (currentStats.autoMiningPacksSold || 0) + packs } };
-                const wasteToAdd = packs * 300 * (routeTierRef.current === 'Interstellar' ? 1 + (extractionTechLevelRef.current * 0.1) : 1);
-                const previousMiningWaste = miningWasteRef.current;
-                const nextMiningWaste = Math.min(7500, previousMiningWaste + wasteToAdd);
-                const miningWasteDelta = nextMiningWaste - previousMiningWaste;
-                if (miningWasteDelta > 0) {
-                  miningWasteRef.current = nextMiningWaste;
-                  lastFlushedWasteRef.current = nextMiningWaste;
-                  dispatch({ type: 'EARN_RESOURCES', payload: { miningWaste: miningWasteDelta } });
-                }
-                nextOres[ore.id] -= packs * ore.packSize;
-                oresChanged = true;
-                applyMissionProgress('sell', ore.id, packs, routeTierRef.current);
-              }
-            }
-          }
-        });
-
-        if (oresChanged) {
-          oresCollectedRef.current = nextOres;
-          dispatch({ type: 'SET_ORES_COLLECTED', payload: { ores: nextOres } });
-        }
-        if (miningQcBonus > 0) {
-          creditQc(miningQcBonus, 'mining');
-          updateHistoryStats('acquired', miningQcBonus, routeTierRef.current, 'mining');
-        }
+        // Mining production and auto-sell are owned by DashboardProvider.
       };
-
       if (!isLoadedRef.current || isResettingRef.current) return;
 
       const shouldPauseRouteSystems = isTransitioningRef.current || showRoute2LoreRef.current || showVoidLoreRef.current || voidBattleStatusRef.current === 'fighting';
@@ -6911,14 +7113,16 @@ const DashboardContent = memo(({
             const minLvl = Math.max(1, Math.floor(battleLevelRef.current * 0.9));
             const maxLvl = Math.max(1, Math.ceil(battleLevelRef.current * 1.1));
             const enemyTier = Math.min(20, Math.floor(Math.random() * (maxLvl - minLvl + 1)) + minLvl);
-
-            let bossChance = 0.10 + (battleLevelRef.current >= 15 ? 0.10 : 0);
-            if (battleLevelRef.current >= 45 && routeTierRef.current === 'Interstellar') bossChance += 0.25;
-
             const bossCooldownReady = nowTimestamp() - lastBossBattleTimeRef.current >= BOSS_ENCOUNTER_COOLDOWN_MS;
-            const isBoss = bossCooldownReady && Math.random() < bossChance;
-            const isElite = !isBoss && enemyTier > 10;
-            const enemyType = isBoss ? 'Boss' : (isElite ? 'Elite' : (enemyTier > 5 ? 'Alien' : (Math.random() > 0.5 ? 'Pirate' : 'Alien')));
+            const enemyRarity = rollCap12EnemyRarity({
+              battleLevel: battleLevelRef.current,
+              enemyTier,
+              routeTier: routeTierRef.current,
+              bossCooldownReady,
+            });
+            const isBoss = enemyRarity === 'boss';
+            const isElite = enemyRarity === 'elite';
+            const enemyType = getEnemyTypeForRarity(enemyRarity);
 
             const enemyHp = (50 + (enemyTier * 60) + Math.floor(Math.random() * 50)) * (isBoss ? 10 : (isElite ? 5 : 1));
             let playerHp = 100 + (battleLevelRef.current * 150);
@@ -6939,14 +7143,16 @@ const DashboardContent = memo(({
             const multipliers = getEconomicMultipliers();
             const rewardMultiplier = isBoss ? 6 : (isElite ? 3 : 1);
             const result = (Math.random() * 100 < totalWinProb) ? 'victory' : 'defeat';
+            const playerSpriteSheet = getCap12PlayerSprite(battleLevelRef.current);
+            const enemySpriteSheet = selectCap12EnemySprite(enemyRarity);
 
             const battle: Battle = {
               id: Math.random().toString(36).substr(2, 9),
               routeId: routeId,
               deliveryId: targetId,
-              enemyName: isBoss ? (languageRef.current === 'pt' ? 'Nave Mãe (BOSS)' : 'MOTHER SHIP (BOSS)') : (isElite ? (languageRef.current === 'pt' ? 'Cruzador de Elite' : 'Elite Cruiser') : enemyTier > 5 ? (languageRef.current === 'pt' ? 'Cruzador Alienígena' : 'Alien Cruiser') : (enemyType === 'Pirate' ? (languageRef.current === 'pt' ? 'Pirata Espacial' : 'Space Pirate') : (languageRef.current === 'pt' ? 'Batedor Alienígena' : 'Alien Scout'))),
+              enemyName: isBoss ? (languageRef.current === 'pt' ? 'Nave Mãe (BOSS)' : 'MOTHER SHIP (BOSS)') : (isElite ? (languageRef.current === 'pt' ? 'Cruzador de Elite' : 'Elite Cruiser') : enemyRarity === 'alien' ? (languageRef.current === 'pt' ? 'Cruzador Alienígena' : 'Alien Cruiser') : (languageRef.current === 'pt' ? 'Inimigo Comum' : 'Common Enemy')),
               enemyType: enemyType,
-              enemyColor: isBoss ? '#ff0000' : (isElite ? '#f59e0b' : enemyTier > 5 ? '#a855f7' : enemyColors[Math.floor(Math.random() * enemyColors.length)]),
+              enemyColor: isBoss ? '#ff0000' : (isElite ? '#f59e0b' : enemyRarity === 'alien' ? '#a855f7' : enemyColors[Math.floor(Math.random() * enemyColors.length)]),
               enemyMaxHp: enemyHp,
               enemyHp: enemyHp,
               playerMaxHp: playerHp,
@@ -6961,8 +7167,10 @@ const DashboardContent = memo(({
               enemyTier: enemyTier,
               predeterminedResult: result,
               isCinematicFinished: false,
-              playerImage: battleLevelRef.current >= 25 ? '/images/battle/skyring.webp' : '/images/battle/standard_ship.webp',
-              enemyImage: isBoss ? '/images/battle/enemy_boss.webp' : (isElite ? '/images/battle/enemy_elite.webp' : (enemyTier > 5 ? '/images/battle/enemy_alien.webp' : '/images/battle/enemy_raider.webp')),
+              playerImage: playerSpriteSheet.image,
+              enemyImage: enemySpriteSheet.image,
+              playerSpriteSheet,
+              enemySpriteSheet,
               playerDps: playerDps,
               enemyDps: (10 + enemyTier * 5) / 2,
               isBoss: isBoss
@@ -7064,6 +7272,7 @@ const DashboardContent = memo(({
                 if (isAuto) {
                   if (!victory) {
                     setAutoTravelActive(prev => ({ ...prev, [routeId]: false }));
+                    autoTravelInFlightSlotsRef.current = { ...autoTravelInFlightSlotsRef.current, [routeId]: 0 };
                     setAutoTravelProgress(prev => ({ ...prev, [routeId]: 0 }));
                   }
                 } else {
@@ -7114,9 +7323,12 @@ const DashboardContent = memo(({
           const valueUpgrade = UPGRADES_MAP.get('value')!;
           const valueTier = valueUpgrade.tiers.find(v => v.level === locationTech.value);
           const fuelCost = getDeliveryFuelCost(route, valueTier?.value || 0, qcRef.current);
-          const attemptCost = fuelCost * slots;
-          const aetherionTripCost = slots * 2;
-          if (aetherionRef.current >= aetherionTripCost && qcRef.current >= attemptCost) setAutoTravelActive(prev => ({ ...prev, [routeId]: true }));
+          const canAffordOneQc = fuelCost <= 0 || qcRef.current >= fuelCost;
+          const canAffordOneAetherion = aetherionRef.current >= 2;
+          if (slots > 0 && canAffordOneAetherion && canAffordOneQc) {
+            autoTravelActiveRef.current = { ...autoTravelActiveRef.current, [routeId]: true };
+            setAutoTravelActive(prev => ({ ...prev, [routeId]: true }));
+          }
         }
       });
 
@@ -7136,8 +7348,6 @@ const DashboardContent = memo(({
             const fuelCost = getDeliveryFuelCost(route, valueTier?.value || 0, qcRef.current);
 
             if (currentProgress === 0) {
-              const attemptCost = fuelCost * numSlots;
-              const aetherionTripCost = numSlots * 2;
               const requiredLevel = route.requiredShipLevel;
               const totalOwned = ownedShipsRef.current[`${route.tier}-${requiredLevel}`] || 0;
               const manualInUse = activeDeliveriesRef.current.filter(d => d.shipLevel === requiredLevel && d.tier === route.tier && d.status === 'delivering').length;
@@ -7145,22 +7355,29 @@ const DashboardContent = memo(({
               Object.keys(autoTravelActiveRef.current).forEach(otherId => {
                 if (otherId !== routeId && autoTravelActiveRef.current[otherId]) {
                   const otherRoute = ROUTES_MAP.get(otherId);
-                  if (otherRoute && otherRoute.requiredShipLevel === requiredLevel && otherRoute.tier === route.tier) otherAutoInUse += (autoTravelSlotsRef.current[otherId] || 0);
+                  if (otherRoute && otherRoute.requiredShipLevel === requiredLevel && otherRoute.tier === route.tier) otherAutoInUse += (autoTravelInFlightSlotsRef.current[otherId] || 0);
                 }
               });
 
-              const canAfford = qcRef.current >= attemptCost && aetherionRef.current >= aetherionTripCost;
-              const shipsAvailable = (manualInUse + otherAutoInUse + numSlots) <= totalOwned;
+              const slotsByAetherion = Math.floor(aetherionRef.current / 2);
+              const slotsByQc = fuelCost <= 0 ? numSlots : Math.floor(qcRef.current / fuelCost);
+              const availableShips = Math.max(0, totalOwned - manualInUse - otherAutoInUse);
+              const slotsToLaunch = Math.min(numSlots, slotsByAetherion, slotsByQc, availableShips);
 
-              if (canAfford && shipsAvailable) {
+              if (slotsToLaunch > 0) {
+                const attemptCost = fuelCost * slotsToLaunch;
+                const aetherionTripCost = slotsToLaunch * 2;
                 spendQc(attemptCost);
                 aetherionRef.current = Math.max(0, aetherionRef.current - aetherionTripCost);
+                autoTravelInFlightSlotsRef.current = { ...autoTravelInFlightSlotsRef.current, [routeId]: slotsToLaunch };
                 updateHistoryStats('spent', attemptCost, routeTierRef.current);
                 nextAutoProgress[routeId] = 0.01;
               } else {
-                if (!shipsAvailable && canAfford) return;
+                autoTravelInFlightSlotsRef.current = { ...autoTravelInFlightSlotsRef.current, [routeId]: 0 };
+                if (availableShips <= 0) return;
+                autoTravelActiveRef.current = { ...autoTravelActiveRef.current, [routeId]: false };
                 setAutoTravelActive(prev => ({ ...prev, [routeId]: false }));
-                if (aetherionRef.current < aetherionTripCost) addLog(t('insufficientAetherion'), 'error');
+                if (aetherionRef.current < 2) addLog(t('insufficientAetherion'), 'error');
                 return;
               }
             } else {
@@ -7174,9 +7391,11 @@ const DashboardContent = memo(({
               if (newProgress >= 100) {
                 const aiUpgrade = UPGRADES_MAP.get('ai')!;
                 const aiTier = aiUpgrade.tiers.find(t => t.level === locationTech.ai) || { value: 0.65 };
+                const inFlightSlots = autoTravelInFlightSlotsRef.current[routeId] || numSlots;
                 let succeeded = 0;
-                for (let i = 0; i < numSlots; i++) { if (Math.random() < aiTier.value) succeeded++; }
+                for (let i = 0; i < inFlightSlots; i++) { if (Math.random() < aiTier.value) succeeded++; }
                 if (succeeded > 0) autoCompletedRoutes.push({ routeId, count: succeeded });
+                autoTravelInFlightSlotsRef.current = { ...autoTravelInFlightSlotsRef.current, [routeId]: 0 };
                 newProgress = 0;
               }
               nextAutoProgress[routeId] = newProgress;
@@ -7221,8 +7440,8 @@ const DashboardContent = memo(({
         }
         const manualCount = completions.filter(c => c.isManual).reduce((acc, curr) => acc + curr.count, 0);
         const autoCount = completions.filter(c => !c.isManual).reduce((acc, curr) => acc + curr.count, 0);
-        if (manualCount > 0) incrementDeliveries('manual', manualCount);
-        if (autoCount > 0) incrementDeliveries('auto', autoCount);
+        if (manualCount > 0) incrementDeliveries('manual', manualCount, routeTierRef.current);
+        if (autoCount > 0) incrementDeliveries('auto', autoCount, routeTierRef.current);
         setTotalDeliveries(td => td + totalCompletedCount);
         setDeliveriesByLocation(prevLocs => {
           const nextLocs = { ...prevLocs };
@@ -7427,6 +7646,7 @@ const DashboardContent = memo(({
 
     if (!isActivating) {
       autoTravelProgressRef.current = { ...autoTravelProgressRef.current, [routeId]: 0 };
+      autoTravelInFlightSlotsRef.current = { ...autoTravelInFlightSlotsRef.current, [routeId]: 0 };
       setAutoTravelProgress(prev => ({ ...prev, [routeId]: 0 }));
     }
 
@@ -12178,212 +12398,245 @@ const DashboardContent = memo(({
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 z-[250] flex items-center justify-center bg-black overflow-hidden"
+              className="fixed inset-0 z-[250] overflow-y-auto overflow-x-hidden bg-black text-white"
             >
-              {/* Background Particles */}
+              <div className="absolute inset-0">
+                <div
+                  className="absolute inset-0 bg-cover bg-center opacity-70"
+                  style={{ backgroundImage: "url('/assets/rota2/layout_header_cap_2/background_header_rota_2.webp')" }}
+                />
+                <div
+                  className="absolute inset-y-0 right-0 w-[68%] bg-cover bg-center opacity-45 mix-blend-screen"
+                  style={{ backgroundImage: "url('/assets/rota2/backgrounds_ui/auto/1_alpha_centauri.webp')" }}
+                />
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_48%,rgba(6,182,212,0.22),transparent_28%),radial-gradient(circle_at_72%_42%,rgba(249,115,22,0.34),transparent_34%),linear-gradient(90deg,rgba(0,0,0,0.96)_0%,rgba(0,0,0,0.72)_42%,rgba(0,0,0,0.38)_100%)]" />
+                <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.035)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.025)_1px,transparent_1px)] bg-[size:72px_72px] opacity-30" />
+              </div>
+
               <div className="absolute inset-0 pointer-events-none">
                 {route2ConfirmParticles.map((particle) => (
                   <motion.div
                     key={particle.id}
-                    initial={{
-                      x: particle.x,
-                      y: particle.y,
-                      opacity: particle.opacity,
-                      scale: particle.scale
-                    }}
-                    animate={{
-                      y: [null, '110%'],
-                      opacity: [null, 0]
-                    }}
-                    transition={{
-                      duration: particle.duration,
-                      repeat: Infinity,
-                      ease: "linear",
-                      delay: particle.delay
-                    }}
-                    className="absolute w-1 h-1 bg-white rounded-full"
+                    initial={{ x: particle.x, y: particle.y, opacity: particle.opacity, scale: particle.scale }}
+                    animate={{ y: [null, '110%'], opacity: [null, 0] }}
+                    transition={{ duration: particle.duration, repeat: Infinity, ease: 'linear', delay: particle.delay }}
+                    className="absolute h-1 w-1 rounded-full bg-orange-100 shadow-[0_0_12px_rgba(251,146,60,0.95)]"
                   />
                 ))}
-                {/* Warp Lines */}
                 {route2ConfirmWarpLines.map((line) => (
                   <motion.div
                     key={`warp-${line.id}`}
-                    initial={{
-                      x: line.x,
-                      y: -100,
-                      opacity: 0,
-                      height: 0
-                    }}
-                    animate={{
-                      y: '110%',
-                      opacity: [0, 0.5, 0],
-                      height: [0, 200, 0]
-                    }}
-                    transition={{
-                      duration: 0.5,
-                      repeat: Infinity,
-                      ease: "linear",
-                      delay: line.delay
-                    }}
-                    className="absolute w-0.5 bg-orange-500/30 blur-[1px]"
+                    initial={{ x: line.x, y: -160, opacity: 0, height: 0 }}
+                    animate={{ y: '115%', opacity: [0, 0.65, 0], height: [0, 260, 0] }}
+                    transition={{ duration: 0.65, repeat: Infinity, ease: 'linear', delay: line.delay }}
+                    className="absolute w-px bg-gradient-to-b from-transparent via-orange-300/80 to-transparent blur-[1px]"
                   />
                 ))}
+                <motion.div
+                  animate={{ x: ['-18%', '18%', '-18%'], opacity: [0.45, 0.85, 0.45] }}
+                  transition={{ duration: 6, repeat: Infinity, ease: 'easeInOut' }}
+                  className="absolute left-[16%] top-1/2 h-px w-[68%] bg-gradient-to-r from-cyan-300/0 via-cyan-200/70 to-orange-300/0 shadow-[0_0_28px_rgba(125,211,252,0.75)]"
+                />
+                <motion.div
+                  animate={{ scaleX: [0.7, 1.08, 0.7], opacity: [0.2, 0.62, 0.2] }}
+                  transition={{ duration: 3.4, repeat: Infinity, ease: 'easeInOut' }}
+                  className="absolute left-[18%] top-[calc(50%+18px)] h-px w-[58%] origin-left bg-gradient-to-r from-orange-400/0 via-orange-300/70 to-orange-300/0"
+                />
               </div>
 
               <motion.div
-                initial={{ scale: 0.9, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                className="relative z-10 w-full max-w-xl p-4 flex flex-col items-center"
+                initial={{ opacity: 0, y: 18 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5 }}
+                className="relative z-10 flex min-h-screen items-center px-5 py-6 md:px-10 lg:px-16"
               >
-                {/* Energy Ring - Compact version */}
-                <div className="relative w-24 h-24 mb-4">
-                  <motion.div
-                    animate={{ rotate: 360 }}
-                    transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
-                    className="absolute inset-0 rounded-full border-2 border-dashed border-orange-500/20"
-                  />
-                  <motion.div
-                    animate={{
-                      scale: [1, 1.15, 1],
-                      opacity: [0.4, 0.8, 0.4],
-                      rotate: -360
-                    }}
-                    transition={{
-                      scale: { duration: 2, repeat: Infinity, ease: "easeInOut" },
-                      opacity: { duration: 2, repeat: Infinity, ease: "easeInOut" },
-                      rotate: { duration: 4, repeat: Infinity, ease: "linear" }
-                    }}
-                    className="absolute inset-0 rounded-full border-4 border-t-orange-500 border-r-transparent border-b-orange-400 border-l-transparent shadow-[0_0_25px_rgba(249,115,22,0.3)]"
-                  />
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <Image unoptimized width={800} height={600}
-                      src="/images/bobby_blue/bobby_blue_summer.webp"
-                      alt="Bobby Blue"
-                      className="w-16 h-16 object-contain"
-                    />
-                  </div>
-                </div>
-
-                <motion.h2
-                  initial={{ y: 15, opacity: 0 }}
-                  animate={{ y: 0, opacity: 1 }}
-                  transition={{ delay: 0.2 }}
-                  className="text-3xl md:text-5xl font-orbitron font-black text-white mb-4 tracking-[0.5em] uppercase text-center relative"
-                >
-                  <span className="relative z-10 neon-text-orange">ROTAS 2</span>
-                  <motion.div
-                    animate={{ x: ['-100%', '200%'] }}
-                    transition={{ duration: 2.5, repeat: Infinity, ease: "linear" }}
-                    className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent skew-x-12 pointer-events-none"
-                  />
-                </motion.h2>
-
-                <div className="space-y-2 text-center mb-6 w-full">
-                  <motion.p
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ delay: 0.3 }}
-                    className="text-orange-500 font-orbitron font-bold text-base tracking-[0.3em] uppercase mb-2"
-                  >
-                    {t('systemUnlocked')}
-                  </motion.p>
-
-                  <div className="space-y-0.5 opacity-80">
-                    <motion.p
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      transition={{ delay: 0.4 }}
-                      className="text-base md:text-[14px] font-orbitron uppercase tracking-widest text-slate-300"
-                    >
-                      {t('conqueredSolarSystem')}
-                    </motion.p>
-                    <motion.p
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      transition={{ delay: 0.5 }}
-                      className="text-base md:text-[14px] font-orbitron uppercase tracking-widest text-slate-400"
-                    >
-                      {t('interstellarJourneyBegins')}
-                    </motion.p>
-                    <motion.p
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      transition={{ delay: 0.6 }}
-                      className="text-base md:text-[14px] font-orbitron uppercase tracking-widest text-emerald-400 mt-2"
-                    >
-                      {t('pulsarShipReward')}
-                    </motion.p>
-                  </div>
-
-                  <motion.div
-                    initial={{ opacity: 0, y: 5 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.7 }}
-                    className="py-2"
-                  >
-                    <span className="text-red-500 font-orbitron font-black text-base md:text-[14px] tracking-[0.2em] uppercase border-y border-red-500/20 py-1 px-4">
-                      {language === 'pt' ? 'RUMO AO PRÓXIMO SALTO' : 'TOWARDS THE NEXT LEAP'}
-                    </span>
-                  </motion.div>
-
-                  <motion.p
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ delay: 0.8 }}
-                    className="text-[15px] md:text-[14px] font-orbitron uppercase tracking-widest text-slate-500 max-w-xs mx-auto leading-relaxed"
-                  >
-                    {t('legacyConversionDesc')}
-                  </motion.p>
-
-                  <motion.p
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ delay: 1.2 }}
-                    className="text-base md:text-[14px] font-orbitron font-bold uppercase tracking-[0.2em] text-orange-400/80"
-                  >
-                    {language === 'pt' ? 'RUMO AO PRÓXIMO SALTO' : 'TOWARDS THE NEXT LEAP'}
-                  </motion.p>
-                </div>
-
-                <div className="flex flex-col gap-3 w-full max-w-xs">
-                  <motion.button
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ delay: 1.4 }}
-                    whileHover={{ scale: 1.05, boxShadow: "0 0 50px rgba(249,115,22,0.6)" }}
-                    whileTap={{ scale: 0.95 }}
-                    onClick={() => {
-                      playSfx('click');
-                      setShowRoute2Confirm(false);
-                      setShowRoute2Lore(true);
-                      setLoreLineIndex(0);
-                      setActiveBattle(null);
-                    }}
-                    className="w-full py-5 rounded-xl font-orbitron text-base bg-orange-600 text-black font-black shadow-[0_0_40px_rgba(249,115,22,0.4)] hover:bg-orange-500 transition-all uppercase tracking-[0.4em] relative overflow-hidden group"
-                  >
-                    <span className="relative z-10">{language === 'pt' ? 'INICIAR' : 'START'}</span>
+                <div className="grid w-full items-center gap-8 lg:grid-cols-[minmax(0,0.95fr)_minmax(360px,0.75fr)]">
+                  <section className="max-w-4xl">
                     <motion.div
-                      animate={{ x: ['-100%', '200%'] }}
-                      transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-                      className="absolute inset-0 bg-gradient-to-r from-transparent via-white/50 to-transparent -skew-x-12 pointer-events-none"
-                    />
-                  </motion.button>
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.12 }}
+                      className="mb-5 flex flex-wrap items-center gap-3 font-orbitron text-[11px] font-bold uppercase tracking-[0.32em] text-orange-200/90"
+                    >
+                      <span className="border border-orange-400/40 bg-orange-500/10 px-3 py-1.5 text-orange-200">{t('systemUnlocked')}</span>
+                      <span className="text-cyan-200/70">{language === 'pt' ? 'LEGADO SOLAR ONLINE' : 'SOLAR LEGACY ONLINE'}</span>
+                    </motion.div>
 
-                  <motion.button
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ delay: 1.6 }}
-                    onClick={() => setShowRoute2Confirm(false)}
-                    className="w-full py-2 rounded-lg font-orbitron text-[15px] text-white/30 hover:text-white/60 transition-colors uppercase tracking-widest"
+                    <motion.h2
+                      initial={{ opacity: 0, y: 18 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.2 }}
+                      className="font-orbitron text-[clamp(3rem,8vw,8.5rem)] font-black uppercase leading-[0.82] tracking-[0.08em] text-white"
+                    >
+                      <span className="block text-orange-300 drop-shadow-[0_0_28px_rgba(251,146,60,0.85)]">{language === 'pt' ? 'Capítulo 2' : 'Chapter 2'}</span>
+                      <span className="block text-[clamp(1.4rem,3.4vw,3.6rem)] tracking-[0.28em] text-cyan-100 drop-shadow-[0_0_18px_rgba(125,211,252,0.55)]">
+                        {language === 'pt' ? 'Rotas Interestelares' : 'Interstellar Routes'}
+                      </span>
+                    </motion.h2>
+
+                    <motion.p
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.32 }}
+                      className="mt-7 max-w-2xl font-orbitron text-sm uppercase leading-7 tracking-[0.18em] text-slate-300 md:text-base"
+                    >
+                      {language === 'pt'
+                        ? 'O Sistema Solar ficou para trás. A Horizon agora prepara o primeiro salto para Alpha Centauri.'
+                        : 'The Solar System is behind you. Horizon is preparing the first jump to Alpha Centauri.'}
+                    </motion.p>
+
+                    <motion.div
+                      initial={{ opacity: 0, y: 16 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.42 }}
+                      className="mt-8 grid max-w-3xl gap-3 sm:grid-cols-3"
+                    >
+                      {[
+                        {
+                          icon: <CheckCircle2 className="h-5 w-5" />,
+                          label: language === 'pt' ? 'Sistema Solar' : 'Solar System',
+                          value: language === 'pt' ? 'Conquistado' : 'Conquered',
+                        },
+                        {
+                          icon: <Rocket className="h-5 w-5" />,
+                          label: language === 'pt' ? 'Frota Inicial' : 'Starter Fleet',
+                          value: 'Pulsar I',
+                        },
+                        {
+                          icon: <Navigation className="h-5 w-5" />,
+                          label: language === 'pt' ? 'Primeira Rota' : 'First Route',
+                          value: 'Alpha Centauri',
+                        },
+                      ].map((item, index) => (
+                        <motion.div
+                          key={item.label}
+                          initial={{ opacity: 0, y: 14 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: 0.5 + index * 0.08 }}
+                          className="border border-white/10 bg-black/35 p-4 shadow-[0_0_24px_rgba(0,0,0,0.35)] backdrop-blur-md"
+                        >
+                          <div className="mb-3 flex h-9 w-9 items-center justify-center border border-orange-400/30 bg-orange-500/10 text-orange-200">
+                            {item.icon}
+                          </div>
+                          <div className="font-mono text-[10px] uppercase tracking-[0.26em] text-slate-500">{item.label}</div>
+                          <div className="mt-1 font-orbitron text-sm font-black uppercase tracking-[0.16em] text-slate-100">{item.value}</div>
+                        </motion.div>
+                      ))}
+                    </motion.div>
+                  </section>
+
+                  <motion.aside
+                    initial={{ opacity: 0, x: 24 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.38 }}
+                    className="relative border border-orange-300/20 bg-black/62 p-5 shadow-[0_0_45px_rgba(249,115,22,0.18)] backdrop-blur-xl"
                   >
-                    {t('cancel').toUpperCase()}
-                  </motion.button>
+                    <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-orange-300/80 to-transparent" />
+                    <div className="absolute inset-y-0 left-0 w-px bg-gradient-to-b from-transparent via-cyan-300/60 to-transparent" />
+
+                    <div className="mb-5 flex items-center justify-between gap-4">
+                      <div>
+                        <div className="font-mono text-[10px] uppercase tracking-[0.34em] text-orange-300/80">
+                          {language === 'pt' ? 'Relatório de transição' : 'Transition Brief'}
+                        </div>
+                        <div className="mt-1 font-orbitron text-xl font-black uppercase tracking-[0.16em] text-white">
+                          {language === 'pt' ? 'Próximo Salto' : 'Next Leap'}
+                        </div>
+                      </div>
+                      <motion.div
+                        animate={{ rotate: 360 }}
+                        transition={{ duration: 12, repeat: Infinity, ease: 'linear' }}
+                        className="flex h-16 w-16 items-center justify-center rounded-full border border-dashed border-orange-300/45 bg-orange-500/10 text-orange-200 shadow-[0_0_24px_rgba(251,146,60,0.28)]"
+                      >
+                        <Globe className="h-7 w-7" />
+                      </motion.div>
+                    </div>
+
+                    <div className="relative mb-5 overflow-hidden border border-white/10 bg-slate-950/60 p-4">
+                      <div className="absolute inset-0 opacity-35" style={{ backgroundImage: "url('/assets/common/nebula_bg.webp')", backgroundSize: 'cover', backgroundPosition: 'center' }} />
+                      <div className="relative flex items-center justify-between gap-4">
+                        <div className="text-left">
+                          <div className="font-mono text-[10px] uppercase tracking-[0.24em] text-cyan-200/70">{language === 'pt' ? 'Sol' : 'Sun'}</div>
+                          <div className="mt-1 h-3 w-3 rounded-full bg-cyan-300 shadow-[0_0_18px_rgba(103,232,249,0.95)]" />
+                        </div>
+                        <div className="relative h-px flex-1 bg-gradient-to-r from-cyan-300 via-white to-orange-300">
+                          <motion.div
+                            animate={{ x: ['0%', '100%'], opacity: [0, 1, 0] }}
+                            transition={{ duration: 1.8, repeat: Infinity, ease: 'easeInOut' }}
+                            className="absolute -top-1.5 h-3 w-12 rounded-full bg-orange-200/80 blur-sm"
+                          />
+                        </div>
+                        <div className="text-right">
+                          <div className="font-mono text-[10px] uppercase tracking-[0.24em] text-orange-200/80">Alpha</div>
+                          <div className="mt-1 ml-auto h-4 w-4 rounded-full bg-orange-300 shadow-[0_0_24px_rgba(253,186,116,0.95)]" />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-4">
+                      <div className="border-l-2 border-emerald-300/70 bg-emerald-400/10 px-4 py-3">
+                        <div className="font-mono text-[10px] uppercase tracking-[0.28em] text-emerald-200/70">
+                          {language === 'pt' ? 'Recompensa liberada' : 'Reward Released'}
+                        </div>
+                        <div className="mt-1 font-orbitron text-sm font-black uppercase tracking-[0.14em] text-emerald-100">
+                          {t('pulsarShipReward')}
+                        </div>
+                      </div>
+
+                      <div className="border-l-2 border-orange-300/70 bg-orange-500/10 px-4 py-3">
+                        <div className="font-mono text-[10px] uppercase tracking-[0.28em] text-orange-200/70">
+                          {language === 'pt' ? 'Legado colonial' : 'Colonial Legacy'}
+                        </div>
+                        <div className="mt-1 font-orbitron text-sm uppercase leading-6 tracking-[0.14em] text-slate-300">
+                          {t('legacyConversionDesc')}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="mt-6 flex flex-col gap-3">
+                      <motion.button
+                        initial={{ opacity: 0, y: 12 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.78 }}
+                        whileHover={{ scale: 1.02, boxShadow: '0 0 55px rgba(249,115,22,0.55)' }}
+                        whileTap={{ scale: 0.98 }}
+                        onClick={() => {
+                          playSfx('click');
+                          fadeOutRoute2IntroMusic();
+                          setShowRoute2Confirm(false);
+                          setShowRoute2Lore(true);
+                          setLoreLineIndex(0);
+                          setActiveBattle(null);
+                        }}
+                        className="group relative flex min-h-[64px] w-full items-center justify-center gap-3 overflow-hidden bg-orange-500 px-5 font-orbitron text-sm font-black uppercase tracking-[0.32em] text-black shadow-[0_0_36px_rgba(249,115,22,0.38)] transition-all hover:bg-orange-400"
+                      >
+                        <Rocket className="relative z-10 h-5 w-5" />
+                        <span className="relative z-10">{language === 'pt' ? 'Iniciar Salto' : 'Begin Jump'}</span>
+                        <ArrowRight className="relative z-10 h-5 w-5 transition-transform group-hover:translate-x-1" />
+                        <motion.div
+                          animate={{ x: ['-110%', '210%'] }}
+                          transition={{ duration: 2.1, repeat: Infinity, ease: 'linear' }}
+                          className="absolute inset-0 bg-gradient-to-r from-transparent via-white/55 to-transparent -skew-x-12 pointer-events-none"
+                        />
+                      </motion.button>
+
+                      <button
+                        onClick={() => {
+                          fadeOutRoute2IntroMusic();
+                          setShowRoute2Confirm(false);
+                          resumeRouteMusicAfterRoute2Cancel();
+                        }}
+                        className="min-h-[42px] w-full font-orbitron text-[11px] font-bold uppercase tracking-[0.28em] text-slate-500 transition-colors hover:text-slate-200"
+                      >
+                        {t('cancel').toUpperCase()}
+                      </button>
+                    </div>
+                  </motion.aside>
                 </div>
               </motion.div>
             </motion.div>
           )}
         </AnimatePresence>
-
         {/* Export Modal */}
         <AnimatePresence>
           {showExportModal && (
@@ -13329,61 +13582,224 @@ const DashboardContent = memo(({
           ROUTES_MAP={ROUTES_MAP}
         />
 
-        {/* Route 3 Confirmation Modal */}
+        {/* Route 3 Confirmation Screen */}
         <AnimatePresence>
           {showRoute3Confirm && (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-black/90 backdrop-blur-xl"
+              transition={{ duration: 0.55 }}
+              className="fixed inset-0 z-[1000] overflow-y-auto overflow-x-hidden bg-black text-white"
             >
+              <div className="absolute inset-0">
+                <Image
+                  src="/assets/rota3/layout_header_cap_3/background_header_rota_3.webp"
+                  alt="Void routes background"
+                  fill
+                  priority
+                  sizes="100vw"
+                  className="object-cover opacity-55"
+                />
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_24%_22%,rgba(168,85,247,0.32),transparent_34%),radial-gradient(circle_at_82%_58%,rgba(16,185,129,0.22),transparent_30%),linear-gradient(90deg,rgba(0,0,0,0.96)_0%,rgba(10,3,18,0.78)_48%,rgba(0,0,0,0.95)_100%)]" />
+                <div className="absolute inset-0 bg-[linear-gradient(rgba(168,85,247,0.08)_1px,transparent_1px),linear-gradient(90deg,rgba(168,85,247,0.06)_1px,transparent_1px)] bg-[size:78px_78px] opacity-30" />
+              </div>
+
+              <div className="pointer-events-none absolute inset-0 overflow-hidden">
+                {route2ConfirmParticles.map((particle) => (
+                  <motion.span
+                    key={`route3-particle-${particle.id}`}
+                    className="absolute h-1 w-1 rounded-full bg-purple-200 shadow-[0_0_16px_rgba(216,180,254,0.9)]"
+                    style={{ left: particle.x, top: particle.y, opacity: particle.opacity }}
+                    animate={{ opacity: [0.08, 0.75, 0.08], scale: [0.6, particle.scale, 0.6] }}
+                    transition={{ duration: particle.duration, delay: particle.delay, repeat: Infinity, ease: 'easeInOut' }}
+                  />
+                ))}
+                {route2ConfirmWarpLines.map((line) => (
+                  <motion.span
+                    key={`route3-warp-${line.id}`}
+                    className="absolute h-px rounded-full bg-gradient-to-r from-transparent via-purple-300/70 to-emerald-200/0"
+                    style={{ top: `${(line.id * 7) % 100}%`, left: line.x, width: `${120 + (line.id % 5) * 34}px`, transform: `rotate(${-8 + (line.id % 6) * 3}deg)` }}
+                    animate={{ x: ['-18vw', '112vw'], opacity: [0, 0.55, 0] }}
+                    transition={{ duration: 2.4 + (line.id % 4) * 0.4, delay: line.delay, repeat: Infinity, ease: 'linear' }}
+                  />
+                ))}
+              </div>
+
               <motion.div
-                initial={{ scale: 0.9, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0.9, opacity: 0 }}
-                className="max-w-lg w-full glass-panel border-2 border-purple-500/50 p-8 rounded-3xl space-y-8 relative overflow-hidden"
+                initial={{ opacity: 0, y: 24 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 16 }}
+                transition={{ duration: 0.65, ease: 'easeOut' }}
+                className="relative z-10 flex min-h-screen items-center px-5 py-6 md:px-10 lg:px-16"
               >
-                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-purple-500 to-transparent" />
-
-                <div className="text-center space-y-4">
-                  <div className="w-20 h-20 rounded-full bg-purple-500/20 flex items-center justify-center mx-auto border-2 border-purple-500 shadow-[0_0_30px_rgba(168,85,247,0.4)]">
-                    <Zap className="w-10 h-10 text-purple-400" />
-                  </div>
-                  <h2 className="text-3xl font-orbitron font-black text-purple-400 uppercase tracking-[0.3em]">
-                    {t('startVoidProtocol')}
-                  </h2>
-                  <p className="text-base text-purple-200/60 font-mono uppercase tracking-widest leading-relaxed">
-                    {language === 'pt'
-                      ? 'Ao avançar para o Capítulo 3 - Rotas do Vazio: Projeto Terra, você deixará para trás seu império interestelar para enfrentar o desconhecido. Seus recursos serão resetados, mas uma nova tecnologia te aguarda.'
-                      : 'By advancing to Chapter 3 - Void Routes: Project Earth, you will leave behind your interstellar empire to face the unknown. Your resources will be reset, but a new technology awaits you.'}
-                  </p>
-                </div>
-
-                <div className="flex flex-col gap-4">
-                  <button
-                    onClick={() => {
-                      setShowRoute3Confirm(false);
-                      setShowVoidLore(true);
-                      setLoreLineIndex(0);
-                      setActiveBattle(null);
-                    }}
-                    className="w-full py-5 bg-purple-600 text-white font-orbitron font-black text-xl rounded-xl hover:bg-purple-500 transition-all shadow-[0_0_40px_rgba(168,85,247,0.5)] uppercase tracking-[0.2em] border-b-4 border-purple-800 active:border-b-0 active:translate-y-1"
+                <div className="grid w-full items-center gap-8 lg:grid-cols-[minmax(0,0.95fr)_minmax(360px,0.75fr)]">
+                  <motion.section
+                    initial={{ opacity: 0, x: -28 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.12, duration: 0.7 }}
+                    className="max-w-4xl space-y-7"
                   >
-                    {language === 'pt' ? 'EU ACEITO O DESAFIO' : 'I ACCEPT THE CHALLENGE'}
-                  </button>
-                  <button
-                    onClick={() => setShowRoute3Confirm(false)}
-                    className="w-full py-3 text-[14px] font-orbitron text-slate-500 hover:text-white transition-colors uppercase tracking-widest"
+                    <div className="inline-flex items-center gap-3 border border-purple-300/30 bg-purple-500/10 px-4 py-2 font-mono text-[10px] font-bold uppercase tracking-[0.34em] text-purple-100 shadow-[0_0_26px_rgba(168,85,247,0.18)]">
+                      <Skull className="h-4 w-4 text-purple-200" />
+                      {language === 'pt' ? 'Sistema desbloqueado' : 'System unlocked'}
+                    </div>
+
+                    <div className="space-y-4">
+                      <div className="font-orbitron text-[clamp(3rem,8vw,8.5rem)] font-black uppercase leading-[0.82] tracking-[0.08em] text-purple-200 drop-shadow-[0_0_28px_rgba(168,85,247,0.62)]">
+                        {language === 'pt' ? 'Capítulo 3' : 'Chapter 3'}
+                      </div>
+                      <div className="font-orbitron text-xl font-black uppercase tracking-[0.34em] text-white sm:text-3xl">
+                        {language === 'pt' ? 'Rotas do Vazio' : 'Void Routes'}
+                      </div>
+                      <div className="h-px w-full max-w-xl bg-gradient-to-r from-purple-300 via-emerald-200/80 to-transparent" />
+                    </div>
+
+                    <p className="max-w-2xl font-mono text-sm font-bold uppercase leading-7 tracking-[0.2em] text-slate-300 sm:text-base">
+                      {language === 'pt'
+                        ? 'O Projeto Terra chama você para além das rotas conhecidas. O império interestelar vira legado, e a missão agora é atravessar o Vazio para reconstruir o que foi perdido.'
+                        : 'Project Earth calls you beyond the known routes. The interstellar empire becomes legacy, and the mission now is to cross the Void to rebuild what was lost.'}
+                    </p>
+
+                    <div className="grid gap-3 sm:grid-cols-3">
+                      {[
+                        { icon: Rocket, label: language === 'pt' ? 'Império' : 'Empire', value: language === 'pt' ? 'Legado' : 'Legacy', color: 'cyan' },
+                        { icon: Skull, label: language === 'pt' ? 'Vazio' : 'Void', value: language === 'pt' ? 'Ameaça' : 'Threat', color: 'purple' },
+                        { icon: Globe, label: language === 'pt' ? 'Terra' : 'Earth', value: language === 'pt' ? 'Projeto' : 'Project', color: 'emerald' },
+                      ].map((item, index) => {
+                        const Icon = item.icon;
+                        const colorClass = item.color === 'cyan'
+                          ? 'border-cyan-300/30 bg-cyan-400/10 text-cyan-100'
+                          : item.color === 'emerald'
+                            ? 'border-emerald-300/30 bg-emerald-400/10 text-emerald-100'
+                            : 'border-purple-300/30 bg-purple-500/10 text-purple-100';
+                        return (
+                          <motion.div
+                            key={item.label}
+                            initial={{ opacity: 0, y: 16 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: 0.22 + index * 0.08 }}
+                            className={`border px-4 py-4 ${colorClass}`}
+                          >
+                            <Icon className="mb-3 h-5 w-5" />
+                            <div className="font-mono text-[10px] uppercase tracking-[0.28em] opacity-70">{item.label}</div>
+                            <div className="mt-1 font-orbitron text-sm font-black uppercase tracking-[0.18em]">{item.value}</div>
+                          </motion.div>
+                        );
+                      })}
+                    </div>
+                  </motion.section>
+
+                  <motion.aside
+                    initial={{ opacity: 0, x: 32 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.2, duration: 0.7 }}
+                    className="relative overflow-hidden border border-purple-300/30 bg-black/58 p-4 shadow-[0_0_60px_rgba(88,28,135,0.36)] backdrop-blur-xl"
                   >
-                    {language === 'pt' ? 'AINDA NÃƒÆ’O ESTOU PRONTO' : 'I AM NOT READY YET'}
-                  </button>
+                    <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-purple-300 to-transparent" />
+                    <div className="absolute -right-20 -top-20 h-48 w-48 rounded-full border border-purple-300/20" />
+                    <div className="absolute -bottom-20 -left-20 h-48 w-48 rounded-full border border-emerald-300/20" />
+
+                    <div className="mb-5 flex items-center justify-between gap-4">
+                      <div>
+                        <div className="font-mono text-[10px] uppercase tracking-[0.34em] text-purple-300/80">
+                          {language === 'pt' ? 'Relatório de transição' : 'Transition Brief'}
+                        </div>
+                        <div className="mt-1 font-orbitron text-xl font-black uppercase tracking-[0.16em] text-white">
+                          {language === 'pt' ? 'Projeto Terra' : 'Project Earth'}
+                        </div>
+                      </div>
+                      <motion.div
+                        animate={{ rotate: 360 }}
+                        transition={{ duration: 12, repeat: Infinity, ease: 'linear' }}
+                        className="flex h-16 w-16 items-center justify-center rounded-full border border-dashed border-purple-300/45 bg-purple-500/10 text-purple-200 shadow-[0_0_24px_rgba(168,85,247,0.28)]"
+                      >
+                        <Globe className="h-7 w-7" />
+                      </motion.div>
+                    </div>
+
+                    <div className="relative mb-5 overflow-hidden border border-white/10 bg-slate-950/60 p-4">
+                      <div
+                        className="absolute inset-0 opacity-45"
+                        style={{ backgroundImage: "url('/assets/rota3/void/earth_bg.webp')", backgroundSize: 'cover', backgroundPosition: 'center' }}
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-r from-black/85 via-purple-950/25 to-black/65" />
+                      <div className="relative flex items-center justify-between gap-4">
+                        <div className="text-left">
+                          <div className="font-mono text-[10px] uppercase tracking-[0.24em] text-orange-200/70">Alpha</div>
+                          <div className="mt-1 h-3 w-3 rounded-full bg-orange-300 shadow-[0_0_18px_rgba(253,186,116,0.95)]" />
+                        </div>
+                        <div className="relative h-px flex-1 bg-gradient-to-r from-orange-300 via-purple-200 to-emerald-300">
+                          <motion.div
+                            animate={{ x: ['0%', '100%'], opacity: [0, 1, 0] }}
+                            transition={{ duration: 1.8, repeat: Infinity, ease: 'easeInOut' }}
+                            className="absolute -top-1.5 h-3 w-12 rounded-full bg-purple-200/80 blur-sm"
+                          />
+                        </div>
+                        <div className="text-right">
+                          <div className="font-mono text-[10px] uppercase tracking-[0.24em] text-emerald-200/80">Terra</div>
+                          <div className="mt-1 ml-auto h-4 w-4 rounded-full bg-emerald-300 shadow-[0_0_24px_rgba(110,231,183,0.95)]" />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-4">
+                      <div className="border-l-2 border-purple-300/70 bg-purple-500/10 px-4 py-3">
+                        <div className="font-mono text-[10px] uppercase tracking-[0.28em] text-purple-200/70">
+                          {language === 'pt' ? 'Rumo ao desconhecido' : 'Into the unknown'}
+                        </div>
+                        <div className="mt-1 font-orbitron text-sm uppercase leading-6 tracking-[0.14em] text-slate-300">
+                          {language === 'pt'
+                            ? 'Seus recursos serão reiniciados para a nova fase, mas o progresso conquistado se torna a base do Projeto Terra.'
+                            : 'Your resources reset for the new phase, but everything earned becomes the foundation of Project Earth.'}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="mt-6 flex flex-col gap-3">
+                      <motion.button
+                        initial={{ opacity: 0, y: 12 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.78 }}
+                        whileHover={{ scale: 1.02, boxShadow: '0 0 55px rgba(168,85,247,0.55)' }}
+                        whileTap={{ scale: 0.98 }}
+                        onClick={() => {
+                          playSfx('click');
+                          fadeOutRoute3IntroMusic();
+                          setShowRoute3Confirm(false);
+                          setShowVoidLore(true);
+                          setLoreLineIndex(0);
+                          setActiveBattle(null);
+                        }}
+                        className="group relative flex min-h-[64px] w-full items-center justify-center gap-3 overflow-hidden bg-purple-600 px-5 font-orbitron text-sm font-black uppercase tracking-[0.28em] text-white shadow-[0_0_36px_rgba(168,85,247,0.42)] transition-all hover:bg-purple-500"
+                      >
+                        <Zap className="relative z-10 h-5 w-5" />
+                        <span className="relative z-10">{language === 'pt' ? 'Aceitar o Desafio' : 'Accept the Challenge'}</span>
+                        <ArrowRight className="relative z-10 h-5 w-5 transition-transform group-hover:translate-x-1" />
+                        <motion.div
+                          animate={{ x: ['-110%', '210%'] }}
+                          transition={{ duration: 2.1, repeat: Infinity, ease: 'linear' }}
+                          className="pointer-events-none absolute inset-0 -skew-x-12 bg-gradient-to-r from-transparent via-white/45 to-transparent"
+                        />
+                      </motion.button>
+
+                      <button
+                        onClick={() => {
+                          fadeOutRoute3IntroMusic();
+                          setShowRoute3Confirm(false);
+                          resumeRouteMusicAfterRoute3Cancel();
+                        }}
+                        className="min-h-[42px] w-full font-orbitron text-[11px] font-bold uppercase tracking-[0.28em] text-slate-500 transition-colors hover:text-slate-200"
+                      >
+                        {language === 'pt' ? 'Ainda não estou pronto' : 'I am not ready yet'}
+                      </button>
+                    </div>
+                  </motion.aside>
                 </div>
               </motion.div>
             </motion.div>
           )}
         </AnimatePresence>
-
         {/* Void Lore Screen */}
         <AnimatePresence>
           {showVoidLore && (
@@ -13398,7 +13814,7 @@ const DashboardContent = memo(({
               language={language}
               theme="purple"
               completeText={language === 'pt' ? 'INICIAR ROTA 3' : 'START ROUTE 3'}
-              videoSrc="/videos/bobby_blue/transition.webm"
+              imageSrc="/images/bobby_blue/bobby_blue_fear.webp"
             />
           )}
         </AnimatePresence>
