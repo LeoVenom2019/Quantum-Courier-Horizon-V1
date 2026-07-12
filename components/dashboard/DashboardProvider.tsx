@@ -1603,8 +1603,8 @@ export const DashboardProvider = ({
         if (type === 'Boss') {
           enemyData = {
             ...enemyData,
-            hp: Math.floor(25000 * levelMult * variance),
-            maxHp: Math.floor(25000 * levelMult * variance),
+            hp: Math.floor(75000 * levelMult * variance),
+            maxHp: Math.floor(75000 * levelMult * variance),
             shield: Math.floor(12000 * levelMult * variance),
             maxShield: Math.floor(12000 * levelMult * variance),
             damage: Math.floor(75 * levelMult * variance),
@@ -1614,8 +1614,8 @@ export const DashboardProvider = ({
         } else if (type === 'Elite') {
           enemyData = {
             ...enemyData,
-            hp: Math.floor(8500 * levelMult * variance),
-            maxHp: Math.floor(8500 * levelMult * variance),
+            hp: Math.floor(25500 * levelMult * variance),
+            maxHp: Math.floor(25500 * levelMult * variance),
             shield: Math.floor(4500 * levelMult * variance),
             maxShield: Math.floor(4500 * levelMult * variance),
             damage: Math.floor(45 * levelMult * variance),
@@ -1626,8 +1626,8 @@ export const DashboardProvider = ({
           const variant = Math.floor(Math.random() * 4) + 1;
           enemyData = {
             ...enemyData,
-            hp: Math.floor(3000 * levelMult * variance),
-            maxHp: Math.floor(3000 * levelMult * variance),
+            hp: Math.floor(9000 * levelMult * variance),
+            maxHp: Math.floor(9000 * levelMult * variance),
             shield: Math.floor(1200 * levelMult * variance),
             maxShield: Math.floor(1200 * levelMult * variance),
             damage: Math.floor(20 * levelMult * variance),

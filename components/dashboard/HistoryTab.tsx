@@ -9,6 +9,8 @@ import { GameStorage } from '@/lib/game-storage';
 import { MINI_GAMES_CONFIG } from '@/lib/mini-games-config';
 import { getOwnedArcadeIdsFromCards, normalizeOwnedColonyCardIds } from '@/lib/colony-cards';
 
+const BOBBY_BLUE_SAD_IMAGE = '/images/bobby_blue/bobby_blue_sad.webp';
+
 const ROUTE4_DUST_PARTICLES = [
   { left: 72, top: 18, size: 1.3, delay: 0.1, duration: 8.5 },
   { left: 78, top: 25, size: 0.9, delay: 1.2, duration: 10.5 },
@@ -427,7 +429,7 @@ const HistoryTab = memo(function HistoryTab() {
                         >
                           <div className="absolute inset-0 bg-gradient-to-br from-purple-500/30 via-black to-black rounded-[3rem] border-4 border-purple-500/40 shadow-[0_0_60px_rgba(168,85,247,0.3)] overflow-hidden backdrop-blur-xl">
                             <Image
-                              src="/images/bobby_blue/bobby_blue_sad.png" 
+                              src={BOBBY_BLUE_SAD_IMAGE} 
                               alt="Sad Bobby" 
                               fill
                               sizes="288px"

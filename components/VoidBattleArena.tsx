@@ -51,6 +51,9 @@ export interface VoidBattleEnemy {
   previousSpriteSuffix?: string;
   spriteTransitionStartedAt?: number;
   shootSpriteUntil?: number;
+  assetLocationId?: number;
+  visualScale?: number;
+  spawnDelayMs?: number;
 }
 
 export interface VoidBattleParticle {
@@ -128,6 +131,7 @@ export interface VoidBattleState {
   keysPressed: Set<string>;
   locationId: number;
   enemyQueue?: VoidBattleEnemy[];
+  enemyQueueNextSpawnAt?: number;
   totalRewardAccumulated?: number;
   finishTimer: number;
   zoomTarget: { x: number; y: number };
@@ -165,6 +169,7 @@ export interface VoidBattleState {
   fireballs: any[];
   hellfireQueue: any[];
   hellfireNextLaunchAt: number;
+  hellfireHitStopUntil?: number;
   trailParts: any[];
   burnZones: any[];
   playerDotEffects: any[];
@@ -251,7 +256,15 @@ const BOSS_SPRITE_FADE_MS = 110;
 const BOSS_SHOOT_SPRITE_MS = 320;
 const HELLFIRE_IMPACT_DAMAGE_MULTIPLIER = 6;
 const HELLFIRE_BURN_TICK_DAMAGE_MULTIPLIER = 0.35;
-
+const HELLFIRE_SHOT_COUNT = 7;
+const HELLFIRE_FINISHER_INDEX = HELLFIRE_SHOT_COUNT - 1;
+const HELLFIRE_LAUNCH_INTERVAL = 150;
+const HELLFIRE_CHARGE_MS = 280;
+const HELLFIRE_FINISHER_SIZE_MULT = 1.9;
+const HELLFIRE_FINISHER_DMG_MULT = 2.2;
+const HELLFIRE_FINISHER_SHAKE = 18;
+const HELLFIRE_NORMAL_SHAKE = 6;
+const HELLFIRE_HITSTOP_MS = 90;
 const VoidBattleHUD = memo(function VoidBattleHUD({ hud, playerMaxHp, playerMaxShield, displayEnemy, t, isGroupBattle, routeTier }: any) {
   const isVoid = routeTier === 'Void';
   return (
@@ -272,7 +285,7 @@ const VoidBattleHUD = memo(function VoidBattleHUD({ hud, playerMaxHp, playerMaxS
 
       <div className="text-center">
          <div className={`text-[15px] font-orbitron font-bold ${isGroupBattle ? 'text-yellow-500' : 'text-red-500'} animate-pulse tracking-[0.2em] leading-none`}>
-           {isGroupBattle ? t('groupBattle').toUpperCase() : t('realTimeCombat').toUpperCase()}
+           {String(hud.enemyName || hud.enemyType || '').toUpperCase()}
          </div>
       </div>
 
@@ -317,6 +330,7 @@ export interface VoidBattleArenaProps {
   onExitBattle?: () => void;
   meteoriteRewardValue?: number;
   disableMeteorEvent?: boolean;
+  enableBossIntro?: boolean;
 }
 
 // Gerar estrelas uma única vez — 3 camadas de parallax
@@ -415,7 +429,8 @@ const VoidBattleArena = memo(function VoidBattleArena({
   activeShipSpriteSheet,
   onExitBattle,
   meteoriteRewardValue = 0,
-  disableMeteorEvent = false
+  disableMeteorEvent = false,
+  enableBossIntro = true
 }: VoidBattleArenaProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -424,7 +439,7 @@ const VoidBattleArena = memo(function VoidBattleArena({
     initialEnemies.some(enemy => enemy.type === 'Boss')
       || (enemyQueue || []).some(enemy => enemy.type === 'Boss')
   ), [enemyQueue, initialEnemies]);
-  const bossIntro = routeTier === 'Void' && isBossEncounter ? BOSS_INTROS[locationId] : undefined;
+  const bossIntro = routeTier === 'Void' && enableBossIntro && isBossEncounter ? BOSS_INTROS[locationId] : undefined;
   const [showBossIntro, setShowBossIntro] = useState(Boolean(bossIntro));
   const [meteorEventEnabled] = useState(() => (
     routeTier === 'Void'
@@ -485,6 +500,7 @@ const VoidBattleArena = memo(function VoidBattleArena({
     damageNumbers: [],
     locationId,
     enemyQueue: [...battleEnemyQueue],
+    enemyQueueNextSpawnAt: undefined,
     zoomTarget: { x: 50, y: 50 },
     isSlowMo: false,
     meteors: [],
@@ -525,6 +541,7 @@ const VoidBattleArena = memo(function VoidBattleArena({
     fireballs: [],
     hellfireQueue: [],
     hellfireNextLaunchAt: 0,
+    hellfireHitStopUntil: 0,
     trailParts: [],
     burnZones: [],
     playerDotEffects: [],
@@ -667,12 +684,13 @@ const VoidBattleArena = memo(function VoidBattleArena({
         }
 
         const hasDirectionalSprites = e.type === 'Boss';
-        const assetLocKey = hasDirectionalSprites ? locKey : 'zero';
+        const enemyLocKey = e.assetLocationId === 0 ? 'zero' : (e.assetLocationId || locKey);
+        const assetLocKey = hasDirectionalSprites ? enemyLocKey : 'zero';
         const baseSrc = `/assets/rota3/void/${assetLocKey}/${baseName}`;
         const fallbackBaseSrc = `/assets/rota3/void/zero/${baseName}`;
 
         if (hasDirectionalSprites) {
-          const hasShootSprite = routeTier === 'Void' && locationId === 5;
+          const hasShootSprite = routeTier === 'Void' && e.assetLocationId === 5;
           imagesToLoad.push(
             { id: `${e.id}_neutral`, src: `${baseSrc}_neutral.webp`, fallback: `${fallbackBaseSrc}_neutral.webp` },
             { id: `${e.id}_up`, src: `${baseSrc}_up.webp`, fallback: `${fallbackBaseSrc}_neutral.webp` },
@@ -744,21 +762,29 @@ const VoidBattleArena = memo(function VoidBattleArena({
 
   // Boss Entry Scream Logic
   useEffect(() => {
-    const locKey = locationId === 0 ? 'zero' : locationId;
+    const openingBoss = initialEnemies.find(enemy => enemy.type === 'Boss');
+    if (routeTier !== 'Void' || !openingBoss || showBossIntro) return;
+
+    const openingLocation = openingBoss.assetLocationId ?? locationId;
+    const locKey = openingLocation === 0 ? 'zero' : openingLocation;
     const screamId = `boss_scream_${locKey}`;
+    const timer = window.setTimeout(() => {
+      playSfx(screamId, { loop: true });
+    }, 500);
 
-    if (routeTier === 'Void' && initialEnemies.some(e => e.type === 'Boss')) {
-      const timer = setTimeout(() => {
-        playSfx(screamId, { loop: true });
-      }, 500);
+    return () => {
+      window.clearTimeout(timer);
+      stopSfx(screamId);
+    };
+  }, [locationId, initialEnemies, routeTier, playSfx, showBossIntro, stopSfx]);
 
-      return () => {
-        clearTimeout(timer);
-        stopSfx(screamId);
-      };
-    }
-  }, [locationId, initialEnemies, routeTier, playSfx, stopSfx]);
-
+  useEffect(() => {
+    return () => {
+      ['zero', '1', '2', '3', '4', '5', '6', '7', '8', '9'].forEach(locKey => {
+        stopSfx(`boss_scream_${locKey}`);
+      });
+    };
+  }, [stopSfx]);
   useEffect(() => {
     const engineSfx = 'player_airship_effect_sound';
 
@@ -814,55 +840,24 @@ const VoidBattleArena = memo(function VoidBattleArena({
 
       const dirs = ['up', 'forward', 'down'];
       s.fireballs = [];
-      s.hellfireQueue = Array.from({ length: 5 }, (_, index) => ({
+      s.hellfireQueue = Array.from({ length: HELLFIRE_SHOT_COUNT }, (_, index) => ({
         id: `hb-${now}-${index}`,
         dir: dirs[index % dirs.length],
         arcSeed: Math.random(),
         size: 22 + Math.random() * 12,
+        isFinisher: index === HELLFIRE_FINISHER_INDEX,
       }));
-      s.hellfireNextLaunchAt = now;
+      s.hellfireNextLaunchAt = now + HELLFIRE_CHARGE_MS;
+      s.flashAlpha = Math.max(s.flashAlpha, 0.4);
+      s.flashColor = '255, 170, 80';
+      s.cameraPunch.targetX += (Math.random() - 0.5) * 8;
+      s.cameraPunch.targetY += (Math.random() - 0.5) * 8;
+      window.setTimeout(() => {
+        const current = gameRef.current;
+        current.cameraPunch.targetX *= 0.2;
+        current.cameraPunch.targetY *= 0.2;
+      }, HELLFIRE_CHARGE_MS);
 
-      /*
-      for(let i = 0; i < 0; i++) {
-          const dir = dirs[Math.floor(Math.random() * dirs.length)];
-          let ox = baseOX, oy = baseOY;
-          if (dir === 'up') { ox -= 10; oy -= 28; }
-          else if (dir === 'forward') { ox += 10; }
-          else { ox -= 10; oy += 28; }
-
-          // Localizar inimigo mais próximo
-          const target = s.enemies.reduce<VoidBattleEnemy | null>((closest, en) => {
-            if (en.hp <= 0) return closest;
-            if (!closest) return en;
-
-            const closestDistance = Math.hypot((closest.x / 100) * cWidth - ox, (closest.y / 100) * cHeight - oy);
-            const enemyDistance = Math.hypot((en.x / 100) * cWidth - ox, (en.y / 100) * cHeight - oy);
-            return enemyDistance < closestDistance ? en : closest;
-          }, null);
-
-          const tx = target ? (target.x / 100) * cWidth : cWidth + 200;
-          const ty = target ? (target.y / 100) * cHeight : oy + (Math.random() - 0.5) * 200;
-          const dist = Math.hypot(tx - ox, ty - oy);
-
-          // Viagem entre 35 e 65 frames
-          const travelFrames = Math.max(35, Math.min(65, dist / 12));
-          const speed = 1 / travelFrames;
-
-          s.fireballs.push({
-              id: `hb-${now}-${i}`,
-              ox, oy, tx, ty,
-              targetId: target?.id,
-              x: ox, y: oy,
-              t: 0,
-              speed,
-              arcBend: (dir === 'up' ? -1 : dir === 'down' ? 1 : 0) * (40 + Math.random() * 50) + (Math.random() - 0.5) * 30,
-              size: 22 + Math.random() * 12,
-              life: 1,
-              done: false,
-              readyAt: now + (i * 120) // Mesma base clock do loop
-          });
-      }
-      */
       s.playerShotDuckedUntil = now + 8500;
       playSfx('big_energy_explosion_2', { volume: 1.0, category: 'player' });
     } else if (type === 'special') {
@@ -1140,125 +1135,195 @@ const VoidBattleArena = memo(function VoidBattleArena({
       }, 120);
     };
 
-    const createExplosionEffect = (x: number, y: number, color: string) => {
+    const createExplosionEffect = (x: number, y: number, color: string, isBoss = false) => {
       const s = gameRef.current;
+      const now = Date.now();
+      const isVoidExplosion = routeTier === 'Void';
+      const intensity = isVoidExplosion ? (isBoss ? 1.35 : 1.25) : 1;
       const biasAngle = Math.random() * Math.PI * 2;
 
-      // 0ms: Flash + Core Punch
-      s.flashAlpha = 0.45;
-      s.flashColor = '216, 180, 254'; // Light Purple Flash
-      triggerShake(routeTier === 'Void' ? 50 : 36);
+      // Screen punctuation uses solid overlays only; no blur/filter is applied.
+      s.flashAlpha = Math.max(s.flashAlpha, isBoss ? 0.95 : (isVoidExplosion ? 0.62 : 0.45));
+      s.flashColor = isBoss ? '255, 225, 170' : (isVoidExplosion ? '216, 180, 254' : '255, 255, 255');
+      s.impactFlash = Math.max(s.impactFlash, isBoss ? 1.25 : (isVoidExplosion ? 0.62 : 0.3));
+      s.cinematicDarkness = Math.max(s.cinematicDarkness, isBoss ? 0.82 : (isVoidExplosion ? 0.34 : 0.15));
+      triggerShake(isBoss ? 88 : (isVoidExplosion ? 58 : 36));
+      s.cameraPunch.targetX += (Math.random() - 0.5) * (isBoss ? 34 : 18);
+      s.cameraPunch.targetY += (Math.random() - 0.5) * (isBoss ? 28 : 14);
 
-      // Shockwave - Electric Cyan
-      s.shockwaves.push({
-        x, y, radius: 12, alpha: 0.6, thickness: 25, speed: 28,
-        color: '34, 211, 238'
-      });
+      const pushShockwave = (
+        radius: number,
+        alpha: number,
+        thickness: number,
+        speed: number,
+        waveColor: string,
+        offsetX = 0,
+        offsetY = 0,
+      ) => {
+        s.shockwaves.push({
+          x: x + offsetX,
+          y: y + offsetY,
+          radius,
+          alpha,
+          thickness,
+          speed,
+          color: waveColor,
+        });
+      };
 
-      // Heat Core - Electric Variant
-      for(let i=0; i<3; i++) {
+      pushShockwave(isBoss ? 5 : 8, isBoss ? 0.95 : 0.74, isBoss ? 34 : 24, isBoss ? 36 : 29, isBoss ? '255, 235, 200' : '34, 211, 238');
+      pushShockwave(isBoss ? 12 : 15, isBoss ? 0.78 : 0.52, isBoss ? 16 : 10, isBoss ? 24 : 18, isBoss ? '239, 68, 68' : '192, 132, 252');
+      if (isBoss) {
+        pushShockwave(2, 0.72, 7, 48, '255, 150, 55');
+      }
+
+      const coreCount = Math.round((isBoss ? 8 : 4) * intensity);
+      for (let i = 0; i < coreCount; i++) {
         s.particles.push({
-          id: `heat-${Date.now()}-${i}-${Math.random()}`,
-          x, y, vx: 0, vy: 0, life: 1.0, maxLife: 1.0, size: 25, growth: 4,
-          color: '#c084fc', type: 'heat', blend: 'screen'
+          id: `heat-${now}-${i}-${Math.random()}`,
+          x: x + (Math.random() - 0.5) * (isBoss ? 4 : 2),
+          y: y + (Math.random() - 0.5) * (isBoss ? 5 : 2),
+          vx: 0,
+          vy: 0,
+          life: isBoss ? 1.4 : 1,
+          maxLife: isBoss ? 1.4 : 1,
+          size: (isBoss ? 34 : 24) + Math.random() * 12,
+          growth: isBoss ? 7 : 4,
+          color: i % 3 === 0 ? '#ffffff' : i % 2 === 0 ? '#fb923c' : '#c084fc',
+          type: 'heat',
+          blend: 'screen',
         });
       }
 
-      // Bloom Effect (HDR Look - Simplificado) - Faster Expansion
       s.particles.push({
-        id: `bloom-${Date.now()}-${Math.random()}`,
-        x, y, vx: 0, vy: 0, life: 0.8, maxLife: 0.8, size: 80, growth: 12,
-        color: '#fff', type: 'bloom', blend: 'lighter'
+        id: `bloom-${now}-${Math.random()}`,
+        x,
+        y,
+        vx: 0,
+        vy: 0,
+        life: isBoss ? 1.15 : 0.85,
+        maxLife: isBoss ? 1.15 : 0.85,
+        size: isBoss ? 145 : (isVoidExplosion ? 96 : 80),
+        growth: isBoss ? 20 : 13,
+        color: '#fff',
+        type: 'bloom',
+        blend: 'lighter',
       });
 
-      // Staggered Events (Versão React/Arena)
-      const spawnSparks = (count: number, maxSpeed: number, isCore: boolean) => {
-        for (let i = 0; i < count; i++) {
-          const useBias = Math.random() > 0.4;
-          const angle = useBias ? biasAngle + (Math.random() - 0.5) * 1.5 : Math.random() * Math.PI * 2;
-          const speed = (isCore ? 5 : 2) + Math.random() * maxSpeed;
-          const size = Math.random() > 0.8 ? 4 : 2;
+      const spawnSparks = (count: number, maxSpeed: number, isCore: boolean, originX = x, originY = y) => {
+        for (let i = 0; i < Math.round(count * intensity); i++) {
+          const useBias = Math.random() > 0.42;
+          const angle = useBias ? biasAngle + (Math.random() - 0.5) * 1.65 : Math.random() * Math.PI * 2;
+          const speed = (isCore ? 6 : 2) + Math.random() * maxSpeed;
+          const largeFragment = Math.random() > 0.82;
           s.particles.push({
             id: `spark-${Date.now()}-${i}-${isCore}-${Math.random()}`,
-            x, y,
+            x: originX,
+            y: originY,
             vx: Math.cos(angle) * speed,
             vy: Math.sin(angle) * speed,
-            life: 0.5 + Math.random() * 0.8,
-            maxLife: 0.5 + Math.random() * 0.8,
-            size,
-            color: Math.random() > 0.2 ? (isCore ? '#fff' : color) : '#fb923c',
+            life: (largeFragment ? 1.15 : 0.55) + Math.random() * (isBoss ? 1.25 : 0.8),
+            maxLife: (largeFragment ? 1.15 : 0.55) + Math.random() * (isBoss ? 1.25 : 0.8),
+            size: largeFragment ? (isBoss ? 6 : 4) : 2,
+            color: Math.random() > 0.22 ? (isCore ? '#fff' : color) : '#fb923c',
             type: 'spark',
             blend: 'lighter',
             hasTrail: speed > 6,
-            friction: 0.94
+            friction: largeFragment ? 0.965 : 0.94,
+            gravity: largeFragment ? 0.025 : 0,
           });
         }
       };
 
-      // 0ms: Fast Core - 3x Velocity & Distance
-      spawnSparks(40, 45, true);
+      spawnSparks(isBoss ? 72 : 46, isBoss ? 58 : 44, true);
+      window.setTimeout(() => spawnSparks(isBoss ? 84 : 54, isBoss ? 44 : 34, false), isBoss ? 45 : 25);
 
-      // Delayed Particles - 3x Velocity & Distance
-      setTimeout(() => spawnSparks(50, 35, false), 20);
-
-      setTimeout(() => {
-        // Embers (Electric Sparks)
-        for (let i = 0; i < 20; i++) {
+      window.setTimeout(() => {
+        const emberCount = Math.round((isBoss ? 46 : 24) * intensity);
+        for (let i = 0; i < emberCount; i++) {
           const angle = Math.random() * Math.PI * 2;
-          const speed = 3.0 + Math.random() * 12;
+          const speed = 3 + Math.random() * (isBoss ? 19 : 13);
           s.particles.push({
             id: `ember-${Date.now()}-${i}-${Math.random()}`,
-            x, y,
+            x,
+            y,
             vx: Math.cos(angle) * speed,
             vy: Math.sin(angle) * speed,
-            life: 2.5 + Math.random() * 1.5,
-            maxLife: 2.5 + Math.random() * 1.5,
-            size: 1.2,
-            color: Math.random() > 0.5 ? '#a855f7' : '#22d3ee',
+            life: (isBoss ? 3.5 : 2.5) + Math.random() * 1.8,
+            maxLife: (isBoss ? 3.5 : 2.5) + Math.random() * 1.8,
+            size: isBoss && i % 5 === 0 ? 2.4 : 1.2,
+            color: i % 3 === 0 ? '#ffffff' : i % 2 === 0 ? '#f97316' : '#22d3ee',
             type: 'ember',
             blend: 'lighter',
-            gravity: -0.01,
-            friction: 0.96,
-            hasTrail: true
+            gravity: 0.015,
+            friction: 0.965,
+            hasTrail: true,
           });
         }
-      }, 40);
+      }, 55);
 
-      setTimeout(() => {
-        // Smoke (Electric Fog)
-        for (let i = 0; i < 15; i++) {
+      window.setTimeout(() => {
+        const smokeCount = Math.round((isBoss ? 32 : 18) * intensity);
+        for (let i = 0; i < smokeCount; i++) {
           const angle = Math.random() * Math.PI * 2;
-          const speed = 4 + Math.random() * 14;
-          const grey = 20 + Math.random() * 20;
+          const speed = 3 + Math.random() * (isBoss ? 17 : 12);
           s.particles.push({
             id: `smoke-${Date.now()}-${i}-${Math.random()}`,
-            x, y,
+            x: x + (Math.random() - 0.5) * (isBoss ? 7 : 3),
+            y: y + (Math.random() - 0.5) * (isBoss ? 8 : 3),
             vx: Math.cos(angle) * speed,
             vy: Math.sin(angle) * speed,
-            life: 1.2 + Math.random() * 1.0,
-            maxLife: 1.2 + Math.random() * 1.0,
-            size: 6 + Math.random() * 8,
-            color: `rgba(168, 85, 247, 0.25)`,
+            life: (isBoss ? 2.1 : 1.35) + Math.random() * 1.2,
+            maxLife: (isBoss ? 2.1 : 1.35) + Math.random() * 1.2,
+            size: (isBoss ? 9 : 6) + Math.random() * (isBoss ? 15 : 9),
+            color: isBoss ? 'rgba(70, 35, 45, 0.48)' : 'rgba(95, 60, 130, 0.34)',
             type: 'smoke',
-            growth: 0.3,
-            friction: 0.94,
-            gravity: -0.02
+            growth: isBoss ? 0.55 : 0.34,
+            friction: 0.95,
+            gravity: -0.025,
           });
         }
-      }, 70);
+      }, 90);
 
-      // Secondary Reaction (Micro explosion offset)
-      setTimeout(() => {
-        const offsetX = (Math.random() - 0.5) * 20;
-        const offsetY = (Math.random() - 0.5) * 20;
-        spawnSparks(15, 6, false);
-        s.shockwaves.push({
-          x: x + offsetX, y: y + offsetY, radius: 2, alpha: 0.4, thickness: 5, speed: 6,
-          color: '239, 100, 50'
-        });
-      }, 110);
+      const secondaryBursts = isBoss ? 5 : (isVoidExplosion ? 2 : 1);
+      for (let burst = 0; burst < secondaryBursts; burst++) {
+        window.setTimeout(() => {
+          const distance = isBoss ? 3 + Math.random() * 8 : 2 + Math.random() * 4;
+          const angle = biasAngle + burst * 2.17 + Math.random() * 0.8;
+          const burstX = x + Math.cos(angle) * distance;
+          const burstY = y + Math.sin(angle) * distance;
+          pushShockwave(2, isBoss ? 0.68 : 0.42, isBoss ? 9 : 5, isBoss ? 15 : 8, burst % 2 === 0 ? '255, 125, 45' : '192, 132, 252', burstX - x, burstY - y);
+          spawnSparks(isBoss ? 24 : 14, isBoss ? 22 : 9, false, burstX, burstY);
+          s.flashAlpha = Math.max(s.flashAlpha, isBoss ? 0.34 : 0.18);
+          if (isBoss) triggerShake(24 - burst * 2);
+        }, 130 + burst * (isBoss ? 115 : 90));
+      }
+
+      window.setTimeout(() => {
+        s.cameraPunch.targetX *= 0.18;
+        s.cameraPunch.targetY *= 0.18;
+      }, isBoss ? 850 : 360);
     };
 
+    const triggerEnemyDestruction = (enemy: VoidBattleEnemy) => {
+      if (enemy.hp > 0 || enemy.isExploding) return;
+      enemy.isExploding = true;
+      const isBoss = enemy.type === 'Boss';
+      createExplosionEffect(enemy.x, enemy.y, isBoss ? '#f97316' : '#ef4444', isBoss);
+
+      const enemyLocation = enemy.assetLocationId ?? locationId;
+      const locKey = enemyLocation === 0 ? 'zero' : enemyLocation;
+      if (routeTier === 'Void') {
+        if (isBoss) {
+          stopSfx(`boss_scream_${locKey}`);
+          playSfx(`boss_explosion_${locKey}`);
+        } else {
+          playSfx('alien_explosion_zero');
+        }
+      } else {
+        playSfx('enemy_explosion');
+      }
+    };
     const createDamageNumber = (x: number, y: number, value: number, isCrit: boolean, owner: 'player' | 'enemy') => {
       const s = gameRef.current;
       s.damageNumbers.push({
@@ -1303,34 +1368,46 @@ const VoidBattleArena = memo(function VoidBattleArena({
       }, null);
     };
 
-    const spawnHBImpact = (x: number, y: number) => {
+    const spawnHBImpact = (x: number, y: number, isFinisher: boolean = false, dmgMult: number = 1) => {
       const s = gameRef.current;
       const now = Date.now();
       const canvas = canvasRef.current;
       if (!canvas) return;
       const cWidth = canvas.width;
       const cHeight = canvas.height;
+      const impactScale = cWidth / 800;
+      const impactXPercent = (x / cWidth) * 100;
+      const impactYPercent = (y / cHeight) * 100;
 
-      s.shake = { x: 20, y: 20, decay: 0.80 };
-      s.impactFlash = 1;
-      s.cinematicDarkness = 0.7;
+      s.shake = { x: isFinisher ? 32 : 20, y: isFinisher ? 32 : 20, decay: isFinisher ? 0.74 : 0.80 };
+      s.impactFlash = isFinisher ? 1.35 : 1;
+      s.cinematicDarkness = isFinisher ? 0.86 : 0.7;
+      s.flashAlpha = Math.max(s.flashAlpha, isFinisher ? 0.85 : 0.32);
+      s.flashColor = isFinisher ? '255, 230, 180' : '255, 160, 70';
 
-      // Burst de partículas (usa o sistema de particles existente do projeto)
-      for (let i = 0; i < 160; i++) {
+      const shake = isFinisher ? HELLFIRE_FINISHER_SHAKE : HELLFIRE_NORMAL_SHAKE;
+      s.cameraPunch.targetX += (Math.random() - 0.5) * shake;
+      s.cameraPunch.targetY += (Math.random() - 0.5) * shake;
+      window.setTimeout(() => {
+        const current = gameRef.current;
+        current.cameraPunch.targetX *= 0.25;
+        current.cameraPunch.targetY *= 0.25;
+      }, isFinisher ? 120 : 70);
+
+      for (let i = 0; i < (isFinisher ? 230 : 160); i++) {
         const angle = Math.random() * Math.PI * 2;
-        const spd = 2 + Math.random() * 10;
-        const smoke = i > 110;
+        const spd = (2 + Math.random() * 10) * (isFinisher ? 1.25 : 1);
+        const smoke = i > (isFinisher ? 150 : 110);
         const col = pickFireColorHB(Math.random());
         s.particles.push({
           id: `hb-imp-${now}-${i}-${Math.random()}`,
-          // Converter pixels → % para o sistema de partículas do projeto
-          x: (x / cWidth) * 100,
-          y: (y / cHeight) * 100,
+          x: impactXPercent,
+          y: impactYPercent,
           vx: (Math.cos(angle) * spd / cWidth) * 100,
           vy: (Math.sin(angle) * spd / cHeight) * 100,
           life: smoke ? 0.8 + Math.random() * 0.4 : 0.5 + Math.random() * 0.5,
           maxLife: 1,
-          size: smoke ? 3 + Math.random() * 5 : Math.random() < 0.15 ? 3 + Math.random() * 5 : 1 + Math.random() * 2,
+          size: smoke ? 3 + Math.random() * 6 : Math.random() < 0.15 ? 3 + Math.random() * 6 : 1 + Math.random() * 2.5,
           color: smoke ? `rgba(255,120,30,0.5)` : col,
           type: smoke ? 'smoke' : 'spark',
           blend: 'lighter',
@@ -1339,19 +1416,71 @@ const VoidBattleArena = memo(function VoidBattleArena({
         });
       }
 
-      // Burn Zone — gravar em pixels
       s.burnZones.push({
-        x,       // pixels
-        y,       // pixels
+        x,
+        y,
         life: 1,
         startTime: now,
-        duration: 3500,
-        radius: (60 + Math.random() * 25) * (cWidth / 800), // escala com canvas
+        duration: isFinisher ? 4800 : 3500,
+        radius: (isFinisher ? 95 + Math.random() * 30 : 60 + Math.random() * 25) * impactScale,
+        finisher: isFinisher,
       });
 
-      // Dano imediato nos inimigos próximos
-      const SPLASH_PX = 90 * (cWidth / 800);
-      const immDmg = playerShipStatsRef.current.damage * HELLFIRE_IMPACT_DAMAGE_MULTIPLIER;
+      s.shockwaves.push({
+        x: impactXPercent,
+        y: impactYPercent,
+        radius: isFinisher ? 7 : 4,
+        alpha: isFinisher ? 0.82 : 0.58,
+        thickness: isFinisher ? 13 : 7,
+        speed: isFinisher ? 18 : 12,
+        color: isFinisher ? '255, 190, 90' : '255, 140, 40',
+      });
+      s.shockwaves.push({
+        x: impactXPercent,
+        y: impactYPercent,
+        radius: isFinisher ? 3 : 2,
+        alpha: isFinisher ? 0.62 : 0.36,
+        thickness: isFinisher ? 5 : 3,
+        speed: isFinisher ? 28 : 18,
+        color: '255, 245, 220',
+      });
+
+      s.scars.push({
+        x: impactXPercent,
+        y: impactYPercent,
+        life: isFinisher ? 1.35 : 1,
+        size: (isFinisher ? 34 : 20) * impactScale,
+        rotation: Math.random() * Math.PI * 2,
+      });
+
+      const emberCount = isFinisher ? 34 : 14;
+      for (let i = 0; i < emberCount; i++) {
+        const ang = Math.random() * Math.PI * 2;
+        const spd = (0.3 + Math.random() * 0.9) * (isFinisher ? 1.4 : 1);
+        s.trailParts.push({
+          x: impactXPercent,
+          y: impactYPercent,
+          vx: Math.cos(ang) * spd,
+          vy: Math.sin(ang) * spd - 0.15,
+          life: 0.9 + Math.random() * 0.8,
+          decay: 0.02 + Math.random() * 0.015,
+          size: 1.5 + Math.random() * 3,
+          color: '#ffcf7a',
+          ember: true,
+        });
+      }
+
+      if (isFinisher) {
+        s.hellfireHitStopUntil = now + HELLFIRE_HITSTOP_MS;
+      }
+
+      playSfx(isFinisher ? 'big_energy_explosion_2' : 'big_energy_explosion_', {
+        volume: isFinisher ? 1.0 : 0.42,
+        category: 'player',
+      });
+
+      const SPLASH_PX = (isFinisher ? 130 : 90) * impactScale;
+      const immDmg = playerShipStatsRef.current.damage * HELLFIRE_IMPACT_DAMAGE_MULTIPLIER * dmgMult;
 
       s.enemies.forEach(en => {
         if (en.hp <= 0) return;
@@ -1368,8 +1497,11 @@ const VoidBattleArena = memo(function VoidBattleArena({
     const loop = () => {
       const s = gameRef.current;
       const now = Date.now();
-      const deltaTime = Math.min(2, (now - lastTime) / 16.66);
+      let deltaTime = Math.min(2, (now - lastTime) / 16.66);
       lastTime = now;
+      if (s.hellfireHitStopUntil && now < s.hellfireHitStopUntil) {
+        deltaTime *= 0.15;
+      }
       if (showBossIntro) {
         ctx.fillStyle = '#000000';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -2127,21 +2259,7 @@ const VoidBattleArena = memo(function VoidBattleArena({
                 const impactAngle = Math.atan2(p.vy || 0, p.vx || 0);
                 createImpactEffect(p.x, p.y, p.isCrit ? '#fcd34d' : '#22d3ee', impactAngle, 1.0, 'ship', 1.5);
                 createDamageNumber(enemy.x, enemy.y - 10, p.damage, p.isCrit || false, 'player');
-                  if (enemy.hp <= 0 && !enemy.isExploding) {
-                    enemy.isExploding = true;
-                    createExplosionEffect(enemy.x, enemy.y, '#ef4444');
-                    const locKey = locationId === 0 ? 'zero' : locationId;
-                    if (routeTier === 'Void') {
-                      if (enemy.type === 'Boss') {
-                        stopSfx(`boss_scream_${locKey}`);
-                        playSfx(`boss_explosion_${locKey}`);
-                      } else {
-                        playSfx('alien_explosion_zero');
-                      }
-                    } else {
-                      playSfx('enemy_explosion');
-                    }
-                  }
+                triggerEnemyDestruction(enemy);
                 hit = true;
                 break;
               }
@@ -2378,9 +2496,10 @@ const VoidBattleArena = memo(function VoidBattleArena({
             const dx = s.playerX - enemy.x;
             const dy = s.playerY - enemy.y;
             const dist = Math.hypot(dx, dy) || 1;
-            const bossConfig = routeTier === 'Void' && enemy.type === 'Boss' ? BOSS_INTROS[locationId] : undefined;
+            const bossLocationId = enemy.assetLocationId ?? locationId;
+            const bossConfig = routeTier === 'Void' && enemy.type === 'Boss' ? BOSS_INTROS[bossLocationId] : undefined;
             const projectileDamage = bossConfig ? randomInt(bossConfig.damage) : enemy.damage;
-            if (bossConfig?.attack === 'moltenIron' && locationId === 5) {
+            if (bossConfig?.attack === 'moltenIron' && bossLocationId === 5) {
               enemy.shootSpriteUntil = now + BOSS_SHOOT_SPRITE_MS;
             }
 
@@ -2491,20 +2610,27 @@ const VoidBattleArena = memo(function VoidBattleArena({
         s.trailParts = s.trailParts.filter(p => {
           p.x += p.vx * deltaTime;
           p.y += p.vy * deltaTime;
-          p.vy -= 0.05 * deltaTime;
+          p.vy -= (p.ember ? 0.09 : 0.05) * deltaTime;
           p.life -= p.decay * deltaTime;
           if (p.life <= 0) return false;
 
           const px2 = (p.x / 100) * cWidth;
           const py2 = (p.y / 100) * cHeight;
-          const a = p.life * (p.smoke ? 0.20 : 0.65);
-          ctx.globalAlpha = a;
+          const flicker = p.ember ? (0.7 + Math.sin(now * 0.03 + px2) * 0.3) : 1;
+          const a = p.life * (p.smoke ? 0.20 : p.ember ? 0.85 * flicker : 0.65);
+          ctx.globalAlpha = Math.max(0, a);
 
           if (p.smoke) {
             const sg = ctx.createRadialGradient(px2, py2, 0, px2, py2, p.size * p.life * 0.5 * (cWidth / 800));
             sg.addColorStop(0, `rgba(255,120,20,${p.life * 0.5})`);
             sg.addColorStop(1, 'transparent');
             ctx.fillStyle = sg;
+          } else if (p.ember) {
+            const eg = ctx.createRadialGradient(px2, py2, 0, px2, py2, p.size * p.life * 1.4 * (cWidth / 800));
+            eg.addColorStop(0, 'rgba(255,230,150,0.95)');
+            eg.addColorStop(0.5, 'rgba(255,120,20,0.6)');
+            eg.addColorStop(1, 'transparent');
+            ctx.fillStyle = eg;
           } else {
             ctx.fillStyle = p.color;
           }
@@ -2516,53 +2642,82 @@ const VoidBattleArena = memo(function VoidBattleArena({
         });
         ctx.restore();
       }
-
       // ── HELLFIRE BARRAGE: Burn Zones ──
       s.burnZones = s.burnZones.filter(bz => {
         const age = now - bz.startTime;
         bz.life = Math.max(0, 1 - age / bz.duration);
         if (bz.life <= 0) return false;
 
-        const bx = bz.x; // já em pixels (gravado no spawnHBImpact)
+        const bx = bz.x;
         const by = bz.y;
         const flicker = 0.85 + Math.sin(now * 0.018 + bx * 0.005) * 0.15;
         const r = bz.radius * flicker;
 
-        const g = ctx.createRadialGradient(bx, by, 0, bx, by, r);
-        g.addColorStop(0,    `rgba(255,210,60,${bz.life * 0.9})`);
-        g.addColorStop(0.3,  `rgba(255,100,10,${bz.life * 0.75})`);
-        g.addColorStop(0.65, `rgba(180,20,0,${bz.life * 0.5})`);
-        g.addColorStop(1,    'transparent');
-
         ctx.save();
         ctx.globalCompositeOperation = 'lighter';
+
+        const g = ctx.createRadialGradient(bx, by, 0, bx, by, r);
+        g.addColorStop(0, `rgba(255,225,120,${bz.life * 0.95})`);
+        g.addColorStop(0.28, `rgba(255,210,60,${bz.life * 0.9})`);
+        g.addColorStop(0.5, `rgba(255,100,10,${bz.life * 0.75})`);
+        g.addColorStop(0.75, `rgba(180,20,0,${bz.life * 0.5})`);
+        g.addColorStop(1, 'transparent');
         ctx.fillStyle = g;
         ctx.beginPath();
         ctx.arc(bx, by, r, 0, Math.PI * 2);
         ctx.fill();
+
+        ctx.globalAlpha = bz.life * 0.35;
+        ctx.strokeStyle = `rgba(255,180,80,${bz.life * 0.6})`;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(bx, by, r * (1.05 + Math.sin(now * 0.01) * 0.03), 0, Math.PI * 2);
+        ctx.stroke();
+
+        if (bz.finisher) {
+          const core = ctx.createRadialGradient(bx, by, 0, bx, by, r * 0.35);
+          core.addColorStop(0, `rgba(255,255,220,${bz.life * 0.8})`);
+          core.addColorStop(1, 'transparent');
+          ctx.fillStyle = core;
+          ctx.beginPath();
+          ctx.arc(bx, by, r * 0.35, 0, Math.PI * 2);
+          ctx.fill();
+        }
         ctx.restore();
 
-        // Dano contínuo aos inimigos na zona (a cada 20 frames)
+        if (Math.random() < (bz.finisher ? 0.5 : 0.25)) {
+          s.trailParts.push({
+            x: ((bx + (Math.random() - 0.5) * r) / cWidth) * 100,
+            y: ((by + (Math.random() - 0.5) * r * 0.4) / cHeight) * 100,
+            vx: (Math.random() - 0.5) * 0.1,
+            vy: -0.12 - Math.random() * 0.1,
+            life: 0.8 + Math.random() * 0.6,
+            decay: 0.015,
+            size: 1 + Math.random() * 1.5,
+            color: '#ffcf7a',
+            ember: true,
+          });
+        }
+
         if (s.frameCount % 20 === 0) {
           s.enemies.forEach(en => {
             if (en.hp <= 0) return;
-            const ex = (en.x / 100) * cWidth;  // ← FIX 3: converter para pixels
+            const ex = (en.x / 100) * cWidth;
             const ey = (en.y / 100) * cHeight;
             const d = Math.hypot(ex - bx, ey - by);
             if (d < bz.radius) {
               const dmg = playerShipStatsRef.current.damage * HELLFIRE_BURN_TICK_DAMAGE_MULTIPLIER * deltaTime;
               applyPlayerDamageToEnemy(en, dmg);
-              // Add visible damage number for DoT
             }
           });
         }
         return true;
       });
-
       // ── HELLFIRE BARRAGE: Fireballs ──
       if (s.fireballs.length === 0 && s.hellfireQueue.length > 0 && now >= s.hellfireNextLaunchAt) {
         const nextHellfire = s.hellfireQueue.shift();
         const dir = nextHellfire.dir || 'forward';
+        const isFinisher = !!nextHellfire.isFinisher;
         let ox = (s.playerX / 100) * cWidth + 40;
         let oy = (s.playerY / 100) * cHeight;
         if (dir === 'up') { ox -= 10; oy -= 28; }
@@ -2573,7 +2728,7 @@ const VoidBattleArena = memo(function VoidBattleArena({
         const tx = target ? (target.x / 100) * cWidth : cWidth + 200;
         const ty = target ? (target.y / 100) * cHeight : oy + (Math.random() - 0.5) * 200;
         const dist = Math.hypot(tx - ox, ty - oy);
-        const travelFrames = Math.max(35, Math.min(65, dist / 12));
+        const travelFrames = Math.max(35, Math.min(65, dist / 12)) * (isFinisher ? 1.15 : 1);
         const speed = 1 / travelFrames;
 
         s.fireballs.push({
@@ -2584,12 +2739,16 @@ const VoidBattleArena = memo(function VoidBattleArena({
           t: 0,
           speed,
           arcBend: (dir === 'up' ? -1 : dir === 'down' ? 1 : 0) * (40 + (nextHellfire.arcSeed || 0) * 50) + (Math.random() - 0.5) * 30,
-          size: nextHellfire.size || 26,
+          size: (nextHellfire.size || 26) * (isFinisher ? HELLFIRE_FINISHER_SIZE_MULT : 1),
           life: 1,
           done: false,
           readyAt: now,
+          isFinisher,
+          dmgMult: isFinisher ? HELLFIRE_FINISHER_DMG_MULT : 1,
+          wobbleSeed: Math.random() * Math.PI * 2,
+          rot: Math.random() * Math.PI * 2,
         });
-        s.hellfireNextLaunchAt = now + 180;
+        s.hellfireNextLaunchAt = now + HELLFIRE_LAUNCH_INTERVAL;
       }
 
       if (s.fireballs.length > 0) {
@@ -2597,7 +2756,6 @@ const VoidBattleArena = memo(function VoidBattleArena({
         ctx.globalCompositeOperation = 'lighter';
 
         s.fireballs = s.fireballs.filter(fb => {
-          // FIX 1 aplicado: deltaTime sem divisão por 16
           if (now < fb.readyAt) return true;
 
           let target = s.enemies.find(en => en.id === fb.targetId && en.hp > 0);
@@ -2611,67 +2769,82 @@ const VoidBattleArena = memo(function VoidBattleArena({
             fb.ty = (target.y / 100) * cHeight;
           }
 
-          fb.t += fb.speed * deltaTime;  // ← CORRETO
+          fb.t += fb.speed * deltaTime;
 
           const cx = (fb.ox + fb.tx) / 2;
           const cy = (fb.oy + fb.ty) / 2 + fb.arcBend;
           fb.x = bezier(fb.ox, cx, fb.tx, fb.t);
           fb.y = bezier(fb.oy, cy, fb.ty, fb.t);
 
+          const wobble = Math.sin(fb.t * 14 + fb.wobbleSeed) * (fb.isFinisher ? 5 : 3);
+          const drawX = fb.x + wobble;
+          const drawY = fb.y;
+          fb.rot += 0.25 * deltaTime;
+
           const hitDistance = target ? Math.hypot((target.x / 100) * cWidth - fb.x, (target.y / 100) * cHeight - fb.y) : Infinity;
           if (fb.t >= 1 || hitDistance < Math.max(34, fb.size * 1.25)) {
-            // Impacto individual: cada bola recalcula o alvo vivo e explode onde ele está agora.
             if (target) {
-              spawnHBImpact((target.x / 100) * cWidth, (target.y / 100) * cHeight);
+              spawnHBImpact((target.x / 100) * cWidth, (target.y / 100) * cHeight, fb.isFinisher, fb.dmgMult);
             }
             return false;
           }
 
-          // Trail a cada frame
-          const isSpark = Math.random() < 0.32;
-          s.trailParts.push({
-            x: (fb.x / cWidth) * 100,
-            y: (fb.y / cHeight) * 100,
-            vx: (Math.random() - 0.5) * 0.08,
-            vy: -0.06 - Math.random() * 0.12,
-            life: 1,
-            decay: isSpark ? 0.055 + Math.random() * 0.06 : 0.015 + Math.random() * 0.018,
-            size: isSpark ? (2 + Math.random() * 4) * (800 / cWidth) : (8 + Math.random() * 18) * (800 / cWidth),
-            smoke: !isSpark && Math.random() < 0.42,
-            color: pickFireColorHB(Math.random()),
-          });
+          const R = fb.size * (cWidth / 800);
+          const coreR = R * 0.38;
 
-          // Desenhar bola
-          const pulse = 1 + Math.sin(now * 0.018 + fb.x * 0.003) * 0.18;
-          const r = fb.size * pulse;
+          ctx.save();
+          ctx.globalCompositeOperation = 'lighter';
 
-          const halo = ctx.createRadialGradient(fb.x, fb.y, 0, fb.x, fb.y, r * 3);
-          halo.addColorStop(0,   'rgba(255,150,20,0)');
-          halo.addColorStop(0.4, 'rgba(255,70,0,0.13)');
-          halo.addColorStop(1,   'transparent');
-          ctx.globalAlpha = 0.75;
+          const halo = ctx.createRadialGradient(drawX, drawY, 0, drawX, drawY, R * 1.8);
+          halo.addColorStop(0, fb.isFinisher ? 'rgba(255,160,40,0.55)' : 'rgba(255,120,20,0.35)');
+          halo.addColorStop(1, 'transparent');
           ctx.fillStyle = halo;
-          ctx.beginPath(); ctx.arc(fb.x, fb.y, r * 3, 0, Math.PI * 2); ctx.fill();
+          ctx.beginPath();
+          ctx.arc(drawX, drawY, R * 1.8, 0, Math.PI * 2);
+          ctx.fill();
 
-          const cg = ctx.createRadialGradient(fb.x, fb.y, 0, fb.x, fb.y, r);
-          cg.addColorStop(0,    'rgba(255,255,210,1)');
-          cg.addColorStop(0.18, 'rgba(255,185,35,1)');
-          cg.addColorStop(0.5,  'rgba(255,65,0,0.95)');
-          cg.addColorStop(0.85, 'rgba(160,15,0,0.7)');
-          cg.addColorStop(1,    'transparent');
-          ctx.globalAlpha = 1;
-          ctx.fillStyle = cg;
-          ctx.beginPath(); ctx.arc(fb.x, fb.y, r, 0, Math.PI * 2); ctx.fill();
+          ctx.save();
+          ctx.translate(drawX, drawY);
+          ctx.rotate(fb.rot);
+          const corona = ctx.createRadialGradient(0, 0, coreR * 0.3, 0, 0, R);
+          corona.addColorStop(0, 'rgba(255,220,140,0.95)');
+          corona.addColorStop(0.45, 'rgba(255,110,20,0.9)');
+          corona.addColorStop(1, 'rgba(180,20,0,0)');
+          ctx.fillStyle = corona;
+          ctx.beginPath();
+          ctx.arc(0, 0, R, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
 
-          // Núcleo branco
-          ctx.fillStyle = 'rgba(255,255,220,0.95)';
-          ctx.beginPath(); ctx.arc(fb.x, fb.y, r * 0.22, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = fb.isFinisher ? 'rgba(255,255,240,1)' : 'rgba(255,245,220,0.95)';
+          ctx.beginPath();
+          ctx.arc(drawX, drawY, coreR, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+
+          const emitCount = fb.isFinisher ? 3 : 1;
+          for (let e = 0; e < emitCount; e++) {
+            const roll = Math.random();
+            const isSpark = roll < 0.42;
+            const isEmber = !isSpark && roll < 0.5;
+            s.trailParts.push({
+              x: (drawX / cWidth) * 100,
+              y: (drawY / cHeight) * 100,
+              vx: (Math.random() - 0.5) * (isSpark ? 0.4 : 0.15),
+              vy: (Math.random() - 0.5) * (isSpark ? 0.4 : 0.15) - (isEmber ? 0.08 : 0),
+              life: isEmber ? 1.2 + Math.random() * 0.6 : (isSpark ? 0.5 + Math.random() * 0.4 : 0.8 + Math.random() * 0.4),
+              decay: isEmber ? 0.012 : (isSpark ? 0.045 : 0.022),
+              size: isEmber ? 1 + Math.random() * 1.5 : (isSpark ? 1.5 + Math.random() * 2 : 3 + Math.random() * 5),
+              color: isSpark ? (Math.random() < 0.5 ? '#fff3c4' : '#ffb84d') : '#ff7a1a',
+              smoke: !isSpark && !isEmber,
+              ember: isEmber,
+            });
+          }
 
           return true;
         });
         ctx.restore();
       }
-
       // Draw Player with Dynamic Tilting
       if (!s.playerIsExploding) {
         let activePlayerId = 'player_neutral';
@@ -2779,7 +2952,7 @@ const VoidBattleArena = memo(function VoidBattleArena({
           if (eImg && eImg.width > 0) {
             if (routeTier === 'Void') {
               let baseSize = 128;
-              if (enemy.type === 'Boss') baseSize *= 3.0;
+              if (enemy.type === 'Boss') baseSize *= 3.0 * (enemy.visualScale || 1);
               else if (enemy.type === 'Elite') baseSize *= 1.25;
               const imgW = baseSize;
               const imgH = eImg.height * (imgW / eImg.width);
@@ -3081,6 +3254,9 @@ const VoidBattleArena = memo(function VoidBattleArena({
         ctx.restore();
       });
 
+      // Ensure special-ability kills receive the same visual destruction sequence.
+      s.enemies.forEach(triggerEnemyDestruction);
+
       // Win/Loss detection
       if (!battleFinished) {
         const allEnemiesDead = s.enemies.every(e => e.hp <= 0);
@@ -3092,12 +3268,32 @@ const VoidBattleArena = memo(function VoidBattleArena({
             // In meteor events, the single enemy is only the opener.
             // After it dies, the player survives the shower and earns QC from destroyed rocks.
           } else if (!isMeteorSurvivalEvent && s.enemyQueue && s.enemyQueue.length > 0) {
-             s.enemies.forEach(e => { s.totalRewardAccumulated = (s.totalRewardAccumulated || 0) + (e.qc || 0); });
-             const nextEnemy = s.enemyQueue.shift();
-             if (nextEnemy) {
-               s.enemies = [{ ...nextEnemy, isExploding: false }];
-               s.lastEnemyAttack = now;
-             }
+            const queuedEnemy = s.enemyQueue[0];
+            const spawnDelayMs = Math.max(0, queuedEnemy?.spawnDelayMs || 0);
+            if (!s.enemyQueueNextSpawnAt) {
+              s.enemies.forEach(e => {
+                s.totalRewardAccumulated = (s.totalRewardAccumulated || 0) + (e.qc || 0);
+                e.qc = 0;
+              });
+              s.enemyQueueNextSpawnAt = now + spawnDelayMs;
+              s.projectiles = [];
+              s.cinematicDarkness = Math.max(s.cinematicDarkness, 0.32);
+            }
+            if (now >= s.enemyQueueNextSpawnAt) {
+              const nextEnemy = s.enemyQueue.shift();
+              if (nextEnemy) {
+                s.enemies = [{ ...nextEnemy, isExploding: false }];
+                s.lastEnemyAttack = now;
+                s.flashAlpha = Math.max(s.flashAlpha, nextEnemy.visualScale && nextEnemy.visualScale < 1 ? 0.2 : 0.5);
+                s.flashColor = nextEnemy.visualScale && nextEnemy.visualScale < 1 ? '190, 90, 255' : '255, 170, 80';
+                if (routeTier === 'Void' && nextEnemy.type === 'Boss') {
+                  const nextLocation = nextEnemy.assetLocationId ?? locationId;
+                  const nextLocKey = nextLocation === 0 ? 'zero' : nextLocation;
+                  playSfx(`boss_scream_${nextLocKey}`, { loop: true });
+                }
+              }
+              s.enemyQueueNextSpawnAt = undefined;
+            }
           } else {
             if (!s.victoryExplosionStart) {
               s.victoryExplosionStart = now;
@@ -3205,6 +3401,9 @@ const VoidBattleArena = memo(function VoidBattleArena({
   }
 
   const displayEnemy = gameRef.current.enemies.find(e => e.hp > 0) || gameRef.current.enemies[0];
+  const bossIntroDisplayEnemy = [...gameRef.current.enemies, ...(gameRef.current.enemyQueue || [])]
+    .find(enemy => enemy.type === 'Boss' && (enemy.assetLocationId ?? locationId) === locationId && (enemy.visualScale || 1) >= 1)
+    || displayEnemy;
 
   return (
     <div ref={containerRef} className="fixed inset-0 z-[20000] flex flex-col relative overflow-hidden bg-black">
@@ -3240,7 +3439,7 @@ const VoidBattleArena = memo(function VoidBattleArena({
         />
       )}
 
-      {showBossIntro && bossIntro && displayEnemy && (
+      {showBossIntro && bossIntro && bossIntroDisplayEnemy && (
         <div className="absolute inset-0 z-[20050] flex items-center justify-center bg-black/90 p-6 backdrop-blur-xl">
           <motion.div
             initial={{ opacity: 0, scale: 0.94, y: 18 }}
@@ -3276,11 +3475,11 @@ const VoidBattleArena = memo(function VoidBattleArena({
                 <div className="grid grid-cols-2 gap-3">
                   <div className="rounded-2xl border border-red-500/20 bg-white/5 p-4">
                     <p className="font-mono text-[10px] uppercase tracking-widest text-white/40">HP</p>
-                    <p className="font-orbitron text-2xl font-black text-red-300">{Math.floor(displayEnemy.maxHp)}</p>
+                    <p className="font-orbitron text-2xl font-black text-red-300">{Math.floor(bossIntroDisplayEnemy.maxHp)}</p>
                   </div>
                   <div className="rounded-2xl border border-cyan-500/20 bg-white/5 p-4">
                     <p className="font-mono text-[10px] uppercase tracking-widest text-white/40">{language === 'pt' ? 'Escudo' : 'Shield'}</p>
-                    <p className="font-orbitron text-2xl font-black text-cyan-300">{Math.floor(displayEnemy.maxShield)}</p>
+                    <p className="font-orbitron text-2xl font-black text-cyan-300">{Math.floor(bossIntroDisplayEnemy.maxShield)}</p>
                   </div>
                 </div>
 

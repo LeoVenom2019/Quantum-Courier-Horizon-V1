@@ -79,6 +79,30 @@ const ROUTE3_TOTAL_DELIVERIES_REQUIREMENT = 5000;
 const META_ACHIEVEMENTS_STORAGE_KEY = 'qch_meta_achievements';
 const SECRET_ALIEN_ACHIEVEMENT_ID = 'secret_alien_name';
 const SECRET_ALIEN_NAME_STORAGE_KEY = 'qch_secret_alien_name_unlocked';
+const VOID_LOCAL_BATTLE_THEMES: Record<number, string> = {
+  1: '/audio/themes/local_bosses_void_themes/boss_devorador_alpha_theme.ogg',
+  2: '/audio/themes/local_bosses_void_themes/boss_sanguessuga_estelar_theme.ogg',
+  3: '/audio/themes/local_bosses_void_themes/boss_colosso_amalgamado_theme.ogg',
+  4: '/audio/themes/local_bosses_void_themes/boss_kraken_do_vazio_theme.ogg',
+  5: '/audio/themes/local_bosses_void_themes/boss_besta_tita_de_ferro_theme.ogg',
+  6: '/audio/themes/local_bosses_void_themes/boss_horror_mutante_theme.ogg',
+  7: '/audio/themes/local_bosses_void_themes/boss_verme_rei_do_vazio_theme.ogg',
+  8: '/audio/themes/local_bosses_void_themes/boss_predador_abissal_theme.ogg',
+  9: '/audio/themes/local_bosses_void_themes/lux_invicta.ogg',
+};
+const VOID_BATTLE_MUSIC_STORAGE_KEY = 'qch_void_battle_music_enabled';
+const VOID_BOSS_ACHIEVEMENT_IDS: Record<number, string> = {
+  0: 'void_boss_zero_defeated',
+  1: 'void_boss_1_defeated',
+  2: 'void_boss_2_defeated',
+  3: 'void_boss_3_defeated',
+  4: 'void_boss_4_defeated',
+  5: 'void_boss_5_defeated',
+  6: 'void_boss_6_defeated',
+  7: 'void_boss_7_defeated',
+  8: 'void_boss_8_defeated',
+  9: 'void_boss_9_defeated',
+};
 
 const normalizeAchievementMeta = (value: any) => ({
   unlockedAchievements: Array.isArray(value?.unlockedAchievements)
@@ -1305,6 +1329,9 @@ const DashboardContent = memo(({
   const [showRobotModal, setShowRobotModal] = useState(false);
   const [showBattleShipUpgradeModal, setShowBattleShipUpgradeModal] = useState(false);
   const [showVoidWarMap, setShowVoidWarMap] = useState(false);
+  const [voidBattleMusicEnabled, setVoidBattleMusicEnabled] = useState(() => (
+    typeof window === 'undefined' || localStorage.getItem(VOID_BATTLE_MUSIC_STORAGE_KEY) !== 'false'
+  ));
   const [isJumping, setIsJumping] = useState(false);
   const [showRoute2Info, setShowRoute2Info] = useState(false);
   const [showRoute3Info, setShowRoute3Info] = useState(false);
@@ -2906,6 +2933,74 @@ const DashboardContent = memo(({
     }
   }, [dispatch, playSfx]);
 
+  const recordVoidBossDefeat = useCallback((locationId: number) => {
+    const achievementId = VOID_BOSS_ACHIEVEMENT_IDS[locationId];
+    if (!achievementId) return;
+    updateAchievementProgress(achievementId, 1, true);
+  }, [updateAchievementProgress]);
+
+  const voidLocalBattleAudioRef = useRef<HTMLAudioElement | null>(null);
+  const stopJukeboxForVoidBattle = jukebox.stop;
+  const voidBattleMusicVolume = Number(jukebox?.volume ?? 0.55);
+  const voidLocalBattleFadeRef = useRef<number | null>(null);
+  const activeVoidBattleLocation = Number(activeVoidBattle?.locationId ?? 0);
+  const isVoidLocalBattle = routeTier === 'Void'
+    && voidBattleStatus === 'fighting'
+    && activeVoidBattleLocation >= 1
+    && activeVoidBattleLocation <= 9
+    && Boolean(VOID_LOCAL_BATTLE_THEMES[activeVoidBattleLocation]);
+
+  useEffect(() => {
+    localStorage.setItem(VOID_BATTLE_MUSIC_STORAGE_KEY, String(voidBattleMusicEnabled));
+  }, [voidBattleMusicEnabled]);
+
+  useEffect(() => {
+    if (!isVoidLocalBattle) return;
+
+    stopJukeboxForVoidBattle({ rememberPreference: false });
+    if (!voidBattleMusicEnabled) return;
+
+    const audio = new Audio(VOID_LOCAL_BATTLE_THEMES[activeVoidBattleLocation]);
+    voidLocalBattleAudioRef.current = audio;
+    audio.loop = true;
+    audio.preload = 'auto';
+    audio.volume = 0;
+    void audio.play().catch(error => {
+      if (!(error instanceof DOMException && error.name === 'NotAllowedError')) {
+        console.warn('[VoidBattleMusic] Playback failed:', error);
+      }
+    });
+
+    const targetVolume = Math.min(0.8, Math.max(0.25, voidBattleMusicVolume));
+    const fadeStartedAt = performance.now();
+    voidLocalBattleFadeRef.current = window.setInterval(() => {
+      const progress = Math.min(1, (performance.now() - fadeStartedAt) / 700);
+      audio.volume = targetVolume * progress;
+      if (progress >= 1 && voidLocalBattleFadeRef.current !== null) {
+        window.clearInterval(voidLocalBattleFadeRef.current);
+        voidLocalBattleFadeRef.current = null;
+      }
+    }, 40);
+
+    return () => {
+      if (voidLocalBattleFadeRef.current !== null) {
+        window.clearInterval(voidLocalBattleFadeRef.current);
+        voidLocalBattleFadeRef.current = null;
+      }
+      const startVolume = audio.volume;
+      const fadeOutStartedAt = performance.now();
+      const fadeOutTimer = window.setInterval(() => {
+        const progress = Math.min(1, (performance.now() - fadeOutStartedAt) / 1000);
+        audio.volume = Math.max(0, startVolume * (1 - progress));
+        if (progress >= 1) {
+          window.clearInterval(fadeOutTimer);
+          audio.pause();
+          audio.currentTime = 0;
+        }
+      }, 40);
+      if (voidLocalBattleAudioRef.current === audio) voidLocalBattleAudioRef.current = null;
+    };
+  }, [activeVoidBattleLocation, isVoidLocalBattle, stopJukeboxForVoidBattle, voidBattleMusicEnabled, voidBattleMusicVolume]);
   // Route Music System
   useEffect(() => {
     // Only run when loaded and music is ON
@@ -2915,6 +3010,11 @@ const DashboardContent = memo(({
         jukebox.stop();
         lastArcadeMusicGameIdRef.current = null;
       }
+      return;
+    }
+
+    if (isVoidLocalBattle) {
+      jukebox.stop({ rememberPreference: false });
       return;
     }
 
@@ -2946,7 +3046,7 @@ const DashboardContent = memo(({
       jukebox.stop();
     }
 
-  }, [activeMiniGameId, routeTier, isLoaded, musicOn, jukebox, jukebox.playPlaylist, jukebox.stop, jukebox.currentTrack?.url]);
+  }, [activeMiniGameId, routeTier, isLoaded, musicOn, isVoidLocalBattle, jukebox, jukebox.playPlaylist, jukebox.stop, jukebox.currentTrack?.url]);
   const setOresCollected = useCallback((val: Record<string, number> | ((prev: Record<string, number>) => Record<string, number>)) => {
     const nextVal = typeof val === 'function' ? val(oresCollectedRef.current) : val;
     oresCollectedRef.current = nextVal;
@@ -4184,7 +4284,13 @@ const DashboardContent = memo(({
 
   // Invasion Trigger
   useEffect(() => {
-    if (routeTier === 'Void' && dashboardTotalProjectTerra >= 100 && !voidWarAlertActive && !hasTriggeredVoidWarRef.current) {
+    const invasionCanStart = routeTier === 'Void'
+      && dashboardTotalProjectTerra >= 100
+      && !hasWonEliminateEnemiesRoute3
+      && !isRobotRepaired
+      && !isVoidWarActive
+      && voidBattleStatus !== 'fighting';
+    if (invasionCanStart && !voidWarAlertActive && !hasTriggeredVoidWarRef.current) {
       hasTriggeredVoidWarRef.current = true;
       setVoidWarAlertActive(true);
       setVoidWarRobotSpeaking(true);
@@ -4192,7 +4298,18 @@ const DashboardContent = memo(({
       addLog(language === 'pt' ? 'ALERTA: Invasão detectada! O Projeto Terra está sob ataque!' : 'ALERT: Invasion detected! Project Terra is under attack!', 'error');
       playSfx('songs_of_war', { loop: true, volume: 0.75, category: 'ambient', exclusiveKey: 'void-war-invasion-alarm' });
     }
-  }, [dashboardTotalProjectTerra, voidWarAlertActive, routeTier, language, addLog, playSfx]);
+  }, [dashboardTotalProjectTerra, voidWarAlertActive, routeTier, language, addLog, playSfx, hasWonEliminateEnemiesRoute3, isRobotRepaired, isVoidWarActive, voidBattleStatus]);
+
+  // Recover old or interrupted saves that already completed both prerequisites.
+  useEffect(() => {
+    if (routeTier !== 'Void' || !hasWonEliminateEnemiesRoute3 || !isRobotRepaired || isVoidWarActive) return;
+    setVoidWarProgress({ currentSector: 0, currentBattle: 0 });
+    setIsVoidWarActive(true);
+    addLog(
+      language === 'pt' ? 'Sequência dos setores do Vazio retomada.' : 'Void sector sequence resumed.',
+      'success'
+    );
+  }, [routeTier, hasWonEliminateEnemiesRoute3, isRobotRepaired, isVoidWarActive, setVoidWarProgress, setIsVoidWarActive, addLog, language]);
 
 
 
@@ -6207,6 +6324,19 @@ const DashboardContent = memo(({
     updateAchievementProgress('route_2_unlocked', isRoute2Unlocked() ? 1 : 0, true);
     updateAchievementProgress('void_unlocked', isRoute3Unlocked() ? 1 : 0, true);
 
+    // Chapter 3 bosses. This also restores achievements for saves that already advanced.
+    if (hasWonEliminateEnemiesRoute3) {
+      updateAchievementProgress('void_boss_zero_defeated', 1, true);
+    }
+    for (let locationId = 1; locationId <= 9; locationId += 1) {
+      const bossWasDefeated = locationId < 9
+        ? voidWarProgress.currentSector >= locationId
+        : route4Unlocked;
+      if (bossWasDefeated) {
+        updateAchievementProgress(VOID_BOSS_ACHIEVEMENT_IDS[locationId], 1, true);
+      }
+    }
+
     // 6. Tech Master
     const totalTechs = Object.values(unlockedTechLevels).reduce((a, b) => a + (b || 0), 0);
     updateAchievementProgress('tech_master', totalTechs, true);
@@ -6354,11 +6484,13 @@ const DashboardContent = memo(({
     const submarineUpgradeTotal = (colonyId: NewEarthSubmarineColonyId) => NEW_EARTH_SUBMARINE_UPGRADES.reduce((total, upgrade) => (
       total + (newEarthSubmarines[colonyId]?.[upgrade.id] || 0)
     ), 0);
-    const deepestAvailableSubmarine = Math.max(
-      getNewEarthSubmarineStats(newEarthSubmarines['colony-4']).maxDepth,
-      getNewEarthSubmarineStats(newEarthSubmarines['colony-2']).maxDepth,
-      newEarthAchievementMetrics.maxSubmarineDepth
-    );
+    const deepestAvailableSubmarine = route4Unlocked
+      ? Math.max(
+          getNewEarthSubmarineStats(newEarthSubmarines['colony-4']).maxDepth,
+          getNewEarthSubmarineStats(newEarthSubmarines['colony-2']).maxDepth,
+          newEarthAchievementMetrics.maxSubmarineDepth
+        )
+      : 0;
     updateAchievementProgress('ne_neptune_maxed', submarineUpgradeTotal('colony-4'), true);
     updateAchievementProgress('ne_poseidon_maxed', submarineUpgradeTotal('colony-2'), true);
     updateAchievementProgress('ne_enemy_submarines_10', newEarthAchievementMetrics.enemySubmarinesDestroyed, true);
@@ -6367,10 +6499,13 @@ const DashboardContent = memo(({
     updateAchievementProgress,
     totalDeliveries,
     routeTier,
+    route4Unlocked,
     historyStats,
     miningRobots,
     isRoute2Unlocked,
     isRoute3Unlocked,
+    hasWonEliminateEnemiesRoute3,
+    voidWarProgress,
     unlockedTechLevels,
     ownedShips,
     techLevels,
@@ -8009,6 +8144,11 @@ const DashboardContent = memo(({
 
   const handleRepairRobot = () => {
     if (isRobotRepaired || isRepairingRobot) return;
+    if (!hasWonEliminateEnemiesRoute3) {
+      addLog(language === 'pt' ? 'Elimine o Boss Zero antes de reparar Bobby Blue.' : 'Defeat Boss Zero before repairing Bobby Blue.', 'error');
+      playSfx('error');
+      return;
+    }
 
     const energyCost = 2500;
     const techCost = 2500;
@@ -8115,13 +8255,14 @@ const DashboardContent = memo(({
     addLog(`${t('shipUpgradedTo')} ${nextRarity.toUpperCase()}!`, 'success');
   };
 
-  const startVoidBattle = (warType?: 'normal' | 'elite' | 'boss', forcedLocationId?: number) => {
+  const startVoidBattle = (warType?: 'normal' | 'elite' | 'boss', forcedLocationId?: number, forcedEncounterKind?: 'boss-zero' | 'sector-clear' | 'sector-boss') => {
     if (voidBattleShipStats.hp <= 0) {
       addLog(t('shipTooDamaged'), 'error');
       return;
     }
 
     const isOpeningInvasionBattle = voidWarAlertActive && !hasWonEliminateEnemiesRoute3;
+    const encounterKind = forcedEncounterKind || (isOpeningInvasionBattle ? 'boss-zero' : undefined);
     const locId = forcedLocationId !== undefined
       ? forcedLocationId
       : (isOpeningInvasionBattle ? 0 : (voidWarAlertActive ? (1 + Math.floor(randomUnit() * 9)) : 0));
@@ -8163,14 +8304,17 @@ const DashboardContent = memo(({
       }
 
       if (type === 'Padrão') {
-        const hp = 90000 * 0.375;
-        stats = { hp: hp, maxHp: hp, shield: hp, maxShield: hp, damage: (30 + randomUnit() * 20) * 2, qc: 50000 };
+        const baseHp = 90000 * 0.375;
+        const hp = baseHp * 3;
+        stats = { hp: hp, maxHp: hp, shield: baseHp, maxShield: baseHp, damage: (30 + randomUnit() * 20) * 2, qc: 50000 };
       } else if (type === 'Elite') {
-        const hp = 225000 * 0.375;
-        stats = { hp: hp, maxHp: hp, shield: hp, maxShield: hp, damage: (60 + randomUnit() * 20) * 2, qc: 150000 };
+        const baseHp = 225000 * 0.375;
+        const hp = baseHp * 3;
+        stats = { hp: hp, maxHp: hp, shield: baseHp, maxShield: baseHp, damage: (60 + randomUnit() * 20) * 2, qc: 150000 };
       } else {
-        const hp = 390000 * 0.375;
-        const shield = hp;
+        const baseHp = 390000 * 0.375;
+        const hp = baseHp * 3;
+        const shield = baseHp;
         stats = { hp: hp, maxHp: hp, shield: shield, maxShield: shield, damage: (100 + randomUnit() * 20) * 2, qc: 500000 };
       }
 
@@ -8195,11 +8339,48 @@ const DashboardContent = memo(({
               : '/images/ships/battle/enemy-boss.webp')
       };
 
-      setVoidBattleOptions([enemy]);
+      const isFinalInvasionGauntlet = encounterKind === 'sector-boss' && locId === 9;
+      const buildGauntletBoss = (bossLocationId: number): VoidBattleEnemy => {
+        const bossName = bossLocationId === 0 ? 'Boss Zero' : sectorBossNames[bossLocationId - 1];
+        const reducedHp = Math.max(1, Math.floor(stats.maxHp * 0.5));
+        return {
+          ...enemy,
+          id: `final-gauntlet-boss-${bossLocationId}-${nowTimestamp()}`,
+          name: bossName,
+          hp: reducedHp,
+          maxHp: reducedHp,
+          shield: stats.shield,
+          maxShield: stats.maxShield,
+          qc: 0,
+          assetLocationId: bossLocationId,
+          visualScale: 0.4,
+          spawnDelayMs: 2000,
+          image: `/assets/rota3/void/${bossLocationId === 0 ? 'zero' : bossLocationId}/boss_neutral.webp`,
+        };
+      };
+      const finalBoss = isFinalInvasionGauntlet
+        ? {
+            ...enemy,
+            id: `final-gauntlet-deus-monstro-${nowTimestamp()}`,
+            assetLocationId: 9,
+            visualScale: 1,
+            spawnDelayMs: 2000,
+          }
+        : enemy;
+      const battleSequence: VoidBattleEnemy[] = isFinalInvasionGauntlet
+        ? [
+            ...Array.from({ length: 9 }, (_, bossLocationId) => buildGauntletBoss(bossLocationId)),
+            finalBoss,
+          ]
+        : [{ ...enemy, assetLocationId: type === 'Boss' ? locId : undefined }];
+      const openingEnemy = battleSequence[0];
+      const queuedEnemies = battleSequence.slice(1);
+
+      setVoidBattleOptions([openingEnemy]);
       setVoidBattleStatus('fighting');
       setActiveVoidBattle({
-        enemies: [enemy],
-        enemyQueue: [],
+        enemies: [openingEnemy],
+        enemyQueue: queuedEnemies,
         projectiles: [],
         particles: [],
         damageNumbers: [],
@@ -8223,16 +8404,22 @@ const DashboardContent = memo(({
           special: { lastUsed: 0, cooldown: 15000, activeUntil: 0 }
         },
         locationId: locId,
+        encounterKind,
+        warSector: encounterKind?.startsWith('sector-') ? voidWarProgress.currentSector : undefined,
+        warBattle: encounterKind?.startsWith('sector-') ? voidWarProgress.currentBattle : undefined,
         totalRewardAccumulated: 0,
         finishTimer: 0,
         zoomTarget: { x: 50, y: 50 },
         isSlowMo: false
       });
 
-      const engagementMsg = language === 'pt'
-        ? `Iniciando missão de defesa do setor. Elimine o alvo hostil!`
-        : `Starting sector defense mission. Eliminate the hostile target!`;
-
+      const engagementMsg = isFinalInvasionGauntlet
+        ? (language === 'pt'
+            ? 'Protocolo final iniciado: derrote o legado dos nove chefes antes do Deus-Monstro!'
+            : 'Final protocol initiated: defeat the legacy of the nine bosses before the Monster-God!')
+        : language === 'pt'
+          ? 'Iniciando missão de defesa do setor. Elimine o alvo hostil!'
+          : 'Starting sector defense mission. Eliminate the hostile target!';
       addLog(engagementMsg, 'warning');
       return;
     }
@@ -8263,8 +8450,8 @@ const DashboardContent = memo(({
         if (roll < eliteThreshold) {
           type = 'Padrão';
           stats = {
-            hp: 9000 * 0.75,
-            maxHp: 9000 * 0.75,
+            hp: 9000 * 0.75 * 3,
+            maxHp: 9000 * 0.75 * 3,
             shield: 400 * 0.75,
             maxShield: 400 * 0.75,
             damage: 30 + randomUnit() * 20,
@@ -8273,8 +8460,8 @@ const DashboardContent = memo(({
         } else if (roll < bossThreshold) {
           type = 'Elite';
           stats = {
-            hp: 15000 * 0.75,
-            maxHp: 15000 * 0.75,
+            hp: 15000 * 0.75 * 3,
+            maxHp: 15000 * 0.75 * 3,
             shield: 800 * 0.75,
             maxShield: 800 * 0.75,
             damage: 60 + randomUnit() * 20,
@@ -8283,8 +8470,8 @@ const DashboardContent = memo(({
         } else {
           type = 'Boss';
           stats = {
-            hp: 19500 * 0.75,
-            maxHp: 19500 * 0.75,
+            hp: 19500 * 0.75 * 3,
+            maxHp: 19500 * 0.75 * 3,
             shield: 1000 * 0.75,
             maxShield: 1000 * 0.75,
             damage: 100 + randomUnit() * 20,
@@ -8828,6 +9015,12 @@ const DashboardContent = memo(({
   };
 
   const RobotRepairModal = () => {
+    const diagnosticCamLabel = language === 'pt' ? 'CAM_DIAGNOSTICO' : 'DIAGNOSTIC_CAM';
+    const robotModelLabel = language === 'pt' ? 'MODELO: B.B. UNIDADE-01' : 'MODEL: B.B. UNIT-01';
+    const robotStatusLabel = isRobotRepaired
+      ? (language === 'pt' ? 'STATUS: OPERACIONAL' : 'STATUS: NOMINAL')
+      : (language === 'pt' ? 'STATUS: FALHA CRITICA' : 'STATUS: CRITICAL FAILURE');
+
     return (
       <AnimatePresence>
         {showRobotModal && (
@@ -8864,10 +9057,10 @@ const DashboardContent = memo(({
                   <div className="absolute top-8 left-8 space-y-2">
                     <div className="flex items-center gap-2">
                       <div className={`w-3 h-3 rounded-full animate-ping ${isRobotRepaired ? 'bg-emerald-500' : 'bg-red-500'}`} />
-                      <span className="text-[10px] font-mono text-white/60 tracking-widest uppercase">DIAGNOSTIC_CAM_{isRobotRepaired ? '01' : 'ERR'}</span>
+                      <span className="text-[10px] font-mono text-white/60 tracking-widest uppercase">{diagnosticCamLabel}_{isRobotRepaired ? '01' : 'ERR'}</span>
                     </div>
                     <div className="text-[10px] font-mono text-white/40 uppercase tracking-widest leading-tight">
-                      MODEL: B.B. UNIT-01<br />
+                      {robotModelLabel}<br />
                       ID: RD-2024-X
                     </div>
                   </div>
@@ -8884,10 +9077,10 @@ const DashboardContent = memo(({
                   <div className="space-y-8 relative z-10">
                     <div className="flex justify-between items-start">
                       <div>
-                        <h2 className="text-3xl lg:text-4xl font-orbitron font-black text-white tracking-widest uppercase mb-2">{t('robotRepairHeader')}</h2>
+                        <h2 className="text-3xl lg:text-4xl font-orbitron font-black text-white tracking-widest uppercase mb-2">{isRobotRepaired ? t('robotRepairedHeader') : t('robotRepairHeader')}</h2>
                         <div className="flex items-center gap-3">
                           <span className={`px-3 py-1 rounded-full text-[10px] font-mono font-bold tracking-widest uppercase ${isRobotRepaired ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>
-                            {isRobotRepaired ? 'STATUS: NOMINAL' : 'STATUS: CRITICAL FAILURE'}
+                            {robotStatusLabel}
                           </span>
                         </div>
                       </div>
@@ -8950,7 +9143,7 @@ const DashboardContent = memo(({
 
                         <PremiumCanvasButton
                           onClick={handleRepairRobot}
-                          disabled={isRobotRepaired || isRepairingRobot || voidResources.energy < 2500 || voidResources.tech < 2500}
+                          disabled={!hasWonEliminateEnemiesRoute3 || isRobotRepaired || isRepairingRobot || voidResources.energy < 2500 || voidResources.tech < 2500}
                           tone={isRepairingRobot ? 'orange' : 'red'}
                           className="h-20 w-full rounded-2xl"
                           contentClassName="gap-4 text-xl font-black uppercase tracking-[0.3em] text-white"
@@ -9179,14 +9372,11 @@ const DashboardContent = memo(({
     const startWarBattle = (sectorId: number) => {
       if (sectorId !== voidWarProgress.currentSector) return;
 
-      // Determine battle type based on currentBattle in sector
-      // 0-1: Normal, 2-3: Elite, 4: Boss (5 battles total)
-      let type: 'normal' | 'elite' | 'boss' = 'normal';
-      if (voidWarProgress.currentBattle >= 2 && voidWarProgress.currentBattle <= 3) type = 'elite';
-      if (voidWarProgress.currentBattle === 4) type = 'boss';
+      // Battles 1-4 clear common enemies. Battle 5 introduces the sector boss.
+      const isBossBattle = voidWarProgress.currentBattle === 4;
+      const type: 'normal' | 'boss' = isBossBattle ? 'boss' : 'normal';
 
-      // Start battle with modified stats and explicit locationId
-      startVoidBattle(type, sectorId + 1);
+      startVoidBattle(type, sectorId + 1, isBossBattle ? 'sector-boss' : 'sector-clear');
       setShowVoidWarMap(false);
     };
 
@@ -9240,9 +9430,29 @@ const DashboardContent = memo(({
                             ))}
                           </div>
                         </div>
-                        <div className="flex items-center gap-2 text-red-500/60 font-mono text-xs uppercase tracking-widest">
-                          <Activity className="w-4 h-4 animate-pulse" />
-                          {language === 'pt' ? 'ATIVIDADE HOSTIL DETECTADA' : 'HOSTILE ACTIVITY DETECTED'}
+                        <div className="flex flex-wrap items-center justify-end gap-3">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setVoidBattleMusicEnabled(current => !current);
+                              playSfx(voidBattleMusicEnabled ? 'close_window' : 'open_window');
+                            }}
+                            className={`flex items-center gap-2 rounded-xl border px-3 py-2 font-mono text-[10px] font-bold uppercase tracking-[0.18em] transition-all ${
+                              voidBattleMusicEnabled
+                                ? 'border-cyan-400/40 bg-cyan-500/10 text-cyan-300 shadow-[0_0_16px_rgba(34,211,238,0.15)]'
+                                : 'border-white/10 bg-white/5 text-white/35'
+                            }`}
+                            title={language === 'pt' ? 'Ligar ou desligar somente as músicas das batalhas dos locais' : 'Toggle only local battle music'}
+                          >
+                            {voidBattleMusicEnabled ? <Volume2 className="h-4 w-4" /> : <Music className="h-4 w-4" />}
+                            {language === 'pt'
+                              ? `MÚSICA DE BATALHA ${voidBattleMusicEnabled ? 'ON' : 'OFF'}`
+                              : `BATTLE MUSIC ${voidBattleMusicEnabled ? 'ON' : 'OFF'}`}
+                          </button>
+                          <div className="flex items-center gap-2 text-red-500/60 font-mono text-xs uppercase tracking-widest">
+                            <Activity className="w-4 h-4 animate-pulse" />
+                            {language === 'pt' ? 'ATIVIDADE HOSTIL DETECTADA' : 'HOSTILE ACTIVITY DETECTED'}
+                          </div>
                         </div>
                       </div>
 
@@ -10488,6 +10698,8 @@ const DashboardContent = memo(({
                     setShowRobotModal={setShowRobotModal}
                     isVoidWarActive={isVoidWarActive}
                     voidWarAlertActive={voidWarAlertActive}
+                    hasWonEliminateEnemiesRoute3={hasWonEliminateEnemiesRoute3}
+                    onVoidBossDefeated={recordVoidBossDefeat}
                     setHasWonEliminateEnemiesRoute3={setHasWonEliminateEnemiesRoute3}
                     setVoidWarAlertActive={setVoidWarAlertActive}
                     setIsShaking={setIsShaking}
@@ -13863,11 +14075,13 @@ const DashboardContent = memo(({
                   setIsShaking(false);
                   setIsFlashingRed(false);
                   setShowInvasionAlertOverlay(false);
+                  setActiveTab('void_battle');
+                  startVoidBattle('boss', 0, 'boss-zero');
                 }, 3000);
 
                 playSfx('alert_alert');
-                setIsFirstInvasionBattle(true);
-                addLog(language === 'pt' ? 'INVASÃƒO DETECTADA! Defenda a estrutura de reconstrução!' : 'INVASION DETECTED! Defend the reconstruction structure!', 'error');
+                setIsFirstInvasionBattle(false);
+                addLog(language === 'pt' ? 'INVASÃO DETECTADA! Defenda a estrutura de reconstrução!' : 'INVASION DETECTED! Defend the reconstruction structure!', 'error');
               }}
               language={language}
               theme="purple"
@@ -13902,4 +14116,3 @@ export const GameDashboard = memo((props: GameDashboardProps) => {
 GameDashboard.displayName = 'GameDashboard';
 
 export default GameDashboard;
-

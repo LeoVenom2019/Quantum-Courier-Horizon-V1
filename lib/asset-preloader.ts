@@ -613,6 +613,18 @@ const route3VoidBattleVideos = [
   '/assets/rota3/void/9/deus_monstro_do_vazio.mp4',
 ];
 
+const route3VoidLocalBattleThemes = [
+  '/audio/themes/local_bosses_void_themes/boss_devorador_alpha_theme.ogg',
+  '/audio/themes/local_bosses_void_themes/boss_sanguessuga_estelar_theme.ogg',
+  '/audio/themes/local_bosses_void_themes/boss_colosso_amalgamado_theme.ogg',
+  '/audio/themes/local_bosses_void_themes/boss_kraken_do_vazio_theme.ogg',
+  '/audio/themes/local_bosses_void_themes/boss_besta_tita_de_ferro_theme.ogg',
+  '/audio/themes/local_bosses_void_themes/boss_horror_mutante_theme.ogg',
+  '/audio/themes/local_bosses_void_themes/boss_verme_rei_do_vazio_theme.ogg',
+  '/audio/themes/local_bosses_void_themes/boss_predador_abissal_theme.ogg',
+  '/audio/themes/local_bosses_void_themes/lux_invicta.ogg',
+];
+
 const route3VoidDonationAudio = [
   '/audio/sfx/open_window_void.ogg',
   '/audio/sfx/close_window_void.ogg',
@@ -680,6 +692,7 @@ export const ASSET_GROUPS: Record<AssetGroupId, AssetPreloadEntry[]> = {
       '/images/bobby_blue/bobby_blue_summer.webp',
       '/images/bobby_blue/bobby_blue_fear.webp',
       '/images/bobby_blue/bobby_blue_in_love.webp',
+      '/images/bobby_blue/bobby_blue_sad.webp',
       '/images/bobby_blue/bobby_loader.webp',
       '/images/ui/earth_card.webp',
       '/images/ui/alien_wait.webp',
@@ -726,7 +739,7 @@ export const ASSET_GROUPS: Record<AssetGroupId, AssetPreloadEntry[]> = {
       ...route3VoidBattleImages,
     ], 'image'),
     ...asEntries(route3VoidBattleVideos, 'video'),
-    ...asEntries([...routeThemeAudio('Void'), '/audio/themes/intro_cap_03.ogg', ...route3VoidDonationAudio], 'audio'),
+    ...asEntries([...routeThemeAudio('Void'), '/audio/themes/intro_cap_03.ogg', ...route3VoidDonationAudio, ...route3VoidLocalBattleThemes], 'audio'),
   ],
   route4: [
     ...asEntries([routeHeaderImages.route4, '/images/bobby_blue/bobby_blue_new_land.webp', '/assets/rota4/new_land_map.webp', ...route4TextureImages], 'image'),

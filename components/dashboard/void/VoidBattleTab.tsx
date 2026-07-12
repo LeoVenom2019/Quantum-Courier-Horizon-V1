@@ -16,6 +16,8 @@ interface VoidBattleTabProps {
   setShowRobotModal: (show: boolean) => void;
   isVoidWarActive: boolean;
   voidWarAlertActive: boolean;
+  hasWonEliminateEnemiesRoute3: boolean;
+  onVoidBossDefeated: (locationId: number) => void;
   setHasWonEliminateEnemiesRoute3: (won: boolean) => void;
   setVoidWarAlertActive: (active: boolean) => void;
   setIsShaking: (shake: boolean) => void;
@@ -36,6 +38,8 @@ const VoidBattleTab = memo(function VoidBattleTab({
   setShowRobotModal,
   isVoidWarActive,
   voidWarAlertActive,
+  hasWonEliminateEnemiesRoute3,
+  onVoidBossDefeated,
   setHasWonEliminateEnemiesRoute3,
   setVoidWarAlertActive,
   setIsShaking,
@@ -339,6 +343,11 @@ const VoidBattleTab = memo(function VoidBattleTab({
   if (voidBattleStatus === 'fighting' && activeVoidBattle) {
     const effectiveStats = getEffectiveVoidStats(voidBattleShipStats);
     const isInvasionSectorBattle = (isVoidWarActive || voidWarAlertActive) && (activeVoidBattle.locationId ?? 0) > 0;
+    const encounterKind = activeVoidBattle.encounterKind as string | undefined;
+    const isBossZeroBattle = encounterKind === 'boss-zero';
+    const isExpectedSectorBattle = isVoidWarActive
+      && activeVoidBattle.warSector === voidWarProgress.currentSector
+      && activeVoidBattle.warBattle === voidWarProgress.currentBattle;
 
     return (
       <VoidBattleArena
@@ -347,6 +356,7 @@ const VoidBattleTab = memo(function VoidBattleTab({
         voidResources={combat.voidResources}
         routeTier={routeTier}
         locationId={activeVoidBattle.locationId ?? 0}
+        enableBossIntro={isBossZeroBattle || encounterKind === 'sector-boss'}
         activeShipImage={battleLevel >= 25 ? '/images/battle/skyring.png' : '/images/battle/standard_ship.png'}
         battleLevel={battleLevel}
         onBattleEnd={(status, result) => {
@@ -360,7 +370,13 @@ const VoidBattleTab = memo(function VoidBattleTab({
              setVoidBattleStatus('won');
              playSfx('bobby_blue_theme_victory');
 
-             if (voidWarAlertActive) {
+             const defeatedBoss = [...activeBattleEnemies, ...activeBattleEnemyQueue]
+               .some(enemy => enemy.type === 'Boss');
+             if (routeTier === 'Void' && defeatedBoss) {
+               onVoidBossDefeated(activeVoidBattle.locationId ?? 0);
+             }
+
+             if (isBossZeroBattle && voidWarAlertActive) {
                setHasWonEliminateEnemiesRoute3(true);
                setVoidWarAlertActive(false);
                setIsShaking(false);
@@ -376,7 +392,7 @@ const VoidBattleTab = memo(function VoidBattleTab({
                );
              }
 
-             if (isVoidWarActive) {
+             if (isExpectedSectorBattle) {
                if (voidWarProgress.currentSector === 8 && voidWarProgress.currentBattle === 4) {
                  setShowRoute3Ending(true);
                  setVoidAircraftAutoToggles({ 'va-1': false, 'va-2': false, 'va-3': false });
@@ -851,7 +867,7 @@ const VoidBattleTab = memo(function VoidBattleTab({
             </div>
           </div>
 
-          {(voidWarAlertActive) && !isRobotRepaired && (
+          {hasWonEliminateEnemiesRoute3 && !isRobotRepaired && (
             <PremiumCanvasButton
               onClick={() => setShowRobotModal(true)}
               tone="amber"
