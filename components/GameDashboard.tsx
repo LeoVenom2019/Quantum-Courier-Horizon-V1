@@ -2378,6 +2378,8 @@ const DashboardContent = memo(({
 
     const audio = route2IntroAudioRef.current || new Audio('/audio/themes/intro_cap_02.ogg');
     route2IntroAudioRef.current = audio;
+    // HTMLAudioElement is an imperative browser API intentionally controlled by this ref.
+    // eslint-disable-next-line react-hooks/immutability
     audio.loop = false;
     audio.currentTime = 0;
     audio.volume = 0;
@@ -2397,7 +2399,7 @@ const DashboardContent = memo(({
         route2IntroFadeRef.current = null;
       }
     }, 50);
-  }, [jukebox?.volume, musicOn]);
+  }, [jukebox.volume, musicOn]);
 
   const resumeRouteMusicAfterRoute2Cancel = useCallback(() => {
     if (!musicOn) return;
@@ -2465,6 +2467,8 @@ const DashboardContent = memo(({
 
     const audio = route3IntroAudioRef.current || new Audio('/audio/themes/intro_cap_03.ogg');
     route3IntroAudioRef.current = audio;
+    // HTMLAudioElement is an imperative browser API intentionally controlled by this ref.
+    // eslint-disable-next-line react-hooks/immutability
     audio.loop = false;
     audio.currentTime = 0;
     audio.volume = 0;
@@ -2484,7 +2488,7 @@ const DashboardContent = memo(({
         route3IntroFadeRef.current = null;
       }
     }, 50);
-  }, [jukebox?.volume, musicOn]);
+  }, [jukebox.volume, musicOn]);
 
   const resumeRouteMusicAfterRoute3Cancel = useCallback(() => {
     if (!musicOn) return;
@@ -4071,7 +4075,7 @@ const DashboardContent = memo(({
       earthHappinessRef.current = nextHappiness;
       dispatch({ type: 'UPDATE_EARTH_STATE', payload: { happiness: nextHappiness } });
     }
-  }, [dispatch, language, setColonies, setEarthEvents]);
+  }, [dispatch, language, setEarthEvents, setEarthPopulation]);
 
   // Global Game Time & Earth Simulation Loop (Route 4)
   useEffect(() => {
@@ -6029,7 +6033,7 @@ const DashboardContent = memo(({
     if (currentMissions.length !== missionsRef.current.length) {
       setMissions(currentMissions);
     }
-  }, [t, routeTier, getEconomicMultipliers, setMissions]);
+  }, [t, getEconomicMultipliers, setMissions]);
 
   // Auto-Shipment stops once Project Terra is complete.
   useEffect(() => {

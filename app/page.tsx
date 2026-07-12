@@ -1089,7 +1089,10 @@ export default function GameHome() {
   ];
   useEffect(() => {
     if (!isMounted) return;
-    setRandomVisualIndex(Math.random() > 0.5 ? Math.floor(Math.random() * landingVisuals.length) : -1);
+    const randomVisualTimer = window.setTimeout(() => {
+      setRandomVisualIndex(Math.random() > 0.5 ? Math.floor(Math.random() * landingVisuals.length) : -1);
+    }, 0);
+    return () => window.clearTimeout(randomVisualTimer);
   }, [isMounted, landingVisuals.length]);
 
   const randomVisual = isMounted && view === 'landing' && randomVisualIndex >= 0 ? landingVisuals[randomVisualIndex] : null;

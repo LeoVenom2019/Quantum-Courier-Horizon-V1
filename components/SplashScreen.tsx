@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { motion } from 'motion/react';
 import { Cog } from 'lucide-react';
 
@@ -16,11 +16,11 @@ export const SplashScreen = ({ onComplete }: { onComplete: () => void }) => {
   const completedRef = useRef(false);
   const videoFinishedRef = useRef(false);
 
-  const complete = () => {
+  const complete = useCallback(() => {
     if (completedRef.current) return;
     completedRef.current = true;
     onComplete();
-  };
+  }, [onComplete]);
 
   useEffect(() => {
     if (phase !== 'intro-black') return;
@@ -63,7 +63,7 @@ export const SplashScreen = ({ onComplete }: { onComplete: () => void }) => {
 
     const timer = window.setTimeout(complete, OUTRO_BLACK_MS);
     return () => window.clearTimeout(timer);
-  }, [phase]);
+  }, [complete, phase]);
 
   const finishVideo = () => {
     if (videoFinishedRef.current) return;

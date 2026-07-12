@@ -429,7 +429,7 @@ const HistoryTab = memo(function HistoryTab() {
                         >
                           <div className="absolute inset-0 bg-gradient-to-br from-purple-500/30 via-black to-black rounded-[3rem] border-4 border-purple-500/40 shadow-[0_0_60px_rgba(168,85,247,0.3)] overflow-hidden backdrop-blur-xl">
                             <Image
-                              src={BOBBY_BLUE_SAD_IMAGE} 
+                              src={BOBBY_BLUE_SAD_IMAGE}
                               alt="Sad Bobby" 
                               fill
                               sizes="288px"
