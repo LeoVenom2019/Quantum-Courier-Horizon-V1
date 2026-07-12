@@ -91,6 +91,7 @@ const VOID_LOCAL_BATTLE_THEMES: Record<number, string> = {
   9: '/audio/themes/local_bosses_void_themes/lux_invicta.ogg',
 };
 const VOID_BATTLE_MUSIC_STORAGE_KEY = 'qch_void_battle_music_enabled';
+const ROUTE3_ENDING_THEME = '/audio/themes/road_of_hollow_kings_endcap3theme.ogg';
 const VOID_BOSS_ACHIEVEMENT_IDS: Record<number, string> = {
   0: 'void_boss_zero_defeated',
   1: 'void_boss_1_defeated',
@@ -1313,6 +1314,50 @@ const DashboardContent = memo(({
   } | null>(null);
   const [showRoute3Ending, setShowRoute3Ending] = useState(false);
   const [route3EndingStep, setRoute3EndingStep] = useState(0);
+  const route3EndingAudioRef = useRef<HTMLAudioElement | null>(null);
+  const stopJukeboxForRoute3Ending = jukebox.stop;
+  const route3EndingMusicVolume = Number(jukebox.volume ?? 0.55);
+
+  useEffect(() => {
+    if (!showRoute3Ending) return;
+
+    stopJukeboxForRoute3Ending({ rememberPreference: false });
+
+    const audio = new Audio(ROUTE3_ENDING_THEME);
+    route3EndingAudioRef.current = audio;
+    audio.loop = true;
+    audio.preload = 'auto';
+    audio.volume = 0;
+    void audio.play().catch(error => {
+      if (!(error instanceof DOMException && error.name === 'NotAllowedError')) {
+        console.warn('[Route3EndingMusic] Playback failed:', error);
+      }
+    });
+
+    const targetVolume = Math.min(0.82, Math.max(0.24, route3EndingMusicVolume));
+    const fadeStartedAt = performance.now();
+    const fadeInTimer = window.setInterval(() => {
+      const progress = Math.min(1, (performance.now() - fadeStartedAt) / 2400);
+      audio.volume = targetVolume * progress;
+      if (progress >= 1) window.clearInterval(fadeInTimer);
+    }, 40);
+
+    return () => {
+      window.clearInterval(fadeInTimer);
+      const startVolume = audio.volume;
+      const fadeOutStartedAt = performance.now();
+      const fadeOutTimer = window.setInterval(() => {
+        const progress = Math.min(1, (performance.now() - fadeOutStartedAt) / 1600);
+        audio.volume = Math.max(0, startVolume * (1 - progress));
+        if (progress >= 1) {
+          window.clearInterval(fadeOutTimer);
+          audio.pause();
+          audio.currentTime = 0;
+        }
+      }, 40);
+      if (route3EndingAudioRef.current === audio) route3EndingAudioRef.current = null;
+    };
+  }, [route3EndingMusicVolume, showRoute3Ending, stopJukeboxForRoute3Ending]);
   const [showVoidLore, setShowVoidLore] = useState(false);
   const [showRoute2Lore, setShowRoute2Lore] = useState(false);
   const [voidWarRobotSpeaking, setVoidWarRobotSpeaking] = useState(false);
@@ -8735,6 +8780,11 @@ const DashboardContent = memo(({
     const stepText = typeof rawStepText === 'string'
       ? t(rawStepText)
       : rawStepText?.[language as 'pt' | 'en'] || rawStepText?.en || '';
+    const stepLines: string[] = String(stepText).split('\n');
+    const endingProgress = ((route3EndingStep + 1) / steps.length) * 100;
+    const isDanger = step.type === 'danger';
+    const isSuccess = step.type === 'success';
+    const isRobot = step.type === 'robot';
 
     const handleNext = () => {
       if (route3EndingStep < steps.length - 1) {
@@ -8755,94 +8805,97 @@ const DashboardContent = memo(({
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 z-[10000] bg-black flex flex-col items-center justify-center p-8 overflow-hidden text-center"
+        transition={{ duration: 1.4 }}
+        className="fixed inset-0 z-[10000] flex flex-col items-center justify-center overflow-hidden bg-black p-6 text-center md:p-10"
       >
+        <motion.div
+          key={`ending-atmosphere-${step.type}`}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 1.5 }}
+          className={`absolute inset-0 ${isDanger ? 'bg-[radial-gradient(circle_at_50%_72%,rgba(127,29,29,0.24),transparent_50%)]' : isSuccess ? 'bg-[radial-gradient(circle_at_50%_78%,rgba(16,185,129,0.2),transparent_52%)]' : 'bg-[radial-gradient(circle_at_50%_72%,rgba(88,28,135,0.24),transparent_54%)]'}`}
+        />
+        <div className="absolute inset-0 z-[1] bg-[linear-gradient(rgba(168,85,247,0.035)_1px,transparent_1px),linear-gradient(90deg,rgba(168,85,247,0.035)_1px,transparent_1px)] bg-[size:72px_72px] [mask-image:linear-gradient(to_bottom,transparent,black_35%,transparent_94%)]" />
+        <motion.div animate={{ y: ['-5vh', '105vh'] }} transition={{ duration: 7, repeat: Infinity, ease: 'linear' }} className="absolute inset-x-0 top-0 z-[2] h-px bg-gradient-to-r from-transparent via-purple-300/30 to-transparent" />
+        <motion.div
+          initial={{ opacity: 0, scale: 0.82, y: 180 }}
+          animate={{ opacity: isDanger ? 0.22 : 0.5, scale: 1, y: 120 }}
+          transition={{ duration: 3.2, ease: 'easeOut' }}
+          className={`absolute -bottom-[44vh] z-[3] h-[72vh] w-[115vw] rounded-[50%] border-t ${isDanger ? 'border-red-500/60 shadow-[0_-20px_90px_rgba(239,68,68,0.18)]' : isSuccess ? 'border-emerald-300/70 shadow-[0_-20px_100px_rgba(52,211,153,0.22)]' : 'border-purple-300/55 shadow-[0_-20px_90px_rgba(168,85,247,0.2)]'}`}
+        />
+        <div className="absolute inset-0 z-10 bg-[radial-gradient(circle,transparent_32%,rgba(0,0,0,0.82)_100%)]" />
+        <div className="absolute inset-x-0 top-0 z-40 h-[7vh] bg-black" />
+        <div className="absolute inset-x-0 bottom-0 z-40 h-[7vh] bg-black" />
+
+        <div className="absolute left-6 right-6 top-[9vh] z-30 flex items-center justify-between font-mono text-[9px] uppercase tracking-[0.35em] text-purple-200/40 md:left-12 md:right-12">
+          <span>{language === 'pt' ? 'Epílogo // Guerra do Vazio' : 'Epilogue // Void War'}</span>
+          <span>{String(route3EndingStep + 1).padStart(2, '0')} / {String(steps.length).padStart(2, '0')}</span>
+        </div>
+        <div className="absolute left-6 right-6 top-[12vh] z-30 h-px overflow-hidden bg-white/5 md:left-12 md:right-12">
+          <motion.div animate={{ width: `${endingProgress}%` }} transition={{ duration: 0.8, ease: 'easeOut' }} className={`h-full ${isDanger ? 'bg-red-500' : isSuccess ? 'bg-emerald-400' : 'bg-purple-400'}`} />
+        </div>
+
         <AnimatePresence mode="wait">
           <motion.div
             key={route3EndingStep}
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95 }}
-            transition={{ duration: 0.8 }}
-            className="max-w-2xl w-full space-y-12"
+            initial={{ opacity: 0, scale: 0.97 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 1.025, filter: 'blur(8px)' }}
+            transition={{ duration: 0.85, ease: 'easeOut' }}
+            className="relative z-30 flex w-full max-w-5xl flex-col items-center gap-9"
           >
-            {step.type === 'robot' && (
-              <div className="mx-auto flex w-full max-w-md items-center gap-5 rounded-2xl border border-purple-400/30 bg-purple-950/20 p-4 text-left shadow-[0_0_40px_rgba(168,85,247,0.18)]">
+            {isRobot && (
+              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15, duration: 0.8 }} className="mx-auto flex w-full max-w-md items-center gap-5 rounded-2xl border border-purple-400/30 bg-purple-950/20 p-4 text-left shadow-[0_0_50px_rgba(168,85,247,0.2)] backdrop-blur-md">
                 <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-2xl border border-purple-400/40 bg-black">
-                  <motion.div
-                    animate={{ scale: [1, 1.1, 1], opacity: [0.2, 0.4, 0.2] }}
-                    transition={{ duration: 3, repeat: Infinity }}
-                    className="absolute inset-0 bg-purple-500 blur-2xl"
-                  />
-                  <Image unoptimized width={800} height={600}
-                    src="/images/bobby_blue/bobby_blue_in_love.webp"
-                    alt="Bobby Blue"
-                    className="relative h-full w-full object-cover"
-                  />
+                  <motion.div animate={{ scale: [1, 1.14, 1], opacity: [0.15, 0.45, 0.15] }} transition={{ duration: 3, repeat: Infinity }} className="absolute inset-0 bg-purple-500 blur-2xl" />
+                  <Image unoptimized width={800} height={600} src="/images/bobby_blue/bobby_blue_in_love.webp" alt="Bobby Blue" className="relative h-full w-full object-cover" />
                 </div>
                 <div>
                   <p className="font-orbitron text-[10px] font-black uppercase tracking-[0.35em] text-purple-300/70">Bobby Blue</p>
-                  <p className="mt-2 font-mono text-xs uppercase tracking-[0.25em] text-purple-200/60">
-                    {language === 'pt' ? 'sinal restaurado' : 'signal restored'}
-                  </p>
+                  <p className="mt-2 font-mono text-xs uppercase tracking-[0.25em] text-purple-200/60">{language === 'pt' ? 'canal restaurado' : 'channel restored'}</p>
                 </div>
+              </motion.div>
+            )}
+
+            {isDanger && (
+              <div className="relative py-2">
+                <motion.div animate={{ scale: [0.8, 1.5, 0.8], opacity: [0, 0.28, 0] }} transition={{ duration: 2.2, repeat: Infinity }} className="absolute inset-0 rounded-full bg-red-600 blur-[90px]" />
+                <motion.div animate={{ rotate: [0, 4, -4, 0] }} transition={{ duration: 3.5, repeat: Infinity }} className="relative z-10 mx-auto flex h-20 w-20 items-center justify-center rounded-full border border-red-400/60 bg-red-950/40 shadow-[0_0_35px_rgba(239,68,68,0.25)]">
+                  <ShieldAlert className="h-10 w-10 text-red-400" />
+                </motion.div>
               </div>
             )}
 
-            {step.type === 'danger' && (
-              <div className="relative py-8">
-                <motion.div
-                  animate={{ scale: [1, 1.2, 1], opacity: [0, 0.2, 0] }}
-                  transition={{ duration: 1.5, repeat: Infinity }}
-                  className="absolute inset-0 bg-red-600 rounded-full blur-[100px]"
-                />
-                <div className="w-24 h-24 bg-red-600/20 border-2 border-red-500 rounded-full flex items-center justify-center mx-auto relative z-10 animate-pulse">
-                  <ShieldAlert className="w-12 h-12 text-red-500" />
-                </div>
-              </div>
-            )}
-
-            <div className="space-y-8">
-              <h2 className={`font-orbitron font-black uppercase tracking-[0.3em] leading-relaxed px-4 ${step.type === 'danger' ? 'text-red-500 text-3xl md:text-4xl drop-shadow-[0_0_15px_rgba(239,68,68,0.5)]' :
-                  step.type === 'success' ? 'text-emerald-400 text-3xl md:text-3xl' :
-                    step.type === 'robot' ? 'text-purple-300 text-2xl italic' :
-                      'text-purple-100 text-2xl md:text-3xl'
-                }`}>
-                {stepText}
-              </h2>
+            <div className="min-h-[9rem] space-y-3">
+              {stepLines.map((line, index) => (
+                <motion.h2
+                  key={`${route3EndingStep}-${index}`}
+                  initial={{ opacity: 0, y: 18, letterSpacing: '0.45em' }}
+                  animate={{ opacity: 1, y: 0, letterSpacing: '0.28em' }}
+                  transition={{ delay: 0.18 + index * 0.42, duration: 0.9, ease: 'easeOut' }}
+                  className={`px-3 font-orbitron text-2xl font-black uppercase leading-relaxed md:text-4xl ${isDanger ? 'text-red-400 drop-shadow-[0_0_18px_rgba(239,68,68,0.5)]' : isSuccess ? 'text-emerald-300 drop-shadow-[0_0_18px_rgba(52,211,153,0.35)]' : isRobot ? 'text-purple-200 italic' : 'text-purple-50 drop-shadow-[2px_0_0_rgba(239,68,68,0.35),-2px_0_0_rgba(59,130,246,0.35)]'}`}
+                >
+                  {line}
+                </motion.h2>
+              ))}
             </div>
 
-            <PremiumCanvasButton
-              onClick={handleNext}
-              tone={step.type === 'danger' ? 'red' : step.type === 'success' ? 'green' : 'purple'}
-              className="h-16 rounded-2xl"
-              contentClassName="px-16 text-base font-black uppercase tracking-[0.5em] text-white"
-            >
-              {language === 'pt' ? 'CONTINUAR' : 'CONTINUE'}
-            </PremiumCanvasButton>
+            <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.75 + Math.max(0, stepLines.length - 1) * 0.3, duration: 0.7 }}>
+              <PremiumCanvasButton onClick={handleNext} tone={isDanger ? 'red' : isSuccess ? 'green' : 'purple'} className="h-16 min-w-72 rounded-2xl" contentClassName="px-12 text-sm font-black uppercase tracking-[0.48em] text-white">
+                {language === 'pt' ? 'CONTINUAR' : 'CONTINUE'}
+              </PremiumCanvasButton>
+            </motion.div>
           </motion.div>
         </AnimatePresence>
 
-        {/* Cinematic Background Particles */}
-        <div className="absolute inset-0 pointer-events-none opacity-20">
-          {[...Array(50)].map((_, i) => (
+        <div className="pointer-events-none absolute inset-0 z-[5] opacity-35">
+          {Array.from({ length: 42 }, (_, i) => (
             <motion.div
               key={i}
-              className={`absolute w-1 h-1 rounded-full ${step.type === 'danger' ? 'bg-red-500' : 'bg-purple-400'}`}
-              style={{
-                top: `${Math.random() * 100}%`,
-                left: `${Math.random() * 100}%`,
-              }}
-              animate={{
-                y: [0, -100 - randomUnit() * 200],
-                opacity: [0, 1, 0],
-                scale: [0, 1.5, 0]
-              }}
-              transition={{
-                duration: 2 + Math.random() * 3,
-                repeat: Infinity,
-                delay: Math.random() * 5
-              }}
+              className={`absolute rounded-full ${isDanger ? 'bg-red-400' : isSuccess ? 'bg-emerald-300' : 'bg-purple-300'}`}
+              style={{ top: `${(i * 37) % 100}%`, left: `${(i * 61) % 100}%`, width: `${1 + (i % 3)}px`, height: `${1 + (i % 3)}px` }}
+              animate={{ y: [20, -120 - (i % 5) * 30], opacity: [0, 0.8, 0], scale: [0.4, 1.4, 0.4] }}
+              transition={{ duration: 3.2 + (i % 7) * 0.45, repeat: Infinity, delay: (i % 11) * 0.32, ease: 'linear' }}
             />
           ))}
         </div>

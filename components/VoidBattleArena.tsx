@@ -620,19 +620,20 @@ const VoidBattleArena = memo(function VoidBattleArena({
 
     const loadImage = (id: string, src: string, fallbackSrc?: string): Promise<void> => {
       return new Promise((resolve) => {
-        const img = new Image();
-        img.onload = () => {
-          if (!cancelled) assetsRef.current[id] = img;
-          resolve();
+        const cacheDecodedImage = (image: HTMLImageElement) => {
+          const cacheAndResolve = () => {
+            if (!cancelled) assetsRef.current[id] = image;
+            resolve();
+          };
+          void image.decode().catch(() => undefined).then(cacheAndResolve);
         };
+        const img = new Image();
+        img.onload = () => cacheDecodedImage(img);
         img.onerror = () => {
           console.warn(`[VoidBattleArena] Failed to load asset: ${id} from ${src}`);
           if (fallbackSrc) {
             const fImg = new Image();
-            fImg.onload = () => {
-              if (!cancelled) assetsRef.current[id] = fImg;
-              resolve();
-            };
+            fImg.onload = () => cacheDecodedImage(fImg);
             fImg.onerror = () => { 
               console.error(`[VoidBattleArena] Critical: Failed to load fallback for ${id}`);
               resolve(); 
@@ -1495,6 +1496,12 @@ const VoidBattleArena = memo(function VoidBattleArena({
     };
 
     const loop = () => {
+      if (isPausedRef.current) {
+        lastTime = Date.now();
+        animId = requestAnimationFrame(loop);
+        return;
+      }
+
       const s = gameRef.current;
       const now = Date.now();
       let deltaTime = Math.min(2, (now - lastTime) / 16.66);
@@ -3278,6 +3285,11 @@ const VoidBattleArena = memo(function VoidBattleArena({
               s.enemyQueueNextSpawnAt = now + spawnDelayMs;
               s.projectiles = [];
               s.cinematicDarkness = Math.max(s.cinematicDarkness, 0.32);
+              if (routeTier === 'Void' && queuedEnemy.type === 'Boss') {
+                const nextLocation = queuedEnemy.assetLocationId ?? locationId;
+                const nextLocKey = nextLocation === 0 ? 'zero' : nextLocation;
+                playSfx(`boss_scream_${nextLocKey}`, { loop: true });
+              }
             }
             if (now >= s.enemyQueueNextSpawnAt) {
               const nextEnemy = s.enemyQueue.shift();
@@ -3286,11 +3298,7 @@ const VoidBattleArena = memo(function VoidBattleArena({
                 s.lastEnemyAttack = now;
                 s.flashAlpha = Math.max(s.flashAlpha, nextEnemy.visualScale && nextEnemy.visualScale < 1 ? 0.2 : 0.5);
                 s.flashColor = nextEnemy.visualScale && nextEnemy.visualScale < 1 ? '190, 90, 255' : '255, 170, 80';
-                if (routeTier === 'Void' && nextEnemy.type === 'Boss') {
-                  const nextLocation = nextEnemy.assetLocationId ?? locationId;
-                  const nextLocKey = nextLocation === 0 ? 'zero' : nextLocation;
-                  playSfx(`boss_scream_${nextLocKey}`, { loop: true });
-                }
+
               }
               s.enemyQueueNextSpawnAt = undefined;
             }

@@ -614,6 +614,7 @@ const route3VoidBattleVideos = [
 ];
 
 const route3VoidLocalBattleThemes = [
+  '/audio/themes/road_of_hollow_kings_endcap3theme.ogg',
   '/audio/themes/local_bosses_void_themes/boss_devorador_alpha_theme.ogg',
   '/audio/themes/local_bosses_void_themes/boss_sanguessuga_estelar_theme.ogg',
   '/audio/themes/local_bosses_void_themes/boss_colosso_amalgamado_theme.ogg',
@@ -744,7 +745,7 @@ export const ASSET_GROUPS: Record<AssetGroupId, AssetPreloadEntry[]> = {
   route4: [
     ...asEntries([routeHeaderImages.route4, '/images/bobby_blue/bobby_blue_new_land.webp', '/assets/rota4/new_land_map.webp', ...route4TextureImages], 'image'),
     ...asEntries(['/assets/rota4/videos/quantum_courier_credits.webm'], 'video'),
-    ...asEntries([...routeThemeAudio('Earth'), '/audio/themes/infinite_horizon_short_version.ogg', ...route4BobbyAccessDeniedAudio, ...route4BobbyMissionCompleteAudio, ...route4BobbyWarningAudio, ...route4BobbyPrepareForBattleAudio, ...route4BobbyLockedTvAudio, ...route4BobbyPopulationMilestoneAudio, ...route4BobbyMuralAudio], 'audio'),
+    ...asEntries([...routeThemeAudio('Earth'), '/audio/themes/infinite_horizon_full_version.ogg', ...route4BobbyAccessDeniedAudio, ...route4BobbyMissionCompleteAudio, ...route4BobbyWarningAudio, ...route4BobbyPrepareForBattleAudio, ...route4BobbyLockedTvAudio, ...route4BobbyPopulationMilestoneAudio, ...route4BobbyMuralAudio], 'audio'),
   ],
   'route4-colonies': [
     ...asEntries([...route4ColonyImages, ...route4LayoutImages], 'image'),

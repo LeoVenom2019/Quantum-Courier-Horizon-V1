@@ -103,6 +103,33 @@ export const ARCADE_THEMES: Record<string, RouteTheme> = {
   }
 };
 
+export const SPECIAL_THEMES: Record<string, RouteTheme> = {
+  transitions: {
+    id: 'transitions',
+    name: 'Transitions & Epilogues',
+    playlist: [
+      { id: 'transition_cap2', title: 'Chapter 2 - Interstellar Transition', url: '/audio/themes/intro_cap_02.ogg' },
+      { id: 'transition_cap3', title: 'Chapter 3 - Into the Void', url: '/audio/themes/intro_cap_03.ogg' },
+      { id: 'epilogue_cap3', title: 'Road of Hollow Kings', url: '/audio/themes/road_of_hollow_kings_endcap3theme.ogg' },
+      { id: 'credits_cap4_full', title: 'Infinite Horizon (Full Version)', url: '/audio/themes/infinite_horizon_full_version.ogg' },
+    ],
+  },
+  'void-bosses': {
+    id: 'void-bosses',
+    name: 'Chapter 3 - Void Bosses',
+    playlist: [
+      { id: 'void_boss_1_theme', title: 'Devorador Alpha', url: '/audio/themes/local_bosses_void_themes/boss_devorador_alpha_theme.ogg' },
+      { id: 'void_boss_2_theme', title: 'Sanguessuga Estelar', url: '/audio/themes/local_bosses_void_themes/boss_sanguessuga_estelar_theme.ogg' },
+      { id: 'void_boss_3_theme', title: 'Colosso Amalgamado', url: '/audio/themes/local_bosses_void_themes/boss_colosso_amalgamado_theme.ogg' },
+      { id: 'void_boss_4_theme', title: 'Kraken do Vazio', url: '/audio/themes/local_bosses_void_themes/boss_kraken_do_vazio_theme.ogg' },
+      { id: 'void_boss_5_theme', title: 'Besta-Titã de Ferro', url: '/audio/themes/local_bosses_void_themes/boss_besta_tita_de_ferro_theme.ogg' },
+      { id: 'void_boss_6_theme', title: 'Horror Mutante', url: '/audio/themes/local_bosses_void_themes/boss_horror_mutante_theme.ogg' },
+      { id: 'void_boss_7_theme', title: 'Verme-Rei do Vazio', url: '/audio/themes/local_bosses_void_themes/boss_verme_rei_do_vazio_theme.ogg' },
+      { id: 'void_boss_8_theme', title: 'Predador Abissal', url: '/audio/themes/local_bosses_void_themes/boss_predador_abissal_theme.ogg' },
+      { id: 'void_boss_9_theme', title: 'Lux Invicta - Deus-Monstro', url: '/audio/themes/local_bosses_void_themes/lux_invicta.ogg' },
+    ],
+  },
+};
 /**
  * Helper to get a random track from a route's playlist
  */

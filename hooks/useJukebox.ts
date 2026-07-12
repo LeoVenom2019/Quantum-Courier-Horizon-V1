@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { GameStorage } from '@/lib/game-storage';
-import { ROUTE_THEMES, ARCADE_THEMES, Track } from '@/lib/music-data';
+import { ROUTE_THEMES, ARCADE_THEMES, SPECIAL_THEMES, Track } from '@/lib/music-data';
 import { useSoundMaster } from './useSoundMaster';
 
 export type { Track };
@@ -48,6 +48,11 @@ export function useJukebox(onPlayStateChange?: (isPlaying: boolean) => void) {
     Object.values(ARCADE_THEMES).forEach(arcade => {
       arcade.playlist.forEach(track => {
         tracks.push({ ...track, origin: arcade.name });
+      });
+    });
+    Object.values(SPECIAL_THEMES).forEach(collection => {
+      collection.playlist.forEach(track => {
+        tracks.push({ ...track, origin: collection.name });
       });
     });
     
