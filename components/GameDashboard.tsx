@@ -5053,6 +5053,7 @@ const DashboardContent = memo(({
   const performSave = useCallback(async () => {
     if (!isLoaded || isResettingRef.current) return;
 
+    const horizonSkillTree = await GameStorage.load('horizon_skill_tree');
     const saveData = {
       qc: qcRef.current,
       unlockedRouteIds: unlockedRouteIdsRef.current,
@@ -5151,6 +5152,7 @@ const DashboardContent = memo(({
       hydrosphere: hydrosphereRef.current,
       biosphere: biosphereRef.current,
       colonies: coloniesRef.current,
+      horizonSkillTree,
       newEarthSubmarines: newEarthSubmarinesRef.current,
       newEarthHelicopters: newEarthHelicoptersRef.current,
       newEarthTanks: newEarthTanksRef.current,
@@ -7008,6 +7010,8 @@ const DashboardContent = memo(({
     setSaveProgress(100);
     await new Promise(resolve => setTimeout(resolve, 300));
 
+    const horizonSkillTree = await GameStorage.load('horizon_skill_tree');
+
     // Prepare save data - DISABLE ALL AUTO MODES
     const saveData = {
       qc: qcRef.current,
@@ -7107,6 +7111,7 @@ const DashboardContent = memo(({
       isRobotRepaired: isRobotRepairedRef.current,
       battleShipUpgradeLevel: battleShipUpgradeLevelRef.current,
       colonies,
+      horizonSkillTree,
       newEarthSubmarines,
       newEarthHelicopters,
       newEarthTanks,
@@ -10792,7 +10797,7 @@ const DashboardContent = memo(({
                       onDefenseThreatAlertChange={setRoute4DefenseThreatAlert}
                       openDefenseRequest={openRoute4DefenseRequest}
                       abandonDefenseRequest={abandonRoute4DefenseRequest}
-                      defenseAlertsPaused={Boolean(activeMiniGameId)}
+                      defenseAlertsPaused={Boolean(activeMiniGameId || activeSurfaceBattle || activeUnderwaterBattle)}
                       selectedColonyId={selectedColonyId}
                       setSelectedColonyId={setSelectedColonyId}
                     />
@@ -12367,7 +12372,7 @@ const DashboardContent = memo(({
                 )}
 
                 {activeTab === 'history' && (
-                  <HistoryTab />
+                  <HistoryTab newEarthWarIntelCollection={newEarthWarIntelCollection} />
                 )}
 
               </React.Fragment>

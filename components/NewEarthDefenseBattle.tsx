@@ -23,6 +23,12 @@ type SpecialHudSnapshot = {
 };
 
 const REGULAR_ENEMIES_BEFORE_FINAL_BOSS = 20;
+const getBossHpPhaseMultiplier = (battleLevel: number) => {
+  const phase = Math.max(1, Math.floor(Number(battleLevel) || 1));
+  if (phase >= 20) return 1;
+  if (phase >= 10) return 0.25;
+  return 0.125;
+};
 const BOSS_BASE_HP_MULTIPLIER = 8;
 const BOSS_ABSORB_SHIELD_MULTIPLIER = 5;
 
@@ -36,8 +42,11 @@ interface NewEarthDefenseBattleProps {
   horizonNextXp: number;
   specials: DefenseSpecialId[];
   trinityShotEnabled?: boolean;
+  damageSupportDrone?: boolean;
+  defenseSupportDrone?: boolean;
   threatTitle: string;
   onVictory: (summary: BattleResultSummary) => void;
+  queuedDefenseCount?: number;
   onDefeat: () => void;
   onClose: () => void;
 }
@@ -73,6 +82,7 @@ type Enemy = {
   width: number;
   height: number;
   damage: number;
+  weakenedUntil?: number;
   status: EnemyStatus;
   attackCooldown: number;
   image: string;
@@ -116,6 +126,7 @@ type Projectile = {
   elemental: { ice: number; electric: number; fire: number };
   color: string;
   trinityShot?: boolean;
+  drone?: 'damage';
   size?: number;
   seed?: number;
   born?: number;
@@ -132,6 +143,15 @@ type FloatText = {
   maxLife: number;
   size: number;
   shadowColor?: string;
+};
+
+type DroneBeam = {
+  fromX: number;
+  fromY: number;
+  toX: number;
+  toY: number;
+  color: string;
+  life: number;
 };
 
 type LaserParticle = {
@@ -798,7 +818,10 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
   horizonNextXp,
   specials,
   trinityShotEnabled = false,
+  damageSupportDrone = false,
+  defenseSupportDrone = false,
   threatTitle,
+  queuedDefenseCount = 0,
   onVictory,
   onDefeat,
   onClose,
@@ -822,6 +845,10 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
     projectiles: [] as Projectile[],
     floats: [] as FloatText[],
     lastShot: 0,
+    lastDamageDroneShot: 0,
+    damageDroneTargetId: undefined as number | undefined,
+    lastDefenseDronePulse: 0,
+    droneBeams: [] as DroneBeam[],
     lastSpawn: 0,
     kills: 0,
     regularEnemiesSpawned: 0,
@@ -991,6 +1018,10 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
     state.earnedXp = 0;
     state.earnedQc = 0;
     state.lastShot = 0;
+    state.lastDamageDroneShot = performance.now();
+    state.damageDroneTargetId = undefined;
+    state.lastDefenseDronePulse = performance.now();
+    state.droneBeams = [];
     state.lastSpawn = 0;
     state.ended = false;
     state.monsterSpawned = false;
@@ -2344,9 +2375,10 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
       const bossScale = isMonsterKind(blueprint.kind) ? 1.25 : 1;
       const battleLevelScale = 1 + Math.max(0, currentDefenseBattleLevel - 1) * 0.1;
       const rewardScale = battleLevelScale;
-      const scaledHp = Math.round(blueprint.hp * levelScale * bossScale * battleLevelScale);
-      const scaledDamage = Math.round(blueprint.damage * levelScale * bossScale * battleLevelScale);
       const isBossLike = blueprint.kind === 'boss-ship' || isMonsterKind(blueprint.kind);
+      const bossHpMultiplier = isBossLike ? getBossHpPhaseMultiplier(currentDefenseBattleLevel) : 1;
+      const scaledHp = Math.max(1, Math.round(blueprint.hp * levelScale * bossScale * battleLevelScale * bossHpMultiplier));
+      const scaledDamage = Math.round(blueprint.damage * levelScale * bossScale * battleLevelScale);
       const absorbShield = isBossLike ? Math.round(scaledHp * BOSS_ABSORB_SHIELD_MULTIPLIER) : 0;
       const enemy: Enemy = {
         id: state.nextId++,
@@ -2615,6 +2647,64 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
       });
     };
 
+    const getDamageDroneTarget = () => {
+      const focusedTarget = state.enemies.find(enemy => enemy.id === state.damageDroneTargetId && enemy.hp > 0);
+      if (focusedTarget) return focusedTarget;
+      const nextTarget = state.enemies
+        .filter(enemy => enemy.hp > 0)
+        .sort((a, b) => a.x - b.x)[0];
+      state.damageDroneTargetId = nextTarget?.id;
+      return nextTarget;
+    };
+
+    const fireDamageSupportDrone = (now: number) => {
+      if (!damageSupportDrone || now - state.lastDamageDroneShot < 900) return;
+      const target = getDamageDroneTarget();
+      if (!target) return;
+      state.lastDamageDroneShot = now;
+      const droneX = state.player.x - 4;
+      const droneY = clamp(state.player.y - 58, 24, HEIGHT - 24);
+      const dx = target.x - droneX;
+      const dy = target.y - droneY;
+      const length = Math.max(1, Math.hypot(dx, dy));
+      const speed = 10.5;
+      state.projectiles.push({
+        id: state.nextId++,
+        from: 'player',
+        drone: 'damage',
+        targetId: target.id,
+        x: droneX,
+        y: droneY,
+        vx: (dx / length) * speed,
+        vy: (dy / length) * speed,
+        damage: shipStats.damage * 0.4,
+        crit: false,
+        elemental: { ice: 0, electric: 0, fire: 0 },
+        color: '#e879f9',
+        size: 6,
+      });
+    };
+
+    const pulseDefenseSupportDrone = (now: number) => {
+      if (!defenseSupportDrone || now - state.lastDefenseDronePulse < 10000) return;
+      state.lastDefenseDronePulse = now;
+      const droneX = state.player.x - 4;
+      const droneY = clamp(state.player.y + 58, 24, HEIGHT - 24);
+      const heal = shipStats.health * 0.1;
+      const healed = Math.max(0, Math.min(heal, shipStats.health - state.player.hp));
+      state.player.hp = Math.min(shipStats.health, state.player.hp + heal);
+      state.droneBeams.push({ fromX: droneX, fromY: droneY, toX: state.player.x, toY: state.player.y, color: '#4ade80', life: 1 });
+      if (healed > 0) spawnFloat(state.player.x - 8, state.player.y - 34, `+${Math.round(healed)}`, '#4ade80', { size: 18, life: 58, shadowColor: 'rgba(74,222,128,0.8)' });
+
+      const target = state.enemies
+        .filter(enemy => enemy.hp > 0)
+        .sort((a, b) => a.x - b.x)[0];
+      if (target) {
+        target.weakenedUntil = now + 10000;
+        state.droneBeams.push({ fromX: droneX, fromY: droneY, toX: target.x, toY: target.y, color: '#f87171', life: 1 });
+        spawnFloat(target.x, target.y - 34, '-20% DMG', '#f87171', { size: 15, life: 58, shadowColor: 'rgba(248,113,113,0.8)' });
+      }
+    };
     const fireEnemyShot = (enemy: Enemy) => {
       const now = performance.now();
       if (enemy.attackCooldown > now) return;
@@ -2639,7 +2729,10 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
         spawnParticle(enemy.x - 30, enemy.y + (Math.random() * 12 - 6), 'rgba(180, 180, 180, 0.6)', 1.5, 0.5, 3.5, state.backgroundParticles);
       }
       const slowed = enemy.status.slowUntil && enemy.status.slowUntil > now;
-      const damage = enemy.damage * (slowed ? 1 - shipStats.conditionalBonuses.slowEnemyDamageReductionPercent / 100 : 1);
+      const weakened = enemy.weakenedUntil && enemy.weakenedUntil > now;
+      const damage = enemy.damage
+        * (slowed ? 1 - shipStats.conditionalBonuses.slowEnemyDamageReductionPercent / 100 : 1)
+        * (weakened ? 0.8 : 1);
 
       state.projectiles.push({
         id: state.nextId++,
@@ -4199,6 +4292,86 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
         });
       }
       ctx.restore();
+      const drawSupportDrone = (kind: 'damage' | 'defense', x: number, y: number) => {
+        const isDamage = kind === 'damage';
+        const color = isDamage ? '#e879f9' : '#4ade80';
+        const secondary = isDamage ? '#67e8f9' : '#a7f3d0';
+        const faintColor = isDamage ? 'rgba(232,121,249,0.28)' : 'rgba(74,222,128,0.28)';
+        const wingColor = isDamage ? 'rgba(232,121,249,0.42)' : 'rgba(74,222,128,0.42)';
+        const bob = Math.sin(now / 280 + (isDamage ? 0 : Math.PI)) * 3;
+        ctx.save();
+        ctx.translate(x, y + bob);
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.strokeStyle = faintColor;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.arc(0, 0, 22 + Math.sin(now / 180) * 2, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.shadowColor = color;
+        ctx.shadowBlur = 18;
+        ctx.fillStyle = 'rgba(3,7,18,0.94)';
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 1.6;
+        ctx.beginPath();
+        ctx.moveTo(18, 0);
+        ctx.lineTo(6, -11);
+        ctx.lineTo(-10, -8);
+        ctx.lineTo(-18, 0);
+        ctx.lineTo(-10, 8);
+        ctx.lineTo(6, 11);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = wingColor;
+        ctx.beginPath();
+        ctx.moveTo(-8, -7);
+        ctx.lineTo(-24, -13);
+        ctx.lineTo(-18, -2);
+        ctx.closePath();
+        ctx.fill();
+        ctx.beginPath();
+        ctx.moveTo(-8, 7);
+        ctx.lineTo(-24, 13);
+        ctx.lineTo(-18, 2);
+        ctx.closePath();
+        ctx.fill();
+        ctx.shadowBlur = 24;
+        ctx.fillStyle = secondary;
+        ctx.beginPath();
+        ctx.arc(4, 0, 4.5 + Math.sin(now / 120) * 0.6, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.font = '900 7px Orbitron, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillStyle = color;
+        ctx.fillText(isDamage ? 'ATK' : 'DEF', -2, 3);
+        ctx.restore();
+      };
+
+      ctx.save();
+      ctx.lineCap = 'round';
+      state.droneBeams.forEach(beam => {
+        const alpha = Math.max(0, beam.life);
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.globalAlpha = alpha;
+        ctx.shadowColor = beam.color;
+        ctx.shadowBlur = 18;
+        ctx.strokeStyle = beam.color;
+        ctx.lineWidth = 2 + alpha * 3;
+        ctx.beginPath();
+        ctx.moveTo(beam.fromX, beam.fromY);
+        ctx.lineTo(beam.toX, beam.toY);
+        ctx.stroke();
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 0.8;
+        ctx.stroke();
+        beam.life -= 0.055 * visualTimeScale;
+      });
+      state.droneBeams = state.droneBeams.filter(beam => beam.life > 0);
+      ctx.restore();
+
+      if (damageSupportDrone) drawSupportDrone('damage', p.x - 4, clamp(p.y - 58, 24, HEIGHT - 24));
+      if (defenseSupportDrone) drawSupportDrone('defense', p.x - 4, clamp(p.y + 58, 24, HEIGHT - 24));
 
       state.projectiles.forEach(projectile => {
         if (projectile.special === 'hellfire') {
@@ -4214,7 +4387,7 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
         const isEliteShot = projectile.visualType === 'elite';
         const coreColor = isBossShot ? '#e879f9' : isEliteShot ? '#fde68a' : projectile.color;
         const glowColor = isBossShot ? 'rgba(168,85,247,0.6)' : isEliteShot ? 'rgba(251,191,36,0.6)' : isEnemy ? 'rgba(239,68,68,0.52)' : 'rgba(34,211,238,0.48)';
-        const size = isBossShot ? 9 : isEliteShot ? 6.5 : isEnemy ? 5.4 : 4.8;
+        const size = isBossShot ? 9 : isEliteShot ? 6.5 : isEnemy ? 5.4 : projectile.size || 4.8;
         const pulse = 1 + Math.sin(now / 70 + projectile.id) * 0.12;
 
         ctx.save();
@@ -4592,6 +4765,9 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
         );
       }
 
+      fireDamageSupportDrone(now);
+      pulseDefenseSupportDrone(now);
+
       if (keys[' ']) fireShot();
       if (keys.q || keys.keyc) triggerSpecial(0);
       if (keys.e || keys.keyf) triggerSpecial(1);
@@ -4667,7 +4843,10 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
           const shocked = enemy.status.shockedUntil && enemy.status.shockedUntil > now;
           const skip = shocked && Math.random() * 100 < shipStats.conditionalBonuses.shockedEnemySkipChance;
           if (!skip) {
-            const damage = enemy.damage * (slowed ? 1 - shipStats.conditionalBonuses.slowEnemyDamageReductionPercent / 100 : 1);
+            const weakened = enemy.weakenedUntil && enemy.weakenedUntil > now;
+            const damage = enemy.damage
+              * (slowed ? 1 - shipStats.conditionalBonuses.slowEnemyDamageReductionPercent / 100 : 1)
+              * (weakened ? 0.8 : 1);
             damagePlayer(damage);
           }
           enemy.hp = 0;
@@ -4870,7 +5049,7 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
       canvas?.removeEventListener('click', handleCanvasClick);
       stopAllBattleSounds();
     };
-  }, [shipStats, specials, horizonLevel, horizonXp, horizonNextXp, horizonMaxLevel, trinityShotEnabled, currentDefenseBattleLevel]);
+  }, [shipStats, specials, horizonLevel, horizonXp, horizonNextXp, horizonMaxLevel, trinityShotEnabled, damageSupportDrone, defenseSupportDrone, currentDefenseBattleLevel]);
 
   const finishResult = () => {
     if (result === 'victory') {
@@ -4924,6 +5103,11 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
           <div className="min-w-0">
             <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-cyan-300">{t('New Earth Aerial Defense', 'Defesa Aérea da Nova Terra')}</p>
             <h3 className="truncate font-orbitron text-lg font-black uppercase text-white">{threatTitle}</h3>
+            {queuedDefenseCount > 0 && (
+              <p className="mt-1 font-mono text-[9px] uppercase tracking-wider text-amber-300">
+                {queuedDefenseCount} {t('defenses waiting — battle in progress', 'defesas aguardando — combate em andamento')}
+              </p>
+            )}
           </div>
           <div className="hidden w-[480px] rounded-2xl border border-amber-300/25 bg-amber-300/10 px-4 py-2 lg:block">
             <div className="flex items-center justify-between gap-4">

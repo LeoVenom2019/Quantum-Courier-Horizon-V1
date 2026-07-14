@@ -61,6 +61,7 @@ const SUPPLEMENTAL_LEGACY_KEYS: Partial<Record<ColonySaveStorageKey, string>> = 
   colony_cards_data: 'ownedCardIds',
   colony_card_levels: 'cardLevels',
   colony_search_upgrade_levels: 'searchUpgradeLevels',
+  colony_political_card_milestones: 'politicalCardConstructionMilestones',
   colony_active_search: 'activeSearches',
   colony_search_threat_bonus: 'searchThreatBonus',
   route4_search_battle_cycle: 'route4SearchBattleCycle',
@@ -87,7 +88,7 @@ const mergeSupplementalSaveValue = (key: ColonySaveStorageKey, localValue: any, 
   if (mainValue === null || mainValue === undefined) return localValue;
   if (localValue === null || localValue === undefined) return mainValue;
 
-  if (key === 'colony_cards_data') {
+  if (key === 'colony_cards_data' || key === 'colony_political_card_milestones') {
     const merged = new Set<string>();
     if (Array.isArray(mainValue)) mainValue.forEach(id => typeof id === 'string' && merged.add(id));
     if (Array.isArray(localValue)) localValue.forEach(id => typeof id === 'string' && merged.add(id));

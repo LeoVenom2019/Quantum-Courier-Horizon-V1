@@ -26,7 +26,6 @@ import {
   Activity,
   Gamepad2,
   X,
-  Coins,
   ChevronLeft,
   ChevronRight
 } from 'lucide-react';
@@ -34,6 +33,7 @@ import { GameStorage } from '@/lib/game-storage';
 import { MINI_GAMES_CONFIG } from '@/lib/mini-games-config';
 import { preloadAssetGroupPassive } from '@/lib/asset-preloader';
 import NewEarthDefenseBattle, { BattleResultSummary } from './NewEarthDefenseBattle';
+import HorizonSkillTreeModal from './HorizonSkillTreeModal';
 import { PremiumCanvasButton } from './ui/PremiumCanvasButton';
 import {
   BATTLE_CARD_SLOTS,
@@ -70,8 +70,17 @@ import {
   isPoliticalCard,
   normalizeOwnedColonyCardIds,
   rollAnyMissingColonyCardReward,
+  rollMissingPoliticalCardReward,
   TRINITY_REACTOR_CARD_ID,
 } from '@/lib/colony-cards';
+import {
+  DEFAULT_HORIZON_SKILLS,
+  getAvailableHorizonSkillPoints,
+  HORIZON_SKILL_CAPS,
+  HorizonSkillAllocation,
+  HorizonSkillId,
+  normalizeHorizonSkills,
+} from '@/lib/horizon-skill-tree';
 import {
   NEW_EARTH_MISSIONS_STORAGE_KEY,
   NewEarthMissionState,
@@ -261,6 +270,7 @@ interface DefenseSpecial {
   id: DefenseSpecialId;
   name: Record<'en' | 'pt', string>;
   description: Record<'en' | 'pt', string>;
+  unlockLevel: number;
   implemented: boolean;
 }
 
@@ -274,6 +284,7 @@ interface PendingDefenseThreat {
   detectedAt: number;
   expiresAt?: number;
   openedAt?: number;
+  waitingForDefenseSlot?: boolean;
   status: 'pending';
 }
 
@@ -281,7 +292,10 @@ const MAX_PENDING_DEFENSE_THREATS = 6;
 const DEFENSE_THREAT_RESPONSE_SECONDS = 50;
 const dispatchNewEarthAchievementMetric = (detail: Record<string, unknown>) => {
   if (typeof window === 'undefined') return;
-  window.dispatchEvent(new CustomEvent('qch:new-earth-achievement-metric', { detail }));
+  const metricDetail = { ...detail };
+  window.queueMicrotask(() => {
+    window.dispatchEvent(new CustomEvent('qch:new-earth-achievement-metric', { detail: metricDetail }));
+  });
 };
 const DEFENSE_VICTORY_REWARD_BONUS_PERCENT = 30;
 const ROUTE4_SEARCH_SFX_BASE = '/assets/rota4/SFX_new_land';
@@ -567,6 +581,7 @@ const DEFENSE_SPECIALS: DefenseSpecial[] = [
       en: 'Route 4 special: a sustained Horizon beam for deleting priority threats.',
       pt: 'Especial da Rota 4: feixe sustentado Horizon para apagar ameaças prioritárias.',
     },
+    unlockLevel: 5,
     implemented: true,
   },
   {
@@ -576,6 +591,7 @@ const DEFENSE_SPECIALS: DefenseSpecial[] = [
       en: 'Route 4 special: a heavy Horizon barrage for pressure windows.',
       pt: 'Especial da Rota 4: barragem pesada Horizon para janelas de pressão.',
     },
+    unlockLevel: 10,
     implemented: true,
   },
   {
@@ -585,6 +601,7 @@ const DEFENSE_SPECIALS: DefenseSpecial[] = [
       en: 'Route 4 special: a divine storm with tornados, lightning strikes, and a final thunderbolt.',
       pt: 'Especial da Rota 4: tempestade divina com tornados, raios e um trovão final.',
     },
+    unlockLevel: 15,
     implemented: true,
   },
   {
@@ -594,6 +611,7 @@ const DEFENSE_SPECIALS: DefenseSpecial[] = [
       en: 'Route 4 special: an ice storm that freezes the right flank and drops explosive glacier blocks.',
       pt: 'Especial da Rota 4: nevasca que congela o flanco direito e derruba blocos glaciais explosivos.',
     },
+    unlockLevel: 20,
     implemented: true,
   },
 ];
@@ -1357,6 +1375,8 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
   const [colonySupplies, setColonySupplies] = useState<ColonySupplies>(DEFAULT_COLONY_SUPPLIES);
   const [ownedCardIds, setOwnedCardIds] = useState<string[]>(DEFAULT_OWNED_COLONY_CARD_IDS);
   const [isOwnedCardsLoaded, setIsOwnedCardsLoaded] = useState(false);
+  const [politicalCardConstructionMilestones, setPoliticalCardConstructionMilestones] = useState<string[]>([]);
+  const [isPoliticalCardConstructionMilestonesLoaded, setIsPoliticalCardConstructionMilestonesLoaded] = useState(false);
   const [managementPanel, setManagementPanel] = useState<'status' | 'council' | 'claims'>('status');
   const [cardEvent, setCardEvent] = useState<ColonyCard | null>(null);
   const [cardFeedback, setCardFeedback] = useState<string | null>(null);
@@ -1376,12 +1396,15 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
   const [isCardLevelsLoaded, setIsCardLevelsLoaded] = useState(false);
   const [horizonXp, setHorizonXp] = useState(0);
   const [isHorizonXpLoaded, setIsHorizonXpLoaded] = useState(false);
+  const [horizonSkills, setHorizonSkills] = useState<HorizonSkillAllocation>(DEFAULT_HORIZON_SKILLS);
+  const [isHorizonSkillsLoaded, setIsHorizonSkillsLoaded] = useState(false);
+  const [showHorizonSkillTree, setShowHorizonSkillTree] = useState(false);
   const [defenseBattleLevel, setDefenseBattleLevel] = useState(1);
   const [isDefenseBattleLevelLoaded, setIsDefenseBattleLevelLoaded] = useState(false);
   const [lastSearchReport, setLastSearchReport] = useState<string | null>(null);
   const [battleLoadout, setBattleLoadout] = useState<BattleLoadout>({});
   const [isBattleLoadoutLoaded, setIsBattleLoadoutLoaded] = useState(false);
-  const [selectedSpecialIds, setSelectedSpecialIds] = useState<DefenseSpecialId[]>(['apocalypse-laser', 'hellfire-barrage']);
+  const [selectedSpecialIds, setSelectedSpecialIds] = useState<DefenseSpecialId[]>([]);
   const [isDefenseSpecialLoadoutLoaded, setIsDefenseSpecialLoadoutLoaded] = useState(false);
   const [pendingDefenseThreats, setPendingDefenseThreats] = useState<PendingDefenseThreat[]>([]);
   const [activeDefenseThreat, setActiveDefenseThreat] = useState<PendingDefenseThreat | null>(null);
@@ -1405,7 +1428,6 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
   const horizonXpRef = useRef(0);
   const handledOpenDefenseRequestRef = useRef(0);
   const handledAbandonDefenseRequestRef = useRef(0);
-  const defenseAlertsPausedAtRef = useRef<number | null>(null);
   const lastBuildingLevelsRef = useRef<Record<string, Record<string, number>>>({});
   const newEarthMissionCycleBonusTimeoutRef = useRef<number | null>(null);
   const newEarthMissionCycleBonusDrainIntervalRef = useRef<number | null>(null);
@@ -1416,6 +1438,21 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
   const readyNewEarthMissionAudioInitializedRef = useRef(false);
 
   const t = useCallback((en: string, pt: string) => language === 'pt' ? pt : en, [language]);
+  const isDefenseQueuePaused = defenseAlertsPaused || Boolean(activeDefenseThreat) || Boolean(activeSearchBattle);
+  const availableDefenseThreatId = useMemo(() => (
+    pendingDefenseThreats
+      .filter(threat => !threat.openedAt && Boolean(threat.expiresAt))
+      .sort((left, right) => left.detectedAt - right.detectedAt)[0]?.id || null
+  ), [pendingDefenseThreats]);
+  const waitingDefenseThreatCount = useMemo(() => (
+    pendingDefenseThreats.filter(threat => !threat.openedAt && !threat.expiresAt).length
+  ), [pendingDefenseThreats]);
+  const queuedDefenseCountDuringBattle = useMemo(() => (
+    pendingDefenseThreats.filter(threat => (
+      threat.id !== activeDefenseThreat?.id && !threat.openedAt
+    )).length
+  ), [activeDefenseThreat?.id, pendingDefenseThreats]);
+
   const effectiveActiveColonyId = selectedColonyId || activeColonyId || colonies[0]?.id || null;
   const newEarthMissionContext = useMemo(() => {
     const unlockedArcadeIds = Array.from(getOwnedArcadeIdsFromCards(ownedCardIds));
@@ -1501,6 +1538,7 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
   }, []);
   const closeDefenseHangar = useCallback(() => {
     playRoute4UiSfx(ROUTE4_HANGAR_CLOSE_SFX, 0.72);
+    setShowHorizonSkillTree(false);
     setShowDefenseHangar(false);
   }, []);
 
@@ -1535,6 +1573,25 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
       setIsOwnedCardsLoaded(true);
     });
     return () => { mounted = false; };
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+    GameStorage.load('colony_political_card_milestones').then(saved => {
+      if (!mounted) return;
+      setPoliticalCardConstructionMilestones(Array.isArray(saved) ? Array.from(new Set(saved.filter(item => typeof item === 'string'))) : []);
+      setIsPoliticalCardConstructionMilestonesLoaded(true);
+    });
+    const handleCardsUpdated = (event: Event) => {
+      const detail = (event as CustomEvent<string[]>).detail;
+      if (!Array.isArray(detail)) return;
+      setOwnedCardIds(normalizeOwnedColonyCardIds(detail));
+    };
+    window.addEventListener('qch:colony-cards-updated', handleCardsUpdated);
+    return () => {
+      mounted = false;
+      window.removeEventListener('qch:colony-cards-updated', handleCardsUpdated);
+    };
   }, []);
 
   useEffect(() => {
@@ -1693,6 +1750,16 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
 
   useEffect(() => {
     let mounted = true;
+    GameStorage.load('horizon_skill_tree').then(saved => {
+      if (!mounted) return;
+      setHorizonSkills(normalizeHorizonSkills(saved));
+      setIsHorizonSkillsLoaded(true);
+    });
+    return () => { mounted = false; };
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
     GameStorage.load('route4_defense_battle_level').then(saved => {
       if (!mounted) return;
       if (Number.isFinite(saved)) setDefenseBattleLevel(Math.max(1, Math.floor(saved)));
@@ -1738,12 +1805,25 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
       if (Array.isArray(saved)) {
         setPendingDefenseThreats(saved
           .filter(threat => threat?.status === 'pending')
-          .map((threat, index) => ({
-            ...threat,
-            id: `${threat.id || `threat-${threat.sourceSearchId || 'unknown'}-${threat.detectedAt || Date.now()}`}-${index}`,
-            detectedAt: Number(threat.detectedAt) || Date.now(),
-            expiresAt: threat.openedAt ? undefined : (Number(threat.expiresAt) || (Number(threat.detectedAt) || Date.now()) + DEFENSE_THREAT_RESPONSE_SECONDS * 1000),
-          }))
+          .map((threat, index) => {
+            const detectedAt = Number(threat.detectedAt) || Date.now();
+            const wasInterruptedDuringBattle = Boolean(threat.openedAt);
+            const waitingForDefenseSlot = Boolean(threat.waitingForDefenseSlot || wasInterruptedDuringBattle);
+            const savedExpiresAt = Number(threat.expiresAt);
+            return {
+              ...threat,
+              id: `${threat.id || `threat-${threat.sourceSearchId || 'unknown'}-${detectedAt}`}-${index}`,
+              detectedAt,
+              openedAt: undefined,
+              waitingForDefenseSlot,
+              expiresAt: waitingForDefenseSlot
+                ? undefined
+                : (Number.isFinite(savedExpiresAt) && savedExpiresAt > 0
+                  ? savedExpiresAt
+                  : detectedAt + DEFENSE_THREAT_RESPONSE_SECONDS * 1000),
+            };
+          })
+          .sort((left, right) => left.detectedAt - right.detectedAt)
           .slice(0, MAX_PENDING_DEFENSE_THREATS)
         );
       }
@@ -1788,6 +1868,11 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
   }, [ownedCardIds, isLoaded, isOwnedCardsLoaded]);
 
   useEffect(() => {
+    if (!isLoaded || !isPoliticalCardConstructionMilestonesLoaded) return;
+    GameStorage.save(politicalCardConstructionMilestones, 'colony_political_card_milestones');
+  }, [isLoaded, isPoliticalCardConstructionMilestonesLoaded, politicalCardConstructionMilestones]);
+
+  useEffect(() => {
     if (!isLoaded || !isSuppliesLoaded) return;
     GameStorage.save(colonySupplies, 'colony_supplies_data');
   }, [colonySupplies, isLoaded, isSuppliesLoaded]);
@@ -1828,6 +1913,11 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
     GameStorage.save(horizonXp, 'horizon_ship_xp');
     window.dispatchEvent(new CustomEvent('qch:horizon-xp-updated', { detail: horizonXp }));
   }, [horizonXp, isLoaded, isHorizonXpLoaded]);
+
+  useEffect(() => {
+    if (!isLoaded || !isHorizonSkillsLoaded) return;
+    GameStorage.save(horizonSkills, 'horizon_skill_tree');
+  }, [horizonSkills, isLoaded, isHorizonSkillsLoaded]);
 
   useEffect(() => {
     if (!isLoaded || !isDefenseBattleLevelLoaded) return;
@@ -1979,23 +2069,55 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
   }, [isLoaded, isNewEarthMissionsLoaded, newEarthMissionContext]);
 
   useEffect(() => {
-    if (defenseAlertsPaused) {
-      defenseAlertsPausedAtRef.current = defenseAlertsPausedAtRef.current || Date.now();
+    const syncQueueTimeout = window.setTimeout(() => {
+    const now = Date.now();
+
+    if (isDefenseQueuePaused) {
       onDefenseThreatAlertChange?.(null);
+      setPendingDefenseThreats(prev => {
+        let changed = false;
+        const next = prev.map(threat => {
+          if (threat.openedAt || threat.id === activeDefenseThreat?.id) return threat;
+          if (!threat.expiresAt && threat.waitingForDefenseSlot) return threat;
+          changed = true;
+          return { ...threat, expiresAt: undefined, waitingForDefenseSlot: true };
+        });
+        return changed ? next : prev;
+      });
       return;
     }
 
-    const pausedAt = defenseAlertsPausedAtRef.current;
-    if (!pausedAt) return;
-    defenseAlertsPausedAtRef.current = null;
-    const nextExpiresAt = Date.now() + DEFENSE_THREAT_RESPONSE_SECONDS * 1000;
+    setPendingDefenseThreats(prev => {
+      const pending = prev
+        .filter(threat => !threat.openedAt)
+        .sort((left, right) => left.detectedAt - right.detectedAt);
+      if (pending.length === 0) return prev;
 
-    setPendingDefenseThreats(prev => prev.map(threat => (
-      threat.expiresAt && !threat.openedAt
-        ? { ...threat, expiresAt: nextExpiresAt }
-        : threat
-    )));
-  }, [defenseAlertsPaused, onDefenseThreatAlertChange]);
+      const countdownThreat = pending.find(threat => (
+        Boolean(threat.expiresAt) && !threat.waitingForDefenseSlot
+      ));
+      const nextThreat = countdownThreat || pending[0];
+      let changed = false;
+
+      const next = prev.map(threat => {
+        if (threat.openedAt) return threat;
+        if (threat.id === nextThreat.id) {
+          const expiresAt = threat.expiresAt || now + DEFENSE_THREAT_RESPONSE_SECONDS * 1000;
+          if (!threat.waitingForDefenseSlot && threat.expiresAt === expiresAt) return threat;
+          changed = true;
+          return { ...threat, expiresAt, waitingForDefenseSlot: false };
+        }
+
+        if (!threat.expiresAt && threat.waitingForDefenseSlot) return threat;
+        changed = true;
+        return { ...threat, expiresAt: undefined, waitingForDefenseSlot: true };
+      });
+
+      return changed ? next : prev;
+    });
+    }, 0);
+    return () => window.clearTimeout(syncQueueTimeout);
+  }, [activeDefenseThreat?.id, isDefenseQueuePaused, onDefenseThreatAlertChange, pendingDefenseThreats.length]);
 
   useEffect(() => {
     colonySuppliesRef.current = colonySupplies;
@@ -2205,13 +2327,13 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
       rewards: search.rewards,
       threatChance: search.threatChance,
       detectedAt: checkedAt,
-      expiresAt: checkedAt + DEFENSE_THREAT_RESPONSE_SECONDS * 1000,
+      waitingForDefenseSlot: true,
       status: 'pending',
     };
-    setPendingDefenseThreats(prev => [
-      threat,
-      ...prev,
-    ].slice(0, MAX_PENDING_DEFENSE_THREATS));
+    setPendingDefenseThreats(prev => {
+      if (prev.length >= MAX_PENDING_DEFENSE_THREATS) return prev;
+      return [...prev, threat].sort((left, right) => left.detectedAt - right.detectedAt).slice(0, MAX_PENDING_DEFENSE_THREATS);
+    });
     setCardFeedback(t('Hostile contact detected during search', 'Contato hostil detectado durante a busca'));
   }, [t]);
 
@@ -2267,7 +2389,7 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
   }, [activeSearches, completeSearch, triggerSearchThreatCheck]);
 
   useEffect(() => {
-    if (defenseAlertsPaused) {
+    if (isDefenseQueuePaused) {
       onDefenseThreatAlertChange?.(null);
       return;
     }
@@ -2304,10 +2426,10 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
     updateDefenseThreatClock();
     const interval = window.setInterval(updateDefenseThreatClock, 1000);
     return () => window.clearInterval(interval);
-  }, [activeDefenseThreat?.id, defenseAlertsPaused, language, onDefenseThreatAlertChange, pendingDefenseThreats.length]);
+  }, [activeDefenseThreat?.id, isDefenseQueuePaused, language, onDefenseThreatAlertChange, pendingDefenseThreats.length]);
 
   useEffect(() => {
-    if (defenseAlertsPaused) {
+    if (isDefenseQueuePaused) {
       onDefenseThreatAlertChange?.(null);
       return;
     }
@@ -2329,7 +2451,7 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
       title: alertThreat.sourceTitle,
       remainingSeconds: Math.max(0, Math.ceil(((alertThreat.expiresAt || now) - now) / 1000)),
     });
-  }, [activeDefenseThreat?.id, defenseAlertTick, defenseAlertsPaused, onDefenseThreatAlertChange, pendingDefenseThreats]);
+  }, [activeDefenseThreat?.id, defenseAlertTick, isDefenseQueuePaused, onDefenseThreatAlertChange, pendingDefenseThreats]);
 
   useEffect(() => {
     if (!openDefenseRequest || handledOpenDefenseRequestRef.current === openDefenseRequest) return;
@@ -2337,23 +2459,23 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
     if (activeDefenseThreat) return;
 
     const threat = pendingDefenseThreats.find(item => (
-      !item.openedAt &&
-      Boolean(item.expiresAt)
+      item.id === availableDefenseThreatId
     ));
     if (!threat) return;
 
     const openedAt = Date.now();
     const openTimeout = window.setTimeout(() => {
+      setShowHorizonSkillTree(false);
       setShowDefenseHangar(false);
       setPendingDefenseThreats(prev => prev.map(item => (
-        item.id === threat.id ? { ...item, openedAt, expiresAt: undefined } : item
+        item.id === threat.id ? { ...item, openedAt, expiresAt: undefined, waitingForDefenseSlot: false } : item
       )));
       onDefenseThreatAlertChange?.(null);
-      setActiveDefenseThreat({ ...threat, openedAt, expiresAt: undefined });
+      setActiveDefenseThreat({ ...threat, openedAt, expiresAt: undefined, waitingForDefenseSlot: false });
     }, 0);
 
     return () => window.clearTimeout(openTimeout);
-  }, [activeDefenseThreat, onDefenseThreatAlertChange, openDefenseRequest, pendingDefenseThreats]);
+  }, [activeDefenseThreat, availableDefenseThreatId, onDefenseThreatAlertChange, openDefenseRequest, pendingDefenseThreats]);
 
   useEffect(() => {
     if (!abandonDefenseRequest || handledAbandonDefenseRequestRef.current === abandonDefenseRequest) return;
@@ -2454,6 +2576,50 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
     colonies.length > 0 && colonies.every(colony => isColonyReadyForPopulation(colony.constructions))
   ), [colonies]);
 
+
+  useEffect(() => {
+    if (!isLoaded || !isOwnedCardsLoaded || !isPoliticalCardConstructionMilestonesLoaded) return;
+    const completedMilestoneIds = colonies
+      .flatMap(colony => colony.constructions
+        .filter(construction => construction.isComplete || Math.floor(Number(construction.level) || 0) >= 10)
+        .map(construction => `${colony.id}:${construction.type}:10`)
+      );
+    const claimedMilestones = new Set(politicalCardConstructionMilestones);
+    const unclaimedMilestones = completedMilestoneIds.filter(milestoneId => !claimedMilestones.has(milestoneId));
+    if (unclaimedMilestones.length === 0) return;
+
+    const rewardTimer = window.setTimeout(() => {
+      let nextOwnedCardIds = normalizeOwnedColonyCardIds(ownedCardIds);
+      const awardedCards: ColonyCard[] = [];
+
+      unclaimedMilestones.forEach(() => {
+        const reward = rollMissingPoliticalCardReward(nextOwnedCardIds)
+          || rollAnyMissingColonyCardReward(nextOwnedCardIds);
+        if (!reward) return;
+        nextOwnedCardIds = normalizeOwnedColonyCardIds([...nextOwnedCardIds, reward.id]);
+        awardedCards.push(reward);
+      });
+
+      const nextMilestones = Array.from(new Set([...politicalCardConstructionMilestones, ...unclaimedMilestones]));
+      setPoliticalCardConstructionMilestones(nextMilestones);
+      GameStorage.save(nextMilestones, 'colony_political_card_milestones');
+
+      if (awardedCards.length === 0) return;
+      setOwnedCardIds(nextOwnedCardIds);
+      GameStorage.save(nextOwnedCardIds, 'colony_cards_data');
+      window.dispatchEvent(new CustomEvent('qch:colony-cards-updated', { detail: nextOwnedCardIds }));
+      setCardEvent(awardedCards[awardedCards.length - 1]);
+      playSfx?.('claim_card');
+      const rewardCount = awardedCards.length;
+      setCardFeedback(t(
+        `${rewardCount} construction milestone card rewards acquired`,
+        `${rewardCount} recompensas de cartas por construções 10/10 adquiridas`
+      ));
+    }, 0);
+
+    return () => window.clearTimeout(rewardTimer);
+  }, [colonies, isLoaded, isOwnedCardsLoaded, isPoliticalCardConstructionMilestonesLoaded, ownedCardIds, playSfx, politicalCardConstructionMilestones, t]);
+
   const ownedCards = useMemo(() =>
     ownedCardIds
       .map(id => getCardById(id))
@@ -2473,8 +2639,32 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
 
   const horizonMaxLevel = allColoniesFullyBuilt ? MAX_HORIZON_LEVEL : BASE_HORIZON_LEVEL_CAP;
   const horizonProgress = useMemo(() => getHorizonLevelFromXp(horizonXp, horizonMaxLevel), [horizonMaxLevel, horizonXp]);
+  const unlockedDefenseSpecialIds = useMemo(() => new Set(
+    DEFENSE_SPECIALS
+      .filter(special => horizonProgress.level >= special.unlockLevel)
+      .map(special => special.id)
+  ), [horizonProgress.level]);
+  const equippedDefenseSpecialIds = useMemo(() => (
+    selectedSpecialIds.filter(id => unlockedDefenseSpecialIds.has(id))
+  ), [selectedSpecialIds, unlockedDefenseSpecialIds]);
+
+  useEffect(() => {
+    if (!isHorizonXpLoaded || !isDefenseSpecialLoadoutLoaded) return;
+    const migrationTimer = window.setTimeout(() => {
+      setSelectedSpecialIds(current => {
+        const unlocked = current.filter(id => unlockedDefenseSpecialIds.has(id));
+        return unlocked.length === current.length ? current : unlocked;
+      });
+    }, 0);
+    return () => window.clearTimeout(migrationTimer);
+  }, [isDefenseSpecialLoadoutLoaded, isHorizonXpLoaded, unlockedDefenseSpecialIds]);
   const battleStatTotals = useMemo(() => calculateBattleStatTotals(battleLoadoutCards, cardLevels), [battleLoadoutCards, cardLevels]);
-  const battleShipStats = useMemo(() => calculateBattleShipStats(battleLoadoutCards, BASE_BATTLE_SHIP_STATS, cardLevels, horizonProgress.level), [battleLoadoutCards, cardLevels, horizonProgress.level]);
+  const availableHorizonSkillPoints = useMemo(() => (
+    getAvailableHorizonSkillPoints(horizonProgress.level, horizonSkills)
+  ), [horizonProgress.level, horizonSkills]);
+  const battleShipStats = useMemo(() => (
+    calculateBattleShipStats(battleLoadoutCards, BASE_BATTLE_SHIP_STATS, cardLevels, horizonProgress.level, horizonSkills)
+  ), [battleLoadoutCards, cardLevels, horizonProgress.level, horizonSkills]);
   const trinityShotEnabled = useMemo(() => (
     battleLoadoutCards.some(card => card.id === TRINITY_REACTOR_CARD_ID)
   ), [battleLoadoutCards]);
@@ -3108,12 +3298,24 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
     const retryUntil = Date.now() + DEFENSE_THREAT_RESPONSE_SECONDS * 1000;
     if (activeDefenseThreat) {
       setPendingDefenseThreats(prev => prev.map(threat => (
-        threat.id === activeDefenseThreat.id ? { ...threat, openedAt: undefined, expiresAt: retryUntil } : threat
+        threat.id === activeDefenseThreat.id ? { ...threat, openedAt: undefined, expiresAt: retryUntil, waitingForDefenseSlot: false } : threat
       )));
     }
     setActiveDefenseThreat(null);
     setCardFeedback(language === 'pt' ? 'Defesa falhou. A ameaça permanece pendente.' : 'Defense failed. Threat remains pending.');
   }, [activeDefenseThreat, language]);
+
+  const postponeActiveDefense = useCallback(() => {
+    if (activeDefenseThreat) {
+      setPendingDefenseThreats(prev => prev.map(threat => (
+        threat.id === activeDefenseThreat.id
+          ? { ...threat, openedAt: undefined, expiresAt: undefined, waitingForDefenseSlot: true }
+          : threat
+      )));
+    }
+    setActiveDefenseThreat(null);
+    setCardFeedback(t('Defense returned to the queue', 'Defesa devolvida para a fila'));
+  }, [activeDefenseThreat, t]);
 
   const resolveSearchBattleVictory = useCallback((summary?: BattleResultSummary) => {
     if (!activeSearchBattle) return;
@@ -3344,11 +3546,11 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
   const searchOptions: ColonySearchOption[] = [
     {
       id: 'land',
-      title: t('Land Search', 'Busca por Terra'),
-      subtitle: t('Ground Vehicles', 'Veículos Terrestres'),
+      title: t('Land Searches', 'Buscas por Terra'),
+      subtitle: t('Land', 'Terra'),
       description: t(
-        'Ground convoys recover supplies across ruined roads and old farms.',
-        'Comboios terrestres recuperam suprimentos em estradas e antigas fazendas.'
+        'Ground teams recover supplies.',
+        'Equipes terrestres recuperam suprimentos.'
       ),
       tone: 'text-emerald-300 border-emerald-400/40 bg-emerald-400/10',
       icon: Bot,
@@ -3362,11 +3564,11 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
     },
     {
       id: 'sea',
-      title: t('Sea and Air Search', 'Buscas Marítimas e Aéreas'),
-      subtitle: t('Aquatic and Air Vehicles', 'Veículos Aquáticos e Aéreos'),
+      title: t('Sea and Air Searches', 'Buscas por Mar e Ar'),
+      subtitle: t('Sea and Air', 'Mar e Ar'),
       description: t(
-        'Crews scan coastlines, air routes, wreckage, and submerged cargo.',
-        'Equipes vasculham costas, rotas aéreas, destroços e cargas submersas.'
+        'Sea and air teams recover supplies.',
+        'Equipes marítimas e aéreas recuperam suprimentos.'
       ),
       tone: 'text-cyan-300 border-cyan-400/40 bg-cyan-400/10',
       icon: Activity,
@@ -3439,7 +3641,29 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
     );
   };
 
+  const upgradeHorizonSkill = (skillId: HorizonSkillId) => {
+    const currentLevel = horizonSkills[skillId];
+    const maxLevel = HORIZON_SKILL_CAPS[skillId];
+    if (currentLevel >= maxLevel) {
+      setCardFeedback(t('Skill already mastered', 'Habilidade já está no máximo'));
+      return;
+    }
+    if (availableHorizonSkillPoints <= 0) {
+      setCardFeedback(t('No Horizon skill points available', 'Nenhum ponto de habilidade disponível'));
+      return;
+    }
+    setHorizonSkills(previous => ({ ...previous, [skillId]: previous[skillId] + 1 }));
+    playSfx?.('equip_card');
+  };
+
   const toggleDefenseSpecial = (specialId: DefenseSpecialId) => {
+    const special = DEFENSE_SPECIALS.find(candidate => candidate.id === specialId);
+    if (!special || horizonProgress.level < special.unlockLevel) {
+      const requiredLevel = special?.unlockLevel || 1;
+      setCardFeedback(t(`Unlocks at Horizon level ${requiredLevel}`, `Desbloqueia no nível ${requiredLevel} da Horizon`));
+      playRoute4UiSfx(ROUTE4_CANT_EQUIP_SFX);
+      return;
+    }
     setSelectedSpecialIds(prev => {
       if (prev.includes(specialId)) {
         playRoute4UiSfx(ROUTE4_SPECIAL_UNEQUIP_SFX);
@@ -3627,12 +3851,15 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
             defenseBattleLevel={defenseBattleLevel}
             horizonXp={horizonProgress.currentXp}
             horizonNextXp={horizonProgress.nextXp}
-            specials={selectedSpecialIds}
+            specials={equippedDefenseSpecialIds}
             trinityShotEnabled={trinityShotEnabled}
+            damageSupportDrone={horizonSkills.damageDrone > 0}
+            defenseSupportDrone={horizonSkills.defenseDrone > 0}
             threatTitle={activeDefenseThreat.sourceTitle}
+            queuedDefenseCount={queuedDefenseCountDuringBattle}
             onVictory={resolveDefenseVictory}
             onDefeat={resolveDefenseDefeat}
-            onClose={() => setActiveDefenseThreat(null)}
+            onClose={postponeActiveDefense}
           />
         )}
       </AnimatePresence>
@@ -3647,12 +3874,27 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
             defenseBattleLevel={activeSearchBattle.battleLevel}
             horizonXp={horizonProgress.currentXp}
             horizonNextXp={horizonProgress.nextXp}
-            specials={selectedSpecialIds}
+            specials={equippedDefenseSpecialIds}
             trinityShotEnabled={trinityShotEnabled}
+            damageSupportDrone={horizonSkills.damageDrone > 0}
+            defenseSupportDrone={horizonSkills.defenseDrone > 0}
             threatTitle={activeSearchBattle.title}
+            queuedDefenseCount={queuedDefenseCountDuringBattle}
             onVictory={resolveSearchBattleVictory}
             onDefeat={resolveSearchBattleDefeat}
             onClose={() => setActiveSearchBattle(null)}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showHorizonSkillTree && (
+          <HorizonSkillTreeModal
+            language={language}
+            horizonLevel={horizonProgress.level}
+            skills={horizonSkills}
+            onUpgrade={upgradeHorizonSkill}
+            onClose={() => setShowHorizonSkillTree(false)}
           />
         )}
       </AnimatePresence>
@@ -3703,9 +3945,17 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
                           <p className="font-mono text-[9px] uppercase tracking-[0.22em] text-amber-200">Horizon XP</p>
                           <p className="mt-0.5 font-orbitron text-base font-black text-white">LVL {horizonProgress.level} / {horizonMaxLevel}</p>
                         </div>
-                        <span className="rounded-lg border border-yellow-300/25 bg-black/35 px-2 py-1 font-mono text-[10px] uppercase tracking-widest text-yellow-200">
-                          <Coins size={11} className="mr-1 inline" />{formatValue(qc)} QC
-                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setShowHorizonSkillTree(true)}
+                          className="group flex items-center gap-2 rounded-xl border border-cyan-300/30 bg-cyan-300/10 px-3 py-2 text-left transition hover:border-cyan-200/60 hover:bg-cyan-300/20 hover:shadow-[0_0_24px_rgba(34,211,238,0.18)]"
+                        >
+                          <Sparkles size={14} className="text-cyan-200 transition group-hover:rotate-12 group-hover:scale-110" />
+                          <span>
+                            <span className="block font-mono text-[8px] uppercase tracking-[0.2em] text-cyan-100">{t('Skill Tree', 'Árvore de Habilidades')}</span>
+                            <span className="block font-orbitron text-[10px] font-black text-amber-200">{availableHorizonSkillPoints} PTS</span>
+                          </span>
+                        </button>
                       </div>
                       <div className="mt-2.5 h-2 overflow-hidden rounded-full bg-black/55">
                         <div
@@ -3761,7 +4011,8 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
 
                   <div className="grid min-h-0 grid-cols-2 gap-2">
                     {DEFENSE_SPECIALS.map(special => {
-                      const selected = selectedSpecialIds.includes(special.id);
+                      const unlocked = horizonProgress.level >= special.unlockLevel;
+                      const selected = unlocked && selectedSpecialIds.includes(special.id);
                       const specialButtonLabel = special.id === 'thor-oath'
                         ? t('Thor\nOath', 'Juramento de\nThor')
                         : special.id === 'apocalypse-laser'
@@ -3774,13 +4025,19 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
                           key={special.id}
                           type="button"
                           onClick={() => toggleDefenseSpecial(special.id)}
+                          disabled={!unlocked}
                           tone={selected ? 'brown' : 'steel'}
                           className={`min-h-0 rounded-xl ${selected ? DEFENSE_SPECIAL_BUTTON_SELECTED_CLASS : DEFENSE_SPECIAL_BUTTON_UNSELECTED_CLASS}`}
-                          contentClassName={`flex h-full items-center justify-center p-3 text-center ${selected ? 'text-white' : 'text-stone-300/72'}`}
+                          contentClassName={`flex h-full flex-col items-center justify-center p-3 text-center ${selected ? 'text-white' : 'text-stone-300/72'}`}
                         >
                           <span className={`whitespace-pre-line font-orbitron text-[13px] font-black uppercase leading-tight tracking-tight ${selected ? 'text-amber-50' : 'text-stone-300/78'}`}>
                             {specialButtonLabel}
                           </span>
+                          {!unlocked && (
+                            <span className="mt-1 flex items-center gap-1 font-mono text-[8px] uppercase tracking-widest text-zinc-400">
+                              <LockKeyhole className="h-3 w-3" /> LVL {special.unlockLevel}
+                            </span>
+                          )}
                         </PremiumCanvasButton>
                       );
                     })}
@@ -3838,29 +4095,36 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
                       </div>
                       <AlertTriangle size={18} className={pendingDefenseThreats.length > 0 ? 'text-red-300' : 'text-zinc-600'} />
                     </div>
+                    {waitingDefenseThreatCount > 0 && (
+                      <p className="mt-2 font-mono text-[9px] uppercase tracking-wider text-amber-200">
+                        {waitingDefenseThreatCount} {isDefenseQueuePaused ? t('defenses waiting — battle in progress', 'defesas aguardando — combate em andamento') : t('defenses waiting in queue', 'defesas aguardando na fila')}
+                      </p>
+                    )}
                     <div className="mt-3 grid gap-2">
                       {pendingDefenseThreats.length > 0 ? pendingDefenseThreats.slice(0, MAX_PENDING_DEFENSE_THREATS).map((threat, index) => (
                         <div key={`${threat.id}-${index}`} className="rounded-xl border border-red-300/20 bg-black/35 p-3">
                           <div className="flex items-center justify-between gap-2">
                             <p className="font-orbitron text-[10px] font-black uppercase text-white">{threat.sourceTitle}</p>
-                            <span className="rounded-full border border-red-300/25 bg-black/30 px-2 py-0.5 font-mono text-[9px] text-red-100">{threat.threatChance}%</span>
+                            <span className="rounded-full border border-red-300/25 bg-black/30 px-2 py-0.5 font-mono text-[9px] text-red-100">{threat.id === availableDefenseThreatId ? `${threat.threatChance}%` : t('Waiting', 'Aguardando')}</span>
                           </div>
                           <PremiumCanvasButton
                             type="button"
+                            disabled={isDefenseQueuePaused || threat.id !== availableDefenseThreatId}
                             onClick={() => {
+                              if (isDefenseQueuePaused || threat.id !== availableDefenseThreatId) return;
                               closeDefenseHangar();
                               const openedAt = Date.now();
                               setPendingDefenseThreats(prev => prev.map(item => (
-                                item.id === threat.id ? { ...item, openedAt, expiresAt: undefined } : item
+                                item.id === threat.id ? { ...item, openedAt, expiresAt: undefined, waitingForDefenseSlot: false } : item
                               )));
                               onDefenseThreatAlertChange?.(null);
-                              setActiveDefenseThreat(threat);
+                              setActiveDefenseThreat({ ...threat, openedAt, expiresAt: undefined, waitingForDefenseSlot: false });
                             }}
                             tone="red"
                             className="mt-3 h-9 w-full rounded-lg"
                             contentClassName="px-3 text-[10px] font-black uppercase tracking-widest text-white"
                           >
-                            {t('Launch Defense', 'Iniciar Defesa')}
+                            {threat.id === availableDefenseThreatId ? t('Launch Defense', 'Iniciar Defesa') : t('Waiting in queue', 'Aguardando na fila')}
                           </PremiumCanvasButton>
                         </div>
                       )) : (
@@ -4500,7 +4764,7 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
                   </div>
                 </div>
 
-                <p className="line-clamp-2 text-sm leading-snug text-zinc-300">{optionDescription}</p>
+                <p className="line-clamp-1 text-sm leading-snug text-zinc-300">{optionDescription}</p>
 
                 <div className="mt-3 grid grid-cols-2 gap-2">
                   <div className="rounded-xl border border-white/10 bg-black/25 p-3">

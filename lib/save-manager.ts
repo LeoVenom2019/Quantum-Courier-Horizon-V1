@@ -1,4 +1,6 @@
-export const CURRENT_SAVE_VERSION = "1.3.0";
+import { normalizeHorizonSkills } from './horizon-skill-tree';
+
+export const CURRENT_SAVE_VERSION = "1.4.0";
 
 const VALID_ROUTE_TIERS = new Set(['Solar', 'Interstellar', 'Void', 'Earth']);
 
@@ -62,12 +64,14 @@ const normalizeSavedRouteTier = (routeTier: unknown, data: any): 'Solar' | 'Inte
 export const COLONY_SAVE_STORAGE_KEYS = [
   'colonies_data',
   'colony_cards_data',
+  'colony_political_card_milestones',
   'colony_card_levels',
   'colony_search_upgrade_levels',
   'colony_active_search',
   'colony_search_threat_bonus',
   'route4_search_battle_cycle',
   'horizon_ship_xp',
+  'horizon_skill_tree',
   'route4_defense_battle_level',
   'battle_cards_loadout',
   'battle_card_legendary_pity',
@@ -143,6 +147,7 @@ const sanitizeStringArray = (value: unknown): string[] => (
 export interface ColonySystemSaveData {
   colonies: any[];
   ownedCardIds: string[];
+  politicalCardConstructionMilestones: string[];
   cardLevels: Record<string, number>;
   searchUpgradeLevels: Record<'land' | 'sea', number>;
   activeSearches: Record<string, any>;
@@ -150,6 +155,7 @@ export interface ColonySystemSaveData {
   searchBattleCycle: any;
   horizonShipXp: number;
   horizonShipLevel: number;
+  horizonSkillTree: Record<string, number>;
   defenseBattleLevel: number;
   battleLoadout: Record<string, string>;
   legendaryBattleCardPity: number;
@@ -211,12 +217,16 @@ const getFlatOrStorageValue = (flatData: any, flatKey: string, storageKey: Colon
 const createColonySystemSave = (flatData: any): ColonySystemSaveData => {
   const colonies = getFlatOrStorageValue(flatData, 'colonies', 'colonies_data', []);
   const ownedCardIds = getFlatOrStorageValue(flatData, 'colonyCardIds', 'colony_cards_data', []);
+  const politicalCardConstructionMilestones = getFlatOrStorageValue(flatData, 'politicalCardConstructionMilestones', 'colony_political_card_milestones', []);
   const cardLevels = getFlatOrStorageValue(flatData, 'colonyCardLevels', 'colony_card_levels', {});
   const searchUpgradeLevels = getFlatOrStorageValue(flatData, 'colonySearchUpgradeLevels', 'colony_search_upgrade_levels', { land: 0, sea: 0 });
   const activeSearches = getFlatOrStorageValue(flatData, 'colonyActiveSearches', 'colony_active_search', {});
   const searchThreatBonus = getFlatOrStorageValue(flatData, 'colonySearchThreatBonus', 'colony_search_threat_bonus', { land: 0, sea: 0 });
   const searchBattleCycle = getFlatOrStorageValue(flatData, 'route4SearchBattleCycle', 'route4_search_battle_cycle', { nextBattleIndex: 0, cycle: 0 });
   const horizonShipXp = Number(getFlatOrStorageValue(flatData, 'horizonShipXp', 'horizon_ship_xp', 0)) || 0;
+  const horizonSkillTree = normalizeHorizonSkills(
+    getFlatOrStorageValue(flatData, 'horizonSkillTree', 'horizon_skill_tree', {})
+  );
   const defenseBattleLevel = Number(getFlatOrStorageValue(flatData, 'route4DefenseBattleLevel', 'route4_defense_battle_level', 1)) || 1;
   const battleLoadout = getFlatOrStorageValue(flatData, 'battleCardsLoadout', 'battle_cards_loadout', {});
   const legendaryBattleCardPity = Number(getFlatOrStorageValue(flatData, 'battleCardLegendaryPity', 'battle_card_legendary_pity', 0)) || 0;
@@ -240,6 +250,7 @@ const createColonySystemSave = (flatData: any): ColonySystemSaveData => {
   return {
     colonies: Array.isArray(colonies) ? colonies : [],
     ownedCardIds: Array.isArray(ownedCardIds) ? ownedCardIds : [],
+    politicalCardConstructionMilestones: sanitizeStringArray(politicalCardConstructionMilestones),
     cardLevels: cardLevels && typeof cardLevels === 'object' ? cardLevels : {},
     searchUpgradeLevels: {
       land: Math.max(0, Number(searchUpgradeLevels?.land) || 0),
@@ -253,6 +264,7 @@ const createColonySystemSave = (flatData: any): ColonySystemSaveData => {
     searchBattleCycle: searchBattleCycle && typeof searchBattleCycle === 'object' ? searchBattleCycle : { nextBattleIndex: 0, cycle: 0 },
     horizonShipXp: Math.max(0, horizonShipXp),
     horizonShipLevel: getHorizonLevelFromXp(horizonShipXp),
+    horizonSkillTree,
     defenseBattleLevel: Math.max(1, Math.floor(defenseBattleLevel)),
     battleLoadout: battleLoadout && typeof battleLoadout === 'object' ? battleLoadout : {},
     legendaryBattleCardPity: Math.max(0, legendaryBattleCardPity),
@@ -271,12 +283,14 @@ const createColonySystemSave = (flatData: any): ColonySystemSaveData => {
     storage: {
       colonies_data: Array.isArray(colonies) ? colonies : [],
       colony_cards_data: Array.isArray(ownedCardIds) ? ownedCardIds : [],
+      colony_political_card_milestones: sanitizeStringArray(politicalCardConstructionMilestones),
       colony_card_levels: cardLevels && typeof cardLevels === 'object' ? cardLevels : {},
       colony_search_upgrade_levels: searchUpgradeLevels && typeof searchUpgradeLevels === 'object' ? searchUpgradeLevels : { land: 0, sea: 0 },
       colony_active_search: activeSearches && typeof activeSearches === 'object' ? activeSearches : {},
       colony_search_threat_bonus: searchThreatBonus && typeof searchThreatBonus === 'object' ? searchThreatBonus : { land: 0, sea: 0 },
       route4_search_battle_cycle: searchBattleCycle && typeof searchBattleCycle === 'object' ? searchBattleCycle : { nextBattleIndex: 0, cycle: 0 },
       horizon_ship_xp: Math.max(0, horizonShipXp),
+      horizon_skill_tree: horizonSkillTree,
       route4_defense_battle_level: Math.max(1, Math.floor(defenseBattleLevel)),
       battle_cards_loadout: battleLoadout && typeof battleLoadout === 'object' ? battleLoadout : {},
       battle_card_legendary_pity: Math.max(0, legendaryBattleCardPity),
@@ -913,12 +927,14 @@ export const sanitizeSave = (rawData: any): ModularSaveData => {
     _skipLocalStorage: true,
     colonies: save.colony_system.colonies,
     colonyCardIds: save.colony_system.ownedCardIds,
+    politicalCardConstructionMilestones: save.colony_system.politicalCardConstructionMilestones,
     colonyCardLevels: save.colony_system.cardLevels,
     colonySearchUpgradeLevels: save.colony_system.searchUpgradeLevels,
     colonyActiveSearches: save.colony_system.activeSearches,
     colonySearchThreatBonus: save.colony_system.searchThreatBonus,
     route4SearchBattleCycle: save.colony_system.searchBattleCycle,
     horizonShipXp: save.colony_system.horizonShipXp,
+    horizonSkillTree: save.colony_system.horizonSkillTree,
     route4DefenseBattleLevel: save.colony_system.defenseBattleLevel,
     battleCardsLoadout: save.colony_system.battleLoadout,
     battleCardLegendaryPity: save.colony_system.legendaryBattleCardPity,

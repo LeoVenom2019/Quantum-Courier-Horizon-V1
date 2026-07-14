@@ -8,6 +8,11 @@ import { useDashboard } from './DashboardProvider';
 import { GameStorage } from '@/lib/game-storage';
 import { MINI_GAMES_CONFIG } from '@/lib/mini-games-config';
 import { getOwnedArcadeIdsFromCards, normalizeOwnedColonyCardIds } from '@/lib/colony-cards';
+import {
+  NEW_EARTH_HELICOPTER_WAR_INTEL,
+  NEW_EARTH_TANK_WAR_INTEL,
+  type NewEarthWarIntelCollection,
+} from '@/lib/new-earth-war-intel';
 
 const BOBBY_BLUE_SAD_IMAGE = '/images/bobby_blue/bobby_blue_sad.webp';
 
@@ -63,7 +68,11 @@ const playRandomRoute4LockedTvSfx = () => {
   });
 };
 
-const HistoryTab = memo(function HistoryTab() {
+type HistoryTabProps = {
+  newEarthWarIntelCollection: NewEarthWarIntelCollection;
+};
+
+const HistoryTab = memo(function HistoryTab({ newEarthWarIntelCollection }: HistoryTabProps) {
   const { 
     t, 
     language, 
@@ -102,8 +111,18 @@ const HistoryTab = memo(function HistoryTab() {
       && colony.constructions.every((construction: any) => construction.isComplete)
     ));
   const unlockedArcadeIds = getOwnedArcadeIdsFromCards(ownedCardIds);
+  const recoveredHelicopterWarIntel = NEW_EARTH_HELICOPTER_WAR_INTEL.filter(
+    intel => Boolean(newEarthWarIntelCollection[intel.id])
+  ).length;
+  const recoveredTankWarIntel = NEW_EARTH_TANK_WAR_INTEL.filter(
+    intel => Boolean(newEarthWarIntelCollection[intel.id])
+  ).length;
+  const allHelicopterWarIntelRecovered = recoveredHelicopterWarIntel === NEW_EARTH_HELICOPTER_WAR_INTEL.length;
+  const allTankWarIntelRecovered = recoveredTankWarIntel === NEW_EARTH_TANK_WAR_INTEL.length;
   const route4CreditsUnlocked = allNewEarthConstructionsComplete
-    && MINI_GAMES_CONFIG.every(game => unlockedArcadeIds.has(game.id));
+    && MINI_GAMES_CONFIG.every(game => unlockedArcadeIds.has(game.id))
+    && allHelicopterWarIntelRecovered
+    && allTankWarIntelRecovered;
 
   useEffect(() => {
     const creditsVideo = creditsVideoRef.current;
@@ -288,8 +307,15 @@ const HistoryTab = memo(function HistoryTab() {
                     {creditsPlaying ? <Pause className="h-6 w-6" /> : <Play className="h-6 w-6 translate-x-0.5" />}
                   </span>
                 ) : (
-                  <span className="rounded-lg border border-cyan-200/20 bg-black/70 px-4 py-3 text-center font-mono text-[10px] font-black uppercase tracking-[0.24em] text-cyan-100/80 shadow-[0_0_18px_rgba(34,211,238,0.18)]">
-                    {language === 'pt' ? 'Transmissão final indisponível' : 'Final transmission unavailable'}
+                  <span className="rounded-lg border border-cyan-200/20 bg-black/70 px-4 py-3 text-center font-mono text-[10px] font-black uppercase tracking-[0.18em] text-cyan-100/80 shadow-[0_0_18px_rgba(34,211,238,0.18)]">
+                    <span className="block">
+                      {language === 'pt' ? 'Transmissão final indisponível' : 'Final transmission unavailable'}
+                    </span>
+                    <span className="mt-2 block text-[8px] tracking-[0.12em] text-cyan-100/55">
+                      {language === 'pt' ? 'Planos de Helicóptero' : 'Helicopter Plans'}: {recoveredHelicopterWarIntel}/{NEW_EARTH_HELICOPTER_WAR_INTEL.length}
+                      {' · '}
+                      {language === 'pt' ? 'Planos de Tanque' : 'Tank Plans'}: {recoveredTankWarIntel}/{NEW_EARTH_TANK_WAR_INTEL.length}
+                    </span>
                   </span>
                 )}
               </button>

@@ -1,4 +1,5 @@
 import { Cpu, Factory, Music, School, Shield, Utensils } from 'lucide-react';
+import { DEFAULT_HORIZON_SKILLS, HorizonSkillAllocation } from './horizon-skill-tree';
 
 export type ColonySectorId = 'happiness' | 'health' | 'economy' | 'security' | 'technology' | 'culture';
 export type ColonyCardSlot = 'leadership' | 'infrastructure' | 'culture';
@@ -317,7 +318,8 @@ export const calculateBattleShipStats = (
   cards: ColonyCard[],
   baseStats: BattleShipBaseStats = BASE_BATTLE_SHIP_STATS,
   levels: ColonyCardLevels = {},
-  horizonLevel = 1
+  horizonLevel = 1,
+  horizonSkills: HorizonSkillAllocation = DEFAULT_HORIZON_SKILLS
 ): BattleShipComputedStats => {
   const horizonMultiplier = 1 + Math.max(0, horizonLevel - 1) * 0.05;
   const scaledBaseStats: BattleShipBaseStats = {
@@ -328,10 +330,10 @@ export const calculateBattleShipStats = (
     critMultiplier: baseStats.critMultiplier * horizonMultiplier,
   };
   const totals = calculateBattleStatTotals(cards, levels);
-  const baseDamageBonusPercent = totals.damagePercent + totals.defensePercent;
+  const baseDamageBonusPercent = totals.damagePercent + totals.defensePercent + horizonSkills.damage * 20;
   const healthBonusPercent = totals.healthPercent;
-  const shieldBonusPercent = totals.shieldPercent;
-  const critDamageBonusPercent = totals.critDamage;
+  const shieldBonusPercent = totals.shieldPercent + horizonSkills.shield * 20;
+  const critDamageBonusPercent = totals.critDamage + horizonSkills.critDamage * 20;
   const damage = Math.round(scaledBaseStats.damage * (1 + baseDamageBonusPercent / 100));
   const health = Math.round(scaledBaseStats.health * (1 + healthBonusPercent / 100));
   const shield = Math.round(scaledBaseStats.shield * (1 + shieldBonusPercent / 100));
@@ -341,21 +343,21 @@ export const calculateBattleShipStats = (
     damage,
     health,
     shield,
-    critChance: scaledBaseStats.critChance + totals.critChance,
+    critChance: scaledBaseStats.critChance + totals.critChance + horizonSkills.critChance,
     critMultiplier,
     baseDamageBonusPercent,
     healthBonusPercent,
     shieldBonusPercent,
     critDamageBonusPercent,
     elementalDamage: {
-      ice: Math.round(damage * (totals.iceDamagePercent / 100)),
-      electric: Math.round(damage * (totals.electricDamagePercent / 100)),
-      fire: Math.round(damage * (totals.fireDamagePercent / 100)),
+      ice: Math.round(damage * ((totals.iceDamagePercent + horizonSkills.iceDamage * 10) / 100)),
+      electric: Math.round(damage * ((totals.electricDamagePercent + horizonSkills.electricDamage * 10) / 100)),
+      fire: Math.round(damage * ((totals.fireDamagePercent + horizonSkills.fireDamage * 10) / 100)),
     },
     elementalBonusPercent: {
-      ice: totals.iceDamagePercent,
-      electric: totals.electricDamagePercent,
-      fire: totals.fireDamagePercent,
+      ice: totals.iceDamagePercent + horizonSkills.iceDamage * 10,
+      electric: totals.electricDamagePercent + horizonSkills.electricDamage * 10,
+      fire: totals.fireDamagePercent + horizonSkills.fireDamage * 10,
     },
     conditionalBonuses: {
       bonusDamageVsSlowPercent: totals.bonusDamageVsSlowPercent,
@@ -489,6 +491,34 @@ export const rollBattleCardReward = (
   if (pool.length === 0) return null;
 
   return pool[Math.floor(random() * pool.length)];
+};
+
+export const rollMissingPoliticalCardReward = (
+  ownedIds: string[] = [],
+  random = Math.random
+) => {
+  const owned = new Set(ownedIds);
+  const pool = COLONY_CARD_CATALOG.filter(card => isPoliticalCard(card) && !owned.has(card.id));
+  if (pool.length === 0) return null;
+
+  const missingPoliticalMythics = pool.filter(card => card.rarity === 'mythic');
+  if (missingPoliticalMythics.length > 0 && random() < 0.42) {
+    return missingPoliticalMythics[Math.floor(random() * missingPoliticalMythics.length)];
+  }
+
+  const getRewardWeight = (card: ColonyCard) => {
+    if (card.rarity === 'mythic') return 24;
+    if (card.rarity === 'legendary') return 8;
+    if (card.rarity === 'epic') return 10;
+    if (card.rarity === 'rare') return 12;
+    return 14;
+  };
+  const totalWeight = pool.reduce((sum, card) => sum + getRewardWeight(card), 0);
+  let roll = random() * totalWeight;
+  return pool.find(card => {
+    roll -= getRewardWeight(card);
+    return roll <= 0;
+  }) || pool[pool.length - 1];
 };
 
 export const rollAnyMissingColonyCardReward = (
