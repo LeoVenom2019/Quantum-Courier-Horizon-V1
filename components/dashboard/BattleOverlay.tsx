@@ -20,6 +20,8 @@ import {
 } from 'lucide-react';
 import VoidBattleArena, { VoidBattleEnemy } from '../VoidBattleArena';
 import { PremiumCanvasButton } from '../ui/PremiumCanvasButton';
+import SolarInterstellarBattleExperience from './SolarInterstellarBattleExperience';
+import { isSolarInterstellarManualBattle } from '@/lib/solar-interstellar-battle-media.mjs';
 
 interface BattleOverlayProps {
   activeBattle: any;
@@ -43,6 +45,8 @@ interface BattleOverlayProps {
   aetherion: number;
   autoSkipBattle: (battle: any, cost: number) => boolean;
   meteoriteRewardValue?: number;
+  musicOn: boolean;
+  jukebox: any;
 }
 
 const BattleOverlay = memo(({
@@ -66,7 +70,9 @@ const BattleOverlay = memo(({
   ROUTES_MAP,
   aetherion,
   autoSkipBattle,
-  meteoriteRewardValue = 0
+  meteoriteRewardValue = 0,
+  musicOn,
+  jukebox
 }: BattleOverlayProps) => {
   if (!activeBattle) return null;
   
@@ -75,6 +81,30 @@ const BattleOverlay = memo(({
   if (battleRoute?.tier !== routeTier) return null;
 
   const canSkipActiveBattle = String(activeBattle.deliveryId || '').startsWith('auto-');
+
+  if (isSolarInterstellarManualBattle(routeTier, activeBattle.deliveryId)) {
+    return (
+      <SolarInterstellarBattleExperience
+        activeBattle={activeBattle}
+        routeTier={routeTier as 'Solar' | 'Interstellar'}
+        language={language}
+        t={t}
+        formatValue={formatValue}
+        finishBattle={finishBattle}
+        resolveBattleVictory={resolveBattleVictory}
+        resolveBattleDefeat={resolveBattleDefeat}
+        setActiveBattle={setActiveBattle}
+        playSfx={playSfx}
+        stopSfx={stopSfx}
+        addLog={addLog}
+        voidResources={voidResources}
+        battleLevel={battleLevel}
+        meteoriteRewardValue={meteoriteRewardValue}
+        musicOn={musicOn}
+        jukebox={jukebox}
+      />
+    );
+  }
 
   const cooldowns = {
     laser: 1000,

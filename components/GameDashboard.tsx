@@ -13853,6 +13853,8 @@ const DashboardContent = memo(({
           getPoliceBonus={getPoliceBonus}
           aetherion={aetherion}
           autoSkipBattle={autoSkipBattle}
+          musicOn={musicOn}
+          jukebox={jukebox}
           ROUTES_MAP={ROUTES_MAP}
         />
 

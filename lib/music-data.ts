@@ -1,3 +1,5 @@
+import { SOLAR_INTERSTELLAR_BATTLE_MEDIA } from './solar-interstellar-battle-media.mjs';
+
 export interface Track {
   id: string;
   title: string;
@@ -22,6 +24,8 @@ export const ROUTE_THEMES: Record<string, RouteTheme> = {
       { id: 'r1_t3', title: 'Solar Echoes', url: '/audio/themes/route1/solar_schoes.ogg' },
       { id: 'r1_t4', title: 'Space After Space', url: '/audio/themes/route1/space_after_space.ogg' },
       { id: 'r1_t5', title: 'Throne Signal', url: '/audio/themes/route1/throne_signal.ogg' },
+      { id: 'r1_battle_1', title: 'Solar Battle I', url: SOLAR_INTERSTELLAR_BATTLE_MEDIA.Solar.battleThemes[0] },
+      { id: 'r1_battle_2', title: 'Solar Battle II', url: SOLAR_INTERSTELLAR_BATTLE_MEDIA.Solar.battleThemes[1] },
     ]
   },
   'Interstellar': {
@@ -32,6 +36,8 @@ export const ROUTE_THEMES: Record<string, RouteTheme> = {
       { id: 'r2_t2', title: 'Far Horizon Drift', url: '/audio/themes/route2/far_horizon _drift.ogg' },
       { id: 'r2_t3', title: 'Going to Future', url: '/audio/themes/route2/going_to_future.ogg' },
       { id: 'r2_t4', title: 'This Way', url: '/audio/themes/route2/this_way.ogg' },
+      { id: 'r2_battle_1', title: 'Interstellar Battle I', url: SOLAR_INTERSTELLAR_BATTLE_MEDIA.Interstellar.battleThemes[0] },
+      { id: 'r2_battle_2', title: 'Interstellar Battle II', url: SOLAR_INTERSTELLAR_BATTLE_MEDIA.Interstellar.battleThemes[1] },
     ]
   },
   'Void': {

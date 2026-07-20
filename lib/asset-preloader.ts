@@ -1,6 +1,7 @@
 import { CARD_BACKGROUND_BY_RARITY, CARD_MODAL_BACKGROUND_BY_RARITY } from './colony-cards';
 import { MINI_GAMES_CONFIG } from './mini-games-config';
 import { ARCADE_THEMES, ROUTE_THEMES } from './music-data';
+import { SOLAR_INTERSTELLAR_BATTLE_MEDIA } from './solar-interstellar-battle-media.mjs';
 import { NEW_EARTH_TREASURE_CATALOG } from './new-earth-treasures';
 import { AETHERION_CHAMBER_BACKGROUND, ACTIVE_DELIVERY_BACKGROUNDS, MISSION_HEADER_BACKGROUNDS, ROUTE1_UI_BACKGROUNDS, ROUTE2_UI_BACKGROUNDS, SCIFI_TEXTURE_BACKGROUND } from './ui-backgrounds';
 
@@ -727,12 +728,21 @@ export const ASSET_GROUPS: Record<AssetGroupId, AssetPreloadEntry[]> = {
   route1: [
     ...asEntries([routeHeaderImages.route1, ACTIVE_DELIVERY_BACKGROUNDS.route1, MISSION_HEADER_BACKGROUNDS.route1, AETHERION_CHAMBER_BACKGROUND, ...ROUTE1_UI_BACKGROUNDS, ...route1UpgradeBackgrounds, ...route1HistoricBackgrounds, ...route12BattleImages], 'image'),
     ...asEntries(route1MineralVideos, 'video'),
-    ...asEntries(routeThemeAudio('Solar'), 'audio'),
+    ...asEntries([
+      ...routeThemeAudio('Solar'),
+      SOLAR_INTERSTELLAR_BATTLE_MEDIA.Solar.victoryTheme,
+      SOLAR_INTERSTELLAR_BATTLE_MEDIA.defeatTheme,
+    ], 'audio'),
   ],
   route2: [
     ...asEntries([routeHeaderImages.route2, ACTIVE_DELIVERY_BACKGROUNDS.route2, MISSION_HEADER_BACKGROUNDS.route2, AETHERION_CHAMBER_BACKGROUND, ...ROUTE2_UI_BACKGROUNDS, ...route2UpgradeBackgrounds, ...route2HistoricBackgrounds, ...route12BattleImages], 'image'),
     ...asEntries(route2MineralVideos, 'video'),
-    ...asEntries([...routeThemeAudio('Interstellar'), '/audio/themes/intro_cap_02.ogg'], 'audio'),
+    ...asEntries([
+      ...routeThemeAudio('Interstellar'),
+      '/audio/themes/intro_cap_02.ogg',
+      SOLAR_INTERSTELLAR_BATTLE_MEDIA.Interstellar.victoryTheme,
+      SOLAR_INTERSTELLAR_BATTLE_MEDIA.defeatTheme,
+    ], 'audio'),
   ],
   route3: [
     ...asEntries([
