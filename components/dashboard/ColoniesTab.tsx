@@ -7,6 +7,9 @@ import { useDashboard } from './DashboardProvider';
 import { preloadAssetGroupPassive } from '@/lib/asset-preloader';
 
 interface ColoniesTabProps {
+  musicOn: boolean;
+  jukebox: any;
+  onBattleMusicSessionChange?: (active: boolean, previousTrackUrl?: string) => void;
   addEarthYears: (years: number) => void;
   isColoniesOpenRef: React.MutableRefObject<boolean>;
   handleBuildingComplete: (type: any, level: number) => void;
@@ -19,6 +22,9 @@ interface ColoniesTabProps {
 }
 
 const ColoniesTab = memo(({
+  musicOn,
+  jukebox,
+  onBattleMusicSessionChange,
   addEarthYears,
   isColoniesOpenRef,
   handleBuildingComplete,
@@ -56,6 +62,9 @@ const ColoniesTab = memo(({
       className="h-full"
     >
       <ColonySystem 
+        musicOn={musicOn}
+        jukebox={jukebox}
+        onBattleMusicSessionChange={onBattleMusicSessionChange}
         language={language as any}
         onAddYear={addEarthYears}
         onTabStatusChange={(isOpen) => { isColoniesOpenRef.current = isOpen; }}

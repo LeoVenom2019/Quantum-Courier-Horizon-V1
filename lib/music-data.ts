@@ -1,4 +1,5 @@
 import { SOLAR_INTERSTELLAR_BATTLE_MEDIA } from './solar-interstellar-battle-media.mjs';
+import { NEW_LAND_BATTLE_MUSIC } from './new-land-battle-music.mjs';
 
 export interface Track {
   id: string;
@@ -110,6 +111,16 @@ export const ARCADE_THEMES: Record<string, RouteTheme> = {
 };
 
 export const SPECIAL_THEMES: Record<string, RouteTheme> = {
+  'new-land-battles': {
+    id: 'new-land-battles',
+    name: 'Chapter 4 - New Land Battles',
+    playlist: [
+      { id: 'r4_battle_1', title: 'New Land Battle I', url: NEW_LAND_BATTLE_MUSIC.themes[0] },
+      { id: 'r4_battle_2', title: 'New Land Battle II', url: NEW_LAND_BATTLE_MUSIC.themes[1] },
+      { id: 'r4_battle_3', title: 'New Land Battle III', url: NEW_LAND_BATTLE_MUSIC.themes[2] },
+      { id: 'r4_battle_4', title: 'New Land Battle IV', url: NEW_LAND_BATTLE_MUSIC.themes[3] },
+    ],
+  },
   transitions: {
     id: 'transitions',
     name: 'Transitions & Epilogues',

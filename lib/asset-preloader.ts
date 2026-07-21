@@ -2,6 +2,7 @@ import { CARD_BACKGROUND_BY_RARITY, CARD_MODAL_BACKGROUND_BY_RARITY } from './co
 import { MINI_GAMES_CONFIG } from './mini-games-config';
 import { ARCADE_THEMES, ROUTE_THEMES } from './music-data';
 import { SOLAR_INTERSTELLAR_BATTLE_MEDIA } from './solar-interstellar-battle-media.mjs';
+import { NEW_LAND_BATTLE_MUSIC } from './new-land-battle-music.mjs';
 import { NEW_EARTH_TREASURE_CATALOG } from './new-earth-treasures';
 import { AETHERION_CHAMBER_BACKGROUND, ACTIVE_DELIVERY_BACKGROUNDS, MISSION_HEADER_BACKGROUNDS, ROUTE1_UI_BACKGROUNDS, ROUTE2_UI_BACKGROUNDS, SCIFI_TEXTURE_BACKGROUND } from './ui-backgrounds';
 
@@ -410,6 +411,7 @@ const route4BattleImages = [
 ];
 
 const route4BattleAudio = [
+  ...NEW_LAND_BATTLE_MUSIC.themes,
   '/audio/sfx/shoot_enemy.ogg',
   '/audio/sfx/shoot_player.ogg',
   '/assets/rota4/SFX_new_land/airplane_enemys_sounds.ogg',

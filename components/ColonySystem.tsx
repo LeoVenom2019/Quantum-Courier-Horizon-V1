@@ -32,6 +32,7 @@ import {
 import { GameStorage } from '@/lib/game-storage';
 import { MINI_GAMES_CONFIG } from '@/lib/mini-games-config';
 import { preloadAssetGroupPassive } from '@/lib/asset-preloader';
+import { NEW_LAND_BATTLE_MUSIC, pickNewLandBattleTheme } from '@/lib/new-land-battle-music.mjs';
 import NewEarthDefenseBattle, { BattleResultSummary } from './NewEarthDefenseBattle';
 import HorizonSkillTreeModal from './HorizonSkillTreeModal';
 import { PremiumCanvasButton } from './ui/PremiumCanvasButton';
@@ -424,6 +425,9 @@ export interface Colony {
 }
 
 export interface ColonySystemProps {
+  musicOn: boolean;
+  jukebox: any;
+  onBattleMusicSessionChange?: (active: boolean, previousTrackUrl?: string) => void;
   language: 'en' | 'pt';
   onAddYear: (years: number) => void;
   onTabStatusChange: (isOpen: boolean) => void;
@@ -1344,6 +1348,9 @@ const CardDetailOverlay = ({
 // --- Component ---
 
 export const ColonySystem: React.FC<ColonySystemProps> = ({ 
+  musicOn,
+  jukebox,
+  onBattleMusicSessionChange,
   language, 
   onAddYear, 
   onTabStatusChange,
@@ -1390,6 +1397,9 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
   const [isSearchBattleCycleLoaded, setIsSearchBattleCycleLoaded] = useState(false);
   const [activeSearchBattle, setActiveSearchBattle] = useState<ActiveSearchBattle | null>(null);
   const [directBattleBriefing, setDirectBattleBriefing] = useState<DirectBattleBriefing | null>(null);
+  const [directBattleMusicEnabled, setDirectBattleMusicEnabled] = useState(true);
+  const [searchDefenseBattleMusicEnabled, setSearchDefenseBattleMusicEnabled] = useState(true);
+  const [areBattleMusicPreferencesLoaded, setAreBattleMusicPreferencesLoaded] = useState(false);
   const [legendaryBattleCardPity, setLegendaryBattleCardPity] = useState(0);
   const [isBattlePityLoaded, setIsBattlePityLoaded] = useState(false);
   const [cardLevels, setCardLevels] = useState<ColonyCardLevels>({});
@@ -1408,6 +1418,7 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
   const [isDefenseSpecialLoadoutLoaded, setIsDefenseSpecialLoadoutLoaded] = useState(false);
   const [pendingDefenseThreats, setPendingDefenseThreats] = useState<PendingDefenseThreat[]>([]);
   const [activeDefenseThreat, setActiveDefenseThreat] = useState<PendingDefenseThreat | null>(null);
+  const [defenseBattleStarted, setDefenseBattleStarted] = useState(false);
   const [showDefenseHangar, setShowDefenseHangar] = useState(false);
   const [defenseAlertTick, setDefenseAlertTick] = useState(0);
   const colonySystemClock = useSyncExternalStore(
@@ -1436,6 +1447,15 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
   const readyNewEarthMissionIdsRef = useRef<Set<string>>(new Set());
   const countedNewEarthMissionCompletionIdsRef = useRef<Set<string>>(new Set());
   const readyNewEarthMissionAudioInitializedRef = useRef(false);
+  const newLandBattleAudioRef = useRef<HTMLAudioElement | null>(null);
+  const newLandBattleMusicVolumeRef = useRef(Number(jukebox.volume ?? 0.5));
+  const musicOnRef = useRef(musicOn);
+  const jukeboxBattleStateRef = useRef({
+    isPlaying: Boolean(jukebox.isPlaying),
+    currentTrackUrl: jukebox.currentTrack?.url as string | undefined,
+    stop: jukebox.stop as (options?: { rememberPreference?: boolean }) => void,
+    setIsPlaying: jukebox.setIsPlaying as (playing: boolean) => void,
+  });
 
   const t = useCallback((en: string, pt: string) => language === 'pt' ? pt : en, [language]);
   const isDefenseQueuePaused = defenseAlertsPaused || Boolean(activeDefenseThreat) || Boolean(activeSearchBattle);
@@ -1554,6 +1574,89 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
     }
   }, [showDefenseHangar, activeDefenseThreat, activeSearchBattle]);
 
+  useEffect(() => {
+    let mounted = true;
+    Promise.all([
+      GameStorage.load(NEW_LAND_BATTLE_MUSIC.searchDefensePreferenceKey),
+      GameStorage.load(NEW_LAND_BATTLE_MUSIC.directPreferenceKey),
+    ]).then(([savedSearchDefense, savedDirect]) => {
+      if (!mounted) return;
+      setSearchDefenseBattleMusicEnabled(savedSearchDefense !== false);
+      setDirectBattleMusicEnabled(savedDirect !== false);
+      setAreBattleMusicPreferencesLoaded(true);
+    });
+    return () => { mounted = false; };
+  }, []);
+
+  useEffect(() => {
+    if (!areBattleMusicPreferencesLoaded) return;
+    GameStorage.save(searchDefenseBattleMusicEnabled, NEW_LAND_BATTLE_MUSIC.searchDefensePreferenceKey);
+    GameStorage.save(directBattleMusicEnabled, NEW_LAND_BATTLE_MUSIC.directPreferenceKey);
+  }, [areBattleMusicPreferencesLoaded, directBattleMusicEnabled, searchDefenseBattleMusicEnabled]);
+
+  const activeNewLandBattleMusicSession = activeSearchBattle
+    ? `direct:${activeSearchBattle.searchId}:${activeSearchBattle.battleIndex}`
+    : activeDefenseThreat && defenseBattleStarted
+      ? `search-defense:${activeDefenseThreat.id}`
+      : null;
+  const isActiveNewLandBattleMusicEnabled = activeSearchBattle
+    ? directBattleMusicEnabled
+    : searchDefenseBattleMusicEnabled;
+  const newLandBattleMusicVolume = Number(jukebox.volume ?? 0.5);
+
+  useEffect(() => {
+    newLandBattleMusicVolumeRef.current = newLandBattleMusicVolume;
+    musicOnRef.current = musicOn;
+    jukeboxBattleStateRef.current = {
+      isPlaying: Boolean(jukebox.isPlaying),
+      currentTrackUrl: jukebox.currentTrack?.url,
+      stop: jukebox.stop,
+      setIsPlaying: jukebox.setIsPlaying,
+    };
+  }, [jukebox.currentTrack?.url, jukebox.isPlaying, jukebox.setIsPlaying, jukebox.stop, musicOn, newLandBattleMusicVolume]);
+
+  useEffect(() => {
+    if (!activeNewLandBattleMusicSession) return;
+
+    const previousPlayback = {
+      wasPlaying: jukeboxBattleStateRef.current.isPlaying,
+      trackUrl: jukeboxBattleStateRef.current.currentTrackUrl,
+    };
+    onBattleMusicSessionChange?.(true, previousPlayback.trackUrl);
+    jukeboxBattleStateRef.current.stop({ rememberPreference: false });
+
+    return () => {
+      if (previousPlayback.wasPlaying && musicOnRef.current) {
+        jukeboxBattleStateRef.current.setIsPlaying(true);
+      }
+      onBattleMusicSessionChange?.(false, previousPlayback.trackUrl);
+    };
+  }, [activeNewLandBattleMusicSession, onBattleMusicSessionChange]);
+
+  useEffect(() => {
+    if (!activeNewLandBattleMusicSession || !musicOn || !isActiveNewLandBattleMusicEnabled) return;
+
+    const audio = new Audio(pickNewLandBattleTheme());
+    audio.loop = true;
+    audio.preload = 'auto';
+    audio.volume = Math.min(0.8, Math.max(0.18, newLandBattleMusicVolumeRef.current * 0.95));
+    newLandBattleAudioRef.current = audio;
+    audio.play().catch((error: unknown) => {
+      if (error instanceof DOMException && (error.name === 'AbortError' || error.name === 'NotAllowedError')) return;
+      console.warn('[NewLandBattleMusic] Playback failed:', error);
+    });
+
+    return () => {
+      audio.pause();
+      audio.currentTime = 0;
+      if (newLandBattleAudioRef.current === audio) newLandBattleAudioRef.current = null;
+    };
+  }, [activeNewLandBattleMusicSession, isActiveNewLandBattleMusicEnabled, musicOn]);
+
+  useEffect(() => {
+    if (!newLandBattleAudioRef.current) return;
+    newLandBattleAudioRef.current.volume = Math.min(0.8, Math.max(0.18, newLandBattleMusicVolume * 0.95));
+  }, [newLandBattleMusicVolume]);
   useEffect(() => {
     const timer = window.setTimeout(() => setIsLoaded(true), 0);
     onTabStatusChange(true);
@@ -2471,6 +2574,7 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
         item.id === threat.id ? { ...item, openedAt, expiresAt: undefined, waitingForDefenseSlot: false } : item
       )));
       onDefenseThreatAlertChange?.(null);
+      setDefenseBattleStarted(false);
       setActiveDefenseThreat({ ...threat, openedAt, expiresAt: undefined, waitingForDefenseSlot: false });
     }, 0);
 
@@ -3256,6 +3360,7 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
       });
     }
     setPendingDefenseThreats(prev => prev.filter(threat => threat.id !== activeDefenseThreat.id));
+    setDefenseBattleStarted(false);
     setActiveDefenseThreat(null);
     if (summary?.perfect) {
       dispatchNewEarthAchievementMetric({ type: 'perfect-search-defense', searchId: activeDefenseThreat.sourceSearchId, amount: 1 });
@@ -3301,6 +3406,7 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
         threat.id === activeDefenseThreat.id ? { ...threat, openedAt: undefined, expiresAt: retryUntil, waitingForDefenseSlot: false } : threat
       )));
     }
+    setDefenseBattleStarted(false);
     setActiveDefenseThreat(null);
     setCardFeedback(language === 'pt' ? 'Defesa falhou. A ameaça permanece pendente.' : 'Defense failed. Threat remains pending.');
   }, [activeDefenseThreat, language]);
@@ -3313,8 +3419,16 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
           : threat
       )));
     }
+    setDefenseBattleStarted(false);
     setActiveDefenseThreat(null);
     setCardFeedback(t('Defense returned to the queue', 'Defesa devolvida para a fila'));
+  }, [activeDefenseThreat, t]);
+
+  const startSearchDefenseBattle = useCallback(() => {
+    if (!activeDefenseThreat) return;
+    playRandomBobbyBluePrepareForBattleSfx();
+    setDefenseBattleStarted(true);
+    setCardFeedback(t('Defense launched', 'Defesa iniciada'));
   }, [activeDefenseThreat, t]);
 
   const resolveSearchBattleVictory = useCallback((summary?: BattleResultSummary) => {
@@ -3721,6 +3835,97 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
       </AnimatePresence>
 
       <AnimatePresence>
+        {activeDefenseThreat && !activeSearchBattle && !defenseBattleStarted && (
+          <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/88 p-4">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.96, y: 14 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.97, y: 8 }}
+              className="relative w-full max-w-2xl overflow-hidden rounded-3xl border border-red-300/30 bg-slate-950 shadow-[0_0_64px_rgba(248,113,113,0.16)]"
+            >
+              <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-cyan-300 to-transparent" />
+              <div className="pointer-events-none absolute right-0 top-0 h-40 w-40 bg-[radial-gradient(circle_at_top_right,rgba(239,68,68,0.18),transparent_68%)]" />
+              <header className="relative border-b border-white/10 bg-black/45 px-6 py-5">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="font-mono text-[10px] font-black uppercase tracking-[0.34em] text-red-200/75">
+                      {t('Defense battle briefing', 'Briefing de batalha defensiva')}
+                    </p>
+                    <h3 className="mt-2 font-orbitron text-3xl font-black uppercase leading-none text-white">
+                      {activeDefenseThreat.sourceTitle}
+                    </h3>
+                    <p className="mt-2 font-mono text-[10px] uppercase tracking-[0.2em] text-cyan-100/55">
+                      {t('Search perimeter under attack', 'Perímetro de busca sob ataque')}
+                    </p>
+                  </div>
+                  <PremiumCanvasButton type="button" tone="steel" onClick={postponeActiveDefense} className="h-10 w-10 rounded-full" contentClassName="text-slate-100">
+                    <X size={18} />
+                  </PremiumCanvasButton>
+                </div>
+              </header>
+
+              <div className="relative grid gap-3 p-6">
+                <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+                  {[
+                    { label: t('Defense phase', 'Fase de defesa'), value: defenseBattleLevel },
+                    { label: t('Threat chance', 'Chance de ameaça'), value: `${activeDefenseThreat.threatChance}%` },
+                    { label: t('Horizon level', 'Nível da Horizon'), value: `${horizonProgress.level}/${horizonMaxLevel}` },
+                    { label: t('Threats queued', 'Ameaças na fila'), value: queuedDefenseCountDuringBattle },
+                  ].map(item => (
+                    <div key={item.label} className="rounded-2xl border border-white/10 bg-black/40 p-4">
+                      <p className="font-mono text-[9px] font-black uppercase tracking-[0.18em] text-slate-400">{item.label}</p>
+                      <p className="mt-2 font-orbitron text-2xl font-black uppercase text-white">{item.value}</p>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="grid gap-3 md:grid-cols-[1.35fr_1fr]">
+                  <div className="rounded-2xl border border-emerald-300/18 bg-emerald-300/[0.06] p-4">
+                    <p className="font-mono text-[9px] font-black uppercase tracking-[0.26em] text-emerald-100/70">
+                      {t('Protected search cargo', 'Carga protegida da busca')}
+                    </p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {(Object.entries(activeDefenseThreat.rewards || {}) as Array<[ColonySupplyId, number]>).map(([key, value]) => (
+                        <span key={key} className={`rounded-lg border px-2.5 py-1.5 font-mono text-[10px] font-black uppercase tracking-wider ${SUPPLY_CONFIG[key].border} ${SUPPLY_CONFIG[key].color}`}>
+                          +{value} {SUPPLY_CONFIG[key].label[language]}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="rounded-2xl border border-cyan-300/16 bg-cyan-300/[0.05] p-4">
+                    <p className="font-mono text-[9px] font-black uppercase tracking-[0.26em] text-cyan-100/65">{t('Combat systems', 'Sistemas de combate')}</p>
+                    <p className="mt-2 text-sm font-semibold text-slate-200">
+                      {t(`${equippedDefenseSpecialIds.length} specials equipped`, `${equippedDefenseSpecialIds.length} especiais equipados`)} · {t(`Damage ${battleShipStats.damage}`, `Dano ${battleShipStats.damage}`)}
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  aria-pressed={searchDefenseBattleMusicEnabled}
+                  onClick={() => setSearchDefenseBattleMusicEnabled(enabled => !enabled)}
+                  className={`flex min-h-14 items-center justify-between rounded-2xl border px-4 text-left transition-colors ${searchDefenseBattleMusicEnabled ? 'border-cyan-300/35 bg-cyan-300/10 text-cyan-50' : 'border-white/10 bg-black/35 text-slate-400'}`}
+                >
+                  <span className="flex items-center gap-3">
+                    <Music size={18} />
+                    <span>
+                      <span className="block font-mono text-[9px] font-black uppercase tracking-[0.26em]">{t('Battle soundtrack', 'Trilha sonora da batalha')}</span>
+                      <span className="mt-1 block text-xs font-semibold">{t('Four New Land themes · equal random selection', 'Quatro temas da Nova Terra · seleção aleatória igual')}</span>
+                    </span>
+                  </span>
+                  <span className="font-orbitron text-xs font-black uppercase">{searchDefenseBattleMusicEnabled ? 'ON' : 'OFF'}</span>
+                </button>
+
+                <PremiumCanvasButton type="button" tone="red" onClick={startSearchDefenseBattle} className="h-14 rounded-2xl" contentClassName="gap-2 text-sm font-black uppercase tracking-[0.24em]">
+                  <Shield size={18} />
+                  {t('Launch Defense', 'Iniciar Defesa')}
+                </PremiumCanvasButton>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+      <AnimatePresence>
         {directBattleBriefing && (() => {
           const baseBattleLevel = Math.max(1, Math.floor(defenseBattleLevel));
           const effectiveBattleLevel = baseBattleLevel + directBattleBriefing.boost;
@@ -3825,6 +4030,21 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
                     </PremiumCanvasButton>
                   </div>
 
+                  <button
+                    type="button"
+                    aria-pressed={directBattleMusicEnabled}
+                    onClick={() => setDirectBattleMusicEnabled(enabled => !enabled)}
+                    className={`flex min-h-14 items-center justify-between rounded-2xl border px-4 text-left transition-colors ${directBattleMusicEnabled ? 'border-cyan-300/35 bg-cyan-300/10 text-cyan-50' : 'border-white/10 bg-black/35 text-slate-400'}`}
+                  >
+                    <span className="flex items-center gap-3">
+                      <Music size={18} />
+                      <span>
+                        <span className="block font-mono text-[9px] font-black uppercase tracking-[0.26em]">{t('Battle soundtrack', 'Trilha sonora da batalha')}</span>
+                        <span className="mt-1 block text-xs font-semibold">{t('New Land combat themes', 'Temas de combate da Nova Terra')}</span>
+                      </span>
+                    </span>
+                    <span className="font-orbitron text-xs font-black uppercase">{directBattleMusicEnabled ? 'ON' : 'OFF'}</span>
+                  </button>
                   <PremiumCanvasButton
                     type="button"
                     tone="cyan"
@@ -3842,7 +4062,7 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
       </AnimatePresence>
 
       <AnimatePresence>
-        {activeDefenseThreat && !activeSearchBattle && (
+        {activeDefenseThreat && !activeSearchBattle && defenseBattleStarted && (
           <NewEarthDefenseBattle
             language={language}
             shipStats={battleShipStats}
@@ -4118,6 +4338,7 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
                                 item.id === threat.id ? { ...item, openedAt, expiresAt: undefined, waitingForDefenseSlot: false } : item
                               )));
                               onDefenseThreatAlertChange?.(null);
+                              setDefenseBattleStarted(false);
                               setActiveDefenseThreat({ ...threat, openedAt, expiresAt: undefined, waitingForDefenseSlot: false });
                             }}
                             tone="red"

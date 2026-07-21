@@ -6,6 +6,7 @@
   "private": true,
   "scripts": {
     "test:battle-media": "node --test lib/solar-interstellar-battle-media.test.mjs",
+    "test:new-land-battle-music": "node --test lib/new-land-battle-music.test.mjs",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",

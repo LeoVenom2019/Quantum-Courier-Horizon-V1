@@ -1403,6 +1403,12 @@ const DashboardContent = memo(({
   const [route4DefenseThreatAlert, setRoute4DefenseThreatAlert] = useState<{ title: string; remainingSeconds: number } | null>(null);
   const [openRoute4DefenseRequest, setOpenRoute4DefenseRequest] = useState(0);
   const [abandonRoute4DefenseRequest, setAbandonRoute4DefenseRequest] = useState(0);
+  const [route4ColonyBattleMusicActive, setRoute4ColonyBattleMusicActive] = useState(false);
+  const route4BattleResumeTrackUrlRef = useRef<string | null>(null);
+  const handleRoute4BattleMusicSessionChange = useCallback((active: boolean, previousTrackUrl?: string) => {
+    if (active) route4BattleResumeTrackUrlRef.current = previousTrackUrl || null;
+    setRoute4ColonyBattleMusicActive(active);
+  }, []);
   const [pendingArcadeDefenseGameId, setPendingArcadeDefenseGameId] = useState<string | null>(null);
   const [selectedColonyId, setSelectedColonyId] = useState<string>('colony-1');
   const [newEarthCardLevels, setNewEarthCardLevels] = useState<ColonyCardLevels>({});
@@ -3067,6 +3073,16 @@ const DashboardContent = memo(({
       return;
     }
 
+    if (route4ColonyBattleMusicActive) {
+      return;
+    }
+
+    const route4ResumeTrackUrl = route4BattleResumeTrackUrlRef.current;
+    if (route4ResumeTrackUrl && jukebox.currentTrack?.url === route4ResumeTrackUrl) {
+      route4BattleResumeTrackUrlRef.current = null;
+      return;
+    }
+
     // Priority for Arcade Music
     if (activeMiniGameId) {
       const arcadeTheme = ARCADE_THEMES[activeMiniGameId];
@@ -3095,7 +3111,7 @@ const DashboardContent = memo(({
       jukebox.stop();
     }
 
-  }, [activeMiniGameId, routeTier, isLoaded, musicOn, isVoidLocalBattle, jukebox, jukebox.playPlaylist, jukebox.stop, jukebox.currentTrack?.url]);
+  }, [activeMiniGameId, routeTier, isLoaded, musicOn, isVoidLocalBattle, route4ColonyBattleMusicActive, jukebox, jukebox.playPlaylist, jukebox.stop, jukebox.currentTrack?.url]);
   const setOresCollected = useCallback((val: Record<string, number> | ((prev: Record<string, number>) => Record<string, number>)) => {
     const nextVal = typeof val === 'function' ? val(oresCollectedRef.current) : val;
     oresCollectedRef.current = nextVal;
@@ -10791,6 +10807,9 @@ const DashboardContent = memo(({
                 {isEarth && (
                   <div className={activeTab === 'colonies' ? 'contents' : 'hidden'} key="colonies_tab_wrapper">
                     <ColoniesTab
+                      musicOn={musicOn}
+                      jukebox={jukebox}
+                      onBattleMusicSessionChange={handleRoute4BattleMusicSessionChange}
                       addEarthYears={addEarthYears}
                       isColoniesOpenRef={isColoniesOpenRef}
                       handleBuildingComplete={handleBuildingComplete}
