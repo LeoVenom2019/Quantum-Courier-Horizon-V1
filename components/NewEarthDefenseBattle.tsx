@@ -3,6 +3,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { X } from 'lucide-react';
 import { BattleShipComputedStats, getHorizonXpForNextLevel, MAX_HORIZON_LEVEL } from '@/lib/colony-cards';
+import type { NewEarthBattleBackground } from '@/lib/route4-battle-backgrounds.types';
 import { PremiumCanvasButton } from './ui/PremiumCanvasButton';
 import BattlePauseDialog from './BattlePauseDialog';
 
@@ -45,6 +46,7 @@ interface NewEarthDefenseBattleProps {
   damageSupportDrone?: boolean;
   defenseSupportDrone?: boolean;
   threatTitle: string;
+  battleBackground: NewEarthBattleBackground;
   onVictory: (summary: BattleResultSummary) => void;
   queuedDefenseCount?: number;
   onDefeat: () => void;
@@ -407,19 +409,6 @@ const ROUTE4_ENEMY_VARIANT_SHOT_SOUNDS = [
   '/audio/sfx/shoot_player.ogg',
 ];
 
-const BATTLE_BACKGROUNDS = [
-  `${ASSET_BASE}/backgrounds/day/rt4_background_day.webp`,
-  `${ASSET_BASE}/backgrounds/night/rt4_background_night.webp`,
-  `${ASSET_BASE}/backgrounds/winter/rt4_background_winter.webp`,
-  `${ASSET_BASE}/backgrounds/multiple/rt4_background_day_2.webp`,
-  `${ASSET_BASE}/backgrounds/multiple/rt4_background_day_3.webp`,
-  `${ASSET_BASE}/backgrounds/multiple/rt4_background_day_4.webp`,
-  `${ASSET_BASE}/backgrounds/multiple/rt4_background_night_2.webp`,
-  `${ASSET_BASE}/backgrounds/multiple/rt4_background_night_3.webp`,
-  `${ASSET_BASE}/backgrounds/multiple/rt4_background_night_4.webp`,
-  `${ASSET_BASE}/backgrounds/multiple/rt4_background_night_5.webp`,
-  `${ASSET_BASE}/backgrounds/multiple/rt4_background_winter_2.webp`,
-];
 const RESULT_VICTORY_BACKGROUNDS = [
   '/assets/rota4/layout_cap4/bg_victory_battle_cap4_1.webp',
   '/assets/rota4/layout_cap4/bg_victory_battle_cap4_2.webp',
@@ -821,6 +810,7 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
   damageSupportDrone = false,
   defenseSupportDrone = false,
   threatTitle,
+  battleBackground,
   queuedDefenseCount = 0,
   onVictory,
   onDefeat,
@@ -828,7 +818,7 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const rafRef = useRef<number | null>(null);
-  const backgroundRef = useRef(pick(BATTLE_BACKGROUNDS));
+  const backgroundVideoRef = useRef<HTMLVideoElement | null>(null);
   const keysRef = useRef<Record<string, boolean>>({});
   const controlsRef = useRef({ specialOne: 0, specialTwo: 0 });
   const horizonProgressRef = useRef({ level: horizonLevel, currentXp: horizonXp, nextXp: horizonNextXp });
@@ -4161,9 +4151,12 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
         state.aaaShake *= 0.88;
       }
 
-      const background = getImage(backgroundRef.current);
-      if (background?.complete && background.naturalWidth > 0) {
-        ctx.drawImage(background, 0, 0, WIDTH, HEIGHT);
+      const backgroundVideo = backgroundVideoRef.current;
+      const fallbackBackground = getImage(battleBackground.image);
+      if (backgroundVideo && backgroundVideo.readyState >= 2) {
+        ctx.drawImage(backgroundVideo, 0, 0, WIDTH, HEIGHT);
+      } else if (fallbackBackground?.complete && fallbackBackground.naturalWidth > 0) {
+        ctx.drawImage(fallbackBackground, 0, 0, WIDTH, HEIGHT);
       } else {
         ctx.fillStyle = '#020617';
         ctx.fillRect(0, 0, WIDTH, HEIGHT);
@@ -4180,15 +4173,7 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
             ? 'rgba(3, 10, 24, 0.42)'
             : 'rgba(2, 6, 23, 0.42)';
       ctx.fillRect(0, 0, WIDTH, HEIGHT);
-      ctx.strokeStyle = laserActive || thorActive || blizzardActive ? 'rgba(34, 211, 238, 0.18)' : 'rgba(34, 211, 238, 0.08)';
-      ctx.lineWidth = 1;
       const now = performance.now();
-      for (let x = 0; x < WIDTH; x += 48) {
-        ctx.beginPath();
-        ctx.moveTo(x, 0);
-        ctx.lineTo(x - 120, HEIGHT);
-        ctx.stroke();
-      }
       if (laserActive) {
         ctx.save();
         ctx.globalCompositeOperation = 'lighter';
@@ -5049,7 +5034,7 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
       canvas?.removeEventListener('click', handleCanvasClick);
       stopAllBattleSounds();
     };
-  }, [shipStats, specials, horizonLevel, horizonXp, horizonNextXp, horizonMaxLevel, trinityShotEnabled, damageSupportDrone, defenseSupportDrone, currentDefenseBattleLevel]);
+  }, [battleBackground, shipStats, specials, horizonLevel, horizonXp, horizonNextXp, horizonMaxLevel, trinityShotEnabled, damageSupportDrone, defenseSupportDrone, currentDefenseBattleLevel]);
 
   const finishResult = () => {
     if (result === 'victory') {
@@ -5155,6 +5140,17 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
                 onReturn={returnFromPause}
               />
             )}
+            <video
+              ref={backgroundVideoRef}
+              src={battleBackground.video}
+              className="pointer-events-none absolute h-px w-px opacity-0"
+              autoPlay
+              loop
+              muted
+              playsInline
+              preload="auto"
+              aria-hidden="true"
+            />
             <canvas ref={canvasRef} width={WIDTH} height={HEIGHT} className="h-full w-full" />
             <div className="pointer-events-none absolute left-4 top-4 rounded-2xl border border-cyan-300/20 bg-black/55 px-4 py-3 backdrop-blur-md">
               <p className="font-mono text-[10px] uppercase tracking-[0.28em] text-cyan-200">{t('Objective', 'Objetivo')}</p>

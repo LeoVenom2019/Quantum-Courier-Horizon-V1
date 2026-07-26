@@ -3,6 +3,7 @@ import { MINI_GAMES_CONFIG } from './mini-games-config';
 import { ARCADE_THEMES, ROUTE_THEMES } from './music-data';
 import { SOLAR_INTERSTELLAR_BATTLE_MEDIA } from './solar-interstellar-battle-media.mjs';
 import { NEW_LAND_BATTLE_MUSIC } from './new-land-battle-music.mjs';
+import { NEW_EARTH_BATTLE_BACKGROUNDS } from './route4-battle-backgrounds.mjs';
 import { NEW_EARTH_TREASURE_CATALOG } from './new-earth-treasures';
 import { AETHERION_CHAMBER_BACKGROUND, ACTIVE_DELIVERY_BACKGROUNDS, MISSION_HEADER_BACKGROUNDS, ROUTE1_UI_BACKGROUNDS, ROUTE2_UI_BACKGROUNDS, SCIFI_TEXTURE_BACKGROUND } from './ui-backgrounds';
 
@@ -275,19 +276,8 @@ const route4SubmarineSpriteImages = [
 ];
 const route4TreasureRelicImages = NEW_EARTH_TREASURE_CATALOG.map(treasure => treasure.src);
 
-const route4BattleBackgroundImages = [
-  `${route4BattleBase}/backgrounds/day/rt4_background_day.webp`,
-  `${route4BattleBase}/backgrounds/night/rt4_background_night.webp`,
-  `${route4BattleBase}/backgrounds/winter/rt4_background_winter.webp`,
-  `${route4BattleBase}/backgrounds/multiple/rt4_background_day_2.webp`,
-  `${route4BattleBase}/backgrounds/multiple/rt4_background_day_3.webp`,
-  `${route4BattleBase}/backgrounds/multiple/rt4_background_day_4.webp`,
-  `${route4BattleBase}/backgrounds/multiple/rt4_background_night_2.webp`,
-  `${route4BattleBase}/backgrounds/multiple/rt4_background_night_3.webp`,
-  `${route4BattleBase}/backgrounds/multiple/rt4_background_night_4.webp`,
-  `${route4BattleBase}/backgrounds/multiple/rt4_background_night_5.webp`,
-  `${route4BattleBase}/backgrounds/multiple/rt4_background_winter_2.webp`,
-];
+const route4BattleBackgroundImages = NEW_EARTH_BATTLE_BACKGROUNDS.map(background => background.image);
+const route4BattleBackgroundVideos = NEW_EARTH_BATTLE_BACKGROUNDS.map(background => background.video);
 
 const route4NewEarthSurfaceBattleBackgroundImages = [
   ...Array.from({ length: 6 }, (_, index) => (
@@ -412,6 +402,10 @@ const route4BattleImages = [
 
 const route4BattleAudio = [
   ...NEW_LAND_BATTLE_MUSIC.themes,
+  '/audio/sfx/direct_battle_cap4_open.ogg',
+  '/audio/sfx/level_up_dif_cap4.ogg',
+  '/audio/sfx/open_skill_tree_cap4.ogg',
+  '/audio/sfx/close_skill_tree_cap4.ogg',
   '/audio/sfx/shoot_enemy.ogg',
   '/audio/sfx/shoot_player.ogg',
   '/assets/rota4/SFX_new_land/airplane_enemys_sounds.ogg',
@@ -528,6 +522,8 @@ const fliperSfx = [
   'robot_runner_power_up',
   'robot_runner_lost_life',
   'robot_runner_slow',
+  'ghost_dead_rr',
+  'robot_get_points',
   'ruptura_estelar_player_shot',
   'ruptura_estelar_boss_shot',
   'ruptura_estelar_enemy_explosion',
@@ -765,6 +761,7 @@ export const ASSET_GROUPS: Record<AssetGroupId, AssetPreloadEntry[]> = {
   ],
   'route4-battle': [
     ...asEntries(route4BattleImages, 'image'),
+    ...asEntries(route4BattleBackgroundVideos, 'video'),
     ...asEntries([...route4BattleAudio, ...route4OceanThemeAudio], 'audio'),
   ],
 };

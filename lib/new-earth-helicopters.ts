@@ -1,3 +1,5 @@
+import { getNewEarthVehicleUpgradeCost } from './new-earth-vehicle-upgrade-costs.mjs';
+
 export const NEW_EARTH_HELICOPTERS_STORAGE_KEY = 'new_earth_helicopters';
 export const NEW_EARTH_TANKS_STORAGE_KEY = 'new_earth_tanks';
 export const NEW_EARTH_SURFACE_BATTLES_STORAGE_KEY = 'new_earth_surface_battles';
@@ -148,7 +150,7 @@ export const normalizeNewEarthHelicopterState = (raw: unknown): NewEarthHelicopt
   return defaults;
 };
 
-export const getNewEarthHelicopterUpgradeCost = (level: number) => Math.round(520 + Math.pow(level + 1, 1.38) * 220);
+export const getNewEarthHelicopterUpgradeCost = getNewEarthVehicleUpgradeCost;
 
 export const normalizeNewEarthTankState = (raw: unknown): NewEarthTankState => {
   const defaults = createDefaultNewEarthTankState();
@@ -167,7 +169,7 @@ export const normalizeNewEarthTankState = (raw: unknown): NewEarthTankState => {
   return defaults;
 };
 
-export const getNewEarthTankUpgradeCost = (level: number) => Math.round(620 + Math.pow(level + 1, 1.42) * 260);
+export const getNewEarthTankUpgradeCost = getNewEarthVehicleUpgradeCost;
 
 export const getNewEarthHelicopterStats = (levels: NewEarthHelicopterUpgradeLevels) => ({
   speedBonus: levels.speed * 10,

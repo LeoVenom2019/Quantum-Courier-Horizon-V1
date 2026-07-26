@@ -264,7 +264,6 @@ export const HorizonSkillTreeModal: React.FC<HorizonSkillTreeModalProps> = ({
                 </div>
                 <Zap className="h-5 w-5 text-sky-300/70" />
               </div>
-              <div className="pointer-events-none absolute bottom-5 left-8 top-16 w-px bg-gradient-to-b from-sky-300/40 via-violet-300/25 to-transparent" />
               <div className="relative grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
                 {ELEMENTAL_SKILLS.map((skill, index) => <SkillNode key={skill.id} skill={skill} level={skills[skill.id]} availablePoints={availablePoints} language={language} onUpgrade={onUpgrade} index={CORE_SKILLS.length + index} />)}
               </div>

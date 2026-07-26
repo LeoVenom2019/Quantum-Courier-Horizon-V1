@@ -151,6 +151,7 @@ import { GameStorage } from '@/lib/game-storage';
 import { SaveManager } from '@/lib/save-manager';
 import { useEconomy, useDispatch, useProgression, useMining, useCombat, useMissions, useEarth, useGame, useSystem } from '@/lib/game-state/index';
 import { normalizeGameNumber } from '@/lib/game-state/numbers';
+import { calculateNewEarthAnnualPopulationGrowth } from '@/lib/new-earth-population-growth.mjs';
 import {
   BOSS_ENCOUNTER_COOLDOWN_MS,
   getDeliveryFuelCost,
@@ -172,6 +173,7 @@ import { calcExtractionSaleValue, canAfford } from '@/lib/game-state/selectors';
 import { SpaceAmbience } from './SpaceAmbience';
 import { MINI_GAMES_CONFIG } from '@/lib/mini-games-config';
 import { MiniGames } from './MiniGames';
+import { ArcadeIntroOverlay, ARCADE_INTRO_SKIP_STORAGE_KEY } from './ArcadeIntroOverlay';
 import { ColonySystem, Colony, cleanColoniesData } from './ColonySystem';
 import NewEarthUnderwaterBattle from './NewEarthUnderwaterBattle';
 import NewEarthSurfaceBattle, { type NewEarthSurfaceBattleKind, type NewEarthSurfaceBattleSiteId, type NewEarthSurfaceBattleVictoryPayload } from './NewEarthSurfaceBattle';
@@ -181,6 +183,7 @@ import {
   BASE_BATTLE_SHIP_STATS,
   BATTLE_CARD_SLOTS,
   MAX_COLONY_CARD_LEVEL,
+  MAX_HORIZON_LEVEL,
   COLONY_CARD_CATALOG,
   ColonyCard,
   ColonyCardLevels,
@@ -204,6 +207,11 @@ import {
   rollAnyMissingColonyCardReward,
   isWildcardCard,
 } from '@/lib/colony-cards';
+import {
+  DEFAULT_HORIZON_SKILLS,
+  normalizeHorizonSkills,
+  type HorizonSkillAllocation,
+} from '@/lib/horizon-skill-tree';
 import {
   NEW_EARTH_MISSIONS_STORAGE_KEY,
   NewEarthMission,
@@ -773,12 +781,12 @@ const calculateNewEarthSectors = (colony: Colony, cardLevels: ColonyCardLevels) 
     const passive = getPoliticalPassiveBonuses(card, cardLevels);
     if (passive.allSectorBonus) {
       NEW_EARTH_SECTOR_ORDER.forEach(sector => {
-        next[sector] = Math.min(100, Math.max(0, next[sector] + passive.allSectorBonus!));
+        next[sector] = Math.max(0, next[sector] + passive.allSectorBonus!);
       });
     }
 
     getPoliticalEffects(card, cardLevels).forEach(effect => {
-      next[effect.sector] = Math.min(100, Math.max(0, next[effect.sector] + effect.value));
+      next[effect.sector] = Math.max(0, next[effect.sector] + effect.value);
     });
   });
 
@@ -1302,6 +1310,7 @@ const DashboardContent = memo(({
   const [saveProgress, setSaveProgress] = useState(0);
 
   const [activeMiniGameId, setActiveMiniGameId] = useState<string | null>(null);
+  const [pendingArcadeIntroGameId, setPendingArcadeIntroGameId] = useState<string | null>(null);
   const [arcadeCardReward, setArcadeCardReward] = useState<ColonyCard | null>(null);
   const [arcadeTabWarning, setArcadeTabWarning] = useState<string | null>(null);
   const [achievementNotification, setAchievementNotification] = useState<Achievement | null>(null);
@@ -1416,6 +1425,9 @@ const DashboardContent = memo(({
   const [newEarthBattleLoadout, setNewEarthBattleLoadout] = useState<Record<string, string>>({});
   const [newEarthAchievementMetrics, setNewEarthAchievementMetrics] = useState<NewEarthAchievementMetrics>(() => createDefaultNewEarthAchievementMetrics());
   const [newEarthHorizonXp, setNewEarthHorizonXp] = useState(0);
+  const [newEarthHorizonSkills, setNewEarthHorizonSkills] = useState<HorizonSkillAllocation>(
+    () => ({ ...DEFAULT_HORIZON_SKILLS })
+  );
   const [newEarthDefenseBattleLevel, setNewEarthDefenseBattleLevel] = useState(1);
   const [selectedNewEarthColonyId, setSelectedNewEarthColonyId] = useState<string | null>(null);
   const [selectedNewEarthCardIndex, setSelectedNewEarthCardIndex] = useState<number | null>(null);
@@ -1470,6 +1482,13 @@ const DashboardContent = memo(({
       })
       .catch(error => console.warn('Unable to load Horizon XP for achievements', error));
 
+    GameStorage.load('horizon_skill_tree')
+      .then(saved => {
+        if (!mounted) return;
+        setNewEarthHorizonSkills(normalizeHorizonSkills(saved));
+      })
+      .catch(error => console.warn('Unable to load Horizon skills for achievements', error));
+
     GameStorage.load('route4_defense_battle_level')
       .then(saved => {
         if (!mounted) return;
@@ -1481,16 +1500,22 @@ const DashboardContent = memo(({
       const customEvent = event as CustomEvent<number>;
       setNewEarthHorizonXp(safeMetricNumber(customEvent.detail));
     };
+    const handleHorizonSkillsUpdated = (event: Event) => {
+      const customEvent = event as CustomEvent<unknown>;
+      setNewEarthHorizonSkills(normalizeHorizonSkills(customEvent.detail));
+    };
     const handleDefenseBattleLevelUpdated = (event: Event) => {
       const customEvent = event as CustomEvent<number>;
       setNewEarthDefenseBattleLevel(Math.max(1, safeMetricNumber(customEvent.detail) || 1));
     };
 
     window.addEventListener('qch:horizon-xp-updated', handleHorizonXpUpdated);
+    window.addEventListener('qch:horizon-skills-updated', handleHorizonSkillsUpdated);
     window.addEventListener('qch:new-earth-defense-battle-level-updated', handleDefenseBattleLevelUpdated);
     return () => {
       mounted = false;
       window.removeEventListener('qch:horizon-xp-updated', handleHorizonXpUpdated);
+      window.removeEventListener('qch:horizon-skills-updated', handleHorizonSkillsUpdated);
       window.removeEventListener('qch:new-earth-defense-battle-level-updated', handleDefenseBattleLevelUpdated);
     };
   }, []);
@@ -2591,6 +2616,44 @@ const DashboardContent = memo(({
     addLog(`${language === 'pt' ? 'Iniciando' : 'Starting'} ${id}...`, 'info');
   }, [addLog, isArcadeUnlocked, language]);
 
+  const requestArcadeGameLaunch = useCallback(async (id: string) => {
+    let skipIntro = false;
+    try {
+      skipIntro = window.localStorage.getItem(ARCADE_INTRO_SKIP_STORAGE_KEY) === 'true';
+    } catch (error) {
+      console.warn('Unable to read arcade intro preference', error);
+    }
+
+    if (skipIntro) {
+      await launchArcadeGame(id);
+      return;
+    }
+
+    setPendingArcadeIntroGameId(id);
+    playSfx('intro_fliper', {
+      category: 'ui',
+      exclusiveKey: 'arcade-intro',
+      volume: 1,
+    });
+  }, [launchArcadeGame, playSfx]);
+
+  const completeArcadeIntro = useCallback(async (dontShowAgain: boolean) => {
+    const gameId = pendingArcadeIntroGameId;
+    if (!gameId) return;
+
+    if (dontShowAgain) {
+      try {
+        window.localStorage.setItem(ARCADE_INTRO_SKIP_STORAGE_KEY, 'true');
+      } catch (error) {
+        console.warn('Unable to save arcade intro preference', error);
+      }
+    }
+
+    setPendingArcadeIntroGameId(null);
+    stopSfx('intro_fliper');
+    await launchArcadeGame(gameId);
+  }, [launchArcadeGame, pendingArcadeIntroGameId, stopSfx]);
+
   const handleArcadeGameSelect = useCallback(async (id: string) => {
     if (!isArcadeUnlocked) return;
     if (route4DefenseThreatAlert) {
@@ -2598,8 +2661,8 @@ const DashboardContent = memo(({
       playSfx('warning_gaming');
       return;
     }
-    await launchArcadeGame(id);
-  }, [isArcadeUnlocked, launchArcadeGame, playSfx, route4DefenseThreatAlert]);
+    await requestArcadeGameLaunch(id);
+  }, [isArcadeUnlocked, playSfx, requestArcadeGameLaunch, route4DefenseThreatAlert]);
 
   const confirmArcadeOverDefense = useCallback(async () => {
     if (!pendingArcadeDefenseGameId) return;
@@ -2611,8 +2674,8 @@ const DashboardContent = memo(({
       : 'Defense abandoned to enter the arcade. Result: defeat.',
       'warning'
     );
-    await launchArcadeGame(gameId);
-  }, [addLog, language, launchArcadeGame, pendingArcadeDefenseGameId]);
+    await requestArcadeGameLaunch(gameId);
+  }, [addLog, language, pendingArcadeDefenseGameId, requestArcadeGameLaunch]);
 
   const goToRoute4DefenseFromArcadePrompt = useCallback(() => {
     setPendingArcadeDefenseGameId(null);
@@ -2622,7 +2685,7 @@ const DashboardContent = memo(({
   }, [playSfx, setActiveTab]);
 
   const handleDashboardTabChange = useCallback((tab: string) => {
-    if (activeMiniGameId && tab !== activeTab) {
+    if ((activeMiniGameId || pendingArcadeIntroGameId) && tab !== activeTab) {
       setArcadeTabWarning('Saia do fliperama antes de trocar de aba');
       playSfx('warning_gaming');
       window.setTimeout(() => setArcadeTabWarning(null), 2400);
@@ -2635,7 +2698,7 @@ const DashboardContent = memo(({
       playSfx('aba_click');
     }
     setActiveTab(tab as any);
-  }, [activeMiniGameId, activeTab, playSfx, setActiveTab]);
+  }, [activeMiniGameId, activeTab, pendingArcadeIntroGameId, playSfx, setActiveTab]);
 
   const selectedNewEarthColony = useMemo(
     () => colonies.find((colony: Colony) => colony.id === selectedNewEarthColonyId) || null,
@@ -4218,24 +4281,9 @@ const DashboardContent = memo(({
     lastProcessedYearRef.current = gameTime.years;
 
     // 1. Calculate Growth Rate based on current year
-    // User asked for slower growth targeting 1M in 20 years from 500k.
-    // Factor 2 over 20 years = ~3.5% annual growth.
-    let minRate = 0.03;
-    let maxRate = 0.04;
-
-    if (gameTime.years > 15) {
-      minRate = 0.025; // Slow down slightly
-      maxRate = 0.035;
-    } else if (gameTime.years > 10) {
-      minRate = 0.032;
-      maxRate = 0.038;
-    }
-
-    const rate = minRate + Math.random() * (maxRate - minRate);
     const colonyPop = (colonies || []).reduce((sum, c) => sum + (c.population || 0), 0);
     const totalPop = earthPopulationRef.current + colonyPop;
-    const populationGrowthPenalty = totalPop >= 100000000000 ? 0.05 : 1;
-    const baseGrowth = totalPop * rate * populationGrowthPenalty;
+    const { rate, growth: baseGrowth } = calculateNewEarthAnnualPopulationGrowth(totalPop, gameTime.years);
 
     // 2. Random Demographic Events
     let eventBonus = 0;
@@ -4611,10 +4659,11 @@ const DashboardContent = memo(({
     const currentAmount = Math.max(0, Math.floor(Number(newEarthDistributionSupplies[neededSupply]) || 0));
     const supplyLabel = NEW_EARTH_SUPPLY_CONFIG[neededSupply].label[language as 'pt' | 'en'];
     const colony = colonies.find((item: Colony) => item.id === colonyId);
+    if (!colony) return;
     const sectorLabel = SECTOR_CONFIG[sector].label[language as 'pt' | 'en'];
-    const currentSectorValue = Number(colony?.sectors?.[sector] ?? DEFAULT_COLONY_SECTORS[sector]);
+    const currentEffectiveSectorValue = Number(calculateNewEarthSectors(colony, newEarthCardLevels)[sector] ?? DEFAULT_COLONY_SECTORS[sector]);
 
-    if (currentSectorValue >= NEW_EARTH_DISTRIBUTION_SECTOR_MAX) {
+    if (currentEffectiveSectorValue >= NEW_EARTH_DISTRIBUTION_SECTOR_MAX) {
       setNewEarthMapFeedback(
         language === 'pt'
           ? `${sectorLabel} já está no limite máximo de ${NEW_EARTH_DISTRIBUTION_SECTOR_MAX}.`
@@ -4622,6 +4671,11 @@ const DashboardContent = memo(({
       );
       return;
     }
+
+    const appliedSectorGain = Math.min(
+      NEW_EARTH_DISTRIBUTION_SECTOR_GAIN,
+      NEW_EARTH_DISTRIBUTION_SECTOR_MAX - currentEffectiveSectorValue,
+    );
 
     if (currentAmount < NEW_EARTH_DISTRIBUTION_DONATION_COST) {
       setNewEarthMapFeedback(
@@ -4646,19 +4700,19 @@ const DashboardContent = memo(({
 
     setColonies(prevColonies => prevColonies.map((item: Colony) => {
       if (item.id !== colonyId) return item;
-      const currentSectorValue = Number(item.sectors?.[sector] ?? DEFAULT_COLONY_SECTORS[sector]);
+      const currentRawSectorValue = Number(item.sectors?.[sector] ?? DEFAULT_COLONY_SECTORS[sector]);
       return {
         ...item,
         sectors: {
           ...item.sectors,
-          [sector]: Math.min(NEW_EARTH_DISTRIBUTION_SECTOR_MAX, currentSectorValue + NEW_EARTH_DISTRIBUTION_SECTOR_GAIN),
+          [sector]: currentRawSectorValue + appliedSectorGain,
         },
       };
     }));
 
     const successFeedback = language === 'pt'
-      ? `${colony?.name || 'Colônia'} recebeu ${NEW_EARTH_DISTRIBUTION_DONATION_COST.toLocaleString('pt-BR')} ${supplyLabel}: ${sectorLabel} +${NEW_EARTH_DISTRIBUTION_SECTOR_GAIN}.`
-      : `${colony?.name || 'Colony'} received ${NEW_EARTH_DISTRIBUTION_DONATION_COST.toLocaleString('en-US')} ${supplyLabel}: ${sectorLabel} +${NEW_EARTH_DISTRIBUTION_SECTOR_GAIN}.`;
+      ? `${colony?.name || 'Colônia'} recebeu ${NEW_EARTH_DISTRIBUTION_DONATION_COST.toLocaleString('pt-BR')} ${supplyLabel}: ${sectorLabel} +${appliedSectorGain}.`
+      : `${colony?.name || 'Colony'} received ${NEW_EARTH_DISTRIBUTION_DONATION_COST.toLocaleString('en-US')} ${supplyLabel}: ${sectorLabel} +${appliedSectorGain}.`;
     setNewEarthMapFeedback(successFeedback);
     window.setTimeout(() => {
       setNewEarthMapFeedback(current => current === successFeedback ? null : current);
@@ -4667,6 +4721,7 @@ const DashboardContent = memo(({
   }, [
     colonies,
     language,
+    newEarthCardLevels,
     newEarthDistributionNeeds,
     newEarthDistributionSupplies,
     playRandomNewEarthAccessDenied,
@@ -6365,6 +6420,21 @@ const DashboardContent = memo(({
     return true;
   }, [routeTier, unlockedTechLevels, ownedShips, techLevels, miningRobots, miningRobotLevels, autoTravelSlots, historyStats, miningCompressionLevels, totalDeliveries, missions]);
 
+  const newEarthAchievementHorizonStats = useMemo(() => {
+    const horizonLevel = getHorizonLevelFromXp(newEarthHorizonXp, MAX_HORIZON_LEVEL).level;
+    const equippedCards = BATTLE_CARD_SLOTS
+      .map(slot => getCardById(newEarthBattleLoadout[slot]))
+      .filter((card): card is ColonyCard => Boolean(card));
+
+    return calculateBattleShipStats(
+      equippedCards,
+      BASE_BATTLE_SHIP_STATS,
+      newEarthCardLevels,
+      horizonLevel,
+      newEarthHorizonSkills
+    );
+  }, [newEarthBattleLoadout, newEarthCardLevels, newEarthHorizonSkills, newEarthHorizonXp]);
+
   const syncAchievements = useCallback(() => {
     const ownedShipTypesForTier = (tier: 'Solar' | 'Interstellar' | 'Void') => (
       SHIPS.filter(ship => ship.tier === tier && (ownedShips[tier + '-' + ship.level] || 0) > 0).length
@@ -6475,7 +6545,7 @@ const DashboardContent = memo(({
     updateAchievementProgress('ne_sea_search_perfect_defenses_10', newEarthAchievementMetrics.perfectSeaSearchDefenses, true);
     updateAchievementProgress('ne_direct_battles_10', newEarthAchievementMetrics.directBattleVictories, true);
 
-    const savedHorizonProgress = getHorizonLevelFromXp(newEarthHorizonXp);
+    const savedHorizonProgress = getHorizonLevelFromXp(newEarthHorizonXp, MAX_HORIZON_LEVEL);
     updateAchievementProgress('ne_horizon_level_50', savedHorizonProgress.level, true);
     updateAchievementProgress('ne_horizon_level_100', savedHorizonProgress.level, true);
 
@@ -6486,11 +6556,7 @@ const DashboardContent = memo(({
     updateAchievementProgress('ne_special_thor_10', newEarthAchievementMetrics.specialUses['thor-oath'], true);
     updateAchievementProgress('ne_special_blizzard_10', newEarthAchievementMetrics.specialUses['special-slot-4'], true);
 
-    const equippedCards = BATTLE_CARD_SLOTS
-      .map(slot => getCardById(newEarthBattleLoadout[slot]))
-      .filter((card): card is ColonyCard => Boolean(card));
-    const horizonStats = calculateBattleShipStats(equippedCards, BASE_BATTLE_SHIP_STATS, newEarthCardLevels, savedHorizonProgress.level);
-    updateAchievementProgress('ne_horizon_crit_90', horizonStats.critChance, true);
+    updateAchievementProgress('ne_horizon_crit_90', newEarthAchievementHorizonStats.critChance, true);
     updateAchievementProgress('ne_horizon_stage_100', newEarthDefenseBattleLevel, true);
     updateAchievementProgress('ne_horizon_stage_200', newEarthDefenseBattleLevel, true);
 
@@ -6580,6 +6646,7 @@ const DashboardContent = memo(({
     battleLevel,
     colonies,
     newEarthHorizonXp,
+    newEarthAchievementHorizonStats,
     newEarthDefenseBattleLevel,
     newEarthAchievementMetrics,
     newEarthBattleLoadout,
@@ -10623,9 +10690,15 @@ const DashboardContent = memo(({
                     initial={{ opacity: 0, x: 20 }}
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0, x: -20 }}
-                    className="h-full"
+                    className="relative h-full"
                   >
-                    {activeMiniGameId ? (
+                    {pendingArcadeIntroGameId ? (
+                      <ArcadeIntroOverlay
+                        key={pendingArcadeIntroGameId}
+                        language={language as 'pt' | 'en'}
+                        onContinue={completeArcadeIntro}
+                      />
+                    ) : activeMiniGameId ? (
                       <div className="relative w-full h-full flex flex-col">
                         <div className="flex justify-between items-center mb-4 p-2 bg-white/5 border border-white/10 rounded-lg">
                           <div className="flex items-center gap-3">
@@ -10816,7 +10889,7 @@ const DashboardContent = memo(({
                       onDefenseThreatAlertChange={setRoute4DefenseThreatAlert}
                       openDefenseRequest={openRoute4DefenseRequest}
                       abandonDefenseRequest={abandonRoute4DefenseRequest}
-                      defenseAlertsPaused={Boolean(activeMiniGameId || activeSurfaceBattle || activeUnderwaterBattle)}
+                      defenseAlertsPaused={Boolean(activeMiniGameId || pendingArcadeIntroGameId || activeSurfaceBattle || activeUnderwaterBattle)}
                       selectedColonyId={selectedColonyId}
                       setSelectedColonyId={setSelectedColonyId}
                     />
@@ -11003,9 +11076,12 @@ const DashboardContent = memo(({
                             return (aIndex === -1 ? 99 : aIndex) - (bIndex === -1 ? 99 : bIndex);
                           });
                           const selectedDistributionColony = distributionColonies.find((colony: Colony) => colony.id === newEarthDistributionColonyId) || distributionColonies[0] || null;
+                          const selectedDistributionEffectiveSectors = selectedDistributionColony
+                            ? calculateNewEarthSectors(selectedDistributionColony, newEarthCardLevels)
+                            : null;
                           const selectedDistributionSectorRows = selectedDistributionColony
                             ? NEW_EARTH_SECTOR_ORDER.map((sector) => {
-                              const value = Number(selectedDistributionColony.sectors?.[sector] ?? DEFAULT_COLONY_SECTORS[sector]);
+                              const value = Number(selectedDistributionEffectiveSectors?.[sector] ?? DEFAULT_COLONY_SECTORS[sector]);
                               const neededSupply = newEarthDistributionNeeds[selectedDistributionColony.id]?.[sector] || 'materials';
                               return { sector, value, neededSupply };
                             })
@@ -11078,7 +11154,8 @@ const DashboardContent = memo(({
                                     style={{ gridTemplateRows: `repeat(${Math.max(1, distributionColonies.length)}, minmax(0, 1fr))` }}
                                   >
                                     {distributionColonies.map((colony: Colony) => {
-                                      const colonyRows = NEW_EARTH_SECTOR_ORDER.map((sector) => Number(colony.sectors?.[sector] ?? DEFAULT_COLONY_SECTORS[sector]));
+                                      const effectiveSectors = calculateNewEarthSectors(colony, newEarthCardLevels);
+                                      const colonyRows = NEW_EARTH_SECTOR_ORDER.map((sector) => Number(effectiveSectors[sector] ?? DEFAULT_COLONY_SECTORS[sector]));
                                       const average = colonyRows.reduce((sum, value) => sum + value, 0) / Math.max(1, colonyRows.length);
                                       const isSelected = selectedDistributionColony?.id === colony.id;
 

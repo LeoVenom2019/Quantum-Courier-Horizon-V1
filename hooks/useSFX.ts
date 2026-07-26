@@ -84,12 +84,21 @@ export type SFXType =
   | 'radar_skip_defeat'
   | 'buy'
   | 'insert_coins'
+  | 'intro_fliper'
+  | 'direct_battle_cap4_open'
+  | 'level_up_dif_cap4'
+  | 'open_skill_tree_cap4'
+  | 'close_skill_tree_cap4'
   | 'game_over';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ATENÇÃO: Só adicione aqui arquivos que JÁ EXISTEM em public/audio/sfx/
 // ─────────────────────────────────────────────────────────────────────────────
 const SFX_PATHS: Partial<Record<string, string>> = {
+  direct_battle_cap4_open: '/audio/sfx/direct_battle_cap4_open.ogg',
+  level_up_dif_cap4: '/audio/sfx/level_up_dif_cap4.ogg',
+  open_skill_tree_cap4: '/audio/sfx/open_skill_tree_cap4.ogg',
+  close_skill_tree_cap4: '/audio/sfx/close_skill_tree_cap4.ogg',
   tech_success: '/audio/sfx/tech.success.ogg',
   success: '/audio/sfx/cash_register.ogg',
   achievement: '/assets/rota4/SFX_new_land/achievment_unlocked.ogg',
@@ -166,6 +175,7 @@ const SFX_PATHS: Partial<Record<string, string>> = {
   songs_of_war: '/audio/sfx/songs_of_war.ogg',
   warning_gaming: '/assets/rota4/SFX_new_land/warning_gaming.ogg',
   insert_coins: '/assets/games/flipers_sfx/insert_coins.ogg',
+  intro_fliper: '/assets/games/flipers_sfx/intro_fliper.ogg',
   // Void Monster SFX
   alien_explosion_zero: '/audio/sfx/void/alien_explosion_zero.ogg',
   boss_explosion_zero: '/audio/sfx/void/boss_explosion_zero.ogg',

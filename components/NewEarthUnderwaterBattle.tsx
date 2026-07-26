@@ -2107,6 +2107,7 @@ export default function NewEarthUnderwaterBattle({
   const [currentDepthMeters, setCurrentDepthMeters] = useState(0);
   const [portalFeedback, setPortalFeedback] = useState<string | null>(null);
   const [isPaused, setIsPaused] = useState(false);
+  const [isExitConfirmationOpen, setIsExitConfirmationOpen] = useState(false);
   const isPausedRef = useRef(false);
   const portalFeedbackRef = useRef<string | null>(null);
   const oxygenRemainingMsRef = useRef(0);
@@ -2361,6 +2362,12 @@ export default function NewEarthUnderwaterBattle({
     const down = (event: KeyboardEvent) => {
       if (event.key === 'Escape' && status !== 'defeat') {
         event.preventDefault();
+        if (isExitConfirmationOpen) {
+          setIsExitConfirmationOpen(false);
+          isPausedRef.current = false;
+          setIsPaused(false);
+          return;
+        }
         setIsPaused(prev => {
           const next = !prev;
           isPausedRef.current = next;
@@ -2382,7 +2389,7 @@ export default function NewEarthUnderwaterBattle({
       window.removeEventListener('keydown', down);
       window.removeEventListener('keyup', up);
     };
-  }, [status]);
+  }, [isExitConfirmationOpen, status]);
 
   useEffect(() => {
     if (!mounted) return;
@@ -3314,14 +3321,77 @@ export default function NewEarthUnderwaterBattle({
     onDefeat?.();
     onClose();
   };
+  const requestExitConfirmation = () => {
+    keysRef.current.clear();
+    isPausedRef.current = true;
+    setIsPaused(true);
+    setIsExitConfirmationOpen(true);
+  };
+  const cancelExitToSurface = () => {
+    setIsExitConfirmationOpen(false);
+    isPausedRef.current = false;
+    setIsPaused(false);
+  };
+  const confirmExitToSurface = () => {
+    setIsExitConfirmationOpen(false);
+    isPausedRef.current = false;
+    setIsPaused(false);
+    keysRef.current.clear();
+    onClose();
+  };
   if (!mounted) return null;
 
   const overlay = (
     <div className="fixed inset-0 z-[1450] flex items-center justify-center bg-black/88 p-5 backdrop-blur-xl">
+      {isExitConfirmationOpen && (
+        <div
+          className="fixed inset-0 z-[30000] flex items-center justify-center bg-black/82 p-4 backdrop-blur-xl"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="underwater-exit-confirmation-title"
+        >
+          <div className="w-full max-w-md rounded-2xl border border-cyan-300/30 bg-slate-950/95 p-6 text-center shadow-[0_0_55px_rgba(34,211,238,0.22)]">
+            <p className="font-mono text-[10px] font-black uppercase tracking-[0.34em] text-cyan-200/70">
+              {language === 'pt' ? 'Exploração submarina' : 'Underwater exploration'}
+            </p>
+            <h2
+              id="underwater-exit-confirmation-title"
+              className="mt-2 font-orbitron text-2xl font-black uppercase tracking-wider text-white"
+            >
+              {language === 'pt' ? 'Confirmar saída' : 'Confirm exit'}
+            </h2>
+            <p className="mt-4 text-sm leading-relaxed text-slate-300">
+              {language === 'pt'
+                ? 'Deseja encerrar esta exploração e sair para a superfície?'
+                : 'Do you want to end this exploration and return to the surface?'}
+            </p>
+            <div className="mt-7 grid gap-3 sm:grid-cols-2">
+              <PremiumCanvasButton
+                type="button"
+                tone="steel"
+                onClick={cancelExitToSurface}
+                className="h-12 rounded-xl"
+                contentClassName="text-[11px] font-black uppercase tracking-[0.18em] text-slate-100"
+              >
+                {language === 'pt' ? 'Continuar explorando' : 'Keep exploring'}
+              </PremiumCanvasButton>
+              <PremiumCanvasButton
+                type="button"
+                tone="red"
+                onClick={confirmExitToSurface}
+                className="h-12 rounded-xl"
+                contentClassName="text-[11px] font-black uppercase tracking-[0.18em] text-white"
+              >
+                {language === 'pt' ? 'Sair para a superfície' : 'Return to surface'}
+              </PremiumCanvasButton>
+            </div>
+          </div>
+        </div>
+      )}
       <div className={`relative grid w-full max-w-[104rem] grid-cols-1 overflow-hidden rounded-3xl border border-cyan-300/30 bg-gradient-to-br ${site.tone} shadow-[0_0_90px_rgba(34,211,238,0.22)] xl:grid-cols-[minmax(0,1280px)_340px]`}>
         <PremiumCanvasButton
           type="button"
-          onClick={onClose}
+          onClick={requestExitConfirmation}
           tone="steel"
           className="absolute right-5 top-5 z-30 h-10 w-10 rounded-full"
           contentClassName="text-cyan-100"
@@ -3331,7 +3401,7 @@ export default function NewEarthUnderwaterBattle({
         </PremiumCanvasButton>
 
         <div className="relative aspect-video min-h-0 bg-black">
-          {isPaused && (
+          {isPaused && !isExitConfirmationOpen && (
             <BattlePauseDialog
               language={language}
               onContinue={() => {
@@ -3467,7 +3537,7 @@ export default function NewEarthUnderwaterBattle({
 
           <PremiumCanvasButton
             type="button"
-            onClick={onClose}
+            onClick={requestExitConfirmation}
             tone="cyan"
             className="h-12 rounded-2xl"
             contentClassName="px-4 text-[12px] font-black uppercase tracking-[0.22em] text-white"

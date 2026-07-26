@@ -35,6 +35,8 @@ const SFX = {
     powerUp: `${SFX_BASE}/robot_runner_power_up.ogg`,
     lostLife: `${SFX_BASE}/robot_runner_lost_life.ogg`,
     slow: `${SFX_BASE}/robot_runner_slow.ogg`,
+    ghostDead: `${SFX_BASE}/ghost_dead_rr.ogg`,
+    getPoints: `${SFX_BASE}/robot_get_points.ogg`,
 };
 const audioCache = new Map();
 
@@ -398,6 +400,7 @@ function checkItemCollection() {
 
     if (map[gy][gx] === 2) {
         map[gy][gx] = 0; score += 10; player.boost = Math.min(100, player.boost + 3);
+        playSfx(SFX.getPoints, 0.62);
         notifyParentOfScore();
         spawnParticles(player.x + TILE_SIZE/2, player.y + TILE_SIZE/2, THEMES[currentPhase].pellet, 5);
         updateBoostBar(); checkLevelWin();
@@ -476,6 +479,7 @@ function checkGhostCollisions() {
         if (d < TILE_SIZE * 0.75) {
             if (player.isPowered) {
                 g.dead = true; g.respawnTimer = GHOST_RESPAWN_TIME; score += 200;
+                playSfx(SFX.ghostDead, 0.78);
                 notifyParentOfScore();
                 spawnParticles(g.x + TILE_SIZE/2, g.y + TILE_SIZE/2, '#FFFFFF', 30);
                 screenShake = 10;

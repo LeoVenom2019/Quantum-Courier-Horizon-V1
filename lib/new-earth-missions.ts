@@ -35,6 +35,7 @@ export type NewEarthMission = {
   completed: boolean;
   claimed: boolean;
   reward: NewEarthMissionReward;
+  qcRewardMultiplier?: number;
   arcadeRecordPercent?: number;
   gameId?: string;
   arcadeActionId?: string;
@@ -44,6 +45,8 @@ export type NewEarthMission = {
   constructionTargetCount?: number;
   cardId?: string;
   cardTargetLevel?: number;
+  cardRarity?: string;
+  cardClass?: string;
   surfaceSiteId?: string;
   surfaceBattleKind?: 'tank' | 'helicopter';
 };
@@ -61,8 +64,12 @@ export type NewEarthMissionState = {
 export const NEW_EARTH_MISSIONS_STORAGE_KEY = 'new_earth_missions';
 export const NEW_EARTH_MISSION_RENEW_COOLDOWN_MS = 0;
 export const NEW_EARTH_MISSION_QC_REWARD_MULTIPLIER = 5;
+export const NEW_EARTH_FEATURED_MISSION_QC_MULTIPLIER = 4;
 
 const scaleNewEarthMissionQcReward = (amount: number) => Math.round(amount * NEW_EARTH_MISSION_QC_REWARD_MULTIPLIER);
+const scaleFeaturedNewEarthMissionQcReward = (amount: number) => scaleNewEarthMissionQcReward(
+  amount * NEW_EARTH_FEATURED_MISSION_QC_MULTIPLIER
+);
 
 export type NewEarthConstructionType = 'forest' | 'factory' | 'school' | 'culture' | 'defense' | 'restaurant';
 
@@ -86,6 +93,8 @@ export type NewEarthMissionGenerationContext = {
     id: string;
     name: Record<'en' | 'pt', string>;
     level: number;
+    rarity?: string;
+    cardClass?: string;
   }>;
 };
 
@@ -439,8 +448,9 @@ const NEW_EARTH_MISSION_CATALOG: NewEarthMission[] = [
     claimed: false,
     surfaceSiteId: 'ruinas-europeias',
     surfaceBattleKind: 'tank',
+    qcRewardMultiplier: NEW_EARTH_FEATURED_MISSION_QC_MULTIPLIER,
     reward: {
-      qc: scaleNewEarthMissionQcReward(42000),
+      qc: scaleFeaturedNewEarthMissionQcReward(42000),
       supplies: { defense: 16, materials: 22, tech: 10 },
     },
   }),
@@ -458,8 +468,9 @@ const NEW_EARTH_MISSION_CATALOG: NewEarthMission[] = [
     completed: false,
     claimed: false,
     surfaceBattleKind: 'helicopter',
+    qcRewardMultiplier: NEW_EARTH_FEATURED_MISSION_QC_MULTIPLIER,
     reward: {
-      qc: scaleNewEarthMissionQcReward(46000),
+      qc: scaleFeaturedNewEarthMissionQcReward(46000),
       supplies: { defense: 18, tech: 16, meds: 8 },
     },
   }),
@@ -478,8 +489,9 @@ const NEW_EARTH_MISSION_CATALOG: NewEarthMission[] = [
     claimed: false,
     surfaceSiteId: 'zona-glacial',
     surfaceBattleKind: 'helicopter',
+    qcRewardMultiplier: NEW_EARTH_FEATURED_MISSION_QC_MULTIPLIER,
     reward: {
-      qc: scaleNewEarthMissionQcReward(44000),
+      qc: scaleFeaturedNewEarthMissionQcReward(44000),
       supplies: { defense: 16, tech: 18, meds: 6 },
     },
   }),
@@ -498,8 +510,9 @@ const NEW_EARTH_MISSION_CATALOG: NewEarthMission[] = [
     claimed: false,
     surfaceSiteId: 'continente-esquecido',
     surfaceBattleKind: 'helicopter',
+    qcRewardMultiplier: NEW_EARTH_FEATURED_MISSION_QC_MULTIPLIER,
     reward: {
-      qc: scaleNewEarthMissionQcReward(48000),
+      qc: scaleFeaturedNewEarthMissionQcReward(48000),
       supplies: { defense: 18, tech: 18, materials: 12 },
     },
   }),
@@ -517,8 +530,9 @@ const NEW_EARTH_MISSION_CATALOG: NewEarthMission[] = [
     completed: false,
     claimed: false,
     surfaceBattleKind: 'helicopter',
+    qcRewardMultiplier: NEW_EARTH_FEATURED_MISSION_QC_MULTIPLIER,
     reward: {
-      qc: scaleNewEarthMissionQcReward(68000),
+      qc: scaleFeaturedNewEarthMissionQcReward(68000),
       supplies: { defense: 24, tech: 22, meds: 10 },
     },
   }),
@@ -537,8 +551,9 @@ const NEW_EARTH_MISSION_CATALOG: NewEarthMission[] = [
     claimed: false,
     surfaceSiteId: 'ruinas-europeias',
     surfaceBattleKind: 'tank',
+    qcRewardMultiplier: NEW_EARTH_FEATURED_MISSION_QC_MULTIPLIER,
     reward: {
-      qc: scaleNewEarthMissionQcReward(45000),
+      qc: scaleFeaturedNewEarthMissionQcReward(45000),
       supplies: { defense: 20, materials: 22, tech: 10 },
     },
   }),
@@ -556,8 +571,9 @@ const NEW_EARTH_MISSION_CATALOG: NewEarthMission[] = [
     completed: false,
     claimed: false,
     surfaceBattleKind: 'tank',
+    qcRewardMultiplier: NEW_EARTH_FEATURED_MISSION_QC_MULTIPLIER,
     reward: {
-      qc: scaleNewEarthMissionQcReward(56000),
+      qc: scaleFeaturedNewEarthMissionQcReward(56000),
       supplies: { defense: 26, materials: 24, tech: 12 },
     },
   }),
@@ -575,8 +591,9 @@ const NEW_EARTH_MISSION_CATALOG: NewEarthMission[] = [
     completed: false,
     claimed: false,
     surfaceBattleKind: 'tank',
+    qcRewardMultiplier: NEW_EARTH_FEATURED_MISSION_QC_MULTIPLIER,
     reward: {
-      qc: scaleNewEarthMissionQcReward(72000),
+      qc: scaleFeaturedNewEarthMissionQcReward(72000),
       supplies: { defense: 30, materials: 28, tech: 16 },
     },
   }),
@@ -611,8 +628,9 @@ const NEW_EARTH_MISSION_CATALOG: NewEarthMission[] = [
     progress: 0,
     completed: false,
     claimed: false,
+    qcRewardMultiplier: NEW_EARTH_FEATURED_MISSION_QC_MULTIPLIER,
     reward: {
-      qc: scaleNewEarthMissionQcReward(38000),
+      qc: scaleFeaturedNewEarthMissionQcReward(38000),
       supplies: { tech: 16, defense: 12, materials: 18 },
     },
   }),
@@ -629,8 +647,9 @@ const NEW_EARTH_MISSION_CATALOG: NewEarthMission[] = [
     progress: 0,
     completed: false,
     claimed: false,
+    qcRewardMultiplier: NEW_EARTH_FEATURED_MISSION_QC_MULTIPLIER,
     reward: {
-      qc: scaleNewEarthMissionQcReward(26000),
+      qc: scaleFeaturedNewEarthMissionQcReward(26000),
       supplies: { biomass: 10, tech: 14, materials: 16 },
     },
   }),
@@ -688,6 +707,8 @@ const createCardUpgradeMissions = (context: NewEarthMissionGenerationContext = {
     .map(card => {
     const currentLevel = Math.max(1, Math.floor(Number(card.level) || 1));
     const targetLevel = currentLevel + 1;
+    const isFeaturedCardMission = card.rarity === 'mythic'
+      && (card.cardClass === 'battle' || card.cardClass === 'political');
     return makeMission({
       id: `upgrade-card-${card.id}`,
       title: {
@@ -704,12 +725,17 @@ const createCardUpgradeMissions = (context: NewEarthMissionGenerationContext = {
       progress: 0,
       completed: false,
       claimed: false,
+      qcRewardMultiplier: isFeaturedCardMission ? NEW_EARTH_FEATURED_MISSION_QC_MULTIPLIER : undefined,
       reward: {
-        qc: scaleNewEarthMissionQcReward(22000 + currentLevel * 2500),
+        qc: (isFeaturedCardMission ? scaleFeaturedNewEarthMissionQcReward : scaleNewEarthMissionQcReward)(
+          22000 + currentLevel * 2500
+        ),
         supplies: { tech: 8 + currentLevel, materials: 10 + currentLevel },
       },
       cardId: card.id,
       cardTargetLevel: targetLevel,
+      cardRarity: card.rarity,
+      cardClass: card.cardClass,
     });
     })
 );
@@ -718,6 +744,18 @@ const getMissionCatalog = (context?: NewEarthMissionGenerationContext) => [
   ...NEW_EARTH_FULL_MISSION_CATALOG,
   ...createCardUpgradeMissions(context),
 ];
+
+const isFeaturedNewEarthMission = (mission: NewEarthMission) => (
+  mission.surfaceBattleKind === 'tank'
+  || mission.surfaceBattleKind === 'helicopter'
+  || mission.eventType === 'submarine-victory'
+  || mission.eventType === 'submarine-treasure'
+  || (
+    mission.eventType === 'card-upgrade'
+    && mission.cardRarity === 'mythic'
+    && (mission.cardClass === 'battle' || mission.cardClass === 'political')
+  )
+);
 
 const NEW_EARTH_SURFACE_SITE_COLONY_REQUIREMENTS: Record<string, string> = {
   'zona-glacial': 'colony-3',
@@ -868,12 +906,34 @@ export const normalizeNewEarthMissionState = (saved: any, context?: NewEarthMiss
     return isMissionEligible(mission, context);
   }).map(defaultMission => {
     const savedMission: any = savedById.get(defaultMission.id);
+    const contextCard = defaultMission.cardId
+      ? (context?.upgradeableCards || []).find(card => card.id === defaultMission.cardId)
+      : undefined;
+    const isFeaturedMission = isFeaturedNewEarthMission(defaultMission) || (
+      defaultMission.eventType === 'card-upgrade'
+      && contextCard?.rarity === 'mythic'
+      && (contextCard.cardClass === 'battle' || contextCard.cardClass === 'political')
+    );
+    const reward = isFeaturedMission
+      && defaultMission.qcRewardMultiplier !== NEW_EARTH_FEATURED_MISSION_QC_MULTIPLIER
+      && defaultMission.reward.qc != null
+      ? {
+          ...defaultMission.reward,
+          qc: Math.round(defaultMission.reward.qc * NEW_EARTH_FEATURED_MISSION_QC_MULTIPLIER),
+          supplies: defaultMission.reward.supplies ? { ...defaultMission.reward.supplies } : undefined,
+          colonyBonus: defaultMission.reward.colonyBonus ? { ...defaultMission.reward.colonyBonus } : undefined,
+        }
+      : defaultMission.reward;
     const progress = Math.max(0, Math.floor(Number(savedMission?.progress) || 0));
     const claimed = Boolean(savedMission?.claimed);
     const completed = Boolean(savedMission?.completed) || progress >= defaultMission.target;
 
     return {
       ...defaultMission,
+      reward,
+      qcRewardMultiplier: isFeaturedMission
+        ? NEW_EARTH_FEATURED_MISSION_QC_MULTIPLIER
+        : defaultMission.qcRewardMultiplier,
       progress: completed ? defaultMission.target : Math.min(defaultMission.target, progress),
       completed,
       claimed,

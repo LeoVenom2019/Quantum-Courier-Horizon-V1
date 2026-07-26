@@ -33,6 +33,11 @@ import { GameStorage } from '@/lib/game-storage';
 import { MINI_GAMES_CONFIG } from '@/lib/mini-games-config';
 import { preloadAssetGroupPassive } from '@/lib/asset-preloader';
 import { NEW_LAND_BATTLE_MUSIC, pickNewLandBattleTheme } from '@/lib/new-land-battle-music.mjs';
+import {
+  NEW_EARTH_BATTLE_BACKGROUNDS,
+  pickNewEarthBattleBackground,
+} from '@/lib/route4-battle-backgrounds.mjs';
+import type { NewEarthBattleBackground } from '@/lib/route4-battle-backgrounds.types';
 import NewEarthDefenseBattle, { BattleResultSummary } from './NewEarthDefenseBattle';
 import HorizonSkillTreeModal from './HorizonSkillTreeModal';
 import { PremiumCanvasButton } from './ui/PremiumCanvasButton';
@@ -415,7 +420,6 @@ export interface Colony {
   id: string;
   name: string;
   population: number;
-  maxPopulation: number;
   constructors: number; // Total available constructors
   constructions: Construction[];
   sectors: Record<ColonySectorId, number>;
@@ -512,7 +516,6 @@ const CONSTRUCTION_CONFIG: Record<ConstructionType, {
 };
 
 const INITIAL_CONSTRUCTORS = 500;
-const INITIAL_POP_CAPACITY = 10000;
 
 const DEFAULT_COLONY_SUPPLIES: ColonySupplies = {
   materials: 500,
@@ -798,7 +801,6 @@ const createColonyFromBlueprint = (blueprint: typeof COLONY_BLUEPRINTS[number], 
   id: blueprint.id,
   name: blueprint.name[language],
   population: 0,
-  maxPopulation: INITIAL_POP_CAPACITY,
   constructors: INITIAL_CONSTRUCTORS,
   sectors: blueprint.sectors,
   equippedCards: {},
@@ -1397,6 +1399,7 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
   const [isSearchBattleCycleLoaded, setIsSearchBattleCycleLoaded] = useState(false);
   const [activeSearchBattle, setActiveSearchBattle] = useState<ActiveSearchBattle | null>(null);
   const [directBattleBriefing, setDirectBattleBriefing] = useState<DirectBattleBriefing | null>(null);
+  const [activeBattleBackground, setActiveBattleBackground] = useState<NewEarthBattleBackground | null>(null);
   const [directBattleMusicEnabled, setDirectBattleMusicEnabled] = useState(true);
   const [searchDefenseBattleMusicEnabled, setSearchDefenseBattleMusicEnabled] = useState(true);
   const [areBattleMusicPreferencesLoaded, setAreBattleMusicPreferencesLoaded] = useState(false);
@@ -1486,6 +1489,8 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
         id: card.id,
         name: card.name,
         level: getCardLevel(card.id, cardLevels),
+        rarity: card.rarity,
+        cardClass: isBattleCard(card) ? 'battle' : 'political',
       }));
     const submarineColoniesReady = colonies.some(colony => (
       (colony.id === 'colony-2' || colony.id === 'colony-4') &&
@@ -2020,6 +2025,7 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
   useEffect(() => {
     if (!isLoaded || !isHorizonSkillsLoaded) return;
     GameStorage.save(horizonSkills, 'horizon_skill_tree');
+    window.dispatchEvent(new CustomEvent('qch:horizon-skills-updated', { detail: horizonSkills }));
   }, [horizonSkills, isLoaded, isHorizonSkillsLoaded]);
 
   useEffect(() => {
@@ -2575,6 +2581,7 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
       )));
       onDefenseThreatAlertChange?.(null);
       setDefenseBattleStarted(false);
+      setActiveBattleBackground(pickNewEarthBattleBackground());
       setActiveDefenseThreat({ ...threat, openedAt, expiresAt: undefined, waitingForDefenseSlot: false });
     }, 0);
 
@@ -2840,13 +2847,13 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
     const next = { ...DEFAULT_COLONY_SECTORS, ...(activeColony.sectors || {}) };
     if (ownedPassiveBonuses.allSectorBonus > 0) {
       (Object.keys(next) as ColonySectorId[]).forEach(sector => {
-        next[sector] = Math.min(100, Math.max(0, next[sector] + ownedPassiveBonuses.allSectorBonus));
+        next[sector] = Math.max(0, next[sector] + ownedPassiveBonuses.allSectorBonus);
       });
     }
     equippedCards.forEach(card => {
       if (!isPoliticalCard(card)) return;
       getPoliticalEffects(card, cardLevels).forEach(effect => {
-        next[effect.sector] = Math.min(100, Math.max(0, next[effect.sector] + effect.value));
+        next[effect.sector] = Math.max(0, next[effect.sector] + effect.value);
       });
     });
     return next;
@@ -3242,9 +3249,9 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
               sectors: {
                 ...DEFAULT_COLONY_SECTORS,
                 ...(colony.sectors || {}),
-                [reward.colonyBonus!.sector]: Math.min(
-                  100,
-                  Math.max(0, Number(colony.sectors?.[reward.colonyBonus!.sector] ?? DEFAULT_COLONY_SECTORS[reward.colonyBonus!.sector]) + reward.colonyBonus!.value)
+                [reward.colonyBonus!.sector]: Math.max(
+                  0,
+                  Number(colony.sectors?.[reward.colonyBonus!.sector] ?? DEFAULT_COLONY_SECTORS[reward.colonyBonus!.sector]) + reward.colonyBonus!.value
                 ),
               },
             }
@@ -3362,6 +3369,7 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
     setPendingDefenseThreats(prev => prev.filter(threat => threat.id !== activeDefenseThreat.id));
     setDefenseBattleStarted(false);
     setActiveDefenseThreat(null);
+    setActiveBattleBackground(null);
     if (summary?.perfect) {
       dispatchNewEarthAchievementMetric({ type: 'perfect-search-defense', searchId: activeDefenseThreat.sourceSearchId, amount: 1 });
     }
@@ -3408,6 +3416,7 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
     }
     setDefenseBattleStarted(false);
     setActiveDefenseThreat(null);
+    setActiveBattleBackground(null);
     setCardFeedback(language === 'pt' ? 'Defesa falhou. A ameaça permanece pendente.' : 'Defense failed. Threat remains pending.');
   }, [activeDefenseThreat, language]);
 
@@ -3421,6 +3430,7 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
     }
     setDefenseBattleStarted(false);
     setActiveDefenseThreat(null);
+    setActiveBattleBackground(null);
     setCardFeedback(t('Defense returned to the queue', 'Defesa devolvida para a fila'));
   }, [activeDefenseThreat, t]);
 
@@ -3469,9 +3479,9 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
               ...colony,
               sectors: {
                 ...(colony.sectors || {}),
-                [sentimentSector]: Math.min(
-                  100,
-                  Math.max(0, Number(colony.sectors?.[sentimentSector] ?? DEFAULT_COLONY_SECTORS[sentimentSector]) + sentimentValue)
+                [sentimentSector]: Math.max(
+                  0,
+                  Number(colony.sectors?.[sentimentSector] ?? DEFAULT_COLONY_SECTORS[sentimentSector]) + sentimentValue
                 ),
               },
             }
@@ -3513,6 +3523,7 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
         : { ...prev, nextBattleIndex: Math.min(SEARCH_BATTLE_TOTAL - 1, battleIndex + 1) }
     ));
     setActiveSearchBattle(null);
+    setActiveBattleBackground(null);
     dispatchNewEarthAchievementMetric({ type: 'direct-battle-victory', amount: 1 });
     recordNewEarthMissionProgress({ type: 'defense-victory' });
     recordNewEarthMissionProgress({ type: 'defense-kills', amount: kills });
@@ -3547,6 +3558,7 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
 
   const resolveSearchBattleDefeat = useCallback(() => {
     setActiveSearchBattle(null);
+    setActiveBattleBackground(null);
     setCardFeedback(t('Battle failed. The same battle remains available.', 'Batalha falhou. A mesma batalha continua disponível.'));
   }, [t]);
 
@@ -3596,7 +3608,9 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
       return;
     }
 
+    playSfx?.('direct_battle_cap4_open');
     setLastSearchReport(null);
+    setActiveBattleBackground(pickNewEarthBattleBackground());
     setDirectBattleBriefing({
       battleIndex,
       searchId: option.id,
@@ -3605,7 +3619,29 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
       boost: 0,
     });
     setCardFeedback(null);
-  }, [activeSearchBattle, allColoniesFullyBuilt, handleRunSearch, searchBattleCycle.nextBattleIndex, t]);
+  }, [activeSearchBattle, allColoniesFullyBuilt, handleRunSearch, playSfx, searchBattleCycle.nextBattleIndex, t]);
+
+  const increaseDirectBattleDifficulty = useCallback(() => {
+    if (!directBattleBriefing) return;
+    if (directBattleBriefing.boost >= DIRECT_BATTLE_MAX_MANUAL_DIFFICULTY_BOOST) return;
+
+    playSfx?.('level_up_dif_cap4');
+    setDirectBattleBriefing(prev => (
+      prev
+        ? { ...prev, boost: Math.min(DIRECT_BATTLE_MAX_MANUAL_DIFFICULTY_BOOST, prev.boost + 1) }
+        : prev
+    ));
+  }, [directBattleBriefing, playSfx]);
+
+  const openHorizonSkillTree = useCallback(() => {
+    playSfx?.('open_skill_tree_cap4');
+    setShowHorizonSkillTree(true);
+  }, [playSfx]);
+
+  const closeHorizonSkillTree = useCallback(() => {
+    playSfx?.('close_skill_tree_cap4');
+    setShowHorizonSkillTree(false);
+  }, [playSfx]);
 
   const startDirectBattleFromBriefing = useCallback(() => {
     if (!directBattleBriefing) return;
@@ -3807,6 +3843,8 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
     ? Math.max(0, Math.floor(newEarthMissionCycleBonusAnimation?.displayBonus || 0))
     : newEarthMissionCycleBonusValue;
 
+  const selectedBattleBackground = activeBattleBackground || NEW_EARTH_BATTLE_BACKGROUNDS[0];
+
   return (
     <div className="flex flex-col h-full space-y-3 overflow-hidden">
       <AnimatePresence>
@@ -3841,8 +3879,10 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
               initial={{ opacity: 0, scale: 0.96, y: 14 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.97, y: 8 }}
-              className="relative w-full max-w-2xl overflow-hidden rounded-3xl border border-red-300/30 bg-slate-950 shadow-[0_0_64px_rgba(248,113,113,0.16)]"
+              className="relative w-full max-w-2xl overflow-hidden rounded-3xl border border-red-300/30 bg-slate-950 bg-cover bg-center shadow-[0_0_64px_rgba(248,113,113,0.16)]"
+              style={{ backgroundImage: `url(${selectedBattleBackground.image})` }}
             >
+              <div className="pointer-events-none absolute inset-0 bg-black/68" />
               <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-cyan-300 to-transparent" />
               <div className="pointer-events-none absolute right-0 top-0 h-40 w-40 bg-[radial-gradient(circle_at_top_right,rgba(239,68,68,0.18),transparent_68%)]" />
               <header className="relative border-b border-white/10 bg-black/45 px-6 py-5">
@@ -3940,8 +3980,10 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
                 initial={{ opacity: 0, scale: 0.94, y: 18 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.96, y: 10 }}
-                className="relative w-full max-w-2xl overflow-hidden rounded-3xl border border-cyan-300/28 bg-slate-950 shadow-[0_0_70px_rgba(34,211,238,0.18)]"
+                className="relative w-full max-w-2xl overflow-hidden rounded-3xl border border-cyan-300/28 bg-slate-950 bg-cover bg-center shadow-[0_0_70px_rgba(34,211,238,0.18)]"
+                style={{ backgroundImage: `url(${selectedBattleBackground.image})` }}
               >
+                <div className="pointer-events-none absolute inset-0 bg-black/68" />
                 <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_12%,rgba(34,211,238,0.2),transparent_34%),radial-gradient(circle_at_82%_72%,rgba(244,114,182,0.14),transparent_38%)]" />
                 <div className="relative z-10 border-b border-white/10 bg-black/44 px-6 py-5">
                   <div className="flex items-start justify-between gap-4">
@@ -3956,7 +3998,10 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
                     <PremiumCanvasButton
                       type="button"
                       tone="steel"
-                      onClick={() => setDirectBattleBriefing(null)}
+                      onClick={() => {
+                        setDirectBattleBriefing(null);
+                        setActiveBattleBackground(null);
+                      }}
                       className="h-10 w-10 rounded-full"
                       contentClassName="text-slate-100"
                     >
@@ -4017,11 +4062,7 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
                       type="button"
                       tone={canBoost ? 'green' : 'steel'}
                       disabled={!canBoost}
-                      onClick={() => setDirectBattleBriefing(prev => (
-                        prev
-                          ? { ...prev, boost: Math.min(DIRECT_BATTLE_MAX_MANUAL_DIFFICULTY_BOOST, prev.boost + 1) }
-                          : prev
-                      ))}
+                      onClick={increaseDirectBattleDifficulty}
                       className="h-12 min-w-48 rounded-2xl"
                       contentClassName="gap-2 px-4 text-[10px] font-black uppercase tracking-[0.2em]"
                     >
@@ -4076,6 +4117,7 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
             damageSupportDrone={horizonSkills.damageDrone > 0}
             defenseSupportDrone={horizonSkills.defenseDrone > 0}
             threatTitle={activeDefenseThreat.sourceTitle}
+            battleBackground={selectedBattleBackground}
             queuedDefenseCount={queuedDefenseCountDuringBattle}
             onVictory={resolveDefenseVictory}
             onDefeat={resolveDefenseDefeat}
@@ -4099,10 +4141,14 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
             damageSupportDrone={horizonSkills.damageDrone > 0}
             defenseSupportDrone={horizonSkills.defenseDrone > 0}
             threatTitle={activeSearchBattle.title}
+            battleBackground={selectedBattleBackground}
             queuedDefenseCount={queuedDefenseCountDuringBattle}
             onVictory={resolveSearchBattleVictory}
             onDefeat={resolveSearchBattleDefeat}
-            onClose={() => setActiveSearchBattle(null)}
+            onClose={() => {
+              setActiveSearchBattle(null);
+              setActiveBattleBackground(null);
+            }}
           />
         )}
       </AnimatePresence>
@@ -4114,7 +4160,7 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
             horizonLevel={horizonProgress.level}
             skills={horizonSkills}
             onUpgrade={upgradeHorizonSkill}
-            onClose={() => setShowHorizonSkillTree(false)}
+            onClose={closeHorizonSkillTree}
           />
         )}
       </AnimatePresence>
@@ -4167,7 +4213,7 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
                         </div>
                         <button
                           type="button"
-                          onClick={() => setShowHorizonSkillTree(true)}
+                          onClick={openHorizonSkillTree}
                           className="group flex items-center gap-2 rounded-xl border border-cyan-300/30 bg-cyan-300/10 px-3 py-2 text-left transition hover:border-cyan-200/60 hover:bg-cyan-300/20 hover:shadow-[0_0_24px_rgba(34,211,238,0.18)]"
                         >
                           <Sparkles size={14} className="text-cyan-200 transition group-hover:rotate-12 group-hover:scale-110" />
@@ -4339,6 +4385,7 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
                               )));
                               onDefenseThreatAlertChange?.(null);
                               setDefenseBattleStarted(false);
+                              setActiveBattleBackground(pickNewEarthBattleBackground());
                               setActiveDefenseThreat({ ...threat, openedAt, expiresAt: undefined, waitingForDefenseSlot: false });
                             }}
                             tone="red"
@@ -5186,5 +5233,4 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
     </div>
   );
 };
-
 

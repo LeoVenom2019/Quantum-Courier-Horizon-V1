@@ -7,6 +7,11 @@
   "scripts": {
     "test:battle-media": "node --test lib/solar-interstellar-battle-media.test.mjs",
     "test:new-land-battle-music": "node --test lib/new-land-battle-music.test.mjs",
+    "test:route4-interaction-sfx": "node --test lib/route4-interaction-sfx.test.mjs",
+    "test:new-earth-mission-rewards": "node --test lib/new-earth-mission-rewards.test.mjs",
+    "test:horizon-achievement-stats": "node --test lib/horizon-achievement-stats.test.mjs",
+    "test:arcade-intro": "node --test lib/arcade-intro-flow.test.mjs",
+    "test:robot-runner-ghost-sfx": "node --test lib/robot-runner-ghost-sfx.test.mjs",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",

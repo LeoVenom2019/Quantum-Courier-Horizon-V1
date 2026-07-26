@@ -1,3 +1,5 @@
+import { getNewEarthVehicleUpgradeCost } from './new-earth-vehicle-upgrade-costs.mjs';
+
 export const NEW_EARTH_SUBMARINES_STORAGE_KEY = 'new_earth_submarines';
 
 export type NewEarthSubmarineColonyId = 'colony-2' | 'colony-4';
@@ -94,7 +96,7 @@ export const normalizeNewEarthSubmarineState = (raw: unknown): NewEarthSubmarine
   return defaults;
 };
 
-export const getNewEarthSubmarineUpgradeCost = (level: number) => Math.round(420 + Math.pow(level + 1, 1.35) * 180);
+export const getNewEarthSubmarineUpgradeCost = getNewEarthVehicleUpgradeCost;
 
 export const getNewEarthSubmarineStats = (levels: NewEarthSubmarineUpgradeLevels) => {
   const maxDepth =
