@@ -1,5 +1,6 @@
 import { SOLAR_INTERSTELLAR_BATTLE_MEDIA } from './solar-interstellar-battle-media.mjs';
 import { NEW_LAND_BATTLE_MUSIC } from './new-land-battle-music.mjs';
+import { NEW_EARTH_SURFACE_WAR_TRACKS } from './new-earth-surface-war-music.mjs';
 
 export interface Track {
   id: string;
@@ -111,6 +112,11 @@ export const ARCADE_THEMES: Record<string, RouteTheme> = {
 };
 
 export const SPECIAL_THEMES: Record<string, RouteTheme> = {
+  'new-earth-surface-war': {
+    id: 'new-earth-surface-war',
+    name: 'Chapter 4 - Surface War',
+    playlist: NEW_EARTH_SURFACE_WAR_TRACKS.map(track => ({ ...track })),
+  },
   'new-land-battles': {
     id: 'new-land-battles',
     name: 'Chapter 4 - New Land Battles',

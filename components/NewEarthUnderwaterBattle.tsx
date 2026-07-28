@@ -60,7 +60,7 @@ interface NewEarthUnderwaterBattleProps {
     oxygenSeconds?: number;
   };
   onVictory?: (summary: { kills: number; depth: number }) => void;
-  onDefeat?: () => void;
+  onDefeat?: (reason?: 'hull' | 'oxygen') => void;
   onTreasureLoot?: (payload: TreasureRewardPayload) => void;
   defenseBattleLevel: number;
   onClose: () => void;
@@ -1539,20 +1539,6 @@ const drawWaterOverlay = (ctx: CanvasRenderingContext2D, tick: number, bubbles: 
   ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, WIDTH, HEIGHT);
 
-  ctx.save();
-  ctx.globalCompositeOperation = 'screen';
-  for (let i = 0; i < 4; i++) {
-    const y = HEIGHT * (0.18 + i * 0.19) + Math.sin(tick * 0.0007 + i) * 18;
-    const fog = ctx.createLinearGradient(0, y - 42, WIDTH, y + 42);
-    fog.addColorStop(0, 'rgba(14,116,144,0)');
-    fog.addColorStop(0.38, `rgba(34,211,238,${0.018 + i * 0.004})`);
-    fog.addColorStop(0.68, `rgba(125,211,252,${0.012 + i * 0.003})`);
-    fog.addColorStop(1, 'rgba(14,116,144,0)');
-    ctx.fillStyle = fog;
-    ctx.fillRect(0, y - 48, WIDTH, 96);
-  }
-  ctx.restore();
-
   const foregroundShade = ctx.createRadialGradient(WIDTH * 0.52, HEIGHT * 0.42, HEIGHT * 0.18, WIDTH * 0.52, HEIGHT * 0.5, WIDTH * 0.78);
   foregroundShade.addColorStop(0, 'rgba(0,0,0,0)');
   foregroundShade.addColorStop(0.64, 'rgba(0,0,0,0.08)');
@@ -1900,7 +1886,8 @@ const drawIlluminatedBackground = (
   player: { x: number; y: number; vx: number; vy: number; angle: number },
   time: number,
   depthIndex: number,
-  spriteKey: PlayerSubmarineSpriteKey = 'front'
+  spriteKey: PlayerSubmarineSpriteKey = 'front',
+  showPlayerLight = true,
 ) => {
   if (!background?.complete || background.naturalWidth <= 0) {
     drawFallbackBackground(ctx);
@@ -1952,6 +1939,8 @@ const drawIlluminatedBackground = (
   ctx.filter = `brightness(${darkness}%) saturate(82%) contrast(108%)`;
   ctx.drawImage(background, 0, 0, WIDTH, HEIGHT);
   ctx.restore();
+
+  if (!showPlayerLight) return;
 
   ctx.save();
   drawLightConePath(ctx, originX, originY, angle, beamLength, beamWidth, beamTime, 0.8);
@@ -2096,10 +2085,12 @@ export default function NewEarthUnderwaterBattle({
     nextEnemySpawnAt: 0,
     nextId: 1,
     kills: 0,
-    phase: 'combat' as 'combat' | 'exploration' | 'defeat',
+    phase: 'combat' as 'combat' | 'exploration' | 'player_exploding' | 'defeat',
+    playerExplosionEndsAt: 0,
     victoryHandled: false,
   });
   const [status, setStatus] = useState<'fighting' | 'exploration' | 'defeat'>('fighting');
+  const [defeatReason, setDefeatReason] = useState<'hull' | 'oxygen' | null>(null);
   const [kills, setKills] = useState(0);
   const [hull, setHull] = useState(100);
   const [treasuresFound, setTreasuresFound] = useState(0);
@@ -2146,7 +2137,8 @@ export default function NewEarthUnderwaterBattle({
     kills: language === 'pt' ? 'Alvos' : 'Targets',
     controls: language === 'pt' ? 'WASD ou setas movem · Mouse mira · Clique dispara' : 'WASD or arrows move · Mouse aims · Click fires',
     exploration: language === 'pt' ? 'Área liberada para exploração' : 'Area cleared for exploration',
-    defeat: language === 'pt' ? 'Submarino perdido' : 'Submarine lost',
+    defeat: language === 'pt' ? 'Submarino explodido' : 'Submarine exploded',
+    gameOver: 'GAME OVER',
     treasures: language === 'pt' ? 'Tesouros' : 'Treasures',
     depth: language === 'pt' ? 'Profundidade' : 'Depth',
     maxDepth: language === 'pt' ? 'Capacidade' : 'Capacity',
@@ -2185,7 +2177,11 @@ export default function NewEarthUnderwaterBattle({
   };
 
   const handleCanvasPointerDown = (event: React.PointerEvent<HTMLCanvasElement>) => {
-    if (isPausedRef.current) return;
+    if (
+      isPausedRef.current
+      || stateRef.current.phase === 'player_exploding'
+      || stateRef.current.phase === 'defeat'
+    ) return;
     updateAimFromPointer(event);
     aimRef.current.clickQueued = true;
   };
@@ -2218,6 +2214,7 @@ export default function NewEarthUnderwaterBattle({
       nextId: 1,
       kills: 0,
       phase: 'combat' as const,
+      playerExplosionEndsAt: 0,
       victoryHandled: false,
     });
     state.bubbles = Array.from({ length: 86 }, (_, index) => {
@@ -2340,6 +2337,7 @@ export default function NewEarthUnderwaterBattle({
 
     const resetHudTimeout = window.setTimeout(() => {
       setStatus('fighting');
+      setDefeatReason(null);
       setHull(playerMaxHp);
       setKills(0);
       setTreasuresFound(0);
@@ -2360,6 +2358,9 @@ export default function NewEarthUnderwaterBattle({
 
   useEffect(() => {
     const down = (event: KeyboardEvent) => {
+      if (stateRef.current.phase === 'player_exploding' || stateRef.current.phase === 'defeat') {
+        return;
+      }
       if (event.key === 'Escape' && status !== 'defeat') {
         event.preventDefault();
         if (isExitConfirmationOpen) {
@@ -2576,7 +2577,7 @@ export default function NewEarthUnderwaterBattle({
       lastTime = time;
       const step = delta / 16.67;
 
-      if (state.phase !== 'defeat') {
+      if (state.phase === 'combat' || state.phase === 'exploration') {
         const keys = keysRef.current;
         let mx = 0;
         let my = 0;
@@ -2690,9 +2691,10 @@ export default function NewEarthUnderwaterBattle({
           stopUnderwaterSound(playerConstantMotorAudioRef.current);
           playerConstantMotorAudioRef.current = null;
           state.phase = 'defeat';
+          setDefeatReason('oxygen');
           setStatus('defeat');
           setPortalFeedback(labels.oxygenDepleted);
-          onDefeat?.();
+          onDefeat?.('oxygen');
         }
 
         if (state.phase === 'defeat') {
@@ -2976,13 +2978,19 @@ export default function NewEarthUnderwaterBattle({
           } else if (state.player.hp <= 0) {
             if (!playerExplosionPlayedRef.current) {
               playerExplosionPlayedRef.current = true;
+              spawnImpact(state.player.x, state.player.y, '#f87171', true, 1.45);
               playRandomUnderwaterSound(SUBMARINE_EXPLOSION_SFX, 0.86);
             }
             stopUnderwaterSound(playerConstantMotorAudioRef.current);
             playerConstantMotorAudioRef.current = null;
-            state.phase = 'defeat';
-            setStatus('defeat');
-            onDefeat?.();
+            keysRef.current.clear();
+            aimRef.current.clickQueued = false;
+            state.shots = [];
+            state.player.vx = 0;
+            state.player.vy = 0;
+            state.player.thrust = 0;
+            state.playerExplosionEndsAt = time + 1200;
+            state.phase = 'player_exploding';
           }
         }
 
@@ -3070,6 +3078,16 @@ export default function NewEarthUnderwaterBattle({
         }
       }
 
+      if (
+        state.phase === 'player_exploding'
+        && time >= state.playerExplosionEndsAt
+      ) {
+        state.phase = 'defeat';
+        setDefeatReason('hull');
+        setStatus('defeat');
+        onDefeat?.('hull');
+      }
+
       state.bubbles.forEach(bubble => {
         const depthSpeed = 0.65 + bubble.depth * 0.65;
         bubble.y -= bubble.speed * depthSpeed * step;
@@ -3120,7 +3138,15 @@ export default function NewEarthUnderwaterBattle({
       };
       const playerVisualKey = playerSpriteVisualRef.current.key;
 
-      drawIlluminatedBackground(ctx, background, visualPlayer, time, currentDepthIndex, playerVisualKey);
+      drawIlluminatedBackground(
+        ctx,
+        background,
+        visualPlayer,
+        time,
+        currentDepthIndex,
+        playerVisualKey,
+        state.phase !== 'player_exploding' && state.phase !== 'defeat',
+      );
       drawWaterOverlay(ctx, time, state.bubbles);
       drawOceanBubbles(ctx, state.bubbles, time);
       drawForegroundDebris(ctx, time);
@@ -3275,18 +3301,20 @@ export default function NewEarthUnderwaterBattle({
         ctx.fillRect(enemy.x - 24, enemy.y - 30, 48 * Math.max(0, enemy.hp / enemy.maxHp), 4);
       });
 
-      drawPropellerWake(ctx, visualPlayer, time);
+      if (state.phase !== 'player_exploding' && state.phase !== 'defeat') {
+        drawPropellerWake(ctx, visualPlayer, time);
 
-      const playerSprites = PLAYER_SUBMARINE_SPRITES[colonyId];
-      if (playerSprites) {
-        drawNeptuneTurnLightImpact(ctx, visualPlayer.x, visualPlayer.y, visualPlayer.angle, time, playerSpriteVisualRef.current);
-        drawPlayerSpriteSubmarine(ctx, visualPlayer.x, visualPlayer.y, visualPlayer.angle, time, playerSpriteVisualRef.current, playerSprites);
-      } else {
-        drawSubmarine(ctx, visualPlayer.x, visualPlayer.y, visualPlayer.angle, 'rgba(8,145,178,0.94)', true, time);
+        const playerSprites = PLAYER_SUBMARINE_SPRITES[colonyId];
+        if (playerSprites) {
+          drawNeptuneTurnLightImpact(ctx, visualPlayer.x, visualPlayer.y, visualPlayer.angle, time, playerSpriteVisualRef.current);
+          drawPlayerSpriteSubmarine(ctx, visualPlayer.x, visualPlayer.y, visualPlayer.angle, time, playerSpriteVisualRef.current, playerSprites);
+        } else {
+          drawSubmarine(ctx, visualPlayer.x, visualPlayer.y, visualPlayer.angle, 'rgba(8,145,178,0.94)', true, time);
+        }
+        drawTargetingReticle(ctx, aimRef.current, time);
       }
       // drawLaunchBar(ctx, visualPlayer, time);
       drawCombatParticles(ctx, state.combatParticles);
-      drawTargetingReticle(ctx, aimRef.current, time);
 
       frameRef.current = requestAnimationFrame(loop);
     };
@@ -3487,8 +3515,13 @@ export default function NewEarthUnderwaterBattle({
               <div className="rounded-2xl border border-cyan-300/35 bg-slate-950/88 px-8 py-6 text-center shadow-[0_0_40px_rgba(34,211,238,0.24)]">
                 <p className="font-mono text-[10px] uppercase tracking-[0.34em] text-cyan-200">{site.title[language]}</p>
                 <h3 className="mt-2 font-orbitron text-4xl font-black uppercase text-white">
-                  {labels.defeat}
+                  {defeatReason === 'oxygen' ? labels.oxygenDepleted : labels.defeat}
                 </h3>
+                {defeatReason === 'hull' && (
+                  <p className="mt-3 font-orbitron text-sm font-black uppercase tracking-[0.32em] text-red-200">
+                    {labels.gameOver}
+                  </p>
+                )}
               </div>
             </div>
           )}

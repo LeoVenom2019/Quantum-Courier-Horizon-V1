@@ -177,6 +177,7 @@ import { ArcadeIntroOverlay, ARCADE_INTRO_SKIP_STORAGE_KEY } from './ArcadeIntro
 import { ColonySystem, Colony, cleanColoniesData } from './ColonySystem';
 import NewEarthUnderwaterBattle from './NewEarthUnderwaterBattle';
 import NewEarthSurfaceBattle, { type NewEarthSurfaceBattleKind, type NewEarthSurfaceBattleSiteId, type NewEarthSurfaceBattleVictoryPayload } from './NewEarthSurfaceBattle';
+import { pickNewEarthSurfaceWarTheme } from '@/lib/new-earth-surface-war-music.mjs';
 import {
   ARCADE_CARD_REWARD_CHANCE,
   ARCADE_CARD_REWARD_RULES,
@@ -650,6 +651,10 @@ const NEW_EARTH_HELICOPTER_NAME = 'AETHER';
 const NEW_EARTH_TANK_NAME = 'HORIZON WARDEN';
 const NEW_EARTH_TANK_PREVIEW_BACKGROUND = '/assets/rota4/new_land_assets/european_ruins_new_land_system/european_background_2.webp';
 const NEW_EARTH_HELICOPTER_PREVIEW_BACKGROUND = '/assets/rota4/new_land_assets/forgotten_continent_new_land_system/forgotten_continent_background_1.webp';
+const NEW_EARTH_SURFACE_BRIEFING_BACKGROUNDS: Record<NewEarthSurfaceBattleKind, string> = {
+  helicopter: '/assets/rota4/new_land_assets/war_helicopters_cap4.webp',
+  tank: '/assets/rota4/new_land_assets/war_tanks_cap4.webp',
+};
 
 const NEW_EARTH_SECTOR_ORDER: ColonySectorId[] = ['culture', 'economy', 'health', 'happiness', 'security', 'technology'];
 
@@ -3068,6 +3073,73 @@ const DashboardContent = memo(({
     && activeVoidBattleLocation <= 9
     && Boolean(VOID_LOCAL_BATTLE_THEMES[activeVoidBattleLocation]);
 
+  const surfaceWarBattleAudioRef = useRef<HTMLAudioElement | null>(null);
+  const surfaceWarMusicOnRef = useRef(musicOn);
+  const surfaceWarMusicVolumeRef = useRef(Number(jukebox?.volume ?? 0.55));
+  const surfaceWarJukeboxStateRef = useRef({
+    isPlaying: Boolean(jukebox.isPlaying),
+    stop: jukebox.stop,
+    setIsPlaying: jukebox.setIsPlaying,
+  });
+  const surfaceWarMusicVolume = Number(jukebox?.volume ?? 0.55);
+  const surfaceWarBattleSession = activeSurfaceBattle
+    ? `${activeSurfaceBattle.siteId}:${activeSurfaceBattle.battleKind}`
+    : null;
+  const surfaceWarBattleKind = activeSurfaceBattle?.battleKind ?? null;
+  const isSurfaceWarBattle = routeTier === 'Earth' && Boolean(surfaceWarBattleSession);
+
+  useEffect(() => {
+    surfaceWarMusicOnRef.current = musicOn;
+    surfaceWarJukeboxStateRef.current = {
+      isPlaying: Boolean(jukebox.isPlaying),
+      stop: jukebox.stop,
+      setIsPlaying: jukebox.setIsPlaying,
+    };
+  }, [jukebox.isPlaying, jukebox.setIsPlaying, jukebox.stop, musicOn]);
+
+  useEffect(() => {
+    if (!surfaceWarBattleSession) return;
+
+    const previousPlayback = {
+      wasPlaying: surfaceWarJukeboxStateRef.current.isPlaying,
+    };
+    surfaceWarJukeboxStateRef.current.stop({ rememberPreference: false });
+
+    return () => {
+      if (previousPlayback.wasPlaying && surfaceWarMusicOnRef.current) {
+        surfaceWarJukeboxStateRef.current.setIsPlaying(true);
+      }
+    };
+  }, [surfaceWarBattleSession]);
+
+  useEffect(() => {
+    if (!surfaceWarBattleSession || !surfaceWarBattleKind || !musicOn) return;
+
+    const track = pickNewEarthSurfaceWarTheme(surfaceWarBattleKind);
+    if (!track) return;
+    const audio = new Audio(track.url);
+    surfaceWarBattleAudioRef.current = audio;
+    audio.loop = true;
+    audio.preload = 'auto';
+    audio.volume = Math.min(0.8, Math.max(0.18, surfaceWarMusicVolumeRef.current * 0.95));
+    void audio.play().catch(error => {
+      if (error instanceof DOMException && (error.name === 'AbortError' || error.name === 'NotAllowedError')) return;
+      console.warn('[SurfaceWarMusic] Playback failed:', error);
+    });
+
+    return () => {
+      audio.pause();
+      audio.currentTime = 0;
+      if (surfaceWarBattleAudioRef.current === audio) surfaceWarBattleAudioRef.current = null;
+    };
+  }, [musicOn, surfaceWarBattleKind, surfaceWarBattleSession]);
+
+  useEffect(() => {
+    surfaceWarMusicVolumeRef.current = surfaceWarMusicVolume;
+    if (!surfaceWarBattleAudioRef.current) return;
+    surfaceWarBattleAudioRef.current.volume = Math.min(0.8, Math.max(0.18, surfaceWarMusicVolume * 0.95));
+  }, [surfaceWarMusicVolume]);
+
   useEffect(() => {
     localStorage.setItem(VOID_BATTLE_MUSIC_STORAGE_KEY, String(voidBattleMusicEnabled));
   }, [voidBattleMusicEnabled]);
@@ -3136,6 +3208,11 @@ const DashboardContent = memo(({
       return;
     }
 
+    if (isSurfaceWarBattle) {
+      jukebox.stop({ rememberPreference: false });
+      return;
+    }
+
     if (route4ColonyBattleMusicActive) {
       return;
     }
@@ -3174,7 +3251,7 @@ const DashboardContent = memo(({
       jukebox.stop();
     }
 
-  }, [activeMiniGameId, routeTier, isLoaded, musicOn, isVoidLocalBattle, route4ColonyBattleMusicActive, jukebox, jukebox.playPlaylist, jukebox.stop, jukebox.currentTrack?.url]);
+  }, [activeMiniGameId, routeTier, isLoaded, musicOn, isSurfaceWarBattle, isVoidLocalBattle, route4ColonyBattleMusicActive, jukebox, jukebox.playPlaylist, jukebox.stop, jukebox.currentTrack?.url]);
   const setOresCollected = useCallback((val: Record<string, number> | ((prev: Record<string, number>) => Record<string, number>)) => {
     const nextVal = typeof val === 'function' ? val(oresCollectedRef.current) : val;
     oresCollectedRef.current = nextVal;
@@ -9795,11 +9872,19 @@ const DashboardContent = memo(({
               'success'
             );
           }}
-          onDefeat={() => {
+          onDefeat={(reason) => {
             addLog(
-              language === 'pt'
-                ? 'Submarino retornou severamente danificado.'
-                : 'Submarine returned severely damaged.',
+              reason === 'hull'
+                ? language === 'pt'
+                  ? 'Submarino explodiu durante a missão.'
+                  : 'Submarine exploded during the mission.'
+                : reason === 'oxygen'
+                  ? language === 'pt'
+                    ? 'Missão submarina encerrada por falta de oxigênio.'
+                    : 'Submarine mission ended due to oxygen depletion.'
+                  : language === 'pt'
+                    ? 'Submarino retornou severamente danificado.'
+                    : 'Submarine returned severely damaged.',
               'error'
             );
           }}
@@ -11395,6 +11480,7 @@ const DashboardContent = memo(({
                           const briefing = NEW_EARTH_SURFACE_SITE_BRIEFINGS[selectedSurfaceBattleBriefing.siteId];
                           const colonyName = selectedSurfaceBattleBriefing.colonyId === 'colony-1' ? 'Genesis' : 'Elysium';
                           const isTankBattle = selectedSurfaceBattleBriefing.battleKind === 'tank';
+                          const briefingBackground = NEW_EARTH_SURFACE_BRIEFING_BACKGROUNDS[selectedSurfaceBattleBriefing.battleKind];
 
                           return (
                             <motion.div
@@ -11404,12 +11490,12 @@ const DashboardContent = memo(({
                               className="absolute inset-6 z-30 overflow-hidden rounded-3xl border border-red-200/30 bg-slate-950/96 p-5 shadow-[0_0_58px_rgba(248,113,113,0.18)] backdrop-blur-md"
                             >
                               <Image unoptimized width={800} height={600}
-                                src={selectedSurfaceBattleBriefing.background}
+                                src={briefingBackground}
                                 alt=""
                                 aria-hidden="true"
-                                className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-32"
+                                className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-90 saturate-[1.08] contrast-[1.04]"
                               />
-                              <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_34%_26%,rgba(248,113,113,0.18),transparent_38%),linear-gradient(90deg,rgba(2,6,23,0.94),rgba(2,6,23,0.74)_48%,rgba(2,6,23,0.91))]" />
+                              <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_34%_26%,rgba(248,113,113,0.10),transparent_42%),linear-gradient(90deg,rgba(2,6,23,0.64),rgba(2,6,23,0.22)_52%,rgba(2,6,23,0.42))]" />
                               <PremiumCanvasButton
                                 type="button"
                                 onClick={() => {

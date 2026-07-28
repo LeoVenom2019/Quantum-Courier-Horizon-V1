@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { X } from 'lucide-react';
 import { BattleShipComputedStats, getHorizonXpForNextLevel, MAX_HORIZON_LEVEL } from '@/lib/colony-cards';
 import type { NewEarthBattleBackground } from '@/lib/route4-battle-backgrounds.types';
+import { pickRoute4EliteShipImage } from '@/lib/route4-elite-ship-visuals.mjs';
 import { PremiumCanvasButton } from './ui/PremiumCanvasButton';
 import BattlePauseDialog from './BattlePauseDialog';
 
@@ -769,7 +770,7 @@ const buildEnemyBlueprint = (kills: number, forceMonsterBoss: boolean): EnemyBlu
   if (roll > 0.82) {
     return {
       kind: 'elite-ship',
-      image: `${ASSET_BASE}/enemys/air_ships/enemy_elite_rt4.webp`,
+      image: pickRoute4EliteShipImage(),
       shootSound: `${ASSET_BASE}/enemys/air_ships/shoot_enemy_elite_rt4.ogg`,
       hp: 520 + kills * 12,
       damage: 48,

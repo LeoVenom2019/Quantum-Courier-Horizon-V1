@@ -3,6 +3,8 @@ import { MINI_GAMES_CONFIG } from './mini-games-config';
 import { ARCADE_THEMES, ROUTE_THEMES } from './music-data';
 import { SOLAR_INTERSTELLAR_BATTLE_MEDIA } from './solar-interstellar-battle-media.mjs';
 import { NEW_LAND_BATTLE_MUSIC } from './new-land-battle-music.mjs';
+import { NEW_EARTH_SURFACE_WAR_TRACKS } from './new-earth-surface-war-music.mjs';
+import { ROUTE4_ELITE_SHIP_IMAGES } from './route4-elite-ship-visuals.mjs';
 import { NEW_EARTH_BATTLE_BACKGROUNDS } from './route4-battle-backgrounds.mjs';
 import { NEW_EARTH_TREASURE_CATALOG } from './new-earth-treasures';
 import { AETHERION_CHAMBER_BACKGROUND, ACTIVE_DELIVERY_BACKGROUNDS, MISSION_HEADER_BACKGROUNDS, ROUTE1_UI_BACKGROUNDS, ROUTE2_UI_BACKGROUNDS, SCIFI_TEXTURE_BACKGROUND } from './ui-backgrounds';
@@ -280,6 +282,8 @@ const route4BattleBackgroundImages = NEW_EARTH_BATTLE_BACKGROUNDS.map(background
 const route4BattleBackgroundVideos = NEW_EARTH_BATTLE_BACKGROUNDS.map(background => background.video);
 
 const route4NewEarthSurfaceBattleBackgroundImages = [
+  '/assets/rota4/new_land_assets/war_helicopters_cap4.webp',
+  '/assets/rota4/new_land_assets/war_tanks_cap4.webp',
   ...Array.from({ length: 6 }, (_, index) => (
     `/assets/rota4/new_land_assets/forgotten_continent_new_land_system/forgotten_continent_background_${index + 1}.webp`
   )),
@@ -361,8 +365,7 @@ const route4BattleImages = [
   `${route4BattleBase}/enemys/air_ships/enemy_rt4_2.webp`,
   `${route4BattleBase}/enemys/air_ships/enemy_rt4_3.webp`,
   `${route4BattleBase}/enemys/air_ships/enemy_rt4_4.webp`,
-  `${route4BattleBase}/enemys/air_ships/enemy_boss_rt4.webp`,
-  `${route4BattleBase}/enemys/air_ships/enemy_elite_rt4.webp`,
+  ...ROUTE4_ELITE_SHIP_IMAGES,
   `${route4BattleBase}/enemys/monsters/monster 1/m1_neutral.webp`,
   `${route4BattleBase}/enemys/monsters/monster 1/m1_forward.webp`,
   `${route4BattleBase}/enemys/monsters/monster 1/m1_up.webp`,
@@ -402,6 +405,7 @@ const route4BattleImages = [
 
 const route4BattleAudio = [
   ...NEW_LAND_BATTLE_MUSIC.themes,
+  ...NEW_EARTH_SURFACE_WAR_TRACKS.map(track => track.url),
   '/audio/sfx/direct_battle_cap4_open.ogg',
   '/audio/sfx/level_up_dif_cap4.ogg',
   '/audio/sfx/open_skill_tree_cap4.ogg',

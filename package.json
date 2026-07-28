@@ -7,6 +7,8 @@
   "scripts": {
     "test:battle-media": "node --test lib/solar-interstellar-battle-media.test.mjs",
     "test:new-land-battle-music": "node --test lib/new-land-battle-music.test.mjs",
+    "test:surface-war-music": "node --test lib/new-earth-surface-war-music.test.mjs",
+    "test:route4-elite-visuals": "node --test lib/route4-elite-ship-visuals.test.mjs",
     "test:route4-interaction-sfx": "node --test lib/route4-interaction-sfx.test.mjs",
     "test:new-earth-mission-rewards": "node --test lib/new-earth-mission-rewards.test.mjs",
     "test:horizon-achievement-stats": "node --test lib/horizon-achievement-stats.test.mjs",
