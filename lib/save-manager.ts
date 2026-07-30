@@ -643,6 +643,7 @@ export const SaveManager = {
           voidPOIsInspiration: rawData.voidPOIsInspiration || {},
           isVoidWarActive: rawData.isVoidWarActive || false,
           voidWarProgress: rawData.voidWarProgress || { currentSector: 1, currentBattle: 1 },
+          hasWonEliminateEnemiesRoute3: Boolean(rawData.hasWonEliminateEnemiesRoute3),
           robotRepairProgress: rawData.robotRepairProgress || 0,
           isRobotRepaired: rawData.isRobotRepaired || false
         },
@@ -794,6 +795,7 @@ export const SaveManager = {
         voidPOIQCDonations: v.voidPOIQCDonations || {},
         isVoidWarActive: v.isVoidWarActive || false,
         voidWarProgress: v.voidWarProgress || { currentSector: 1, currentBattle: 1 },
+        hasWonEliminateEnemiesRoute3: Boolean(v.hasWonEliminateEnemiesRoute3),
         robotRepairProgress: v.robotRepairProgress || 0,
         isRobotRepaired: v.isRobotRepaired || false,
         // New Aircraft fields

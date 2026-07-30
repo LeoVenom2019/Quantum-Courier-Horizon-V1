@@ -3370,9 +3370,7 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
     setDefenseBattleStarted(false);
     setActiveDefenseThreat(null);
     setActiveBattleBackground(null);
-    if (summary?.perfect) {
-      dispatchNewEarthAchievementMetric({ type: 'perfect-search-defense', searchId: activeDefenseThreat.sourceSearchId, amount: 1 });
-    }
+    dispatchNewEarthAchievementMetric({ type: 'perfect-search-defense', searchId: activeDefenseThreat.sourceSearchId, amount: 1 });
     recordNewEarthMissionProgress({ type: 'defense-victory' });
     recordNewEarthMissionProgress({ type: 'defense-kills', amount: kills });
     recordNewEarthMissionProgress({ type: 'defense-bosses', amount: Math.max(1, Math.floor(Number(summary?.bossesDefeated) || 1)) });

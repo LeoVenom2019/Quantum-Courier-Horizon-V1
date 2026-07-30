@@ -334,6 +334,19 @@ const pickTreasureRelic = (rarity: TreasureRarity) => {
   const relics = NEW_EARTH_TREASURES_BY_RARITY[rarity];
   return relics[Math.floor(Math.random() * relics.length)];
 };
+
+const NORMAL_TREASURE_RESOURCE_MIN = 1_500;
+const NORMAL_TREASURE_RESOURCE_MAX = 3_500;
+const NORMAL_TREASURE_QC_MIN = 1_000_000;
+const NORMAL_TREASURE_QC_MAX = 3_000_000;
+
+const rollNormalTreasureReward = (rewardType: string) => {
+  const [min, max] = rewardType === 'qc'
+    ? [NORMAL_TREASURE_QC_MIN, NORMAL_TREASURE_QC_MAX]
+    : [NORMAL_TREASURE_RESOURCE_MIN, NORMAL_TREASURE_RESOURCE_MAX];
+
+  return Math.round(min + Math.random() * (max - min));
+};
 const spotlightParticles: SpotlightParticle[] = Array.from({ length: 220 }, (_, index) => ({
   x: Math.random() * WIDTH,
   y: Math.random() * HEIGHT,
@@ -2271,18 +2284,7 @@ export default function NewEarthUnderwaterBattle({
         const types = ['qc', 'biomassa', 'materiais', 'techParts', 'defCores', 'food', 'meds'];
         rewardType = types[Math.floor(Math.random() * types.length)];
         
-        if (rewardType === 'qc') {
-          const minQC = 200_000;
-          const commonMaxQC = 1_000_000;
-          const hardMaxQC = 1_500_000;
-          const commonRoll = Math.pow(Math.random(), 1.28);
-          const rolledQC = Math.random() < 0.86
-            ? minQC + commonRoll * (commonMaxQC - minQC)
-            : commonMaxQC + Math.random() * (hardMaxQC - commonMaxQC);
-          rewardAmount = Math.min(hardMaxQC, Math.max(minQC, Math.round(rolledQC)));
-        } else {
-          rewardAmount = Math.round(40 + Math.floor(Math.pow(Math.random(), 2) * 110));
-        }
+        rewardAmount = rollNormalTreasureReward(rewardType);
       }
       const relic = pickTreasureRelic(rarity);
 

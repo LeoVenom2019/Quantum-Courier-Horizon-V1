@@ -152,6 +152,8 @@ import { SaveManager } from '@/lib/save-manager';
 import { useEconomy, useDispatch, useProgression, useMining, useCombat, useMissions, useEarth, useGame, useSystem } from '@/lib/game-state/index';
 import { normalizeGameNumber } from '@/lib/game-state/numbers';
 import { calculateNewEarthAnnualPopulationGrowth } from '@/lib/new-earth-population-growth.mjs';
+import { hasBossZeroDefeatEvidence } from '@/lib/void-boss-achievements.mjs';
+import { getNewEarthDefenseAchievementProgress } from '@/lib/new-earth-defense-achievements.mjs';
 import {
   BOSS_ENCOUNTER_COOLDOWN_MS,
   getDeliveryFuelCost,
@@ -277,6 +279,7 @@ import {
   NEW_EARTH_WAR_INTEL_CATALOG,
   NEW_EARTH_WAR_INTEL_STORAGE_KEY,
   NEW_EARTH_WAR_INTEL_SCROLLS,
+  getNewEarthWarIntelCatalogForSite,
   getNextNewEarthWarIntelDrop,
   normalizeNewEarthWarIntelCollection,
   type NewEarthWarIntel,
@@ -436,6 +439,7 @@ type NewEarthSurfaceVictorySummary = {
   intelNew: boolean;
   intelCollected: number;
   intelTotal: number;
+  qcOnly: boolean;
 };
 
 const rollNewEarthBattleReward = (min: number, max: number) => Math.round(min + Math.random() * (max - min));
@@ -575,16 +579,14 @@ const NEW_EARTH_DEFAULT_SUPPLIES: NewEarthSupplies = {
 
 const NEW_EARTH_SUPPLY_CONFIG: Record<NewEarthSupplyId, {
   label: Record<'pt' | 'en', string>;
-  short: Record<'pt' | 'en', string>;
-  color: string;
   border: string;
 }> = {
-  materials: { label: { pt: 'Materiais', en: 'Materials' }, short: { pt: 'MAT', en: 'MAT' }, color: 'text-slate-100', border: 'border-slate-300/30 bg-slate-300/10' },
-  biomass: { label: { pt: 'Biomassa', en: 'Biomass' }, short: { pt: 'BIO', en: 'BIO' }, color: 'text-emerald-100', border: 'border-emerald-300/30 bg-emerald-300/10' },
-  tech: { label: { pt: 'Peças tecnológicas', en: 'Tech parts' }, short: { pt: 'TEC', en: 'TEC' }, color: 'text-cyan-100', border: 'border-cyan-300/30 bg-cyan-300/10' },
-  defense: { label: { pt: 'Núcleos de defesa', en: 'Defense cores' }, short: { pt: 'DEF', en: 'DEF' }, color: 'text-red-100', border: 'border-red-300/30 bg-red-300/10' },
-  food: { label: { pt: 'Comida', en: 'Food' }, short: { pt: 'COM', en: 'FOO' }, color: 'text-amber-100', border: 'border-amber-300/30 bg-amber-300/10' },
-  meds: { label: { pt: 'Insumos médicos', en: 'Medical supplies' }, short: { pt: 'MED', en: 'MED' }, color: 'text-fuchsia-100', border: 'border-fuchsia-300/30 bg-fuchsia-300/10' },
+  materials: { label: { pt: 'Materiais', en: 'Materials' }, border: 'border-slate-300/30 bg-slate-300/10' },
+  biomass: { label: { pt: 'Biomassa', en: 'Biomass' }, border: 'border-emerald-300/30 bg-emerald-300/10' },
+  tech: { label: { pt: 'Peças tecnológicas', en: 'Tech parts' }, border: 'border-cyan-300/30 bg-cyan-300/10' },
+  defense: { label: { pt: 'Núcleos de defesa', en: 'Defense cores' }, border: 'border-red-300/30 bg-red-300/10' },
+  food: { label: { pt: 'Comida', en: 'Food' }, border: 'border-amber-300/30 bg-amber-300/10' },
+  meds: { label: { pt: 'Insumos médicos', en: 'Medical supplies' }, border: 'border-fuchsia-300/30 bg-fuchsia-300/10' },
 };
 
 const NEW_EARTH_DISTRIBUTION_DONATION_COST = 1000;
@@ -6539,7 +6541,13 @@ const DashboardContent = memo(({
     updateAchievementProgress('void_unlocked', isRoute3Unlocked() ? 1 : 0, true);
 
     // Chapter 3 bosses. This also restores achievements for saves that already advanced.
-    if (hasWonEliminateEnemiesRoute3) {
+    if (hasBossZeroDefeatEvidence({
+      routeTier,
+      route4Unlocked,
+      hasWonEliminateEnemiesRoute3,
+      isRobotRepaired,
+      isVoidWarActive,
+    })) {
       updateAchievementProgress('void_boss_zero_defeated', 1, true);
     }
     for (let locationId = 1; locationId <= 9; locationId += 1) {
@@ -6618,8 +6626,13 @@ const DashboardContent = memo(({
     ), 0);
     updateAchievementProgress('ne_all_colony_sectors_100', fullSectorScore, true);
 
-    updateAchievementProgress('ne_land_search_perfect_defenses_10', newEarthAchievementMetrics.perfectLandSearchDefenses, true);
-    updateAchievementProgress('ne_sea_search_perfect_defenses_10', newEarthAchievementMetrics.perfectSeaSearchDefenses, true);
+    const defenseAchievementProgress = getNewEarthDefenseAchievementProgress({
+      landDefenseVictories: newEarthAchievementMetrics.perfectLandSearchDefenses,
+      seaDefenseVictories: newEarthAchievementMetrics.perfectSeaSearchDefenses,
+      directBattleVictories: newEarthAchievementMetrics.directBattleVictories,
+    });
+    updateAchievementProgress('ne_land_search_perfect_defenses_10', defenseAchievementProgress.land, true);
+    updateAchievementProgress('ne_sea_search_perfect_defenses_10', defenseAchievementProgress.sea, true);
     updateAchievementProgress('ne_direct_battles_10', newEarthAchievementMetrics.directBattleVictories, true);
 
     const savedHorizonProgress = getHorizonLevelFromXp(newEarthHorizonXp, MAX_HORIZON_LEVEL);
@@ -6715,6 +6728,8 @@ const DashboardContent = memo(({
     isRoute2Unlocked,
     isRoute3Unlocked,
     hasWonEliminateEnemiesRoute3,
+    isRobotRepaired,
+    isVoidWarActive,
     voidWarProgress,
     unlockedTechLevels,
     ownedShips,
@@ -9908,15 +9923,19 @@ const DashboardContent = memo(({
           onVictory={(payload?: NewEarthSurfaceBattleVictoryPayload) => {
             const siteTitle = NEW_EARTH_SURFACE_SITE_BRIEFINGS[activeSurfaceBattle.siteId].title[language as 'pt' | 'en'];
             const completedBattleLevel = Math.max(1, battleLevel || 1);
-            const reward = Math.max(0, Math.floor(Number(payload?.qcReward ?? rollNewEarthBattleReward(2_500_000, 5_000_000))));
-            const supplies: Partial<Record<NewEarthSupplyId, number>> = payload?.supplies || {
-              defense: rollNewEarthBattleReward(3_000, 7_000),
-              tech: rollNewEarthBattleReward(4_000, 8_000),
-            };
-            const supplyTotal = awardNewEarthSupplies(supplies);
             const intelKind: NewEarthWarIntelKind = activeSurfaceBattle.battleKind === 'tank' ? 'tank' : 'helicopter';
             const normalizedWarIntel = normalizeNewEarthWarIntelCollection(newEarthWarIntelCollection);
+            const siteIntelCatalog = getNewEarthWarIntelCatalogForSite(intelKind, activeSurfaceBattle.siteId);
             const droppedIntel = getNextNewEarthWarIntelDrop(normalizedWarIntel, intelKind, activeSurfaceBattle.siteId);
+            const qcOnly = !droppedIntel;
+            const reward = qcOnly
+              ? rollNewEarthBattleReward(2_000_000, 3_000_000)
+              : Math.max(0, Math.floor(Number(payload?.qcReward ?? rollNewEarthBattleReward(2_500_000, 5_000_000))));
+            const supplies: Partial<Record<NewEarthSupplyId, number>> = qcOnly ? {} : (payload?.supplies || {
+              defense: rollNewEarthBattleReward(3_000, 7_000),
+              tech: rollNewEarthBattleReward(4_000, 8_000),
+            });
+            const supplyTotal = qcOnly ? 0 : awardNewEarthSupplies(supplies);
             const intelNew = Boolean(droppedIntel);
             const nextWarIntelCollection = droppedIntel
               ? normalizeNewEarthWarIntelCollection({
@@ -9952,8 +9971,8 @@ const DashboardContent = memo(({
             creditQc(reward, 'battle');
             updateHistoryStats('acquired', reward, routeTierRef.current, 'battle');
             updateHistoryStats('battle_win', 1, routeTierRef.current);
-            const intelTotal = intelKind === 'tank' ? NEW_EARTH_TANK_WAR_INTEL.length : NEW_EARTH_HELICOPTER_WAR_INTEL.length;
-            const intelCollected = Object.values(nextWarIntelCollection).filter(item => item.kind === intelKind).length;
+            const intelTotal = siteIntelCatalog.length;
+            const intelCollected = siteIntelCatalog.filter(intel => nextWarIntelCollection[intel.id]).length;
             setNewEarthSurfaceVictorySummary({
               id: nowTimestamp(),
               battleKind: activeSurfaceBattle.battleKind,
@@ -9964,11 +9983,16 @@ const DashboardContent = memo(({
               intelNew,
               intelCollected,
               intelTotal,
+              qcOnly,
             });
             addLog(
-              language === 'pt'
-                ? `Vitória em ${siteTitle}: +${formatValue(reward)} QC + ${formatValue(supplyTotal)} recursos + Informações de Guerra.`
-                : `Victory at ${siteTitle}: +${formatValue(reward)} QC + ${formatValue(supplyTotal)} supplies + War Intel.`,
+              qcOnly
+                ? language === 'pt'
+                  ? `Vitória em ${siteTitle}: +${formatValue(reward)} QC. Arquivo de guerra local completo; nenhum novo plano recuperado.`
+                  : `Victory at ${siteTitle}: +${formatValue(reward)} QC. Local war archive complete; no new plan recovered.`
+                : language === 'pt'
+                  ? `Vitória em ${siteTitle}: +${formatValue(reward)} QC + ${formatValue(supplyTotal)} recursos + Informações de Guerra.`
+                  : `Victory at ${siteTitle}: +${formatValue(reward)} QC + ${formatValue(supplyTotal)} supplies + War Intel.`,
               'success'
             );
             setActiveSurfaceBattle(null);
@@ -10029,25 +10053,29 @@ const DashboardContent = memo(({
                   </PremiumCanvasButton>
                 </div>
 
-                <div className="mt-6 grid gap-3 md:grid-cols-3">
+                <div className={`mt-6 grid gap-3 ${newEarthSurfaceVictorySummary.qcOnly ? 'md:grid-cols-1' : 'md:grid-cols-3'}`}>
                   <div className="rounded-2xl border border-yellow-200/18 bg-yellow-300/8 p-4">
                     <div className="flex items-center gap-2 font-mono text-[9px] font-black uppercase tracking-[0.22em] text-yellow-100/64">
                       <Coins size={15} /> QC
                     </div>
                     <p className="mt-3 font-orbitron text-3xl font-black text-yellow-100">+{formatValue(newEarthSurfaceVictorySummary.qc)}</p>
                   </div>
-                  <div className="rounded-2xl border border-red-200/18 bg-red-300/8 p-4">
-                    <div className="flex items-center gap-2 font-mono text-[9px] font-black uppercase tracking-[0.22em] text-red-100/64">
-                      <ShieldCheck size={15} /> {language === 'pt' ? 'Núcleos de Defesa' : 'Defense Cores'}
-                    </div>
-                    <p className="mt-3 font-orbitron text-3xl font-black text-red-100">+{formatValue(newEarthSurfaceVictorySummary.supplies.defense || 0)}</p>
-                  </div>
-                  <div className="rounded-2xl border border-cyan-200/18 bg-cyan-300/8 p-4">
-                    <div className="flex items-center gap-2 font-mono text-[9px] font-black uppercase tracking-[0.22em] text-cyan-100/64">
-                      <Cpu size={15} /> {language === 'pt' ? 'Peças Tecnológicas' : 'Tech Parts'}
-                    </div>
-                    <p className="mt-3 font-orbitron text-3xl font-black text-cyan-100">+{formatValue(newEarthSurfaceVictorySummary.supplies.tech || 0)}</p>
-                  </div>
+                  {!newEarthSurfaceVictorySummary.qcOnly && (
+                    <>
+                      <div className="rounded-2xl border border-red-200/18 bg-red-300/8 p-4">
+                        <div className="flex items-center gap-2 font-mono text-[9px] font-black uppercase tracking-[0.22em] text-red-100/64">
+                          <ShieldCheck size={15} /> {language === 'pt' ? 'Núcleos de Defesa' : 'Defense Cores'}
+                        </div>
+                        <p className="mt-3 font-orbitron text-3xl font-black text-red-100">+{formatValue(newEarthSurfaceVictorySummary.supplies.defense || 0)}</p>
+                      </div>
+                      <div className="rounded-2xl border border-cyan-200/18 bg-cyan-300/8 p-4">
+                        <div className="flex items-center gap-2 font-mono text-[9px] font-black uppercase tracking-[0.22em] text-cyan-100/64">
+                          <Cpu size={15} /> {language === 'pt' ? 'Peças Tecnológicas' : 'Tech Parts'}
+                        </div>
+                        <p className="mt-3 font-orbitron text-3xl font-black text-cyan-100">+{formatValue(newEarthSurfaceVictorySummary.supplies.tech || 0)}</p>
+                      </div>
+                    </>
+                  )}
                 </div>
 
                 <div className="mt-4 rounded-2xl border border-slate-200/14 bg-black/42 p-4">
@@ -10068,17 +10096,17 @@ const DashboardContent = memo(({
                     </div>
                     <div className="min-w-0 py-1">
                       <p className="font-mono text-[9px] font-black uppercase tracking-[0.24em] text-slate-400">
-                        {language === 'pt' ? 'Drop exclusivo colecionável' : 'Exclusive collectible drop'}
+                        {language === 'pt' ? 'Arquivo de guerra da zona' : 'Zone war archive'}
                       </p>
                       <h3 className="mt-2 font-orbitron text-2xl font-black uppercase text-white">
                         {newEarthSurfaceVictorySummary.intel
                           ? newEarthSurfaceVictorySummary.intel.title[language as 'pt' | 'en']
-                          : (language === 'pt' ? 'Coleção completa' : 'Collection complete')}
+                          : (language === 'pt' ? 'Arquivo local completo' : 'Local archive complete')}
                       </h3>
                       <p className="mt-2 text-sm font-semibold leading-6 text-slate-200/78">
                         {newEarthSurfaceVictorySummary.intel
                           ? newEarthSurfaceVictorySummary.intel.summary[language as 'pt' | 'en']
-                          : (language === 'pt' ? 'Todos os pergaminhos desse tipo já foram recuperados.' : 'All scrolls of this type have already been recovered.')}
+                          : (language === 'pt' ? 'Todos os planos de guerra desta zona já foram recuperados. Esta operação concedeu somente QC.' : 'All war plans for this zone have already been recovered. This operation awarded QC only.')}
                       </p>
                       {newEarthSurfaceVictorySummary.intel && (
                         <div className="mt-3 grid gap-2 text-xs font-semibold text-slate-300/76 md:grid-cols-2">
@@ -10097,7 +10125,7 @@ const DashboardContent = memo(({
                       <p className="mt-2 text-xs font-semibold text-slate-300/70">
                         {newEarthSurfaceVictorySummary.intelNew
                           ? (language === 'pt' ? 'Novo pergaminho arquivado.' : 'New scroll archived.')
-                          : (language === 'pt' ? 'Nenhum espaço novo disponível neste tipo.' : 'No new slot available for this type.')}
+                          : (language === 'pt' ? 'Limite de informações desta zona atingido.' : 'This zone intel limit has been reached.')}
                       </p>
                     </div>
                   </div>
@@ -11192,10 +11220,7 @@ const DashboardContent = memo(({
                                     </h2>
                                   </div>
                                   <div className="flex shrink-0 items-center gap-2">
-                                    <div className="rounded-xl border border-emerald-200/22 bg-emerald-300/9 px-3 py-1.5 text-right">
-                                      <p className="font-mono text-[8px] font-bold uppercase tracking-[0.2em] text-emerald-100/65">QC</p>
-                                      <p className="font-orbitron text-base font-black text-emerald-100">{formatValue(qc)}</p>
-                                    </div>
+
                                     <PremiumCanvasButton
                                       onClick={() => {
                                         setNewEarthDistributionOpen(false);
@@ -11219,12 +11244,10 @@ const DashboardContent = memo(({
                                     const supply = NEW_EARTH_SUPPLY_CONFIG[supplyId];
                                     const amount = Math.max(0, Math.floor(Number(newEarthDistributionSupplies[supplyId]) || 0));
                                     return (
-                                      <div key={supplyId} className={`flex h-full min-w-0 flex-col justify-center rounded-lg border px-2.5 py-1.5 ${supply.border}`}>
-                                        <div className="flex items-center justify-between gap-2">
-                                          <p className="font-mono text-[7px] font-bold uppercase tracking-[0.14em] text-white/45">{supply.short[language as 'pt' | 'en']}</p>
-                                          <p className="truncate font-mono text-[7px] font-bold uppercase tracking-[0.08em] text-white/42">{supply.label[language as 'pt' | 'en']}</p>
-                                        </div>
-                                        <p className={`mt-0.5 truncate font-orbitron text-xs font-black ${supply.color}`}>{amount.toLocaleString(language === 'pt' ? 'pt-BR' : 'en-US')}</p>
+                                      <div key={supplyId} className={`flex h-full min-w-0 items-center justify-center rounded-lg border px-2.5 py-1.5 ${supply.border}`}>
+                                        <p className="truncate font-orbitron text-[13px] font-black tracking-[0.01em] text-white">
+                                          {supply.label[language as 'pt' | 'en']} {amount.toLocaleString(language === 'pt' ? 'pt-BR' : 'en-US')}
+                                        </p>
                                       </div>
                                     );
                                   })}
@@ -11287,9 +11310,13 @@ const DashboardContent = memo(({
                                               {selectedDistributionColony?.name || '-'}
                                             </h3>
                                           </div>
-                                          <div className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-right">
-                                            <p className="font-mono text-[8px] font-bold uppercase tracking-[0.16em] text-white/42">{language === 'pt' ? 'Média' : 'Avg'}</p>
-                                            <p className="font-orbitron text-xl font-black text-sky-100">{Math.round(selectedDistributionAverage)}</p>
+                                          <div className="flex h-full min-w-[92px] flex-col items-center justify-center rounded-xl border border-sky-200/16 bg-white/[0.05] px-4 py-2 text-center">
+                                            <p className="font-mono text-[9px] font-bold uppercase leading-none tracking-[0.18em] text-white/50">
+                                              {language === 'pt' ? 'Média' : 'Avg'}
+                                            </p>
+                                            <p className="mt-1.5 font-orbitron text-xl font-black leading-none tabular-nums text-sky-100">
+                                              {Math.round(selectedDistributionAverage)}
+                                            </p>
                                           </div>
                                         </div>
                                       </div>
@@ -11379,9 +11406,9 @@ const DashboardContent = memo(({
                                 src={briefing.background}
                                 alt=""
                                 aria-hidden="true"
-                                className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-34"
+                                className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-90 saturate-[1.08] contrast-[1.04]"
                               />
-                              <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_34%_26%,rgba(34,211,238,0.16),transparent_38%),linear-gradient(90deg,rgba(2,6,23,0.92),rgba(2,6,23,0.72)_48%,rgba(2,6,23,0.9))]" />
+                              <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_34%_26%,rgba(34,211,238,0.10),transparent_42%),linear-gradient(90deg,rgba(2,6,23,0.64),rgba(2,6,23,0.22)_52%,rgba(2,6,23,0.42))]" />
                               <PremiumCanvasButton
                                 type="button"
                                 onClick={() => {
@@ -11481,6 +11508,14 @@ const DashboardContent = memo(({
                           const colonyName = selectedSurfaceBattleBriefing.colonyId === 'colony-1' ? 'Genesis' : 'Elysium';
                           const isTankBattle = selectedSurfaceBattleBriefing.battleKind === 'tank';
                           const briefingBackground = NEW_EARTH_SURFACE_BRIEFING_BACKGROUNDS[selectedSurfaceBattleBriefing.battleKind];
+                          const briefingIntelKind: NewEarthWarIntelKind = selectedSurfaceBattleBriefing.battleKind === 'tank' ? 'tank' : 'helicopter';
+                          const briefingIntelCatalog = getNewEarthWarIntelCatalogForSite(
+                            briefingIntelKind,
+                            selectedSurfaceBattleBriefing.siteId
+                          );
+                          const normalizedBriefingIntel = normalizeNewEarthWarIntelCollection(newEarthWarIntelCollection);
+                          const briefingIntelCollected = briefingIntelCatalog.filter(intel => normalizedBriefingIntel[intel.id]).length;
+                          const briefingIntelExhausted = briefingIntelCollected >= briefingIntelCatalog.length;
 
                           return (
                             <motion.div
@@ -11570,12 +11605,29 @@ const DashboardContent = memo(({
                                   </div>
                                 </div>
 
-                                <div className="flex items-end justify-end gap-4">
+                                <div className="flex items-end justify-between gap-4">
+                                  {briefingIntelExhausted && (
+                                    <div role="status" className="max-w-2xl rounded-2xl border border-amber-300/30 bg-amber-950/72 px-4 py-3 shadow-[0_0_28px_rgba(245,158,11,0.14)] backdrop-blur-md">
+                                      <div className="flex items-start gap-3">
+                                        <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-300" />
+                                        <div>
+                                          <p className="font-orbitron text-xs font-black uppercase tracking-[0.16em] text-amber-100">
+                                            {language === 'pt' ? 'Arquivo de guerra local completo' : 'Local war archive complete'} · {briefingIntelCollected}/{briefingIntelCatalog.length}
+                                          </p>
+                                          <p className="mt-1 text-sm font-semibold leading-5 text-amber-50/82">
+                                            {language === 'pt'
+                                              ? 'Você ainda pode atacar, mas não haverá novo plano de guerra nesta zona. A recompensa será somente de 2 a 3 milhões de QC.'
+                                              : 'You can still attack, but there will be no new war plan in this zone. The reward will be only 2 to 3 million QC.'}
+                                          </p>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  )}
                                   <PremiumCanvasButton
                                     type="button"
                                     tone="red"
                                     onClick={startNewEarthSurfaceBattle}
-                                    className="h-14 w-64"
+                                    className="h-14 w-64 shrink-0"
                                     contentClassName="gap-3 text-sm tracking-[0.24em]"
                                   >
                                     <Target size={18} />

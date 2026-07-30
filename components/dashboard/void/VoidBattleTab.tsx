@@ -372,8 +372,9 @@ const VoidBattleTab = memo(function VoidBattleTab({
 
              const defeatedBoss = [...activeBattleEnemies, ...activeBattleEnemyQueue]
                .some(enemy => enemy.type === 'Boss');
-             if (routeTier === 'Void' && defeatedBoss) {
-               onVoidBossDefeated(activeVoidBattle.locationId ?? 0);
+             const defeatedBossLocationId = isBossZeroBattle ? 0 : (activeVoidBattle.locationId ?? 0);
+             if (routeTier === 'Void' && (defeatedBoss || isBossZeroBattle)) {
+               onVoidBossDefeated(defeatedBossLocationId);
              }
 
              if (isBossZeroBattle && voidWarAlertActive) {

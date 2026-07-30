@@ -2,11 +2,11 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { motion } from 'motion/react';
-import { Cog } from 'lucide-react';
+import { Cog, SkipForward } from 'lucide-react';
 
-const INTRO_BLACK_MS = 2000;
-const OUTRO_BLACK_MS = 2000;
-const VIDEO_FALLBACK_MS = 12000;
+const INTRO_BLACK_MS = 350;
+const OUTRO_BLACK_MS = 700;
+const VIDEO_FALLBACK_MS = 6500;
 
 type SplashPhase = 'intro-black' | 'video' | 'outro-black';
 
@@ -21,6 +21,12 @@ export const SplashScreen = ({ onComplete }: { onComplete: () => void }) => {
     completedRef.current = true;
     onComplete();
   }, [onComplete]);
+
+  const finishVideo = useCallback(() => {
+    if (videoFinishedRef.current) return;
+    videoFinishedRef.current = true;
+    setPhase('outro-black');
+  }, []);
 
   useEffect(() => {
     if (phase !== 'intro-black') return;
@@ -59,23 +65,29 @@ export const SplashScreen = ({ onComplete }: { onComplete: () => void }) => {
   }, [phase]);
 
   useEffect(() => {
+    if (phase !== 'video') return;
+
+    const handleSkip = (event: KeyboardEvent) => {
+      if (event.repeat) return;
+      finishVideo();
+    };
+
+    window.addEventListener('keydown', handleSkip);
+    return () => window.removeEventListener('keydown', handleSkip);
+  }, [finishVideo, phase]);
+
+  useEffect(() => {
     if (phase !== 'outro-black') return;
 
     const timer = window.setTimeout(complete, OUTRO_BLACK_MS);
     return () => window.clearTimeout(timer);
   }, [complete, phase]);
 
-  const finishVideo = () => {
-    if (videoFinishedRef.current) return;
-    videoFinishedRef.current = true;
-    setPhase('outro-black');
-  };
-
   return (
     <motion.div
       initial={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      transition={{ duration: 0.9, ease: 'easeOut' }}
+      transition={{ duration: 1.35, ease: 'easeInOut' }}
       className="fixed inset-0 z-[200] flex items-center justify-center overflow-hidden bg-black"
     >
       <motion.video
@@ -87,26 +99,39 @@ export const SplashScreen = ({ onComplete }: { onComplete: () => void }) => {
         onError={finishVideo}
         initial={false}
         animate={{ opacity: phase === 'video' ? 1 : 0 }}
-        transition={{ duration: 0.55, ease: 'easeOut' }}
+        transition={{ duration: phase === 'outro-black' ? 1.05 : 0.65, ease: 'easeInOut' }}
         className="absolute inset-0 h-full w-full object-cover object-center"
       />
 
       {phase === 'video' && (
-        <div className="pointer-events-none absolute bottom-5 right-5 md:bottom-7 md:right-8">
-          <motion.div
-            animate={{ rotate: 360 }}
-            transition={{ duration: 2.4, repeat: Infinity, ease: 'linear' }}
-            className="relative grid h-12 w-12 place-items-center rounded-full border border-white/15 bg-black/45 shadow-[0_12px_34px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.18)] backdrop-blur-sm md:h-14 md:w-14"
+        <>
+          <button
+            type="button"
+            onClick={finishVideo}
+            className="group absolute bottom-6 left-1/2 z-10 flex -translate-x-1/2 items-center gap-3 rounded-full border border-white/20 bg-black/55 px-5 py-3 font-mono text-[10px] uppercase tracking-[0.28em] text-white/70 shadow-2xl backdrop-blur-md transition hover:border-cyan-300/60 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 md:bottom-8"
+            aria-label="Pular vinheta da produtora"
           >
+            <SkipForward className="h-4 w-4 text-cyan-300 transition-transform group-hover:translate-x-0.5" />
+            <span>Pular intro</span>
+            <span className="hidden text-white/35 sm:inline">qualquer tecla</span>
+          </button>
+
+          <div className="pointer-events-none absolute bottom-5 right-5 md:bottom-7 md:right-8">
             <motion.div
-              animate={{ rotate: -360 }}
-              transition={{ duration: 3.6, repeat: Infinity, ease: 'linear' }}
-              className="absolute inset-1.5 rounded-full border border-cyan-300/55"
-            />
-            <Cog className="h-7 w-7 text-white drop-shadow-[0_0_8px_rgba(34,211,238,0.35)] md:h-8 md:w-8" strokeWidth={1.75} />
-            <div className="absolute h-2 w-2 rounded-full bg-cyan-300 shadow-[0_0_14px_rgba(34,211,238,0.75)]" />
-          </motion.div>
-        </div>
+              animate={{ rotate: 360 }}
+              transition={{ duration: 2.4, repeat: Infinity, ease: 'linear' }}
+              className="relative grid h-12 w-12 place-items-center rounded-full border border-white/15 bg-black/45 shadow-[0_12px_34px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.18)] backdrop-blur-sm md:h-14 md:w-14"
+            >
+              <motion.div
+                animate={{ rotate: -360 }}
+                transition={{ duration: 3.6, repeat: Infinity, ease: 'linear' }}
+                className="absolute inset-1.5 rounded-full border border-cyan-300/55"
+              />
+              <Cog className="h-7 w-7 text-white drop-shadow-[0_0_8px_rgba(34,211,238,0.35)] md:h-8 md:w-8" strokeWidth={1.75} />
+              <div className="absolute h-2 w-2 rounded-full bg-cyan-300 shadow-[0_0_14px_rgba(34,211,238,0.75)]" />
+            </motion.div>
+          </div>
+        </>
       )}
     </motion.div>
   );

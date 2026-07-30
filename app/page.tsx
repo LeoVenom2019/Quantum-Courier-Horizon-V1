@@ -9,6 +9,7 @@ import { GameDashboard } from '@/components/GameDashboard';
 import { AchievementsModal } from '@/components/AchievementsModal';
 import { Jukebox } from '@/components/Jukebox';
 import { SplashScreen } from '@/components/SplashScreen';
+import { TitleScreen } from '@/components/TitleScreen';
 import { useJukebox } from '@/hooks/useJukebox';
 import { useSFX } from '@/hooks/useSFX';
 import { useSoundMaster } from '@/hooks/useSoundMaster';
@@ -18,6 +19,7 @@ import { useDispatch } from '@/lib/game-state';
 import { COLONY_SAVE_STORAGE_KEYS, SaveManager, sanitizeSave } from '@/lib/save-manager';
 import { Language, t } from '@/lib/i18n';
 import { ThemeColor } from '@/lib/game-data';
+import { hasBossZeroDefeatEvidence } from '@/lib/void-boss-achievements.mjs';
 import {
   areAssetGroupsReady,
   getAssetGroupsSummary,
@@ -63,6 +65,26 @@ type AchievementMeta = {
   achievementProgress: Record<string, number>;
 };
 
+type LandingSaveSummary = {
+  playerName: string;
+  routeTier: string;
+};
+
+const getLandingSaveSummary = (data: any): LandingSaveSummary => ({
+  playerName: data?.system?.playerName || data?.playerName || '',
+  routeTier: data?.progression?.routeTier || data?.routeTier || 'Solar',
+});
+
+const getLandingChapterLabel = (routeTier: string, language: Language) => {
+  const labels: Record<string, Record<Language, string>> = {
+    Solar: { pt: 'Capítulo 1 - Rotas Solares', en: 'Chapter 1 - Solar Routes' },
+    Interstellar: { pt: 'Capítulo 2 - Rotas Interestelares', en: 'Chapter 2 - Interstellar Routes' },
+    Void: { pt: 'Capítulo 3 - Rotas do Vazio', en: 'Chapter 3 - Void Routes' },
+    Earth: { pt: 'Capítulo 4 - Nova Terra', en: 'Chapter 4 - New Earth' },
+  };
+  return labels[routeTier]?.[language] || routeTier;
+};
+
 const normalizeAchievementMeta = (value: any): AchievementMeta => ({
   unlockedAchievements: Array.isArray(value?.unlockedAchievements)
     ? value.unlockedAchievements.filter((id: unknown): id is string => typeof id === 'string')
@@ -81,10 +103,32 @@ const hasSecretAlienAchievement = (meta: AchievementMeta) => (
   || Number(meta.achievementProgress[SECRET_ALIEN_ACHIEVEMENT_ID] || 0) >= 1
 );
 
-const getAchievementMetaFromSaveData = (data: any): AchievementMeta => normalizeAchievementMeta({
-  unlockedAchievements: data?.missions?.unlockedAchievements || data?.unlockedAchievements,
-  achievementProgress: data?.missions?.achievementProgress || data?.achievementProgress,
-});
+const getAchievementMetaFromSaveData = (data: any): AchievementMeta => {
+  const meta = normalizeAchievementMeta({
+    unlockedAchievements: data?.missions?.unlockedAchievements || data?.unlockedAchievements,
+    achievementProgress: data?.missions?.achievementProgress || data?.achievementProgress,
+  });
+  const bossZeroWasDefeated = hasBossZeroDefeatEvidence({
+    routeTier: data?.progression?.routeTier || data?.routeTier,
+    route4Unlocked: data?.progression?.route4Unlocked || data?.route4Unlocked,
+    hasWonEliminateEnemiesRoute3: data?.combat?.hasWonEliminateEnemiesRoute3 || data?.hasWonEliminateEnemiesRoute3,
+    isRobotRepaired: data?.combat?.isRobotRepaired || data?.isRobotRepaired,
+    isVoidWarActive: data?.combat?.isVoidWarActive || data?.isVoidWarActive,
+  });
+
+  if (!bossZeroWasDefeated) return meta;
+
+  return {
+    unlockedAchievements: Array.from(new Set([
+      ...meta.unlockedAchievements,
+      'void_boss_zero_defeated',
+    ])),
+    achievementProgress: {
+      ...meta.achievementProgress,
+      void_boss_zero_defeated: Math.max(1, Number(meta.achievementProgress.void_boss_zero_defeated || 0)),
+    },
+  };
+};
 const subscribeClientReady = () => () => {};
 const getClientReadySnapshot = () => true;
 const getServerReadySnapshot = () => false;
@@ -939,6 +983,8 @@ const MenuButton = ({ label, icon: Icon, onClick, disabled = false, theme = 'cya
       }}
       whileTap={disabled ? {} : { scale: 0.97, x: 6 }}
       onClick={disabled ? undefined : onClick}
+      disabled={disabled}
+      aria-disabled={disabled}
       className={`w-full group relative flex items-center justify-start gap-4 py-4 px-8 rounded-xl overflow-hidden transition-all duration-500 ${
         disabled 
           ? 'bg-slate-900/5 border border-slate-800/10 cursor-not-allowed opacity-30' 
@@ -1067,7 +1113,9 @@ export default function GameHome() {
   const [hasSave, setHasSave] = useState(false);
   const [showAchievements, setShowAchievements] = useState(false);
   const [showJukeboxModal, setShowJukeboxModal] = useState(false);
+  const [showTitleScreen, setShowTitleScreen] = useState(true);
   const [showSplash, setShowSplash] = useState(true);
+  const [saveSummary, setSaveSummary] = useState<LandingSaveSummary | null>(null);
   const [unlockedAchievements, setUnlockedAchievements] = useState<string[]>([]);
   const [achievementProgress, setAchievementProgress] = useState<{ [key: string]: number }>({});
   const [isShaking, setIsShaking] = useState(false);
@@ -1201,6 +1249,7 @@ export default function GameHome() {
             // Improved Route 2 detection
             const routeTier = data.progression?.routeTier || data.routeTier || 'Solar';
             const techLevels = data.progression?.unlockedTechLevels || data.unlockedTechLevels || {};
+            setSaveSummary(getLandingSaveSummary(data));
             setLandingTheme(getLandingThemeForRouteTier(routeTier));
             setHasSave(true);
             
@@ -1330,6 +1379,7 @@ export default function GameHome() {
 
   const resetLocalProgressState = (options?: { keepPlayerName?: boolean; preservedAchievements?: AchievementMeta }) => {
     setHasSave(false);
+    setSaveSummary(null);
     if (!options?.keepPlayerName) {
       setPlayerName('');
     }
@@ -1641,7 +1691,21 @@ export default function GameHome() {
       className={`relative min-h-screen w-full flex flex-col ${view === 'game' ? 'items-stretch justify-start' : 'items-start justify-center pl-12 md:pl-24'} bg-[#050510] overflow-hidden `}
     >
       <AnimatePresence>
-        {showSplash && <SplashScreen onComplete={() => setShowSplash(false)} />}
+        {showSplash && (
+          <SplashScreen onComplete={() => setShowSplash(false)} />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {!showSplash && showTitleScreen && view === 'landing' && (
+          <TitleScreen
+            language={language}
+            theme={theme}
+            hasSave={hasSave}
+            musicOn={masterMusicOn}
+            onEnter={() => setShowTitleScreen(false)}
+          />
+        )}
       </AnimatePresence>
 
       {view === 'narrative' ? (
@@ -1686,11 +1750,13 @@ export default function GameHome() {
             if (saved) {
               try {
                 const data = SaveManager.loadSave(saved);
+                setSaveSummary(getLandingSaveSummary(data));
                 const routeTier = data.progression?.routeTier || data.routeTier || 'Solar';
                 const techLevels = data.progression?.unlockedTechLevels || data.unlockedTechLevels || {};
                 setLandingTheme(getLandingThemeForRouteTier(routeTier));
               } catch (e) {}
             } else {
+              setSaveSummary(null);
               setLandingTheme('cyan');
             }
           }}
@@ -1736,7 +1802,7 @@ export default function GameHome() {
           </div>
 
           {/* Content */}
-          <div className="relative z-20 flex flex-col items-start gap-8 max-w-4xl w-full px-4">
+          <div className="relative z-20 flex w-full max-w-6xl flex-col items-start gap-8 px-4">
             {/* Title Section - PC Impact Version */}
             <motion.div
               initial={{ x: -100, opacity: 0, filter: 'blur(20px)' }}
@@ -1785,33 +1851,102 @@ export default function GameHome() {
             </motion.div>
 
             {/* Menu Section */}
-            <motion.div
-              initial={{ x: -30, opacity: 0 }}
-              animate={{ x: 0, opacity: 1 }}
-              transition={{ duration: 0.8, delay: 0.5 }}
-              className={`w-full max-w-md flex flex-col gap-4 p-8 bg-transparent backdrop-blur-sm border ${landingFrameBorder[theme]} rounded-2xl relative`}
-            >
-              {/* Scanline Effect */}
-              <div className="absolute inset-0 overflow-hidden pointer-events-none rounded-2xl">
-                <div className={`w-full h-1 ${landingDimBg[theme]} absolute top-0 animate-[scan_4s_linear_infinite]`} />
-              </div>
+            <div className="flex w-full flex-col items-start gap-6 lg:flex-row lg:gap-9">
+              <motion.div
+                initial={{ x: -30, opacity: 0 }}
+                animate={{ x: 0, opacity: 1 }}
+                transition={{ duration: 0.8, delay: 0.5 }}
+                className={`w-full max-w-md flex flex-col gap-4 p-8 bg-transparent backdrop-blur-sm border ${landingFrameBorder[theme]} rounded-2xl relative shrink-0`}
+              >
+                {/* Scanline Effect */}
+                <div className="absolute inset-0 overflow-hidden pointer-events-none rounded-2xl">
+                  <div className={`w-full h-1 ${landingDimBg[theme]} absolute top-0 animate-[scan_4s_linear_infinite]`} />
+                </div>
 
-              <MenuButton 
-                label={tl('CONTINUE', 'CONTINUAR')} 
-                icon={Play} 
-                onClick={() => {
-                  playSfx('aba_click');
-                  handleContinue();
-                }} 
-                disabled={!hasSave || Boolean(continuePreload)}
-                theme={theme}
-              />
-              <MenuButton label={tl('CAMPAIGN', 'CAMPANHA')} icon={Rocket} onClick={() => { playSfx('aba_click'); handleStartGame(); }} theme={theme} />
-              <MenuButton label={tl('OPTIONS', 'OPÇÕES')} icon={Settings} onClick={() => { playSfx('aba_click'); setShowOptions(true); }} theme={theme} />
-              <MenuButton label={tl('ACHIEVEMENTS', 'CONQUISTAS')} icon={Trophy} onClick={() => { playSfx('aba_click'); setShowAchievements(true); }} theme={theme} />
-              
+                <MenuButton
+                  label={tl('CONTINUE', 'CONTINUAR')}
+                  icon={Play}
+                  onClick={() => {
+                    playSfx('aba_click');
+                    handleContinue();
+                  }}
+                  disabled={!hasSave || Boolean(continuePreload)}
+                  theme={theme}
+                />
+                <MenuButton label={tl('CAMPAIGN', 'CAMPANHA')} icon={Rocket} onClick={() => { playSfx('aba_click'); handleStartGame(); }} theme={theme} />
+                <MenuButton label={tl('OPTIONS', 'OPÇÕES')} icon={Settings} onClick={() => { playSfx('aba_click'); setShowOptions(true); }} theme={theme} />
+                <MenuButton label={tl('ACHIEVEMENTS', 'CONQUISTAS')} icon={Trophy} onClick={() => { playSfx('aba_click'); setShowAchievements(true); }} theme={theme} />
+              </motion.div>
 
-            </motion.div>
+              {hasSave && saveSummary && (
+                <motion.aside
+                  initial={{ x: 24, opacity: 0 }}
+                  animate={{ x: 0, opacity: 1 }}
+                  transition={{ duration: 0.9, delay: 0.9, ease: 'easeOut' }}
+                  className="relative w-full max-w-md overflow-hidden rounded-2xl border border-white/10 bg-black/35 p-8 font-mono backdrop-blur-sm lg:max-w-md lg:self-stretch"
+                  aria-label={tl('Current game summary', 'Resumo do jogo atual')}
+                >
+                  <div
+                    className="pointer-events-none absolute inset-0 rounded-2xl p-[1px]"
+                    style={{
+                      WebkitMask: 'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
+                      WebkitMaskComposite: 'xor',
+                      maskComposite: 'exclude',
+                    }}
+                  >
+                    <div
+                      className="absolute inset-[-200%] animate-[spin_8s_linear_infinite] opacity-85"
+                      style={{
+                        background: 'conic-gradient(from 0deg, transparent 0%, transparent 70%, #4285f4 80%, #ea4335 87%, #fbbc04 94%, #34a853 100%)',
+                      }}
+                    />
+                  </div>
+
+                  <div className={`pointer-events-none absolute inset-x-0 top-0 h-px ${landingStrongBg[theme]} opacity-60`} />
+                  <div className="relative z-10 flex items-center gap-3">
+                    <span className={`h-2 w-2 rounded-full ${landingStrongBg[theme]} shadow-[0_0_12px_currentColor]`} />
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.34em] text-white/60">
+                      {tl('Active transmission', 'Transmissão ativa')}
+                    </p>
+                  </div>
+
+                  <dl className="relative z-10 mt-7 space-y-7 border-t border-white/15 pt-7">
+                    <div>
+                      <dt className="text-[9px] font-medium uppercase tracking-[0.22em] text-white/50">
+                        {tl('Player name', 'Nome do jogador')}
+                      </dt>
+                      <dd className="mt-2 truncate font-orbitron text-xl font-semibold uppercase tracking-[0.24em] text-white">
+                        {saveSummary.playerName || tl('Commander', 'Comandante')}
+                      </dd>
+                    </div>
+                    <div>
+                      <dd className={`font-orbitron text-base font-semibold uppercase tracking-[0.12em] sm:text-lg ${landingTitleText[theme]}`}>
+                        <span className="relative inline-block">
+                          <span
+                            aria-hidden="true"
+                            className="shimmer-text pointer-events-none absolute inset-0 opacity-100"
+                            style={{
+                              filter: 'drop-shadow(0 0 4px rgba(255,255,255,1)) drop-shadow(0 0 10px rgba(255,255,255,0.65))',
+                            }}
+                          >
+                            {getLandingChapterLabel(saveSummary.routeTier, language)}
+                          </span>
+                          {getLandingChapterLabel(saveSummary.routeTier, language)}
+                        </span>
+                      </dd>
+                    </div>
+                  </dl>
+
+                  <div className="relative z-10 mt-9 flex items-center gap-3 text-[9px] font-medium uppercase tracking-[0.22em] text-white/45">
+                    <span className={`h-px w-12 ${landingStrongBg[theme]}`} />
+                    {tl('Local save synchronized', 'Save local sincronizado')}
+                  </div>
+
+                  <div className={`pointer-events-none absolute left-0 top-8 h-20 w-[2px] ${landingStrongBg[theme]}`} />
+                  <div className={`pointer-events-none absolute bottom-0 right-0 h-14 w-14 border-b-2 border-r-2 ${landingFrameCorner[theme]}`} />
+                </motion.aside>
+              )}
+            </div>
           </div>
         </>
       )}

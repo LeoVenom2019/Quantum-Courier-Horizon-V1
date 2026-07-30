@@ -155,18 +155,22 @@ export const normalizeNewEarthWarIntelCollection = (value: unknown): NewEarthWar
   return normalized;
 };
 
-export const getNextNewEarthWarIntelDrop = (
-  collection: NewEarthWarIntelCollection,
+export const getNewEarthWarIntelCatalogForSite = (
   kind: NewEarthWarIntelKind,
   siteId?: string
-) => {
-  const source = kind === 'helicopter'
+) => (
+  kind === 'helicopter'
     ? siteId === 'zona-glacial'
       ? NEW_EARTH_HELICOPTER_WAR_INTEL.slice(0, 10)
       : siteId === 'continente-esquecido'
         ? NEW_EARTH_HELICOPTER_WAR_INTEL.slice(10, 20)
         : NEW_EARTH_HELICOPTER_WAR_INTEL
-    : NEW_EARTH_TANK_WAR_INTEL;
+    : NEW_EARTH_TANK_WAR_INTEL
+);
 
-  return source.find(intel => !collection[intel.id]) || null;
-};
+export const getNextNewEarthWarIntelDrop = (
+  collection: NewEarthWarIntelCollection,
+  kind: NewEarthWarIntelKind,
+  siteId?: string
+) => getNewEarthWarIntelCatalogForSite(kind, siteId)
+  .find(intel => !collection[intel.id]) || null;
