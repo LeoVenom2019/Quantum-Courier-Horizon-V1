@@ -3495,13 +3495,16 @@ const DashboardContent = memo(({
   }, [isLoaded, setEarthEvents]);
 
   const setActiveBattle = useCallback((val: Battle | null | ((prev: Battle | null) => Battle | null)) => {
-    const nextVal = typeof val === 'function' ? val(activeBattle) : val;
+    const nextVal = typeof val === 'function' ? val(activeBattleRef.current) : val;
+    // Keep the loop-facing ref in sync immediately. Waiting for the render effect
+    // leaves a short window where another delivery can be selected for combat.
+    activeBattleRef.current = nextVal;
     if (nextVal) {
       dispatch({ type: 'START_BATTLE', payload: { battle: nextVal } });
     } else {
       dispatch({ type: 'FLEE_BATTLE' });
     }
-  }, [activeBattle, dispatch]);
+  }, [dispatch]);
 
   const setEarthCouples = useCallback((val: number | ((prev: number) => number)) => {
     const nextVal = typeof val === 'function' ? val(earthCouplesRef.current) : val;
@@ -7354,16 +7357,19 @@ const DashboardContent = memo(({
 
       let updatedDeliveries = [...prev];
 
-      if (autoSkipRandomBattlesRef.current) {
-        const activeCombatDeliveryIds = new Set(
-          [activeBattleRef.current?.deliveryId, underAttackBattleRef.current?.deliveryId].filter(Boolean)
-        );
-        const cleanedDeliveries = updatedDeliveries.filter(d => d.status !== 'combat' || activeCombatDeliveryIds.has(d.id));
-        if (cleanedDeliveries.length !== updatedDeliveries.length) {
-          updatedDeliveries = cleanedDeliveries;
+      // Recover deliveries left in combat by older saves or an interrupted alert.
+      // A delivery is only legitimately paused while its battle is active/pending.
+      const activeCombatDeliveryIds = new Set(
+        [activeBattleRef.current?.deliveryId, underAttackBattleRef.current?.deliveryId]
+          .filter((id): id is string => Boolean(id))
+      );
+      updatedDeliveries = updatedDeliveries.map(d => {
+        if (d.status === 'combat' && !activeCombatDeliveryIds.has(d.id)) {
           deliveriesStateChanged = true;
+          return { ...d, status: 'delivering' };
         }
-      }
+        return d;
+      });
 
       const shipsInUse: { [level: number]: number } = {};
       updatedDeliveries.forEach(d => {
@@ -7448,7 +7454,12 @@ const DashboardContent = memo(({
         ? Math.min(0.0015, (0.00002 + averageRisk * 0.0025) * battleFreqMultiplier)
         : 0;
 
-      if (routeTierRef.current !== 'Void' && !activeBattleRef.current && (Math.random() < randomBattleChance || (forcedBattle && candidateRisks.length > 0))) {
+      if (
+        routeTierRef.current !== 'Void'
+        && !activeBattleRef.current
+        && !underAttackBattleRef.current
+        && (Math.random() < randomBattleChance || (forcedBattle && candidateRisks.length > 0))
+      ) {
         const manualShips = nextManual.filter(d => {
           const r = ROUTES_MAP.get(d.routeId);
           return d.status === 'delivering' && r?.tier === routeTierRef.current;
