@@ -1,4 +1,5 @@
 import { normalizeHorizonSkills } from './horizon-skill-tree';
+import { reconcileTotalDeliveries } from './delivery-progress.mjs';
 
 export const CURRENT_SAVE_VERSION = "1.4.0";
 
@@ -880,7 +881,10 @@ export const sanitizeSave = (rawData: any): ModularSaveData => {
 
   save.global.qc = safeNumber(save.global.qc, 0);
   save.global.gameTimeSeconds = safeNumber(save.global.gameTimeSeconds, 0);
-  save.global.totalDeliveries = safeNumber(save.global.totalDeliveries, 0);
+  save.global.totalDeliveries = reconcileTotalDeliveries(
+    safeNumber(save.global.totalDeliveries, 0),
+    save.global.historyStats
+  );
   save.global.playerName = typeof save.global.playerName === 'string' ? save.global.playerName : '';
   save.global.routeTier = normalizeSavedRouteTier(save.global.routeTier, save);
   save.global.unlockedAchievements = sanitizeStringArray(save.global.unlockedAchievements);

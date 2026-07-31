@@ -7,24 +7,33 @@ interface Goal {
   progress: number;
   current: number | string;
   target: number | string;
+  remaining?: number;
   isCurrency?: boolean;
 }
 
 interface EconomicGoalsProps {
   goals: Goal[];
   isInterstellar: boolean;
+  language: 'pt' | 'en';
 }
 
-const EconomicGoals: React.FC<EconomicGoalsProps> = ({ goals, isInterstellar }) => {
+const EconomicGoals: React.FC<EconomicGoalsProps> = ({ goals, isInterstellar, language }) => {
   return (
     <div className="space-y-3">
       {goals.map((goal) => (
         <div key={goal.id} className="space-y-2">
           <div className="flex justify-between items-end">
             <span className="text-base font-orbitron font-bold text-white uppercase tracking-wider">{goal.label}</span>
-            <span className="text-[15px] font-mono text-slate-500">
-              {goal.current} / {goal.target}
-            </span>
+            <div className="text-right font-mono">
+              <div className="text-[15px] text-slate-400">{goal.current} / {goal.target}</div>
+              {typeof goal.remaining === 'number' && (
+                <div className={`text-[13px] font-bold ${goal.remaining === 0 ? 'text-emerald-400' : isInterstellar ? 'text-orange-300' : 'text-cyan-300'}`}>
+                  {goal.remaining === 0
+                    ? (language === 'pt' ? 'Meta concluída' : 'Goal completed')
+                    : (language === 'pt' ? `Faltam ${goal.remaining}` : `${goal.remaining} remaining`)}
+                </div>
+              )}
+            </div>
           </div>
           <div className="h-2 bg-white/5 rounded-full overflow-hidden border border-white/10">
             <motion.div 

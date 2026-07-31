@@ -151,6 +151,7 @@ import { GameStorage } from '@/lib/game-storage';
 import { SaveManager } from '@/lib/save-manager';
 import { useEconomy, useDispatch, useProgression, useMining, useCombat, useMissions, useEarth, useGame, useSystem } from '@/lib/game-state/index';
 import { normalizeGameNumber } from '@/lib/game-state/numbers';
+import { getChapterDeliveryProgress, getRemainingDeliveries } from '@/lib/delivery-progress.mjs';
 import { calculateNewEarthAnnualPopulationGrowth } from '@/lib/new-earth-population-growth.mjs';
 import { hasBossZeroDefeatEvidence } from '@/lib/void-boss-achievements.mjs';
 import { getNewEarthDefenseAchievementProgress } from '@/lib/new-earth-defense-achievements.mjs';
@@ -6433,8 +6434,9 @@ const DashboardContent = memo(({
     const firstOre = solarOres[0];
     if ((miningCompressionLevels[firstOre.id] || 0) < 10) return false;
 
-    // 8. Total de entregas
-    if (totalDeliveries < ROUTE2_TOTAL_DELIVERIES_REQUIREMENT) return false;
+    // 8. Total de entregas (reconciliado com o histórico para saves antigos)
+    const chapter1Deliveries = getChapterDeliveryProgress({ totalDeliveries, historyStats });
+    if (chapter1Deliveries < ROUTE2_TOTAL_DELIVERIES_REQUIREMENT) return false;
     // 9. Missões concluídas
     const completedUnclaimedSolarMissions = missions.filter(m => m.tier === 'Solar' && m.completed && !m.claimed).length;
     if (((historyStats['Solar']?.missionsCompleted || 0) + completedUnclaimedSolarMissions) < ROUTE2_MISSIONS_REQUIREMENT) return false;
@@ -6489,8 +6491,13 @@ const DashboardContent = memo(({
     const firstOre = interstellarOres[0];
     if (firstOre && (miningCompressionLevels[firstOre.id] || 0) < 10) return false;
 
-    // 8. Total de entregas
-    if (totalDeliveries < ROUTE3_TOTAL_DELIVERIES_REQUIREMENT) return false;
+    // 8. Total de entregas acumuladas dos capítulos 1 e 2
+    const chapter2Deliveries = getChapterDeliveryProgress({
+      totalDeliveries,
+      historyStats,
+      includeInterstellar: true,
+    });
+    if (chapter2Deliveries < ROUTE3_TOTAL_DELIVERIES_REQUIREMENT) return false;
     // 9. Missões concluídas (agregado Solar + Interstellar)
     const completedUnclaimedMissions = missions.filter(m => (m.tier === 'Solar' || m.tier === 'Interstellar') && m.completed && !m.claimed).length;
     const aggregatedMissions = (solarStats.missionsCompleted || 0) + (interstellarStats.missionsCompleted || 0) + completedUnclaimedMissions;
@@ -13459,7 +13466,12 @@ const DashboardContent = memo(({
                   const aggregatedMissions = (isInterstellar ? (solarStats.missionsCompleted || 0) + (interstellarStats.missionsCompleted || 0) : (solarStats.missionsCompleted || 0)) + completedUnclaimedGoalMissions;
                   const missionRequirement = isInterstellar ? ROUTE3_MISSIONS_REQUIREMENT : ROUTE2_MISSIONS_REQUIREMENT;
                   const aggregatedQC = isInterstellar ? (solarStats.qcTotalAcquired || 0) + (interstellarStats.qcTotalAcquired || 0) : (solarStats.qcTotalAcquired || 0);
-                  const aggregatedDeliveries = isInterstellar ? (solarStats.deliveries || 0) + (interstellarStats.deliveries || 0) : (solarStats.deliveries || 0);
+                  const aggregatedDeliveries = getChapterDeliveryProgress({
+                    totalDeliveries,
+                    historyStats,
+                    includeInterstellar: isInterstellar,
+                  });
+                  const deliveryRequirement = isInterstellar ? ROUTE3_TOTAL_DELIVERIES_REQUIREMENT : ROUTE2_TOTAL_DELIVERIES_REQUIREMENT;
 
                   const goals = isVoid
                     ? [
@@ -13479,7 +13491,7 @@ const DashboardContent = memo(({
                       { id: 'compressions', label: t('upgradeRefinedCompression'), progress: (Object.entries(miningCompressionLevels).filter(([id]) => ORES_MAP.get(id)?.tier === (isInterstellar ? 'Interstellar' : 'Solar')).reduce((acc, [, v]) => acc + v, 0) / (ORES.filter(o => o.tier === (isInterstellar ? 'Interstellar' : 'Solar')).length * 10)) * 100, current: Object.entries(miningCompressionLevels).filter(([id]) => ORES_MAP.get(id)?.tier === (isInterstellar ? 'Interstellar' : 'Solar')).reduce((acc, [, v]) => acc + v, 0), target: ORES.filter(o => o.tier === (isInterstellar ? 'Interstellar' : 'Solar')).length * 10 },
                       { id: 'missions', label: `${t('missions')} ${language === 'pt' ? 'Concluídas' : 'Completed'}`, progress: Math.min(100, (aggregatedMissions / missionRequirement) * 100), current: aggregatedMissions, target: missionRequirement },
                       { id: 'qc', label: `${t('reachQC')} ${isInterstellar ? '999 trilhões' : '1 trilhão'} QC`, progress: Math.min(100, (aggregatedQC / (isInterstellar ? 999000000000000 : 1000000000000)) * 100), current: formatValue(aggregatedQC), target: formatValue(isInterstellar ? 999000000000000 : 1000000000000) },
-                      { id: 'deliveries', label: `${t('total')} ${isInterstellar ? ROUTE3_TOTAL_DELIVERIES_REQUIREMENT : ROUTE2_TOTAL_DELIVERIES_REQUIREMENT} ${t('deliveries')}`, progress: Math.min(100, (aggregatedDeliveries / (isInterstellar ? ROUTE3_TOTAL_DELIVERIES_REQUIREMENT : ROUTE2_TOTAL_DELIVERIES_REQUIREMENT)) * 100), current: aggregatedDeliveries, target: isInterstellar ? ROUTE3_TOTAL_DELIVERIES_REQUIREMENT : ROUTE2_TOTAL_DELIVERIES_REQUIREMENT },
+                      { id: 'deliveries', label: `${t('total')} ${deliveryRequirement} ${t('deliveries')}`, progress: Math.min(100, (aggregatedDeliveries / deliveryRequirement) * 100), current: aggregatedDeliveries, target: deliveryRequirement, remaining: getRemainingDeliveries(aggregatedDeliveries, deliveryRequirement) },
                     ];
 
                   const allGoalsMet = goals.every(g => g.progress >= 99.9);
@@ -13487,7 +13499,7 @@ const DashboardContent = memo(({
                   return (
                     <>
                       <div className="flex-1 space-y-4 relative z-10">
-                        <EconomicGoals goals={goals as any} isInterstellar={isInterstellar} />
+                        <EconomicGoals goals={goals as any} isInterstellar={isInterstellar} language={language} />
                       </div>
 
                       <div className="mt-8 pt-6 border-t border-white/5 flex justify-between items-center relative z-10">
