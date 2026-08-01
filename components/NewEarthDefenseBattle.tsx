@@ -4675,7 +4675,10 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
       ctx.restore();
     };
 
-    const handleCanvasClick = (event: MouseEvent) => {
+    let isMouseFiring = false;
+    let heldTargetId: number | undefined;
+
+    const findTargetAtPointer = (event: MouseEvent) => {
       if (state.ended) return;
       const canvas = canvasRef.current;
       if (!canvas) return;
@@ -4692,8 +4695,24 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
         })
         .filter(item => item.distance <= item.enemy.radius + 70)
         .sort((a, b) => a.distance - b.distance)[0]?.enemy;
+      return target;
+    };
 
+    const handleCanvasMouseDown = (event: MouseEvent) => {
+      if (event.button !== 0 || state.ended || isPausedRef.current) return;
+      const target = findTargetAtPointer(event);
+      heldTargetId = target?.id;
+      isMouseFiring = true;
       if (target) fireShot(target);
+    };
+    const handleCanvasMouseMove = (event: MouseEvent) => {
+      if (!isMouseFiring) return;
+      const target = findTargetAtPointer(event);
+      if (target) heldTargetId = target.id;
+    };
+    const stopMouseFiring = () => {
+      isMouseFiring = false;
+      heldTargetId = undefined;
     };
 
     const loop = () => {
@@ -4754,7 +4773,12 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
       fireDamageSupportDrone(now);
       pulseDefenseSupportDrone(now);
 
-      if (keys[' ']) fireShot();
+      if (keys[' '] || keys.space) fireShot();
+      if (isMouseFiring) {
+        const heldTarget = state.enemies.find(enemy => enemy.id === heldTargetId && enemy.hp > 0);
+        if (heldTarget) fireShot(heldTarget);
+        else heldTargetId = undefined;
+      }
       if (keys.q || keys.keyc) triggerSpecial(0);
       if (keys.e || keys.keyf) triggerSpecial(1);
       if (controlsRef.current.specialOne > 0) {
@@ -5027,12 +5051,18 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
     };
 
     const canvas = canvasRef.current;
-    canvas?.addEventListener('click', handleCanvasClick);
+    canvas?.addEventListener('mousedown', handleCanvasMouseDown);
+    canvas?.addEventListener('mousemove', handleCanvasMouseMove);
+    window.addEventListener('mouseup', stopMouseFiring);
+    window.addEventListener('blur', stopMouseFiring);
     rafRef.current = requestAnimationFrame(loop);
     return () => {
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
       state.ended = true;
-      canvas?.removeEventListener('click', handleCanvasClick);
+      canvas?.removeEventListener('mousedown', handleCanvasMouseDown);
+      canvas?.removeEventListener('mousemove', handleCanvasMouseMove);
+      window.removeEventListener('mouseup', stopMouseFiring);
+      window.removeEventListener('blur', stopMouseFiring);
       stopAllBattleSounds();
     };
   }, [battleBackground, shipStats, specials, horizonLevel, horizonXp, horizonNextXp, horizonMaxLevel, trinityShotEnabled, damageSupportDrone, defenseSupportDrone, currentDefenseBattleLevel]);
@@ -5162,7 +5192,7 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
               <div className="absolute bottom-4 left-4 right-4 flex items-end justify-between gap-4">
                 <div className="rounded-2xl border border-white/10 bg-black/60 px-4 py-3 text-xs text-zinc-300 backdrop-blur-md">
                   <p className="font-mono text-[10px] uppercase tracking-[0.24em] text-zinc-500">{t('Movement', 'Movimento')}</p>
-                  <p className="mt-1 font-orbitron text-[12px] font-black uppercase text-white">{t('WASD · click target · C/F specials', 'WASD · clique no alvo · C/F especiais')}</p>
+                  <p className="mt-1 font-orbitron text-[12px] font-black uppercase text-white">{t('WASD · hold mouse/Space · C/F specials', 'WASD · segure mouse/Espaço · C/F especiais')}</p>
                 </div>
 
                 <div className="flex items-center gap-3">
@@ -5285,7 +5315,7 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
               </div>
               <div className="rounded-xl border border-white/10 bg-white/5 p-3">
                 <p className="font-mono text-[9px] uppercase tracking-widest text-zinc-500">{t('Controls', 'Controles')}</p>
-                <p className="mt-2 text-[11px] leading-relaxed text-zinc-300">WASD · {t('Click target', 'Clique no alvo')} · C · F</p>
+                <p className="mt-2 text-[11px] leading-relaxed text-zinc-300">WASD · {t('Hold mouse or Space', 'Segure mouse ou Espaço')} · C · F</p>
                 <p className="mt-1 text-[10px] leading-relaxed text-zinc-500">{t('Projectiles curve slightly toward the selected enemy.', 'Os disparos fazem uma leve curva até o inimigo selecionado.')}</p>
               </div>
               <div className="rounded-xl border border-white/10 bg-white/5 p-3">

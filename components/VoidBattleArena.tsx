@@ -968,6 +968,17 @@ const VoidBattleArena = memo(function VoidBattleArena({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
+    let isMouseFiring = false;
+    const mouseAim = { x: canvas.width, y: canvas.height / 2 };
+
+    const updateMouseAim = (e: MouseEvent) => {
+      const rect = canvas.getBoundingClientRect();
+      const scaleX = canvas.width / rect.width;
+      const scaleY = canvas.height / rect.height;
+      mouseAim.x = (e.clientX - rect.left) * scaleX;
+      mouseAim.y = (e.clientY - rect.top) * scaleY;
+    };
+
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.preventDefault();
@@ -980,28 +991,37 @@ const VoidBattleArena = memo(function VoidBattleArena({
         return;
       }
       if (isPausedRef.current) return;
-      const key = e.key.toLowerCase();
+      const key = e.code === 'Space' ? 'space' : e.key.toLowerCase();
+      if (key === 'space') e.preventDefault();
       gameRef.current.keysPressed.add(key);
       if (e.key.toLowerCase() === 'r') triggerAbility('shield');
       if (e.key.toLowerCase() === 'f') triggerAbility('burst');
       if (e.key.toLowerCase() === 'c') triggerAbility('special');
     };
     const handleKeyUp = (e: KeyboardEvent) => {
-      gameRef.current.keysPressed.delete(e.key.toLowerCase());
+      const key = e.code === 'Space' ? 'space' : e.key.toLowerCase();
+      if (key === 'space') e.preventDefault();
+      gameRef.current.keysPressed.delete(key);
     };
     const handleMouseDown = (e: MouseEvent) => {
-      if (isPausedRef.current) return;
-      const rect = canvas.getBoundingClientRect();
-      const scaleX = canvas.width / rect.width;
-      const scaleY = canvas.height / rect.height;
-      const x = (e.clientX - rect.left) * scaleX;
-      const y = (e.clientY - rect.top) * scaleY;
-      triggerAttack(x, y);
+      if (e.button !== 0 || isPausedRef.current) return;
+      updateMouseAim(e);
+      isMouseFiring = true;
+      triggerAttack(mouseAim.x, mouseAim.y);
+    };
+    const handleMouseMove = (e: MouseEvent) => updateMouseAim(e);
+    const stopMouseFiring = () => { isMouseFiring = false; };
+    const resetHeldControls = () => {
+      isMouseFiring = false;
+      gameRef.current.keysPressed.clear();
     };
 
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('keyup', handleKeyUp);
+    window.addEventListener('mouseup', stopMouseFiring);
+    window.addEventListener('blur', resetHeldControls);
     canvas.addEventListener('mousedown', handleMouseDown);
+    canvas.addEventListener('mousemove', handleMouseMove);
 
     let animId: number;
     let battleFinished = false;
@@ -1515,6 +1535,10 @@ const VoidBattleArena = memo(function VoidBattleArena({
         animId = requestAnimationFrame(loop);
         return;
       }
+      if (isMouseFiring || s.keysPressed.has('space')) {
+        triggerAttack(mouseAim.x, mouseAim.y);
+      }
+
       s.frameCount = (s.frameCount || 0) + 1;
 
       let effectiveDelta = deltaTime;
@@ -3381,6 +3405,10 @@ const VoidBattleArena = memo(function VoidBattleArena({
       clearInterval(hudInterval);
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
+      window.removeEventListener('mouseup', stopMouseFiring);
+      window.removeEventListener('blur', resetHeldControls);
+      canvas.removeEventListener('mousedown', handleMouseDown);
+      canvas.removeEventListener('mousemove', handleMouseMove);
     };
   }, [assetsLoaded, triggerAttack, onBattleEnd, playSfx, stopSfx, dimensions, routeTier, triggerAbility, playerShipStats, locationId, videoReady, showBossIntro, activeShipImage,
   activeShipSpriteSheet, addLog, initialEnemies, language, meteoriteQcValue, meteorQcValue]);
@@ -3596,7 +3624,7 @@ const VoidBattleArena = memo(function VoidBattleArena({
            <div className="w-12 h-12 rounded-xl border-2 border-cyan-500/60 flex items-center justify-center bg-black/80 shadow-[0_0_20px_rgba(6,182,212,0.3)]">
              <MousePointer2 className="w-6 h-6 text-cyan-400" />
            </div>
-           <span className="text-[10px] font-orbitron font-bold tracking-[0.2em] text-cyan-400 uppercase bg-black/40 px-2 py-0.5 rounded-full">{language === 'pt' ? 'Mirar e Atirar' : 'Aim and Shoot'}</span>
+           <span className="text-[10px] font-orbitron font-bold tracking-[0.2em] text-cyan-400 uppercase bg-black/40 px-2 py-0.5 rounded-full">{language === 'pt' ? 'Segure Mouse ou Espaço' : 'Hold Mouse or Space'}</span>
         </div>
       </div>
     </div>
