@@ -217,7 +217,6 @@ interface DashboardContextType {
   // Extraction
   upgradeExtractionRobot: (pointId: string) => void;
   upgradeExtractionProduction: (pointId: string) => void;
-  boostResearchExtractionPoint: (pointId: string) => void;
   upgradeExtractionCompression: (pointId: string) => void;
   buyExtractionAutoSell: (pointId: string) => void;
   toggleExtractionAutoSell: (pointId: string) => void;
@@ -324,7 +323,6 @@ interface DashboardContextType {
   upgradeRadar: () => void;
   upgradeBattleLevel: () => void;
   toggleAutoSell: (oreId: string) => void;
-  boostResearch: () => void;
   autoSkipRandomBattles: boolean;
   toggleAutoSkipRandomBattles: () => void;
   totalProjectTerra: number;
@@ -1182,51 +1180,6 @@ export const DashboardProvider = ({
     addLog(`${t('researchStarted')} ${translateData(tech.name)}!`, 'success');
   }, [progression.routeTier, economy.qc, dispatch, playSfx, addLog, t, getEconomicMultipliers, updateHistoryStats, translateData]);
 
-  const boostResearchExtractionPoint = useCallback((pointId: string) => {
-    if (!mining.researchingExtractionPoint) return;
-    
-    const point = EXTRACTION_POINTS_MAP.get(pointId);
-    if (!point) return;
-
-    const boostCost = Math.floor(point.cost * 0.75);
-
-    if (economy.qc < boostCost) {
-      playSfx('error');
-      addLog(t('insufficientQC'), 'error');
-      return;
-    }
-
-    dispatch({ type: 'FINISH_EXTRACTION_RESEARCH', payload: { pointId } });
-    dispatch({ type: 'SPEND_QC', payload: { amount: boostCost } });
-    updateHistoryStats('spent', boostCost, progression.routeTier);
-    
-    playSfx('zap');
-    addLog(t('researchBoosted'), 'success');
-  }, [mining.researchingExtractionPoint, economy.qc, progression.routeTier, dispatch, playSfx, addLog, t, updateHistoryStats]);
-
-  const boostResearch = useCallback(() => {
-    if (!progression.researchingTech) return;
-    
-    const { tier, level } = progression.researchingTech;
-    const tech = TECHNOLOGIES.find(t => t.tier === tier && t.level === level);
-    if (!tech) return;
-
-    const multipliers = getEconomicMultipliers();
-    const cost = Math.floor(tech.cost * multipliers.cost * 0.75);
-
-    if (economy.qc < cost) {
-      playSfx('error');
-      addLog(t('insufficientQC'), 'error');
-      return;
-    }
-
-    dispatch({ type: 'SPEND_QC', payload: { amount: cost } });
-    dispatch({ type: 'UNLOCK_TECH_LEVEL', payload: { tier, level } });
-    updateHistoryStats('spent', cost, progression.routeTier);
-    
-    playSfx('tech_success');
-    addLog(`${t('researchBoosted')} ${translateData(tech.name)}!`, 'success');
-  }, [progression.researchingTech, progression.routeTier, economy.qc, getEconomicMultipliers, dispatch, playSfx, addLog, t, updateHistoryStats, translateData]);
 
   const upgradeExtractionProduction = useCallback((id: string) => {
     const currentLevel = mining.extractionProductionLevels[id] || 0;
@@ -2455,7 +2408,6 @@ export const DashboardProvider = ({
     system,
     game,
     dispatch,
-    boostResearch,
     t,
     formatValue,
     formatTime,
@@ -2613,7 +2565,6 @@ export const DashboardProvider = ({
     isRoute2Unlocked, isRoute3Unlocked, getMissionUpgradeCost, claimMission,
     sellOrePack,
     upgradeExtractionRobot, upgradeExtractionProduction,
-    boostResearchExtractionPoint,
     upgradeExtractionCompression, buyExtractionAutoSell, toggleExtractionAutoSell,
     sellExtractionPointPacks, 
     earthPopulation, 
@@ -2641,7 +2592,7 @@ export const DashboardProvider = ({
     donateToTerraProject
 
   }), [
-    progression, economy, missions, mining, combat, earth, system, game, dispatch, boostResearch, t, formatValue, 
+    progression, economy, missions, mining, combat, earth, system, game, dispatch, t, formatValue,
     addLog, playSfx, pauseMusicForRoute4Credits, language, activeTab, autoTravelActive, autoTravelProgress, autoTravelDesired, toggleAutoSell,
     activeDeliveries, showSkillMap, miningPageIndex, techSubTab, extractionPageIndex, 
     aircraftSubTab, shipPageIndex, historyPage, colonies, isScanning, scanProgress, scanResult, 
@@ -2656,7 +2607,7 @@ export const DashboardProvider = ({
     voidCompactedResources, voidAutoShipmentUnlocked, voidAutoShipmentActive, compactVoidResource, 
     sendCompactedToEarth, buyVoidAutoShipment, donateToPOI, donateQCToPOI, exportGameData, importGameData, buyMiningRobot, 
     upgradeMiningRobot, buyMiningCompression, buyAutoSell, buyUpgrade, buyAllUpgradesForShip, 
-    synthesizeAetherion, buyTech, boostResearchExtractionPoint, researchPoint, buyShip, 
+    synthesizeAetherion, buyTech, researchPoint, buyShip,
     setExtractionTechLevel, setSolarMappingLevel, setDoubleRouteLevel, setDoomPLevel, 
     isRoute2Unlocked, isRoute3Unlocked, translateData, getEconomicMultipliers, getLocationMultiplier,
     updateHistoryStats, buyRoute, launchRoute, completeInitialMission, getMissionUpgradeCost, claimMission,

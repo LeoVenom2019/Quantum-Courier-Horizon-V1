@@ -15,6 +15,7 @@
     "test:horizon-achievement-stats": "node --test lib/horizon-achievement-stats.test.mjs",
     "test:arcade-intro": "node --test lib/arcade-intro-flow.test.mjs",
     "test:robot-runner-ghost-sfx": "node --test lib/robot-runner-ghost-sfx.test.mjs",
+    "test:research-timing": "node --test lib/research-timing.test.mjs",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",

@@ -192,18 +192,6 @@ export function progressionReducer(state: ProgressionState = initialProgressionS
       };
     }
 
-    case 'BOOST_RESEARCH': {
-      if (!state.researchingTech) return state;
-      const { amount } = action.payload;
-      return {
-        ...state,
-        researchingTech: {
-          ...state.researchingTech,
-          endTime: state.researchingTech.endTime - amount * 1000,
-        },
-      };
-    }
-
     case 'SET_GAME_TIME':
       return { ...state, gameTimeSeconds: action.payload.seconds };
 

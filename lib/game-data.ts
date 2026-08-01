@@ -188,7 +188,7 @@ export const TECHNOLOGIES: Technology[] = [
     description: 'Desbloqueia Nave 2.',
     unlocksShipLevel: 2,
     cost: 5000,
-    researchTime: 300000, // 5 minutes
+    researchTime: 60000, // 1 minute
     tier: 'Solar'
   },
   {
@@ -198,7 +198,7 @@ export const TECHNOLOGIES: Technology[] = [
     description: 'Desbloqueia Nave 3.',
     unlocksShipLevel: 3,
     cost: 25000,
-    researchTime: 600000, // 10 minutes
+    researchTime: 60000, // 1 minute
     tier: 'Solar'
   },
   {
@@ -208,7 +208,7 @@ export const TECHNOLOGIES: Technology[] = [
     description: 'Desbloqueia Nave 4.',
     unlocksShipLevel: 4,
     cost: 100000,
-    researchTime: 900000, // 15 minutes
+    researchTime: 60000, // 1 minute
     tier: 'Solar'
   },
   {
@@ -218,7 +218,7 @@ export const TECHNOLOGIES: Technology[] = [
     description: 'Desbloqueia Nave 5.',
     unlocksShipLevel: 5,
     cost: 500000,
-    researchTime: 1800000, // 30 minutes
+    researchTime: 60000, // 1 minute
     tier: 'Solar'
   },
   {
@@ -228,7 +228,7 @@ export const TECHNOLOGIES: Technology[] = [
     description: 'Desbloqueia Nave 6.',
     unlocksShipLevel: 6,
     cost: 2500000,
-    researchTime: 2700000, // 45 minutes
+    researchTime: 120000, // 2 minutes
     tier: 'Solar'
   },
   {
@@ -238,7 +238,7 @@ export const TECHNOLOGIES: Technology[] = [
     description: 'Desbloqueia Nave 7.',
     unlocksShipLevel: 7,
     cost: 12500000,
-    researchTime: 3600000, // 60 minutes
+    researchTime: 120000, // 2 minutes
     tier: 'Solar'
   },
   {
@@ -248,7 +248,7 @@ export const TECHNOLOGIES: Technology[] = [
     description: 'Desbloqueia Nave 8.',
     unlocksShipLevel: 8,
     cost: 50000000,
-    researchTime: 7200000, // 120 minutes
+    researchTime: 120000, // 2 minutes
     tier: 'Solar'
   },
   {
@@ -258,7 +258,7 @@ export const TECHNOLOGIES: Technology[] = [
     description: 'Desbloqueia Nave 9.',
     unlocksShipLevel: 9,
     cost: 250000000,
-    researchTime: 14400000, // 240 minutes
+    researchTime: 120000, // 2 minutes
     tier: 'Solar'
   },
 
@@ -280,7 +280,7 @@ export const TECHNOLOGIES: Technology[] = [
     description: 'Manipulação de espaço em múltiplas camadas. Desbloqueia Nave 2',
     unlocksShipLevel: 2,
     cost: 25000000,
-    researchTime: 600000, // 10 minutes
+    researchTime: 60000, // 1 minute
     tier: 'Interstellar'
   },
   {
@@ -290,7 +290,7 @@ export const TECHNOLOGIES: Technology[] = [
     description: 'Mantém a nave estável durante distorções espaciais. Desbloqueia Nave 3',
     unlocksShipLevel: 3,
     cost: 35000000,
-    researchTime: 1200000, // 20 minutes
+    researchTime: 60000, // 1 minute
     tier: 'Interstellar'
   },
   {
@@ -300,7 +300,7 @@ export const TECHNOLOGIES: Technology[] = [
     description: 'Mapeamento de regiões além da luz visível. Desbloqueia Nave 4',
     unlocksShipLevel: 4,
     cost: 50000000,
-    researchTime: 1800000, // 30 minutes
+    researchTime: 60000, // 1 minute
     tier: 'Interstellar'
   },
   {
@@ -310,7 +310,7 @@ export const TECHNOLOGIES: Technology[] = [
     description: 'Extração direta de energia de estrelas. Desbloqueia Nave 5',
     unlocksShipLevel: 5,
     cost: 75000000,
-    researchTime: 2400000, // 40 minutes
+    researchTime: 120000, // 2 minutes
     tier: 'Interstellar'
   },
   {
@@ -320,7 +320,7 @@ export const TECHNOLOGIES: Technology[] = [
     description: 'Uso de singularidades para deslocamento. Desbloqueia Nave 6',
     unlocksShipLevel: 6,
     cost: 100000000,
-    researchTime: 3600000, // 60 minutes
+    researchTime: 120000, // 2 minutes
     tier: 'Interstellar'
   },
   {
@@ -330,7 +330,7 @@ export const TECHNOLOGIES: Technology[] = [
     description: 'Navegação entre realidades paralelas. Desbloqueia Nave 7',
     unlocksShipLevel: 7,
     cost: 150000000,
-    researchTime: 7200000, // 120 minutes
+    researchTime: 120000, // 2 minutes
     tier: 'Interstellar'
   },
   {
@@ -340,7 +340,7 @@ export const TECHNOLOGIES: Technology[] = [
     description: 'Compressão extrema de distância e tempo. Desbloqueia Nave 8',
     unlocksShipLevel: 8,
     cost: 250000000,
-    researchTime: 14400000, // 240 minutes
+    researchTime: 120000, // 2 minutes
     tier: 'Interstellar'
   },
   {
@@ -350,7 +350,7 @@ export const TECHNOLOGIES: Technology[] = [
     description: 'Tecnologia além do fluxo linear do tempo. Desbloqueia Nave 9',
     unlocksShipLevel: 9,
     cost: 500000000,
-    researchTime: 21600000, // 360 minutes
+    researchTime: 120000, // 2 minutes
     tier: 'Interstellar'
   },
 
@@ -467,7 +467,7 @@ export const EXTRACTION_POINTS: ExtractionPoint[] = [
     productionPerCycle: 10,
     cycleTime: 5000,
     cost: 500000000, // 500 Mi
-    researchTime: 600000, // 10 minutes
+    researchTime: 60000, // 1 minute
     valuePerPack: 10000000, // 10 Mi
     tier: 'Interstellar',
   },
@@ -478,7 +478,7 @@ export const EXTRACTION_POINTS: ExtractionPoint[] = [
     productionPerCycle: 10,
     cycleTime: 5000,
     cost: 2500000000, // 2.5 Bi
-    researchTime: 900000, // 15 minutes
+    researchTime: 60000, // 1 minute
     valuePerPack: 40000000, // 40 Mi
     tier: 'Interstellar',
   },
@@ -489,7 +489,7 @@ export const EXTRACTION_POINTS: ExtractionPoint[] = [
     productionPerCycle: 10,
     cycleTime: 5000,
     cost: 10000000000, // 10 Bi
-    researchTime: 1200000, // 20 minutes
+    researchTime: 60000, // 1 minute
     valuePerPack: 180000000, // 180 Mi
     tier: 'Interstellar',
   },
@@ -500,7 +500,7 @@ export const EXTRACTION_POINTS: ExtractionPoint[] = [
     productionPerCycle: 10,
     cycleTime: 5000,
     cost: 50000000000, // 50 Bi
-    researchTime: 1500000, // 25 minutes
+    researchTime: 60000, // 1 minute
     valuePerPack: 900000000, // 900 Mi
     tier: 'Interstellar',
   },
@@ -511,7 +511,7 @@ export const EXTRACTION_POINTS: ExtractionPoint[] = [
     productionPerCycle: 10,
     cycleTime: 5000,
     cost: 200000000000, // 200 Bi
-    researchTime: 1800000, // 30 minutes
+    researchTime: 60000, // 1 minute
     valuePerPack: 3500000000, // 3.5 Bi
     tier: 'Interstellar',
   },
@@ -522,7 +522,7 @@ export const EXTRACTION_POINTS: ExtractionPoint[] = [
     productionPerCycle: 10,
     cycleTime: 5000,
     cost: 1000000000000, // 1 Tri
-    researchTime: 2400000, // 40 minutes
+    researchTime: 60000, // 1 minute
     valuePerPack: 18000000000, // 18 Bi
     tier: 'Interstellar',
   },
@@ -533,7 +533,7 @@ export const EXTRACTION_POINTS: ExtractionPoint[] = [
     productionPerCycle: 10,
     cycleTime: 5000,
     cost: 5000000000000, // 5 Tri
-    researchTime: 3000000, // 50 minutes
+    researchTime: 60000, // 1 minute
     valuePerPack: 90000000000, // 90 Bi
     tier: 'Interstellar',
   },
@@ -544,7 +544,7 @@ export const EXTRACTION_POINTS: ExtractionPoint[] = [
     productionPerCycle: 10,
     cycleTime: 5000,
     cost: 25000000000000, // 25 Tri
-    researchTime: 3600000, // 60 minutes
+    researchTime: 60000, // 1 minute
     valuePerPack: 450000000000, // 450 Bi
     tier: 'Interstellar',
   },
@@ -555,7 +555,7 @@ export const EXTRACTION_POINTS: ExtractionPoint[] = [
     productionPerCycle: 10,
     cycleTime: 5000,
     cost: 100000000000000, // 100 Tri
-    researchTime: 4500000, // 75 minutes
+    researchTime: 60000, // 1 minute
     valuePerPack: 1800000000000, // 1.8 Tri
     tier: 'Interstellar',
   },

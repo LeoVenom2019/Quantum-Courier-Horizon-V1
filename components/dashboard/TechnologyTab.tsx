@@ -31,8 +31,6 @@ const TechnologyTab = memo(() => {
     playSfx, 
     addLog,
     buyTech,
-    boostResearch,
-    boostResearchExtractionPoint,
     techSubTab,
     setTechSubTab,
     extractionPageIndex,
@@ -147,7 +145,6 @@ const TechnologyTab = memo(() => {
               const compCost = Math.floor(100000000 * Math.pow(1.2, compLevel));
               const autoSellCost = 5000000000;
               const extractionResearchCost = point.cost;
-              const extractionBoostCost = Math.floor(point.cost * 0.75);
               const extractionBackgroundImage = point.tier === 'Interstellar'
                 ? INTERSTELLAR_EXTRACTION_POINT_BACKGROUNDS[point.id]
                 : undefined;
@@ -295,17 +292,6 @@ const TechnologyTab = memo(() => {
                                 animate={{ width: `${Math.min(100, ((Date.now() - researchingExtractionPoint.startTime) / (point.researchTime)) * 100)}%` }}
                               />
                             </div>
-                            <PremiumCanvasButton
-                              onClick={() => boostResearchExtractionPoint(point.id)}
-                              tone="amber"
-                              className="ml-3 h-9 min-w-[98px] px-2"
-                              contentClassName="gap-2 text-yellow-200"
-                            >
-                              <Zap className="w-3 h-3 animate-pulse" />
-                              <span className="text-[10px] font-bold font-mono">
-                                {formatValue(extractionBoostCost)} QC
-                              </span>
-                            </PremiumCanvasButton>
                           </div>
                         </div>
                       )}
@@ -394,17 +380,9 @@ const TechnologyTab = memo(() => {
                       <Check className="w-4 h-4" />
                     </div>
                   ) : isResearching ? (
-                    <PremiumCanvasButton
-                      onClick={() => boostResearch()}
-                      tone="amber"
-                      className="shrink-0 h-8 px-3"
-                      contentClassName="gap-2 text-yellow-200"
-                    >
-                      <Zap className="w-4 h-4 animate-pulse" />
-                      <span className="text-[12px] font-bold font-mono">
-                        {formatValue(Math.floor(tech.cost * multipliers.cost * 0.75))}
-                      </span>
-                    </PremiumCanvasButton>
+                    <div className="shrink-0 rounded-lg border border-indigo-400/30 bg-indigo-500/10 px-3 py-1 text-[11px] font-mono font-bold text-indigo-300">
+                      {t('researching')}
+                    </div>
                   ) : (
                     <div className="shrink-0 w-8 h-8 rounded-lg flex items-center justify-center border bg-white/5 border-white/10 text-slate-600">
                       <Lock className="w-4 h-4" />
@@ -436,7 +414,7 @@ const TechnologyTab = memo(() => {
                         <motion.div 
                           className="h-full bg-indigo-500" 
                           initial={{ width: 0 }}
-                          animate={{ width: `${Math.min(100, ((Date.now() - researchingTech.startTime) / (tech.researchTime * (routeTier === 'Interstellar' ? 0.5 : 1))) * 100)}%` }}
+                          animate={{ width: `${Math.min(100, ((Date.now() - researchingTech.startTime) / tech.researchTime) * 100)}%` }}
                         />
                       </div>
                       <div className="text-[12px] text-indigo-400 font-mono text-center">PESQUISANDO...</div>

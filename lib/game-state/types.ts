@@ -332,7 +332,6 @@ export type GameAction =
   | { type: 'SET_PROGRESSION_DATA';    payload: Partial<ProgressionState> }
   | { type: 'UPGRADE_BATTLESHIP_LEVEL' }
   | { type: 'START_RESEARCH';    payload: { tier: RouteTier; level: number; duration: number } }
-  | { type: 'BOOST_RESEARCH';    payload: { amount: number } }
   | { type: 'TOGGLE_AUTO_SKIP_RANDOM_BATTLES' }
 
   // ── Mining ────────────────────────────────────────────────────────
@@ -342,9 +341,7 @@ export type GameAction =
   | { type: 'SELL_ORE';                 payload: { oreId: string; packs: number; value: number } }
   | { type: 'TOGGLE_AUTO_SELL_ORE';     payload: { oreId: string } }
   | { type: 'UPGRADE_MINING_COMPRESSION';payload: { oreId: string } }
-  | { type: 'UNLOCK_EXTRACTION_POINT';  payload: { pointId: string } }
   | { type: 'START_EXTRACTION_RESEARCH';payload: { pointId: string; endTime: number } }
-  | { type: 'FINISH_EXTRACTION_RESEARCH';payload: { pointId: string } }
   | { type: 'SET_RESEARCHING_EXTRACTION_POINT'; payload: { research: MiningState['researchingExtractionPoint'] } }
   | { type: 'ADD_EXTRACTION_PACKS';     payload: { pointId: string; amount: number } }
   | { type: 'SELL_EXTRACTION_PACKS';    payload: { pointId: string; packs: number; value: number } }
@@ -353,7 +350,6 @@ export type GameAction =
   | { type: 'UPGRADE_EXTRACTION_COMPRESSION'; payload: { pointId: string } }
   | { type: 'TOGGLE_EXTRACTION_AUTO_SELL'; payload: { pointId: string } }
   | { type: 'UNLOCK_EXTRACTION_AUTO_SELL'; payload: { pointId: string } }
-  | { type: 'BOOST_EXTRACTION_RESEARCH';    payload: { amount: number } }
   | { type: 'SET_MINING_ROBOTS';         payload: { robots: Record<string, number> } }
   | { type: 'SET_MINING_ROBOT_LEVELS';    payload: { levels: Record<string, number> } }
   | { type: 'SET_ORES_COLLECTED';        payload: { ores: Record<string, number> } }

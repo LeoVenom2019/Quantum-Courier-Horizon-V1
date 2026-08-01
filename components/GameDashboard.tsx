@@ -1298,7 +1298,7 @@ const DashboardContent = memo(({
     synthesizeAetherion,
     buyShip: buyShipAction, buyTech, researchPoint, buyAllUpgradesForShip,
     buyMiningRobot, upgradeMiningRobot, buyMiningCompression, buyAutoSell, sellOrePack,
-    boostResearchExtractionPoint, upgradeExtractionRobot, upgradeExtractionProduction, upgradeExtractionCompression, buyExtractionAutoSell, toggleExtractionAutoSell, sellExtractionPointPacks,
+    upgradeExtractionRobot, upgradeExtractionProduction, upgradeExtractionCompression, buyExtractionAutoSell, toggleExtractionAutoSell, sellExtractionPointPacks,
     startVoidMission, claimVoidAircraftMission, upgradeVoidAircraft, buyVoidAircraft, speedUpVoidAircraft, toggleVoidAircraftAuto, buyVoidAircraftAuto,
     compactVoidResource, sendCompactedToEarth, buyVoidAutoShipment,
     battleNotification, setBattleNotification,
@@ -6895,48 +6895,6 @@ const DashboardContent = memo(({
     }, 5000);
   };
 
-  const boostResearch = () => {
-    if (!researchingTech) return;
-
-    const tech = TECHNOLOGIES_MAP.get(`${researchingTech.tier}-${researchingTech.level}`);
-    if (!tech) return;
-
-    const multipliers = getEconomicMultipliers();
-    let boostCost = 0;
-
-    if (researchingTech.tier === 'Solar' || researchingTech.tier === 'Interstellar') {
-      // Valor fixo de 75% do valor de pesquisa da tecnologia
-      boostCost = Math.floor(tech.cost * multipliers.cost * 0.75);
-    } else {
-      let researchTime = tech.researchTime;
-      // No more conditional for Interstellar here because it's handled in the if block above
-
-      const elapsed = nowTimestamp() - researchingTech.startTime;
-      const remainingTime = Math.max(0, researchTime - elapsed);
-
-      const boostRate = 500;
-      boostCost = Math.floor((remainingTime / 1000) * boostRate);
-    }
-
-    if (qc < boostCost) {
-      addLog(language === 'pt' ? `QC insuficiente para acelerar. Necessário ${formatValue(boostCost)} QC` : `Insufficient QC for boost. Need ${formatValue(boostCost)} QC`, 'error');
-      return;
-    }
-
-    spendQc(boostCost);
-    updateHistoryStats('spent', boostCost, routeTier);
-    dispatch({ type: 'UNLOCK_TECH_LEVEL', payload: { tier: researchingTech.tier, level: researchingTech.level } });
-
-    setResearchingTech(null);
-    playSfx('ask_window');
-    if (researchingTech.tier === 'Solar' || researchingTech.tier === 'Interstellar') {
-      playSfx('tech_success');
-    } else {
-      playSfx('success');
-    }
-    addLog(language === 'pt' ? `Pesquisa concluída com boost! (-${formatValue(boostCost)} QC)` : `Research completed with boost! (-${formatValue(boostCost)} QC)`, 'success');
-    performSave().catch(e => console.error("[Save] Failed:", e));
-  };
 
   // Effect to show Route 2 unlock message
   useEffect(() => {
@@ -7844,7 +7802,7 @@ const DashboardContent = memo(({
       if (researching) {
         const tech = TECHNOLOGIES_MAP.get(`${researching.tier}-${researching.level}`);
         if (tech) {
-          let researchTime = tech.researchTime * (researching.tier === 'Interstellar' ? 0.5 : 1);
+          const researchTime = tech.researchTime;
           if (nowTimestamp() - researching.startTime >= researchTime) {
             playSfx('tech_success');
             dispatch({ type: 'UNLOCK_TECH_LEVEL', payload: { tier: researching.tier, level: researching.level } });

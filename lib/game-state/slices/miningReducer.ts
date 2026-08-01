@@ -100,18 +100,6 @@ export function miningReducer(state: MiningState = initialMiningState, action: G
       };
     }
 
-    case 'FINISH_EXTRACTION_RESEARCH': {
-      const { pointId } = action.payload;
-      const already = state.unlockedExtractionPoints.includes(pointId);
-      return {
-        ...state,
-        researchingExtractionPoint: null,
-        unlockedExtractionPoints: already
-          ? state.unlockedExtractionPoints
-          : [...state.unlockedExtractionPoints, pointId],
-      };
-    }
-
     case 'SET_RESEARCHING_EXTRACTION_POINT':
       return { ...state, researchingExtractionPoint: action.payload.research };
 
@@ -176,18 +164,6 @@ export function miningReducer(state: MiningState = initialMiningState, action: G
         extractionAutoSell: {
           ...state.extractionAutoSell,
           [pointId]: !state.extractionAutoSell[pointId],
-        },
-      };
-    }
-
-    case 'BOOST_EXTRACTION_RESEARCH': {
-      if (!state.researchingExtractionPoint) return state;
-      const { amount } = action.payload;
-      return {
-        ...state,
-        researchingExtractionPoint: {
-          ...state.researchingExtractionPoint,
-          endTime: state.researchingExtractionPoint.endTime - amount * 1000,
         },
       };
     }
