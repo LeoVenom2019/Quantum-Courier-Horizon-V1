@@ -176,7 +176,7 @@ import { calcExtractionSaleValue, canAfford } from '@/lib/game-state/selectors';
 import { SpaceAmbience } from './SpaceAmbience';
 import { MINI_GAMES_CONFIG } from '@/lib/mini-games-config';
 import { MiniGames } from './MiniGames';
-import { ArcadeIntroOverlay, ARCADE_INTRO_SKIP_STORAGE_KEY } from './ArcadeIntroOverlay';
+import { ArcadeIntroOverlay } from './ArcadeIntroOverlay';
 import { ColonySystem, Colony, cleanColoniesData } from './ColonySystem';
 import NewEarthUnderwaterBattle from './NewEarthUnderwaterBattle';
 import NewEarthSurfaceBattle, { type NewEarthSurfaceBattleKind, type NewEarthSurfaceBattleSiteId, type NewEarthSurfaceBattleVictoryPayload } from './NewEarthSurfaceBattle';
@@ -1318,8 +1318,22 @@ const DashboardContent = memo(({
   const [saveProgress, setSaveProgress] = useState(0);
 
   const [activeMiniGameId, setActiveMiniGameId] = useState<string | null>(null);
+  const [activeArcadeMusicEnabled, setActiveArcadeMusicEnabled] = useState(true);
   const [pendingArcadeIntroGameId, setPendingArcadeIntroGameId] = useState<string | null>(null);
+  const [pendingArcadeMusicEnabled, setPendingArcadeMusicEnabled] = useState(true);
   const [arcadeCardReward, setArcadeCardReward] = useState<ColonyCard | null>(null);
+
+  useEffect(() => {
+    if (!activeMiniGameId) return;
+    try {
+      window.localStorage.setItem(
+        `qch_arcade_music_effective_${activeMiniGameId}`,
+        String(activeArcadeMusicEnabled && musicOn),
+      );
+    } catch (error) {
+      console.warn('Unable to sync effective arcade music state', error);
+    }
+  }, [activeArcadeMusicEnabled, activeMiniGameId, musicOn]);
   const [arcadeTabWarning, setArcadeTabWarning] = useState<string | null>(null);
   const [achievementNotification, setAchievementNotification] = useState<Achievement | null>(null);
   const [deliveryBattleNotice, setDeliveryBattleNotice] = useState<{
@@ -2625,42 +2639,43 @@ const DashboardContent = memo(({
   }, [addLog, isArcadeUnlocked, language]);
 
   const requestArcadeGameLaunch = useCallback(async (id: string) => {
-    let skipIntro = false;
+    let savedMusicEnabled = true;
     try {
-      skipIntro = window.localStorage.getItem(ARCADE_INTRO_SKIP_STORAGE_KEY) === 'true';
+      const savedPreference = window.localStorage.getItem(`qch_arcade_music_enabled_${id}`);
+      if (savedPreference !== null) savedMusicEnabled = savedPreference === 'true';
     } catch (error) {
-      console.warn('Unable to read arcade intro preference', error);
+      console.warn('Unable to read arcade music preference', error);
     }
 
-    if (skipIntro) {
-      await launchArcadeGame(id);
-      return;
-    }
-
+    setPendingArcadeMusicEnabled(savedMusicEnabled);
     setPendingArcadeIntroGameId(id);
     playSfx('intro_fliper', {
       category: 'ui',
       exclusiveKey: 'arcade-intro',
       volume: 1,
     });
-  }, [launchArcadeGame, playSfx]);
+  }, [playSfx]);
 
-  const completeArcadeIntro = useCallback(async (dontShowAgain: boolean) => {
+  const completeArcadeIntro = useCallback(async (musicEnabled: boolean) => {
     const gameId = pendingArcadeIntroGameId;
     if (!gameId) return;
 
-    if (dontShowAgain) {
-      try {
-        window.localStorage.setItem(ARCADE_INTRO_SKIP_STORAGE_KEY, 'true');
-      } catch (error) {
-        console.warn('Unable to save arcade intro preference', error);
-      }
+    try {
+      window.localStorage.setItem(`qch_arcade_music_enabled_${gameId}`, String(musicEnabled));
+    } catch (error) {
+      console.warn('Unable to save arcade music preference', error);
     }
 
+    setActiveArcadeMusicEnabled(musicEnabled);
     setPendingArcadeIntroGameId(null);
     stopSfx('intro_fliper');
     await launchArcadeGame(gameId);
   }, [launchArcadeGame, pendingArcadeIntroGameId, stopSfx]);
+
+  const closeArcadeIntro = useCallback(() => {
+    setPendingArcadeIntroGameId(null);
+    stopSfx('intro_fliper');
+  }, [stopSfx]);
 
   const handleArcadeGameSelect = useCallback(async (id: string) => {
     if (!isArcadeUnlocked) return;
@@ -3226,13 +3241,19 @@ const DashboardContent = memo(({
       return;
     }
 
-    // Priority for Arcade Music
+    // Priority for Arcade Music. The arcade choice must not overwrite the chapter preference.
     if (activeMiniGameId) {
+      if (!activeArcadeMusicEnabled) {
+        jukebox.stop({ rememberPreference: false });
+        lastArcadeMusicGameIdRef.current = null;
+        return;
+      }
+
       const arcadeTheme = ARCADE_THEMES[activeMiniGameId];
       if (arcadeTheme && arcadeTheme.playlist.length > 0) {
         if (lastArcadeMusicGameIdRef.current !== activeMiniGameId) {
           console.log(`[MusicEngine] Arcade started: ${activeMiniGameId}. Restarting arcade playlist...`);
-          jukebox.playPlaylist(arcadeTheme.playlist, { restart: true, loop: true });
+          jukebox.playPlaylist(arcadeTheme.playlist, { restart: true, loop: true, rememberPreference: false });
           lastArcadeMusicGameIdRef.current = activeMiniGameId;
         }
         return; // Stay in arcade music
@@ -3240,6 +3261,11 @@ const DashboardContent = memo(({
     }
 
     lastArcadeMusicGameIdRef.current = null;
+    if (!jukebox.desiredIsPlaying) {
+      jukebox.stop({ rememberPreference: false });
+      return;
+    }
+
     const theme = ROUTE_THEMES[routeTier];
     if (theme && theme.playlist.length > 0) {
       const currentUrl = jukebox.currentTrack?.url;
@@ -3254,7 +3280,7 @@ const DashboardContent = memo(({
       jukebox.stop();
     }
 
-  }, [activeMiniGameId, routeTier, isLoaded, musicOn, isSurfaceWarBattle, isVoidLocalBattle, route4ColonyBattleMusicActive, jukebox, jukebox.playPlaylist, jukebox.stop, jukebox.currentTrack?.url]);
+  }, [activeArcadeMusicEnabled, activeMiniGameId, routeTier, isLoaded, musicOn, isSurfaceWarBattle, isVoidLocalBattle, route4ColonyBattleMusicActive, jukebox, jukebox.desiredIsPlaying, jukebox.playPlaylist, jukebox.stop, jukebox.currentTrack?.url]);
   const setOresCollected = useCallback((val: Record<string, number> | ((prev: Record<string, number>) => Record<string, number>)) => {
     const nextVal = typeof val === 'function' ? val(oresCollectedRef.current) : val;
     oresCollectedRef.current = nextVal;
@@ -4999,7 +5025,8 @@ const DashboardContent = memo(({
       if (!event.data) return;
 
       if (event.data.type === 'ARCADE_RESULT_SHOWN') {
-        jukebox.stop();
+        setActiveArcadeMusicEnabled(false);
+        jukebox.stop({ rememberPreference: false });
         lastArcadeMusicGameIdRef.current = null;
       }
 
@@ -10785,7 +10812,10 @@ const DashboardContent = memo(({
                       <ArcadeIntroOverlay
                         key={pendingArcadeIntroGameId}
                         language={language as 'pt' | 'en'}
+                        game={MINI_GAMES_CONFIG.find(game => game.id === pendingArcadeIntroGameId)!}
+                        initialMusicEnabled={pendingArcadeMusicEnabled}
                         onContinue={completeArcadeIntro}
+                        onClose={closeArcadeIntro}
                       />
                     ) : activeMiniGameId ? (
                       <div className="relative w-full h-full flex flex-col">

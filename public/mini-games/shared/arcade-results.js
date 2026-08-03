@@ -20,6 +20,14 @@
     return lang.startsWith('en') ? 'en' : 'pt';
   };
 
+  const isGameMusicEnabled = gameId => {
+    try {
+      return window.localStorage.getItem(`qch_arcade_music_effective_${gameId}`) !== 'false';
+    } catch (error) {
+      return true;
+    }
+  };
+
   const labels = {
     pt: {
       victory: 'VITÓRIA',
@@ -60,6 +68,9 @@
         ? `/assets/games/${asset.folder}/${asset.file}_${result}.webm`
         : '';
       const audio = RESULT_AUDIO[result];
+      const resultAudio = isGameMusicEnabled(gameId)
+        ? `<audio class="qch-result-audio" src="${audio}" autoplay loop></audio>`
+        : '';
 
       if (revealTimer) {
         window.clearTimeout(revealTimer);
@@ -78,7 +89,7 @@
         <section class="qch-result-card ${victory ? 'is-victory' : 'is-lose'}" role="dialog" aria-modal="true">
           <div class="qch-result-art">
             <video src="${video}" autoplay loop muted playsinline aria-hidden="true"></video>
-            <audio class="qch-result-audio" src="${audio}" autoplay loop></audio>
+            ${resultAudio}
           </div>
           <div class="qch-result-info">
             <div class="qch-result-kicker">${copy.result}</div>

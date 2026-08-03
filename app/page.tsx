@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef, useSyncExternalStore } from 'react';
 import Image from 'next/image';
 import { motion, AnimatePresence } from 'motion/react';
-import { Rocket, Settings, Trophy, Play, Music, Volume2, Globe, X, Timer, Trash2, ShieldCheck, Clock, Navigation, Database, Coffee, ArrowRight, ChevronRight, ChevronLeft, Radio, Sliders } from 'lucide-react';
+import { Rocket, Settings, Trophy, Play, Music, Volume2, Globe, X, Timer, Trash2, ShieldCheck, Clock, Navigation, Database, Coffee, ArrowRight, ChevronRight, ChevronLeft, Radio, Sliders, Monitor, Maximize2 } from 'lucide-react';
 import { IntroNarrative } from '@/components/IntroNarrative';
 import { GameDashboard } from '@/components/GameDashboard';
 import { AchievementsModal } from '@/components/AchievementsModal';
@@ -59,6 +59,15 @@ const wait = (ms: number) => new Promise(resolve => window.setTimeout(resolve, m
 const META_ACHIEVEMENTS_STORAGE_KEY = 'qch_meta_achievements';
 const SECRET_ALIEN_ACHIEVEMENT_ID = 'secret_alien_name';
 const SECRET_ALIEN_NAME_STORAGE_KEY = 'qch_secret_alien_name_unlocked';
+const DISPLAY_SETTINGS_STORAGE_KEY = 'qch_display_settings';
+const DISPLAY_RESOLUTIONS = [
+  { value: '1280x720', label: '1280 × 720' },
+  { value: '1366x768', label: '1366 × 768' },
+  { value: '1440x900', label: '1440 × 900' },
+  { value: '1600x900', label: '1600 × 900' },
+  { value: '1920x1080', label: '1920 × 1080' },
+] as const;
+type DisplayResolution = (typeof DISPLAY_RESOLUTIONS)[number]['value'];
 
 type AchievementMeta = {
   unlockedAchievements: string[];
@@ -1100,6 +1109,10 @@ export default function GameHome() {
 
   const [view, setView] = useState<'landing' | 'narrative' | 'game'>('landing');
   const [showOptions, setShowOptions] = useState(false);
+  const [displayMode, setDisplayMode] = useState<QchDisplayMode>('windowed');
+  const [displayResolution, setDisplayResolution] = useState<DisplayResolution>('1440x900');
+  const [displayControlsAvailable, setDisplayControlsAvailable] = useState(false);
+  const [displayError, setDisplayError] = useState<string | null>(null);
   const [language, setLanguage] = useState<Language>('pt');
   const { masterMusicOn, masterMusicVolume, masterSfxOn, updateSettings } = useSoundMaster();
   const [showHorizonRadio, setShowHorizonRadio] = useState(false);
@@ -1119,6 +1132,96 @@ export default function GameHome() {
   const [unlockedAchievements, setUnlockedAchievements] = useState<string[]>([]);
   const [achievementProgress, setAchievementProgress] = useState<{ [key: string]: number }>({});
   const [isShaking, setIsShaking] = useState(false);
+
+  const syncDisplayState = React.useCallback((state: QchDisplayState | null) => {
+    if (!state) return;
+    setDisplayMode(state.mode);
+    if (
+      state.mode === 'windowed'
+      && DISPLAY_RESOLUTIONS.some(option => option.value === state.resolution)
+    ) {
+      setDisplayResolution(state.resolution as DisplayResolution);
+    }
+  }, []);
+
+  const applyDisplaySettings = async (
+    mode: QchDisplayMode,
+    resolution: DisplayResolution = displayResolution,
+  ) => {
+    const displayApi = window.qchDesktop?.display;
+    if (!displayApi) return;
+
+    setDisplayError(null);
+    try {
+      const state = await displayApi.apply({ mode, resolution });
+      syncDisplayState(state);
+      setDisplayMode(mode);
+      setDisplayResolution(resolution);
+      window.localStorage.setItem(
+        DISPLAY_SETTINGS_STORAGE_KEY,
+        JSON.stringify({ mode, resolution }),
+      );
+    } catch (error) {
+      console.error('Unable to apply display settings', error);
+      setDisplayError(language === 'pt'
+        ? 'Não foi possível alterar o modo de vídeo.'
+        : 'Unable to change the display mode.');
+    }
+  };
+
+  useEffect(() => {
+    const displayApi = window.qchDesktop?.display;
+    if (!displayApi) return;
+
+    const unsubscribe = displayApi.onChanged(state => {
+      syncDisplayState(state);
+      try {
+        const saved = window.localStorage.getItem(DISPLAY_SETTINGS_STORAGE_KEY);
+        const previousPreference = saved ? JSON.parse(saved) : null;
+        const reportedResolution = DISPLAY_RESOLUTIONS.some(
+          option => option.value === state.resolution,
+        )
+          ? state.resolution
+          : previousPreference?.resolution;
+        const resolution = DISPLAY_RESOLUTIONS.some(option => option.value === reportedResolution)
+          ? reportedResolution
+          : '1440x900';
+        window.localStorage.setItem(
+          DISPLAY_SETTINGS_STORAGE_KEY,
+          JSON.stringify({ mode: state.mode, resolution }),
+        );
+      } catch (error) {
+        console.error('Unable to save display shortcut state', error);
+      }
+    });
+
+    const initializeDisplay = async () => {
+      try {
+        const saved = window.localStorage.getItem(DISPLAY_SETTINGS_STORAGE_KEY);
+        const preference = saved ? JSON.parse(saved) : null;
+        const isKnownResolution = DISPLAY_RESOLUTIONS.some(
+          option => option.value === preference?.resolution,
+        );
+
+        if (
+          (preference?.mode === 'fullscreen' || preference?.mode === 'windowed')
+          && isKnownResolution
+        ) {
+          const state = await displayApi.apply(preference);
+          syncDisplayState(state);
+          if (preference.mode === 'fullscreen') setDisplayMode('fullscreen');
+        } else {
+          syncDisplayState(await displayApi.getState());
+        }
+        setDisplayControlsAvailable(true);
+      } catch (error) {
+        console.error('Unable to initialize display settings', error);
+      }
+    };
+
+    void initializeDisplay();
+    return unsubscribe;
+  }, [syncDisplayState]);
 
   const isMounted = useClientReady();
   const [randomVisualIndex, setRandomVisualIndex] = useState(-1);
@@ -2020,7 +2123,7 @@ export default function GameHome() {
               initial={{ scale: 0.9, y: 20 }}
               animate={{ scale: 1, y: 0 }}
               exit={{ scale: 0.9, y: 20 }}
-              className="w-full max-w-md bg-slate-900 border-2 border-cyan-500 rounded-2xl p-8 relative overflow-hidden bg-[url('/images/ui/options_background.webp')] bg-cover bg-center"
+              className="w-full max-w-xl max-h-[92vh] overflow-y-auto bg-slate-900 border-2 border-cyan-500 rounded-2xl p-8 relative bg-[url('/images/ui/options_background.webp')] bg-cover bg-center"
             >
               <div className="absolute inset-0 bg-slate-950/58 pointer-events-none" />
               {/* Scanline Effect */}
@@ -2040,6 +2143,70 @@ export default function GameHome() {
               </h2>
 
               <div className="relative z-10 space-y-8">
+                {/* Display */}
+                <div className="space-y-4 p-4 bg-cyan-500/5 border border-cyan-500/20 rounded-xl">
+                  <h3 className="text-[12px] font-orbitron text-cyan-400 uppercase tracking-widest flex items-center justify-between">
+                    <span className="flex items-center gap-2">
+                      <Monitor className="w-4 h-4" /> {tl('DISPLAY', 'VÍDEO')}
+                    </span>
+                    <span className="text-[8px] font-mono text-cyan-500/50">
+                      {displayMode === 'fullscreen'
+                        ? tl('NATIVE', 'NATIVA')
+                        : displayResolution.replace('x', ' × ')}
+                    </span>
+                  </h3>
+
+                  <div className="grid grid-cols-2 gap-2" role="group" aria-label={tl('Display mode', 'Modo de vídeo')}>
+                    <button
+                      type="button"
+                      disabled={!displayControlsAvailable}
+                      onClick={() => {
+                        playSfx('aba_click');
+                        void applyDisplaySettings('windowed');
+                      }}
+                      className={`py-2 rounded font-orbitron text-[11px] border transition-all disabled:cursor-not-allowed disabled:opacity-40 ${displayMode === 'windowed' ? 'bg-cyan-500 text-black border-cyan-400' : 'bg-transparent text-cyan-300 border-cyan-500/30 hover:bg-cyan-500/10'}`}
+                    >
+                      <span className="flex items-center justify-center gap-2"><Monitor className="w-3.5 h-3.5" /> {tl('WINDOWED', 'JANELA')}</span>
+                    </button>
+                    <button
+                      type="button"
+                      disabled={!displayControlsAvailable}
+                      onClick={() => {
+                        playSfx('aba_click');
+                        void applyDisplaySettings('fullscreen');
+                      }}
+                      className={`py-2 rounded font-orbitron text-[11px] border transition-all disabled:cursor-not-allowed disabled:opacity-40 ${displayMode === 'fullscreen' ? 'bg-cyan-500 text-black border-cyan-400' : 'bg-transparent text-cyan-300 border-cyan-500/30 hover:bg-cyan-500/10'}`}
+                    >
+                      <span className="flex items-center justify-center gap-2"><Maximize2 className="w-3.5 h-3.5" /> {tl('NATIVE FULLSCREEN', 'TELA CHEIA NATIVA')}</span>
+                    </button>
+                  </div>
+
+                  <label className="block space-y-2">
+                    <span className="font-mono text-[9px] uppercase tracking-[0.2em] text-cyan-100/60">
+                      {tl('Window resolution', 'Resolução da janela')}
+                    </span>
+                    <select
+                      value={displayResolution}
+                      disabled={!displayControlsAvailable}
+                      onChange={event => {
+                        const resolution = event.target.value as DisplayResolution;
+                        setDisplayResolution(resolution);
+                        void applyDisplaySettings('windowed', resolution);
+                      }}
+                      className="w-full rounded-lg border border-cyan-500/35 bg-slate-950 px-3 py-2 font-orbitron text-xs text-cyan-100 outline-none transition focus:border-cyan-300 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      {DISPLAY_RESOLUTIONS.map(option => (
+                        <option key={option.value} value={option.value}>{option.label}</option>
+                      ))}
+                    </select>
+                  </label>
+
+                  {!displayControlsAvailable && (
+                    <p className="font-mono text-[9px] text-amber-300/80">{tl('Available in the desktop version.', 'Disponível na versão desktop.')}</p>
+                  )}
+                  {displayError && <p className="font-mono text-[9px] text-rose-300">{displayError}</p>}
+                </div>
+
                 {/* Horizon Radio - Master Audio Control */}
                 <div className="space-y-3 p-4 bg-cyan-500/5 border border-cyan-500/20 rounded-xl relative overflow-hidden group">
                   <div className="absolute inset-0 bg-gradient-to-r from-cyan-500/10 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000" />
