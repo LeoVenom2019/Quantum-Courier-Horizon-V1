@@ -148,13 +148,14 @@ import {
 } from '@/lib/game-data';
 import { useSFX } from '@/hooks/useSFX';
 import { GameStorage } from '@/lib/game-storage';
-import { SaveManager } from '@/lib/save-manager';
+import { SaveManager, sanitizeSave } from '@/lib/save-manager';
 import { useEconomy, useDispatch, useProgression, useMining, useCombat, useMissions, useEarth, useGame, useSystem } from '@/lib/game-state/index';
 import { normalizeGameNumber } from '@/lib/game-state/numbers';
 import { getChapterDeliveryProgress, getRemainingDeliveries } from '@/lib/delivery-progress.mjs';
 import { calculateNewEarthAnnualPopulationGrowth } from '@/lib/new-earth-population-growth.mjs';
 import { hasBossZeroDefeatEvidence } from '@/lib/void-boss-achievements.mjs';
 import { getNewEarthDefenseAchievementProgress } from '@/lib/new-earth-defense-achievements.mjs';
+import { getPirateSlayerProgress } from '@/lib/pirate-slayer-progress.mjs';
 import {
   BOSS_ENCOUNTER_COOLDOWN_MS,
   getDeliveryFuelCost,
@@ -391,6 +392,7 @@ const createEmptyRouteStats = (): RouteStats => ({
   autoExtractionPacksSold: 0,
   qcFromBattles: 0,
   battlesWon: 0,
+  manualBattlesWon: 0,
   perfectDeliveries: 0,
 });
 
@@ -1912,7 +1914,6 @@ const DashboardContent = memo(({
   const qcRef = React.useRef(qc);
   const isInitialTickRef = React.useRef(true);
   const isResettingRef = React.useRef(false);
-  const pendingHistoryRef = React.useRef(false);
   const lastScanTimeRef = React.useRef(lastScanTime);
   const lastRandomBattleTimeRef = React.useRef(0);
   const lastBossBattleTimeRef = React.useRef(0);
@@ -5150,56 +5151,53 @@ const DashboardContent = memo(({
 
 
   const updateHistoryStats = useCallback((
-    type: 'acquired' | 'spent' | 'mission_complete' | 'battle_win' | 'manual_mining' | 'auto_mining' | 'manual_extraction' | 'auto_extraction' | 'perfect_delivery' | 'random_battle_found',
+    type: 'acquired' | 'spent' | 'mission_complete' | 'battle_win' | 'manual_battle_win' | 'manual_mining' | 'auto_mining' | 'manual_extraction' | 'auto_extraction' | 'perfect_delivery' | 'random_battle_found',
     amount: number,
     tier: string,
     source?: 'delivery' | 'mining' | 'battle' | 'mission' | 'extraction' | 'tutorial'
   ) => {
     const safeAmount = normalizeGameNumber(amount);
-    const next = withRouteStatsDefaults(historyStatsRef.current[tier]);
+    const updates: Array<{ field: keyof RouteStats; amount: number }> = [];
 
     if (type === 'acquired') {
-      next.qcTotalAcquired = normalizeGameNumber(next.qcTotalAcquired) + safeAmount;
-      if (source === 'delivery') next.qcFromDeliveries = normalizeGameNumber(next.qcFromDeliveries) + safeAmount;
-      if (source === 'mining') next.qcFromMining = normalizeGameNumber(next.qcFromMining) + safeAmount;
-      if (source === 'battle') next.qcFromBattles = normalizeGameNumber(next.qcFromBattles) + safeAmount;
-      if (source === 'mission') next.qcFromMissions = normalizeGameNumber(next.qcFromMissions) + safeAmount;
-      if (source === 'extraction') next.qcFromExtraction = normalizeGameNumber(next.qcFromExtraction) + safeAmount;
-      if (source === 'tutorial') next.qcFromTutorial = normalizeGameNumber(next.qcFromTutorial) + safeAmount;
-    } else if (type === 'spent') {
-      next.qcSpent = normalizeGameNumber(next.qcSpent) + safeAmount;
-    } else if (type === 'mission_complete') {
-      next.missionsCompleted = normalizeGameNumber(next.missionsCompleted) + 1;
-    } else if (type === 'battle_win') {
-      next.battlesWon = normalizeGameNumber(next.battlesWon) + 1;
-    } else if (type === 'manual_mining') {
-      next.manualMiningPacksSold = normalizeGameNumber(next.manualMiningPacksSold) + safeAmount;
-    } else if (type === 'auto_mining') {
-      next.autoMiningPacksSold = normalizeGameNumber(next.autoMiningPacksSold) + safeAmount;
-    } else if (type === 'manual_extraction') {
-      next.manualExtractionPacksSold = normalizeGameNumber(next.manualExtractionPacksSold) + safeAmount;
-    } else if (type === 'auto_extraction') {
-      next.autoExtractionPacksSold = normalizeGameNumber(next.autoExtractionPacksSold) + safeAmount;
-    } else if (type === 'perfect_delivery') {
-      next.perfectDeliveries = normalizeGameNumber(next.perfectDeliveries) + safeAmount;
-    } else if (type === 'random_battle_found') {
-      next.randomBattlesFound = normalizeGameNumber(next.randomBattlesFound) + safeAmount;
+      updates.push({ field: 'qcTotalAcquired', amount: safeAmount });
+      const sourceFields: Partial<Record<NonNullable<typeof source>, keyof RouteStats>> = {
+        delivery: 'qcFromDeliveries',
+        mining: 'qcFromMining',
+        battle: 'qcFromBattles',
+        mission: 'qcFromMissions',
+        extraction: 'qcFromExtraction',
+        tutorial: 'qcFromTutorial',
+      };
+      const sourceField = source ? sourceFields[source] : undefined;
+      if (sourceField) updates.push({ field: sourceField, amount: safeAmount });
+    } else {
+      const fields: Record<Exclude<typeof type, 'acquired'>, keyof RouteStats> = {
+        spent: 'qcSpent',
+        mission_complete: 'missionsCompleted',
+        battle_win: 'battlesWon',
+        manual_battle_win: 'manualBattlesWon',
+        manual_mining: 'manualMiningPacksSold',
+        auto_mining: 'autoMiningPacksSold',
+        manual_extraction: 'manualExtractionPacksSold',
+        auto_extraction: 'autoExtractionPacksSold',
+        perfect_delivery: 'perfectDeliveries',
+        random_battle_found: 'randomBattlesFound',
+      };
+      const unitIncrement = type === 'mission_complete' || type === 'battle_win' || type === 'manual_battle_win';
+      updates.push({ field: fields[type], amount: unitIncrement ? 1 : safeAmount });
     }
 
+    const next = withRouteStatsDefaults(historyStatsRef.current[tier]);
+    updates.forEach(({ field, amount: delta }) => {
+      next[field] = normalizeGameNumber(next[field]) + delta;
+    });
     historyStatsRef.current = { ...historyStatsRef.current, [tier]: next };
-    pendingHistoryRef.current = true;
-  }, []);
-  // Bug #2: Throttled History Flush (3s)
-  useEffect(() => {
-    if (!isLoaded) return;
-    const interval = setInterval(() => {
-      if (pendingHistoryRef.current) {
-        dispatch({ type: 'SET_HISTORY_STATS', payload: { stats: historyStatsRef.current } });
-        pendingHistoryRef.current = false;
-      }
-    }, 3000);
-    return () => clearInterval(interval);
-  }, [isLoaded, dispatch]);
+
+    updates.forEach(({ field, amount: delta }) => {
+      dispatch({ type: 'UPDATE_HISTORY', payload: { tier, field, amount: delta } });
+    });
+  }, [dispatch]);
 
   const handleSkillUpgrade = (cost: number, setter: (val: number) => void, level: number, name: string) => {
     if (qc >= cost) {
@@ -5665,7 +5663,7 @@ const DashboardContent = memo(({
 
 
 
-  const resolveBattleVictory = useCallback((battle: Battle) => {
+  const resolveBattleVictory = useCallback((battle: Battle, countsAsManualBattle = false) => {
     const multipliers = getEconomicMultipliers();
 
     // Calculate total win probability for bonus (ONLY FOR AUTO-SKIPPED BATTLES)
@@ -5762,6 +5760,9 @@ const DashboardContent = memo(({
     addXP(xpReward);
     updateHistoryStats('acquired', qcReward, routeTierRef.current, 'battle');
     updateHistoryStats('battle_win', 1, routeTierRef.current);
+    if (countsAsManualBattle && (routeTierRef.current === 'Solar' || routeTierRef.current === 'Interstellar')) {
+      updateHistoryStats('manual_battle_win', 1, routeTierRef.current);
+    }
 
 
     const xpText = xpReward > 0 ? `, +${formatValue(xpReward)} XP` : '';
@@ -5856,7 +5857,7 @@ const DashboardContent = memo(({
 
     if (battle.enemyHp <= 0) {
       battle.isVictory = true;
-      resolveBattleVictory(battle);
+      resolveBattleVictory(battle, true);
     }
 
     setActiveBattle(battle);
@@ -6403,11 +6404,15 @@ const DashboardContent = memo(({
     if (source === 'manual') next.manualDeliveries = normalizeGameNumber(next.manualDeliveries) + safeCount;
     if (source === 'auto') next.autoDeliveries = normalizeGameNumber(next.autoDeliveries) + safeCount;
     historyStatsRef.current = { ...historyStatsRef.current, [tier]: next };
-    pendingHistoryRef.current = true;
+    dispatch({ type: 'UPDATE_HISTORY', payload: { tier, field: 'deliveries', amount: safeCount } });
+    dispatch({
+      type: 'UPDATE_HISTORY',
+      payload: { tier, field: source === 'manual' ? 'manualDeliveries' : 'autoDeliveries', amount: safeCount },
+    });
 
-    // RHSE Solar Energy must be committed immediately; keeping it only in refs can    // be overwritten by unrelated state syncs before the flush interval runs.
+    // RHSE Solar Energy must be committed immediately; keeping it only in refs can be overwritten by unrelated state syncs.
     const mappingBonus = 1 + (solarMappingLevel * 0.1);
-    const energyToAdd = count * 50 * (routeTier === 'Interstellar' ? mappingBonus : 1);
+    const energyToAdd = safeCount * 50 * (tier === 'Interstellar' ? mappingBonus : 1);
     const previousSolarEnergy = solarEnergyRef.current;
     const nextSolarEnergy = Math.min(7500, previousSolarEnergy + energyToAdd);
     const solarDelta = nextSolarEnergy - previousSolarEnergy;
@@ -6567,7 +6572,14 @@ const DashboardContent = memo(({
     // 3. Battle Warrior & Pirate Slayer
     const totalBattlesWon = Object.values(historyStats).reduce((acc, curr) => acc + (curr.battlesWon || 0), 0);
     updateAchievementProgress('battle_warrior', totalBattlesWon, true);
-    updateAchievementProgress('pirate_slayer', totalBattlesWon, true);
+    const pirateSlayerProgress = getPirateSlayerProgress({
+      chapter1ManualVictories: historyStats.Solar?.manualBattlesWon,
+      chapter2ManualVictories: historyStats.Interstellar?.manualBattlesWon,
+      chapter4LandDefenseVictories: newEarthAchievementMetrics.perfectLandSearchDefenses,
+      chapter4SeaDefenseVictories: newEarthAchievementMetrics.perfectSeaSearchDefenses,
+      chapter4DirectBattleVictories: newEarthAchievementMetrics.directBattleVictories,
+    });
+    updateAchievementProgress('pirate_slayer', pirateSlayerProgress, true);
 
     // 4. Robot Owner
     const totalRobots = Object.values(miningRobots).reduce((a, b) => a + b, 0);
@@ -6658,9 +6670,12 @@ const DashboardContent = memo(({
     updateAchievementProgress('ne_genesis_builder_60', colonyBuildProgress('colony-1'), true);
     updateAchievementProgress('ne_elysium_builder_60', colonyBuildProgress('colony-3'), true);
     updateAchievementProgress('ne_gaia_builder_60', colonyBuildProgress('colony-4'), true);
-    const fullSectorScore = colonies.reduce((total, colony) => (
-      total + NEW_EARTH_SECTOR_ORDER.filter(sector => Number(colony.sectors?.[sector] ?? DEFAULT_COLONY_SECTORS[sector]) >= 100).length
-    ), 0);
+    const fullSectorScore = colonies.reduce((total, colony) => {
+      const effectiveSectors = calculateNewEarthSectors(colony, newEarthCardLevels);
+      return total + NEW_EARTH_SECTOR_ORDER.filter(
+        sector => Number(effectiveSectors[sector] ?? DEFAULT_COLONY_SECTORS[sector]) >= 100,
+      ).length;
+    }, 0);
     updateAchievementProgress('ne_all_colony_sectors_100', fullSectorScore, true);
 
     const defenseAchievementProgress = getNewEarthDefenseAchievementProgress({
@@ -6988,7 +7003,7 @@ const DashboardContent = memo(({
 
       if (saved) {
         try {
-          const data = SaveManager.loadSave(saved);
+          const data = SaveManager.loadSave(sanitizeSave(saved));
 
           // CRÍTICO: hidratar o Redux com o save completo
           // O GameProvider agora começa com INITIAL_STATE — precisamos fazer isso aqui
@@ -7805,10 +7820,18 @@ const DashboardContent = memo(({
         if (totalRewardBatch > 0) {
           creditQc(totalRewardBatch, 'delivery');
         }
-        const manualCount = completions.filter(c => c.isManual).reduce((acc, curr) => acc + curr.count, 0);
-        const autoCount = completions.filter(c => !c.isManual).reduce((acc, curr) => acc + curr.count, 0);
-        if (manualCount > 0) incrementDeliveries('manual', manualCount, routeTierRef.current);
-        if (autoCount > 0) incrementDeliveries('auto', autoCount, routeTierRef.current);
+        const deliveryCountsByTier = completions.reduce((counts, completion) => {
+          const completionTier = ROUTES_MAP.get(completion.routeId)?.tier || routeTierRef.current;
+          const current = counts[completionTier] || { manual: 0, auto: 0 };
+          current[completion.isManual ? 'manual' : 'auto'] += completion.count;
+          counts[completionTier] = current;
+          return counts;
+        }, {} as Record<string, { manual: number; auto: number }>);
+
+        Object.entries(deliveryCountsByTier).forEach(([completionTier, counts]) => {
+          if (counts.manual > 0) incrementDeliveries('manual', counts.manual, completionTier);
+          if (counts.auto > 0) incrementDeliveries('auto', counts.auto, completionTier);
+        });
         setTotalDeliveries(td => td + totalCompletedCount);
         setDeliveriesByLocation(prevLocs => {
           const nextLocs = { ...prevLocs };
@@ -7858,7 +7881,6 @@ const DashboardContent = memo(({
       if (Math.abs(miningWasteRef.current - lastFlushedWasteRef.current) > 0.01) { dispatch({ type: 'EARN_RESOURCES', payload: { miningWaste: miningWasteRef.current - lastFlushedWasteRef.current } }); lastFlushedWasteRef.current = miningWasteRef.current; }
       if (Math.abs(solarEnergyRef.current - lastFlushedSolarRef.current) > 0.01) { dispatch({ type: 'EARN_RESOURCES', payload: { solarEnergy: solarEnergyRef.current - lastFlushedSolarRef.current } }); lastFlushedSolarRef.current = solarEnergyRef.current; }
       if (Math.abs(aetherionTubesRef.current - lastFlushedTubesRef.current) > 0.01) { dispatch({ type: 'EARN_RESOURCES', payload: { aetherionTubes: aetherionTubesRef.current - lastFlushedTubesRef.current } }); lastFlushedTubesRef.current = aetherionTubesRef.current; }
-      dispatch({ type: 'SET_HISTORY_STATS', payload: { stats: historyStatsRef.current } });
       setAutoTravelProgress({ ...autoTravelProgressRef.current });
 
 
@@ -14085,7 +14107,7 @@ const DashboardContent = memo(({
           t={t}
           formatValue={formatValue}
           finishBattle={finishBattle}
-          resolveBattleVictory={resolveBattleVictory}
+          resolveBattleVictory={(battle) => resolveBattleVictory(battle, true)}
           resolveBattleDefeat={resolveBattleDefeat}
           setActiveBattle={setActiveBattle}
           playSfx={playSfx}

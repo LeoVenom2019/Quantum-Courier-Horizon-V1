@@ -420,6 +420,9 @@ const RESULT_MODAL_DELAY_MS = 1500;
 
 const PLAYER_IMAGE = `${ASSET_BASE}/player/horizon/horizon.webp`;
 const PLAYER_SPRITESHEET = `${ASSET_BASE}/player/horizon/horizon_12pos_spritesheet.webp`;
+const SUPPORT_DRONE_IMAGE = `${ASSET_BASE}/player/horizon/war_drone.webp`;
+const SUPPORT_DRONE_DRAW_WIDTH = 62;
+const SUPPORT_DRONE_DRAW_HEIGHT = 22;
 const PLAYER_SPRITE_FRAME_WIDTH = 370;
 const PLAYER_SPRITE_FRAME_HEIGHT = 234;
 const PLAYER_DRAW_WIDTH = 118;
@@ -4281,10 +4284,9 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
       const drawSupportDrone = (kind: 'damage' | 'defense', x: number, y: number) => {
         const isDamage = kind === 'damage';
         const color = isDamage ? '#e879f9' : '#4ade80';
-        const secondary = isDamage ? '#67e8f9' : '#a7f3d0';
         const faintColor = isDamage ? 'rgba(232,121,249,0.28)' : 'rgba(74,222,128,0.28)';
-        const wingColor = isDamage ? 'rgba(232,121,249,0.42)' : 'rgba(74,222,128,0.42)';
         const bob = Math.sin(now / 280 + (isDamage ? 0 : Math.PI)) * 3;
+        const droneImage = getImage(SUPPORT_DRONE_IMAGE);
         ctx.save();
         ctx.translate(x, y + bob);
         ctx.globalCompositeOperation = 'lighter';
@@ -4293,44 +4295,35 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
         ctx.beginPath();
         ctx.arc(0, 0, 22 + Math.sin(now / 180) * 2, 0, Math.PI * 2);
         ctx.stroke();
-        ctx.shadowColor = color;
-        ctx.shadowBlur = 18;
-        ctx.fillStyle = 'rgba(3,7,18,0.94)';
-        ctx.strokeStyle = color;
-        ctx.lineWidth = 1.6;
-        ctx.beginPath();
-        ctx.moveTo(18, 0);
-        ctx.lineTo(6, -11);
-        ctx.lineTo(-10, -8);
-        ctx.lineTo(-18, 0);
-        ctx.lineTo(-10, 8);
-        ctx.lineTo(6, 11);
-        ctx.closePath();
-        ctx.fill();
-        ctx.stroke();
-        ctx.fillStyle = wingColor;
-        ctx.beginPath();
-        ctx.moveTo(-8, -7);
-        ctx.lineTo(-24, -13);
-        ctx.lineTo(-18, -2);
-        ctx.closePath();
-        ctx.fill();
-        ctx.beginPath();
-        ctx.moveTo(-8, 7);
-        ctx.lineTo(-24, 13);
-        ctx.lineTo(-18, 2);
-        ctx.closePath();
-        ctx.fill();
-        ctx.shadowBlur = 24;
-        ctx.fillStyle = secondary;
-        ctx.beginPath();
-        ctx.arc(4, 0, 4.5 + Math.sin(now / 120) * 0.6, 0, Math.PI * 2);
-        ctx.fill();
         ctx.globalCompositeOperation = 'source-over';
+        ctx.shadowColor = color;
+        ctx.shadowBlur = 16;
+        if (droneImage?.complete && droneImage.naturalWidth > 0) {
+          ctx.drawImage(
+            droneImage,
+            -SUPPORT_DRONE_DRAW_WIDTH / 2,
+            -SUPPORT_DRONE_DRAW_HEIGHT / 2,
+            SUPPORT_DRONE_DRAW_WIDTH,
+            SUPPORT_DRONE_DRAW_HEIGHT,
+          );
+        } else {
+          ctx.fillStyle = 'rgba(3,7,18,0.94)';
+          ctx.strokeStyle = color;
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.moveTo(20, 0);
+          ctx.lineTo(-12, -8);
+          ctx.lineTo(-20, 0);
+          ctx.lineTo(-12, 8);
+          ctx.closePath();
+          ctx.fill();
+          ctx.stroke();
+        }
+        ctx.shadowBlur = 10;
         ctx.font = '900 7px Orbitron, sans-serif';
         ctx.textAlign = 'center';
         ctx.fillStyle = color;
-        ctx.fillText(isDamage ? 'ATK' : 'DEF', -2, 3);
+        ctx.fillText(isDamage ? 'ATK' : 'DEF', 0, 20);
         ctx.restore();
       };
 

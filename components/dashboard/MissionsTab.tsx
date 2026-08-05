@@ -27,12 +27,13 @@ const MissionsTab = memo(() => {
     setRadarUnlocked,
     autoClaimMissions,
     setAutoClaimMissions,
-    dispatch
+    dispatch,
+    showActionTutorial
   } = useDashboard();
 
   const { missions } = missionsState;
   const { routeTier } = progression;
-  const { qc } = economy;
+  const { qc, aetherion } = economy;
 
   const isInterstellar = routeTier === 'Interstellar';
   const readyToClaimCount = missions.filter(m => m.completed && !m.claimed).length;
@@ -137,10 +138,35 @@ const MissionsTab = memo(() => {
                 } else {
                   playSfx('error');
                   addLog(`${t('insufficientQCForRadar')} (${formatValue(unlockCost)} ${t('required')})`, 'error');
+                  showActionTutorial({
+                    id: `mission-radar-qc-${routeTier}`,
+                    chapter: routeTier,
+                    title: language === 'pt' ? 'Radar de missões indisponível' : 'Mission radar unavailable',
+                    reason: language === 'pt' ? `A instalação do radar custa ${formatValue(unlockCost)} QC.` : `Installing the radar costs ${formatValue(unlockCost)} QC.`,
+                    steps: language === 'pt'
+                      ? ['Conclua e resgate missões manualmente.', 'Faça entregas e venda recursos para acumular QC.', 'Compre o radar quando atingir o valor necessário.']
+                      : ['Complete and claim missions manually.', 'Make deliveries and sell resources to accumulate QC.', 'Buy the radar when you reach the required amount.'],
+                    requirement: `${formatValue(unlockCost)} QC`,
+                  });
                 }
                 return;
               }
               
+              const autoClaimCost = isInterstellar ? 2 : 1;
+              if (!autoClaimMissions && aetherion < autoClaimCost) {
+                showActionTutorial({
+                  id: `mission-auto-aetherion-${routeTier}`,
+                  chapter: routeTier,
+                  title: language === 'pt' ? 'Etérion necessário para o radar' : 'Aetherion required for radar',
+                  reason: language === 'pt' ? `Cada missão resgatada automaticamente consome ${autoClaimCost} Etérion.` : `Each automatically claimed mission consumes ${autoClaimCost} Aetherion.`,
+                  steps: language === 'pt'
+                    ? ['Produza Resíduos e Energia Solar na Mineração.', 'Crie um Tubo de Etérion Bruto no Reator Heliosingular.', 'Sintetize o tubo na CCE e tente ativar o radar novamente.']
+                    : ['Produce Waste and Solar Energy in Mining.', 'Create a Raw Aetherion Tube in the Heliosingular Reactor.', 'Synthesize it in the Aetherion Chamber and enable the radar again.'],
+                  requirement: language === 'pt' ? `${autoClaimCost} ETÉRION POR MISSÃO` : `${autoClaimCost} AETHERION PER MISSION`,
+                });
+                return;
+              }
+
               setAutoClaimMissions(!autoClaimMissions);
               playSfx(autoClaimMissions ? 'close_window' : 'ask_window');
               if (!autoClaimMissions) {

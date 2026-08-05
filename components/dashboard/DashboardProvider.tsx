@@ -21,6 +21,7 @@ import {
 import { useSFX } from '../../hooks/useSFX';
 import { dashboardTranslations as translations } from '@/lib/i18n/dashboard-translations';
 import { ROUTES, SHIPS, UPGRADES, VOID_AIRCRAFT, TECHNOLOGIES, VOID_POIS, ORES } from '@/lib/game-data';
+import { ActionBlockedTutorialModal, ActionTutorialConfig } from './ActionBlockedTutorialModal';
 
 
 import { ROUTES_MAP, EXTRACTION_PRODUCTION_COSTS, ORES_MAP, EXTRACTION_POINTS_MAP, UPGRADES_MAP, ROBOT_UPGRADES_MAP, INTERSTELLAR_EXTRACTION_VALUE_MULTIPLIER, MINING_VALUE_MULTIPLIER, BATTLE_REWARD_VALUE_MULTIPLIER } from '@/lib/game-constants';
@@ -332,6 +333,7 @@ interface DashboardContextType {
   // Tutorials
   seenTutorials: { [key: string]: boolean };
   completeTutorial: (tutorialId: string) => void;
+  showActionTutorial: (tutorial: ActionTutorialConfig) => void;
 
   // Goals Modal
   showRoute2Goals: boolean;
@@ -377,6 +379,7 @@ export const DashboardProvider = ({
   const [scanResult, setScanResult] = React.useState<'success' | 'failure' | null>(null);
   const [lastScanTime, setLastScanTime] = React.useState(0);
   const [gameLogs, setGameLogs] = React.useState<GameLogEntry[]>([]);
+  const [actionTutorial, setActionTutorial] = React.useState<ActionTutorialConfig | null>(null);
   
   const progression = useProgression();
   const totalDeliveries = progression.totalDeliveries;
@@ -390,6 +393,33 @@ export const DashboardProvider = ({
   const game = useGame();
   const dispatch = useDispatch();
   const { playSfx, stopSfx } = useSFX();
+
+  const showActionTutorial = useCallback((tutorial: ActionTutorialConfig) => {
+    try {
+      const dismissed = JSON.parse(window.localStorage.getItem('qch_dismissed_action_tutorials') || '{}') as Record<string, boolean>;
+      if (dismissed[tutorial.id]) return;
+    } catch {
+      // A damaged preference must never prevent contextual help from opening.
+    }
+    setActionTutorial(tutorial);
+    playSfx('tutorial_open');
+  }, [playSfx]);
+
+  const closeActionTutorial = useCallback((doNotShowAgain: boolean) => {
+    if (doNotShowAgain && actionTutorial) {
+      try {
+        const dismissed = JSON.parse(window.localStorage.getItem('qch_dismissed_action_tutorials') || '{}') as Record<string, boolean>;
+        window.localStorage.setItem(
+          'qch_dismissed_action_tutorials',
+          JSON.stringify({ ...dismissed, [actionTutorial.id]: true }),
+        );
+      } catch {
+        // Storage can be unavailable; closing the modal should still work.
+      }
+    }
+    setActionTutorial(null);
+    playSfx('close_window');
+  }, [actionTutorial, playSfx]);
 
   // Route 3 / Void Battle State (Now primarily in Redux)
   const voidBattleStatus = combat.voidBattleStatus;
@@ -680,7 +710,7 @@ export const DashboardProvider = ({
   }, []);
 
   const updateHistoryStats = useCallback((
-    type: 'earned' | 'spent' | 'delivered' | 'travelled' | 'acquired' | 'mission_complete' | 'battle_win' | 'random_battle_found',
+    type: 'earned' | 'spent' | 'delivered' | 'travelled' | 'acquired' | 'mission_complete' | 'battle_win' | 'manual_battle_win' | 'random_battle_found',
     value: number,
     tier: string,
     source?: string
@@ -690,6 +720,7 @@ export const DashboardProvider = ({
     if (type === 'delivered') field = 'deliveries';
     if (type === 'mission_complete') field = 'missionsCompleted';
     if (type === 'battle_win') field = 'battlesWon';
+    if (type === 'manual_battle_win') field = 'manualBattlesWon';
     if (type === 'random_battle_found') field = 'randomBattlesFound';
     
     if (type === 'earned' || type === 'acquired') {
@@ -763,6 +794,18 @@ export const DashboardProvider = ({
     if (economy.qc < cost) {
       playSfx('error');
       addLog('Insufficient QC for auto-travel slot', 'error');
+      showActionTutorial({
+        id: `auto-slot-qc-${route.tier}`,
+        chapter: route.tier,
+        title: language === 'pt' ? 'Central automática sem expansão' : 'Automation bay needs expansion',
+        reason: language === 'pt'
+          ? `Você precisa de ${cost.toLocaleString('pt-BR')} QC para instalar o próximo robô de entrega.`
+          : `You need ${cost.toLocaleString('en-US')} QC to install the next delivery robot.`,
+        steps: language === 'pt'
+          ? ['Faça entregas manuais ou venda pacotes de mineração para obter QC.', 'Volte à Central Automática e compre um espaço para a rota desejada.', 'Depois, mantenha naves e Etérion disponíveis para o sistema operar.']
+          : ['Complete manual deliveries or sell mining packs to earn QC.', 'Return to the Automation Center and buy a slot for the desired route.', 'Then keep ships and Aetherion available for the system to operate.'],
+        requirement: `${cost.toLocaleString(language === 'pt' ? 'pt-BR' : 'en-US')} QC`,
+      });
       return;
     }
 
@@ -775,7 +818,7 @@ export const DashboardProvider = ({
     playSfx('buying_iten');
     updateHistoryStats('spent', cost, progression.routeTier);
     addLog(t('autoTravelSlotPurchased'), 'success');
-  }, [progression, economy, dispatch, playSfx, addLog, getLocationMultiplier, getEconomicMultipliers, updateHistoryStats, completeInitialMission, t]);
+  }, [progression, economy, dispatch, playSfx, addLog, getLocationMultiplier, getEconomicMultipliers, updateHistoryStats, completeInitialMission, t, language, showActionTutorial]);
 
   const buyRoute = useCallback((route: any) => {
     if (economy.qc < (route.unlockCost || 0)) return;
@@ -793,6 +836,18 @@ export const DashboardProvider = ({
 
     if (economy.qc < fuelCost) {
       addLog(`Insufficient QC for fuel to ${route.name}`, 'error');
+      showActionTutorial({
+        id: `delivery-fuel-${route.tier}`,
+        chapter: route.tier,
+        title: language === 'pt' ? 'Combustível insuficiente' : 'Insufficient fuel credits',
+        reason: language === 'pt'
+          ? `O lançamento para ${route.name} custa ${fuelCost.toLocaleString('pt-BR')} QC e seu saldo não cobre a viagem.`
+          : `Launching to ${route.name} costs ${fuelCost.toLocaleString('en-US')} QC and your balance cannot cover the trip.`,
+        steps: language === 'pt'
+          ? ['Venda recursos na Mineração ou conclua missões.', 'Melhore tecnologias de eficiência para controlar os custos.', 'Retorne a Rotas quando tiver QC suficiente.']
+          : ['Sell resources in Mining or complete missions.', 'Upgrade efficiency technologies to control costs.', 'Return to Routes when you have enough QC.'],
+        requirement: `${fuelCost.toLocaleString(language === 'pt' ? 'pt-BR' : 'en-US')} QC`,
+      });
       return;
     }
     
@@ -837,6 +892,17 @@ export const DashboardProvider = ({
     
     if (currentlyInUse >= totalOwned) {
       addLog('No ships available!', 'error');
+      showActionTutorial({
+        id: `delivery-no-ship-${route.tier}`,
+        chapter: route.tier,
+        title: language === 'pt' ? 'Nenhuma nave disponível' : 'No ship available',
+        reason: language === 'pt'
+          ? 'Todas as naves compatíveis estão viajando ou reservadas para entregas automáticas.'
+          : 'Every compatible ship is traveling or reserved for automatic deliveries.',
+        steps: language === 'pt'
+          ? ['Espere uma entrega em andamento terminar.', 'Desative uma automação que esteja usando essa nave.', 'Ou compre outra unidade na aba Naves quando houver tecnologia e QC.']
+          : ['Wait for an active delivery to finish.', 'Disable an automation that is using this ship.', 'Or buy another unit in the Ships tab when technology and QC allow it.'],
+      });
       return;
     }
 
@@ -873,11 +939,39 @@ export const DashboardProvider = ({
       }
     ]);
     addLog(`Ship launched to ${route.name}`, 'info');
-  }, [economy.qc, progression, activeDeliveries, autoTravelActive, dispatch, updateHistoryStats, playSfx, addLog, language, missions.completedInitialMissions, completeInitialMission]);
+  }, [economy.qc, progression, activeDeliveries, autoTravelActive, dispatch, updateHistoryStats, playSfx, addLog, language, missions.completedInitialMissions, completeInitialMission, showActionTutorial]);
 
 
   const toggleAutoTravel = useCallback((routeId: string) => {
     const isActivating = !autoTravelDesired[routeId];
+    const route = ROUTES_MAP.get(routeId);
+
+    if (isActivating && route && (progression.autoTravelSlots[routeId] || 0) <= 0) {
+      showActionTutorial({
+        id: `auto-no-slot-${route.tier}`,
+        chapter: route.tier,
+        title: language === 'pt' ? 'Robô de entrega necessário' : 'Delivery robot required',
+        reason: language === 'pt' ? 'Esta rota ainda não possui um espaço de automação instalado.' : 'This route does not have an automation slot installed yet.',
+        steps: language === 'pt'
+          ? ['Abra a Central Automática.', 'Compre ao menos um espaço para esta rota usando QC.', 'Ative o sistema novamente.']
+          : ['Open the Automation Center.', 'Buy at least one slot for this route using QC.', 'Enable the system again.'],
+      });
+      return;
+    }
+
+    if (isActivating && route && economy.aetherion < 2) {
+      showActionTutorial({
+        id: `auto-aetherion-${route.tier}`,
+        chapter: route.tier,
+        title: language === 'pt' ? 'Etérion insuficiente' : 'Insufficient Aetherion',
+        reason: language === 'pt' ? 'Cada nave automática consome 2 Etérion no início de uma viagem.' : 'Each automatic ship consumes 2 Aetherion when a trip begins.',
+        steps: language === 'pt'
+          ? ['Na Mineração, acumule 2.500 Resíduos e 2.500 Energia Solar.', 'Abra Tecnologias e use o Reator Heliosingular para criar um Tubo de Etérion Bruto.', 'Sintetize o tubo na CCE e volte para ativar as entregas automáticas.']
+          : ['In Mining, collect 2,500 Waste and 2,500 Solar Energy.', 'Open Technologies and use the Heliosingular Reactor to create a Raw Aetherion Tube.', 'Synthesize the tube in the Aetherion Chamber, then enable automatic deliveries.'],
+        requirement: language === 'pt' ? '2 ETÉRION POR NAVE / VIAGEM' : '2 AETHERION PER SHIP / TRIP',
+      });
+      return;
+    }
     
     if (isActivating) {
       playSfx('open_window');
@@ -886,7 +980,7 @@ export const DashboardProvider = ({
     }
     
     setAutoTravelDesired(prev => ({ ...prev, [routeId]: isActivating }));
-  }, [autoTravelDesired, playSfx]);
+  }, [autoTravelDesired, economy.aetherion, language, playSfx, progression.autoTravelSlots, showActionTutorial]);
 
   const toggleAutoSkipRandomBattles = useCallback(() => {
     const isActivating = !progression.autoSkipRandomBattles;
@@ -1357,7 +1451,19 @@ export const DashboardProvider = ({
 
   const findBattle = useCallback(() => {
     const { battleLevel, radarLevel, routeTier } = progression;
-    if (battleLevel < 1) return;
+    if (battleLevel < 1) {
+      showActionTutorial({
+        id: `radar-battle-level-${routeTier}`,
+        chapter: routeTier,
+        title: language === 'pt' ? 'Varredura de batalha bloqueada' : 'Battle scan locked',
+        reason: language === 'pt' ? 'O radar de combate exige ao menos o nível 1 de Batalha.' : 'The combat radar requires at least Battle level 1.',
+        steps: language === 'pt'
+          ? ['Enfrente encontros encontrados durante entregas.', 'Ganhe XP de batalha e alcance o nível 1.', 'Volte a Naves › Nível de Batalha para iniciar a varredura.']
+          : ['Fight encounters found during deliveries.', 'Earn battle XP and reach level 1.', 'Return to Ships › Battle Level to start scanning.'],
+        requirement: language === 'pt' ? 'NÍVEL DE BATALHA 1' : 'BATTLE LEVEL 1',
+      });
+      return;
+    }
     if (isScanning) return;
     
     const now = Date.now();
@@ -1371,6 +1477,16 @@ export const DashboardProvider = ({
     if (now - lastScanTime < cooldown) {
       const remaining = Math.ceil((cooldown - (now - lastScanTime)) / 1000);
       addLog(`${t('radarCooldown')} ${remaining}s.`, 'warning');
+      showActionTutorial({
+        id: `radar-cooldown-${routeTier}`,
+        chapter: routeTier,
+        title: language === 'pt' ? 'Radar em recalibração' : 'Radar recalibrating',
+        reason: language === 'pt' ? `O radar precisa de mais ${remaining}s antes de uma nova varredura.` : `The radar needs another ${remaining}s before a new scan.`,
+        steps: language === 'pt'
+          ? ['Aguarde o contador chegar a zero.', 'No nível 5 de Batalha, o tempo de espera cai pela metade.', 'No Capítulo 2, o nível 55 remove totalmente essa espera.']
+          : ['Wait for the counter to reach zero.', 'At Battle level 5, the wait time is halved.', 'In Chapter 2, level 55 removes this wait entirely.'],
+        requirement: language === 'pt' ? `AGUARDE ${remaining}s` : `WAIT ${remaining}s`,
+      });
       return;
     }
     
@@ -1411,7 +1527,7 @@ export const DashboardProvider = ({
         setTimeout(() => setIsScanning(false), 2000);
       }
     }, intervalTime);
-  }, [progression, isScanning, lastScanTime, addLog, t, playSfx, dispatch]);
+  }, [progression, isScanning, lastScanTime, addLog, t, playSfx, dispatch, language, showActionTutorial]);
 
   const upgradeRadar = useCallback(() => {
     const { radarLevel } = progression;
@@ -1423,6 +1539,16 @@ export const DashboardProvider = ({
     if (economy.qc < cost) {
       playSfx('error');
       addLog(t('insufficientQCRadar'), 'error');
+      showActionTutorial({
+        id: `radar-upgrade-qc-${progression.routeTier}`,
+        chapter: progression.routeTier,
+        title: language === 'pt' ? 'Melhoria de radar indisponível' : 'Radar upgrade unavailable',
+        reason: language === 'pt' ? `A próxima calibração custa ${cost.toLocaleString('pt-BR')} QC.` : `The next calibration costs ${cost.toLocaleString('en-US')} QC.`,
+        steps: language === 'pt'
+          ? ['Vença batalhas e conclua entregas para obter QC.', 'Resgate recompensas de missões.', 'Volte quando tiver o valor necessário.']
+          : ['Win battles and complete deliveries to earn QC.', 'Claim mission rewards.', 'Return when you have the required amount.'],
+        requirement: `${cost.toLocaleString(language === 'pt' ? 'pt-BR' : 'en-US')} QC`,
+      });
       return;
     }
     
@@ -1430,7 +1556,7 @@ export const DashboardProvider = ({
     dispatch({ type: 'UPGRADE_RADAR' });
     playSfx('buy');
     addLog(t('radarUpgraded'), 'success');
-  }, [progression, economy.qc, dispatch, playSfx, addLog, t]);
+  }, [progression, economy.qc, dispatch, playSfx, addLog, t, language, showActionTutorial]);
 
   const upgradeBattleLevel = useCallback(() => {
     const { battleLevel, routeTier } = progression;
@@ -2515,6 +2641,7 @@ export const DashboardProvider = ({
       playSfx('success');
       addLog(tutorialId === 'routes2' ? t('tutorialRoutes2Bonus') : t('tutorialBonus'), 'success');
     },
+    showActionTutorial,
     startVoidMission,
     claimVoidAircraftMission,
     upgradeVoidAircraft,
@@ -2594,6 +2721,7 @@ export const DashboardProvider = ({
   }), [
     progression, economy, missions, mining, combat, earth, system, game, dispatch, t, formatValue,
     addLog, playSfx, pauseMusicForRoute4Credits, language, activeTab, autoTravelActive, autoTravelProgress, autoTravelDesired, toggleAutoSell,
+    showActionTutorial,
     activeDeliveries, showSkillMap, miningPageIndex, techSubTab, extractionPageIndex, 
     aircraftSubTab, shipPageIndex, historyPage, colonies, isScanning, scanProgress, scanResult, 
     lastScanTime, findBattle, upgradeRadar, upgradeBattleLevel, voidBattleStatus, 
@@ -2653,6 +2781,7 @@ export const DashboardProvider = ({
   return (
     <DashboardContext.Provider value={value}>
       {children}
+      <ActionBlockedTutorialModal key={actionTutorial?.id || 'closed'} tutorial={actionTutorial} language={language} onClose={closeActionTutorial} />
     </DashboardContext.Provider>
   );
 };

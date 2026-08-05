@@ -21,7 +21,8 @@ const RoutesTab = memo(() => {
     autoTravelProgress,
     activeDeliveries,
     buyRoute,
-    launchRoute
+    launchRoute,
+    showActionTutorial
   } = useDashboard();
 
   const { 
@@ -169,7 +170,21 @@ const RoutesTab = memo(() => {
               )}
 
               {!isPurchased && (
-                <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/90 backdrop-blur-[2px] p-4 text-center">
+                <div
+                  className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/90 backdrop-blur-[2px] p-4 text-center"
+                  onClick={() => {
+                    if (conditionsMet) return;
+                    showActionTutorial({
+                      id: `route-locked-${routeTier}`,
+                      chapter: routeTier,
+                      title: language === 'pt' ? 'Rota ainda bloqueada' : 'Route still locked',
+                      reason: language === 'pt' ? 'Esta rota depende de um marco de progresso que ainda não foi concluído.' : 'This route depends on a progression milestone that has not been completed yet.',
+                      steps: language === 'pt'
+                        ? ['Confira o requisito exibido no cartão.', 'Compre e evolua as naves exigidas.', 'Conclua as rotas e tecnologias anteriores para liberar o próximo destino.']
+                        : ['Check the requirement displayed on the card.', 'Buy and advance the required ships.', 'Complete prior routes and technologies to unlock the next destination.'],
+                    });
+                  }}
+                >
                   {!conditionsMet ? (
                     <>
                       <Shield className="w-8 h-8 text-slate-600 mb-3" />
@@ -183,8 +198,23 @@ const RoutesTab = memo(() => {
                       <Zap className={`w-8 h-8 ${isInterstellar ? 'text-orange-500' : 'text-yellow-500'} mb-3 animate-pulse`} />
                       <div className={`text-[14px] font-orbitron ${themeText} uppercase tracking-[0.2em] mb-4 font-bold`}>{t('readyToUnlock')}</div>
                       <button
-                        onClick={() => buyRoute(route)}
-                        disabled={!canAffordUnlock}
+                        onClick={() => {
+                          if (canAffordUnlock) {
+                            buyRoute(route);
+                            return;
+                          }
+                          showActionTutorial({
+                            id: `route-unlock-qc-${routeTier}`,
+                            chapter: routeTier,
+                            title: language === 'pt' ? 'QC insuficiente para a rota' : 'Not enough QC for this route',
+                            reason: language === 'pt' ? `O desbloqueio custa ${formatValue(route.unlockCost || 0)} QC.` : `Unlocking this route costs ${formatValue(route.unlockCost || 0)} QC.`,
+                            steps: language === 'pt'
+                              ? ['Faça entregas nas rotas já abertas.', 'Venda pacotes de mineração e conclua missões.', 'Volte quando seu saldo atingir o custo indicado.']
+                              : ['Complete deliveries on routes already open.', 'Sell mining packs and complete missions.', 'Return when your balance reaches the displayed cost.'],
+                            requirement: `${formatValue(route.unlockCost || 0)} QC`,
+                          });
+                        }}
+                        aria-disabled={!canAffordUnlock}
                         className={`px-6 py-3 rounded-lg font-orbitron text-base font-bold tracking-[0.2em] transition-all w-full border-b-2 ${
                           canAffordUnlock 
                           ? `${isInterstellar ? 'bg-orange-500 text-black hover:bg-orange-400 border-orange-700 shadow-[0_0_25px_rgba(249,115,22,0.4)]' : 'bg-yellow-500 text-black hover:bg-yellow-400 border-yellow-700 shadow-[0_0_25px_rgba(234,179,8,0.4)]'}` 
@@ -248,8 +278,35 @@ const RoutesTab = memo(() => {
 
               {/* Launch Button - Perfectly fits the bottom */}
               <button
-                disabled={!isPurchased || !canAffordFuel || !shipAvailable}
-                onClick={() => launchRoute(route)}
+                aria-disabled={!isPurchased || !canAffordFuel || !shipAvailable}
+                onClick={() => {
+                  if (totalOwned === 0) {
+                    showActionTutorial({
+                      id: `delivery-ship-required-${routeTier}`,
+                      chapter: routeTier,
+                      title: language === 'pt' ? 'Nave compatível necessária' : 'Compatible ship required',
+                      reason: language === 'pt' ? `Esta rota exige uma nave de nível ${requiredLevel}.` : `This route requires a level ${requiredLevel} ship.`,
+                      steps: language === 'pt'
+                        ? ['Abra a aba Naves.', `Desbloqueie a tecnologia de nave nível ${requiredLevel}.`, 'Adquira a primeira unidade e volte para lançar a entrega.']
+                        : ['Open the Ships tab.', `Unlock level ${requiredLevel} ship technology.`, 'Acquire the first unit and return to launch the delivery.'],
+                      requirement: language === 'pt' ? `NAVE NÍVEL ${requiredLevel}` : `LEVEL ${requiredLevel} SHIP`,
+                    });
+                    return;
+                  }
+                  if (manualHangarLimitReached || !shipAvailable) {
+                    showActionTutorial({
+                      id: `delivery-hangar-busy-${routeTier}`,
+                      chapter: routeTier,
+                      title: language === 'pt' ? 'Hangar sem disponibilidade' : 'Hangar unavailable',
+                      reason: language === 'pt' ? 'As naves compatíveis estão em viagem ou o limite de operações simultâneas foi atingido.' : 'Compatible ships are traveling or the simultaneous operation limit has been reached.',
+                      steps: language === 'pt'
+                        ? ['Espere uma entrega terminar.', 'Pause uma rota automática que use a mesma nave.', 'Compre outra unidade compatível, se possível.']
+                        : ['Wait for a delivery to finish.', 'Pause an automatic route using the same ship.', 'Buy another compatible unit if possible.'],
+                    });
+                    return;
+                  }
+                  launchRoute(route);
+                }}
                 className={`w-full py-4 font-orbitron text-[14px] font-black tracking-[0.2em] transition-all flex items-center justify-center gap-3 uppercase border-t border-white/10 ${
                   isPurchased && canAffordFuel && shipAvailable
                   ? (isAutoActive 

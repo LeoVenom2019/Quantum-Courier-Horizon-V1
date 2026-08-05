@@ -3,11 +3,13 @@
 import React, { memo, useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
 import { motion, AnimatePresence } from 'motion/react';
-import { Download, Upload, Target, Activity, TrendingUp, LogOut, ChevronLeft, ChevronRight, Play, Pause } from 'lucide-react';
+import { Download, Upload, Target, Activity, TrendingUp, LogOut, ChevronLeft, ChevronRight, Play, Pause, PackageCheck, Bot, User, Database } from 'lucide-react';
 import { useDashboard } from './DashboardProvider';
 import { GameStorage } from '@/lib/game-storage';
 import { MINI_GAMES_CONFIG } from '@/lib/mini-games-config';
 import { getOwnedArcadeIdsFromCards, normalizeOwnedColonyCardIds } from '@/lib/colony-cards';
+import { ROUTES } from '@/lib/game-data';
+import { getDeliveriesByTierFromLocations } from '@/lib/delivery-progress.mjs';
 import {
   NEW_EARTH_HELICOPTER_WAR_INTEL,
   NEW_EARTH_TANK_WAR_INTEL,
@@ -383,6 +385,29 @@ const HistoryTab = memo(function HistoryTab({ newEarthWarIntelCollection }: Hist
                 
                 const tier = availableTiers[historyPage] || 'Solar';
                 const stats = historyStats[tier] || {};
+                const deliveriesFromLocations = getDeliveriesByTierFromLocations(
+                  progression.deliveriesByLocation,
+                  ROUTES,
+                  tier,
+                );
+                const manualDeliveries = Math.max(0, Number(stats.manualDeliveries) || 0);
+                const autoDeliveries = Math.max(0, Number(stats.autoDeliveries) || 0);
+                const classifiedDeliveries = manualDeliveries + autoDeliveries;
+                const totalTierDeliveries = Math.max(
+                  Math.max(0, Number(stats.deliveries) || 0),
+                  classifiedDeliveries,
+                  deliveriesFromLocations,
+                );
+                const legacyDeliveries = Math.max(0, totalTierDeliveries - classifiedDeliveries);
+                const qcSources = [
+                  { label: t('fromDeliveries'), value: Math.max(0, Number(stats.qcFromDeliveries) || 0), color: 'bg-cyan-400' },
+                  { label: t('fromMining'), value: Math.max(0, Number(stats.qcFromMining) || 0), color: 'bg-violet-400' },
+                  { label: t('fromExplorationMining'), value: Math.max(0, Number(stats.qcFromExtraction) || 0), color: 'bg-amber-400' },
+                  { label: t('fromMissions'), value: Math.max(0, Number(stats.qcFromMissions) || 0) + Math.max(0, Number(stats.qcFromTutorial) || 0), color: 'bg-emerald-400' },
+                  { label: t('fromAllBattles'), value: Math.max(0, Number(stats.qcFromBattles) || 0), color: 'bg-rose-400' },
+                ];
+                const qcSourcesTotal = qcSources.reduce((total, source) => total + source.value, 0);
+                const qcAcquiredTotal = Math.max(Math.max(0, Number(stats.qcTotalAcquired) || 0), qcSourcesTotal);
                 
                 const tierColor = tier === 'Solar' ? 'text-cyan-400' : tier === 'Interstellar' ? 'text-orange-400' : tier === 'Void' ? 'text-purple-400' : 'text-emerald-400';
                 const tierBorder = tier === 'Solar' ? 'neon-border-cyan' : tier === 'Interstellar' ? 'neon-border-orange' : tier === 'Void' ? 'neon-border-purple' : 'neon-border-emerald';
@@ -508,47 +533,61 @@ const HistoryTab = memo(function HistoryTab({ newEarthWarIntelCollection }: Hist
                               />
                               <div className="absolute top-0 left-0 w-1 h-full bg-emerald-500/20 group-hover:bg-emerald-500/40 transition-colors z-10" />
                               
-                              <div className="grid grid-cols-2 gap-4 relative z-10">
-                                <div className="flex flex-col bg-white/5 p-3 rounded-xl border border-white/5">
-                                  <span className="text-slate-400 uppercase font-mono text-[10px] font-bold truncate">{t('randomBattlesFound')}</span>
-                                  <span className="font-orbitron font-black text-xl text-white">{formatValue(stats.randomBattlesFound || 0)}</span>
-                                </div>
-                                <div className="flex flex-col bg-white/5 p-3 rounded-xl border border-white/5">
-                                  <span className="text-slate-400 uppercase font-mono text-[10px] font-bold truncate">{t('radarBattlesFound')}</span>
-                                  <span className="font-orbitron font-black text-xl text-white">{formatValue(stats.radarBattlesFound || 0)}</span>
-                                </div>
-                              </div>
-                              
-                              <div className="grid grid-cols-2 gap-4">
-                                <div className="flex flex-col bg-white/5 p-3 rounded-xl border border-white/5">
-                                  <span className="text-slate-400 uppercase font-mono text-[10px] font-bold truncate">{t('manualDeliveries')}</span>
-                                  <span className="font-orbitron font-black text-xl text-white">{formatValue(stats.manualDeliveries || 0)}</span>
-                                </div>
-                                <div className="flex flex-col bg-white/5 p-3 rounded-xl border border-white/5">
-                                  <span className="text-slate-400 uppercase font-mono text-[10px] font-bold truncate">{t('autoDeliveries')}</span>
-                                  <span className="font-orbitron font-black text-xl text-white">{formatValue(stats.autoDeliveries || 0)}</span>
-                                </div>
-                              </div>
-                              
-                              <div className="grid grid-cols-2 gap-4">
-                                <div className="flex flex-col bg-white/5 p-3 rounded-xl border border-white/5">
-                                  <span className="text-slate-400 uppercase font-mono text-[10px] font-bold truncate">{t('totalMiningPacksSold')}</span>
-                                  <span className="font-orbitron font-black text-xl text-white">{formatValue((stats.manualMiningPacksSold || 0) + (stats.autoMiningPacksSold || 0))}</span>
-                                </div>
-                                <div className="flex flex-col bg-white/5 p-3 rounded-xl border border-white/5">
-                                  <span className="text-slate-400 uppercase font-mono text-[10px] font-bold truncate">{t('totalExplorationMiningPacksSold')}</span>
-                                  <span className="font-orbitron font-black text-xl text-white">{formatValue((stats.manualExtractionPacksSold || 0) + (stats.autoExtractionPacksSold || 0))}</span>
-                                </div>
-                              </div>
-                              
-                              <div className="mt-auto pt-3 border-t border-white/10 flex justify-between items-center relative z-10">
-                                <span className="text-slate-300 uppercase font-orbitron text-[10px] font-bold truncate">{t('missionsCompleted')}</span>
-                                <div className="flex items-center gap-3">
-                                  <div className="w-12 h-1 bg-white/5 rounded-full overflow-hidden">
-                                    <div className="h-full bg-emerald-500" style={{ width: `${Math.min(100, (stats.missionsCompleted || 0) / 5)}%` }} />
+                              <div className="relative z-10 rounded-2xl border border-white/10 bg-slate-950/65 p-4 shadow-[0_18px_45px_rgba(0,0,0,0.32)] backdrop-blur-sm">
+                                <div className="flex items-start justify-between gap-4">
+                                  <div>
+                                    <div className="flex items-center gap-2 text-[9px] font-mono font-bold uppercase tracking-[0.28em] text-slate-500">
+                                      <PackageCheck className="h-4 w-4 text-emerald-400" />
+                                      {language === 'pt' ? 'Operações logísticas concluídas' : 'Completed logistics operations'}
+                                    </div>
+                                    <div className="mt-2 font-orbitron text-4xl font-black text-white">
+                                      {formatValue(totalTierDeliveries)}
+                                    </div>
                                   </div>
-                                  <span className="font-orbitron font-black text-2xl text-emerald-400">{formatValue(stats.missionsCompleted || 0)}</span>
+                                  <div className={`rounded-full border px-3 py-1 font-mono text-[9px] font-bold uppercase tracking-widest ${legacyDeliveries > 0 ? 'border-amber-400/30 bg-amber-400/10 text-amber-300' : 'border-emerald-400/30 bg-emerald-400/10 text-emerald-300'}`}>
+                                    {legacyDeliveries > 0
+                                      ? (language === 'pt' ? 'Save reconciliado' : 'Save reconciled')
+                                      : (language === 'pt' ? 'Dados íntegros' : 'Data verified')}
+                                  </div>
                                 </div>
+
+                                <div className="mt-4 grid grid-cols-3 gap-2">
+                                  {[
+                                    { icon: User, label: language === 'pt' ? 'Manuais' : 'Manual', value: manualDeliveries, color: 'text-cyan-300' },
+                                    { icon: Bot, label: language === 'pt' ? 'Automáticas' : 'Automatic', value: autoDeliveries, color: 'text-violet-300' },
+                                    { icon: Database, label: language === 'pt' ? 'Legado' : 'Legacy', value: legacyDeliveries, color: 'text-amber-300' },
+                                  ].map(({ icon: MetricIcon, label, value, color }) => (
+                                    <div key={label} className="rounded-xl border border-white/8 bg-white/[0.035] px-3 py-2.5">
+                                      <div className="flex items-center gap-1.5 font-mono text-[8px] font-bold uppercase tracking-wider text-slate-500">
+                                        <MetricIcon className={`h-3.5 w-3.5 ${color}`} />
+                                        {label}
+                                      </div>
+                                      <div className={`mt-1 font-orbitron text-lg font-black ${color}`}>{formatValue(value)}</div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+
+                              <div className="relative z-10 grid grid-cols-2 gap-2">
+                                {[
+                                  { label: t('randomBattlesFound'), value: stats.randomBattlesFound || 0, accent: 'text-rose-300' },
+                                  { label: t('radarBattlesFound'), value: stats.radarBattlesFound || 0, accent: 'text-cyan-300' },
+                                  { label: t('totalMiningPacksSold'), value: (stats.manualMiningPacksSold || 0) + (stats.autoMiningPacksSold || 0), accent: 'text-violet-300' },
+                                  { label: t('totalExplorationMiningPacksSold'), value: (stats.manualExtractionPacksSold || 0) + (stats.autoExtractionPacksSold || 0), accent: 'text-amber-300' },
+                                ].map((metric) => (
+                                  <div key={metric.label} className="rounded-xl border border-white/8 bg-black/35 p-3 transition hover:border-white/15 hover:bg-white/[0.045]">
+                                    <div className="font-mono text-[8px] font-bold uppercase tracking-wider text-slate-500">{metric.label}</div>
+                                    <div className={`mt-1 font-orbitron text-xl font-black ${metric.accent}`}>{formatValue(metric.value)}</div>
+                                  </div>
+                                ))}
+                              </div>
+
+                              <div className="relative z-10 mt-auto flex items-center justify-between rounded-xl border border-emerald-400/15 bg-emerald-400/[0.055] px-4 py-3">
+                                <div>
+                                  <div className="font-mono text-[8px] font-bold uppercase tracking-[0.22em] text-emerald-300/60">MISSION ARCHIVE</div>
+                                  <div className="font-orbitron text-[10px] font-bold uppercase text-slate-300">{t('missionsCompleted')}</div>
+                                </div>
+                                <span className="font-orbitron text-2xl font-black text-emerald-300">{formatValue(stats.missionsCompleted || 0)}</span>
                               </div>
                             </div>
                           </div>
@@ -573,34 +612,33 @@ const HistoryTab = memo(function HistoryTab({ newEarthWarIntelCollection }: Hist
                               />
                               <div className="absolute top-0 left-0 w-1.5 h-full bg-cyan-500/20 group-hover:bg-cyan-500/40 transition-colors z-10" />
                               
-                              <div className="flex flex-col gap-1 relative z-10">
-                                <div className="flex justify-between items-center text-sm">
-                                  <span className="text-slate-400 uppercase font-mono text-[10px] font-bold">{t('fromDeliveries')}</span>
-                                  <span className="font-mono text-emerald-400 font-black text-lg">+{formatValue(stats.qcFromDeliveries || 0)}</span>
-                                </div>
-                                <div className="flex justify-between items-center text-sm">
-                                  <span className="text-slate-400 uppercase font-mono text-[10px] font-bold">{t('fromMining')}</span>
-                                  <span className="font-mono text-emerald-400 font-black text-lg">+{formatValue(stats.qcFromMining || 0)}</span>
-                                </div>
-                                <div className="flex justify-between items-center text-sm">
-                                  <span className="text-slate-400 uppercase font-mono text-[10px] font-bold">{t('fromExplorationMining')}</span>
-                                  <span className="font-mono text-emerald-400 font-black text-lg">+{formatValue(stats.qcFromExtraction || 0)}</span>
-                                </div>
-                                <div className="flex justify-between items-center text-sm">
-                                  <span className="text-slate-400 uppercase font-mono text-[10px] font-bold">{t('fromMissions')}</span>
-                                  <span className="font-mono text-emerald-400 font-black text-lg">+{formatValue((stats.qcFromMissions || 0) + (stats.qcFromTutorial || 0))}</span>
-                                </div>
-                                <div className="flex justify-between items-center text-sm">
-                                  <span className="text-slate-400 uppercase font-mono text-[10px] font-bold">{t('fromAllBattles')}</span>
-                                  <span className="font-mono text-emerald-400 font-black text-lg">+{formatValue(stats.qcFromBattles || 0)}</span>
-                                </div>
+                              <div className="relative z-10 space-y-3">
+                                {qcSources.map((source) => {
+                                  const percentage = qcAcquiredTotal > 0 ? Math.min(100, (source.value / qcAcquiredTotal) * 100) : 0;
+                                  return (
+                                    <div key={source.label} className="space-y-1">
+                                      <div className="flex items-center justify-between gap-3">
+                                        <span className="font-mono text-[9px] font-bold uppercase tracking-wider text-slate-400">{source.label}</span>
+                                        <span className="font-mono text-sm font-black text-emerald-300">+{formatValue(source.value)}</span>
+                                      </div>
+                                      <div className="h-1 overflow-hidden rounded-full bg-white/5">
+                                        <motion.div
+                                          initial={{ width: 0 }}
+                                          animate={{ width: `${percentage}%` }}
+                                          transition={{ duration: 0.65, ease: 'easeOut' }}
+                                          className={`h-full rounded-full ${source.color}`}
+                                        />
+                                      </div>
+                                    </div>
+                                  );
+                                })}
                               </div>
                               
                               <div className="mt-auto pt-3 border-t-2 border-white/10 flex flex-col gap-1 relative z-10">
                                 <span className="text-[9px] font-mono text-slate-500 uppercase tracking-[0.4em] text-center font-bold">NET ACQUISITION</span>
                                 <div className="flex justify-between items-center bg-white/5 p-3 rounded-xl border border-white/10">
                                   <span className="text-xs font-black text-white uppercase font-orbitron">{t('totalQCAcquired')}</span>
-                                  <span className={`text-xl font-orbitron font-black ${tierColor} drop-shadow-[0_0_10px_rgba(34,211,238,0.3)]`}>{formatValue(stats.qcTotalAcquired || 0)}</span>
+                                  <span className={`text-xl font-orbitron font-black ${tierColor} drop-shadow-[0_0_10px_rgba(34,211,238,0.3)]`}>{formatValue(qcAcquiredTotal)}</span>
                                 </div>
                               </div>
                             </div>

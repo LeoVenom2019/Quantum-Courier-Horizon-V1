@@ -34,7 +34,8 @@ const AircraftTab = memo(({ renderBattleLevelTab }: { renderBattleLevelTab: () =
     setShipPageIndex,
     getEconomicMultipliers,
     translateData,
-    buyShip
+    buyShip,
+    showActionTutorial
   } = useDashboard();
 
   const { routeTier, unlockedTechLevels, ownedShips } = progression;
@@ -109,11 +110,24 @@ const AircraftTab = memo(({ renderBattleLevelTab }: { renderBattleLevelTab: () =
                 <PremiumCanvasButton
                   key={ship.level}
                   onClick={() => {
-                    if (!isUnlocked || shipPageIndex === ship.level - 1) return;
+                    if (!isUnlocked) {
+                      showActionTutorial({
+                        id: `ship-tech-locked-${routeTier}`,
+                        chapter: routeTier,
+                        title: language === 'pt' ? 'Projeto de nave bloqueado' : 'Ship blueprint locked',
+                        reason: language === 'pt' ? `A nave ${translateData(ship.name)} exige tecnologia de nível ${ship.level}.` : `${translateData(ship.name)} requires technology level ${ship.level}.`,
+                        steps: language === 'pt'
+                          ? ['Abra a aba Tecnologias.', 'Compre as tecnologias anteriores em sequência.', `Alcance o nível tecnológico ${ship.level} e volte à frota.`]
+                          : ['Open the Technologies tab.', 'Purchase the preceding technologies in sequence.', `Reach technology level ${ship.level} and return to the fleet.`],
+                        requirement: language === 'pt' ? `TECNOLOGIA NÍVEL ${ship.level}` : `TECHNOLOGY LEVEL ${ship.level}`,
+                      });
+                      return;
+                    }
+                    if (shipPageIndex === ship.level - 1) return;
                     setShipPageIndex(ship.level - 1);
                     if (shouldUseAirShipsSfx) playSfx('change_air_ships');
                   }}
-                  disabled={!isUnlocked}
+                  aria-disabled={!isUnlocked}
                   tone={shipPageIndex === ship.level - 1 ? (isInterstellar ? 'orange' : 'cyan') : 'steel'}
                   className={`min-h-[72px] min-w-[120px] flex-1 px-2 py-3 font-bold ${
                     shipPageIndex === ship.level - 1
@@ -206,9 +220,40 @@ const AircraftTab = memo(({ renderBattleLevelTab }: { renderBattleLevelTab: () =
 
                       <div className="flex items-center gap-4">
                         <PremiumCanvasButton
-                          onClick={() => buyShip(currentShips[shipPageIndex].level)}
-                          disabled={
-                            (ownedShips[`${routeTier}-${currentShips[shipPageIndex].level}`] || 0) >= 5 || 
+                          onClick={() => {
+                            const ship = currentShips[shipPageIndex];
+                            const owned = ownedShips[`${routeTier}-${ship.level}`] || 0;
+                            const cost = ship.level === 1 && owned >= 1 ? 500 * getEconomicMultipliers().cost : ship.cost * getEconomicMultipliers().cost;
+                            if ((unlockedTechLevels[routeTier] || 0) < ship.level) {
+                              showActionTutorial({
+                                id: `ship-tech-locked-${routeTier}`,
+                                chapter: routeTier,
+                                title: language === 'pt' ? 'Tecnologia de nave necessária' : 'Ship technology required',
+                                reason: language === 'pt' ? `O projeto de nível ${ship.level} ainda não foi pesquisado.` : `The level ${ship.level} blueprint has not been researched yet.`,
+                                steps: language === 'pt'
+                                  ? ['Abra Tecnologias.', 'Desbloqueie os projetos em ordem.', 'Volte a Naves para adquirir a primeira unidade gratuitamente.']
+                                  : ['Open Technologies.', 'Unlock the blueprints in order.', 'Return to Ships to acquire the first unit for free.'],
+                                requirement: language === 'pt' ? `TECNOLOGIA NÍVEL ${ship.level}` : `TECHNOLOGY LEVEL ${ship.level}`,
+                              });
+                              return;
+                            }
+                            if (owned > 0 && qc < cost) {
+                              showActionTutorial({
+                                id: `ship-qc-${routeTier}`,
+                                chapter: routeTier,
+                                title: language === 'pt' ? 'QC insuficiente para a nave' : 'Not enough QC for this ship',
+                                reason: language === 'pt' ? `Uma nova unidade custa ${formatValue(cost)} QC.` : `A new unit costs ${formatValue(cost)} QC.`,
+                                steps: language === 'pt'
+                                  ? ['Faça entregas e conclua missões.', 'Venda recursos produzidos na Mineração.', 'Retorne quando tiver o QC necessário.']
+                                  : ['Complete deliveries and missions.', 'Sell resources produced in Mining.', 'Return when you have the required QC.'],
+                                requirement: `${formatValue(cost)} QC`,
+                              });
+                              return;
+                            }
+                            buyShip(ship.level);
+                          }}
+                          disabled={(ownedShips[`${routeTier}-${currentShips[shipPageIndex].level}`] || 0) >= 5}
+                          aria-disabled={
                             (unlockedTechLevels[routeTier] || 0) < currentShips[shipPageIndex].level ||
                             (qc < (currentShips[shipPageIndex].level === 1 && (ownedShips[`${routeTier}-${currentShips[shipPageIndex].level}`] || 0) >= 1 ? 500 * getEconomicMultipliers().cost : currentShips[shipPageIndex].cost * getEconomicMultipliers().cost) && (ownedShips[`${routeTier}-${currentShips[shipPageIndex].level}`] || 0) > 0)
                           }

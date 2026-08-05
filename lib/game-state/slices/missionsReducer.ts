@@ -66,7 +66,7 @@ export function missionsReducer(state: MissionsState = initialMissionsState, act
         missionsCompleted: 0, qcFromMissions: 0, qcFromTutorial: 0,
         randomBattlesFound: 0, radarBattlesFound: 0, manualMiningPacksSold: 0,
         autoMiningPacksSold: 0, manualExtractionPacksSold: 0, autoExtractionPacksSold: 0,
-        qcFromBattles: 0, battlesWon: 0, perfectDeliveries: 0
+        qcFromBattles: 0, battlesWon: 0, manualBattlesWon: 0, perfectDeliveries: 0
       };
       return {
         ...state,

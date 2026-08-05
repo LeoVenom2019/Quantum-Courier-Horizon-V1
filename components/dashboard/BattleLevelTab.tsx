@@ -201,7 +201,8 @@ const BattleLevelTab = memo(({
             <div className="grid grid-cols-2 gap-4 w-full px-4 z-10">
               <PremiumCanvasButton
                 onClick={findBattle}
-                disabled={battleLevel < 1 || isScanning || isCooldownActive}
+                disabled={isScanning}
+                aria-disabled={battleLevel < 1 || isCooldownActive}
                 tone={battleLevel >= 1 && !isScanning && !isCooldownActive ? 'cyan' : 'steel'}
                 className={`h-12 text-[14px] font-black uppercase tracking-widest ${
                   battleLevel >= 1 && !isScanning && !isCooldownActive
@@ -216,7 +217,8 @@ const BattleLevelTab = memo(({
               
               <PremiumCanvasButton
                 onClick={upgradeRadar}
-                disabled={!canUpgradeRadar}
+                disabled={radarLevel >= 8}
+                aria-disabled={!canUpgradeRadar}
                 tone={canUpgradeRadar ? 'orange' : 'steel'}
                 className={`h-12 text-[14px] font-black uppercase tracking-widest ${
                   canUpgradeRadar

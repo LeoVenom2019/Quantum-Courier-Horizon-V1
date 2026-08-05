@@ -36,7 +36,8 @@ const UpgradesTab = memo(function UpgradesTab() {
     setExtractionTechLevel,
     setSolarMappingLevel,
     setDoubleRouteLevel,
-    setDoomPLevel
+    setDoomPLevel,
+    showActionTutorial
   } = useDashboard();
 
   const { 
@@ -85,12 +86,31 @@ const UpgradesTab = memo(function UpgradesTab() {
   }, []);
 
   const handleSynthesizeAetherion = React.useCallback(() => {
-    if (canSynthesizeAetherion) {
-      manualSynthesisPulseRef.current = true;
-      triggerRhseLiquidMotion();
+    if (!canSynthesizeAetherion) {
+      const chamberFull = aetherion >= 10000;
+      const tubeStorageFull = aetherionTubes >= tubeCapacity;
+      showActionTutorial({
+        id: chamberFull ? `aetherion-chamber-full-${routeTier}` : `aetherion-synthesis-resources-${routeTier}`,
+        chapter: routeTier,
+        title: chamberFull
+          ? (language === 'pt' ? 'CCE em capacidade máxima' : 'Aetherion Chamber is full')
+          : (language === 'pt' ? 'Síntese de Etérion indisponível' : 'Aetherion synthesis unavailable'),
+        reason: chamberFull
+          ? (language === 'pt' ? 'A CCE já armazena o máximo de 10.000 Etérion.' : 'The chamber already stores the maximum 10,000 Aetherion.')
+          : tubeStorageFull
+            ? (language === 'pt' ? 'O depósito de tubos está cheio; sintetize um tubo armazenado antes de produzir outro.' : 'Tube storage is full; synthesize a stored tube before creating another.')
+            : (language === 'pt' ? 'Faltam recursos para produzir um Tubo de Etérion Bruto.' : 'You do not have the resources needed to create a Raw Aetherion Tube.'),
+        steps: chamberFull
+          ? (language === 'pt' ? ['Use Etérion em entregas automáticas, resgates ou batalhas.', 'Volte ao reator quando houver espaço na CCE.'] : ['Use Aetherion on automatic deliveries, claims, or battles.', 'Return to the reactor when the chamber has room.'])
+          : (language === 'pt' ? ['Extraia e venda recursos para gerar Resíduos de Mineração.', 'Acumule 2.500 Resíduos e 2.500 Energia Solar.', 'Crie o tubo e clique novamente para sintetizar 1.000 Etérion.'] : ['Extract and sell resources to generate Mining Waste.', 'Collect 2,500 Waste and 2,500 Solar Energy.', 'Create the tube and click again to synthesize 1,000 Aetherion.']),
+        requirement: chamberFull ? '10.000 / 10.000 ET' : '2.500 RESÍDUOS + 2.500 ENERGIA',
+      });
+      return;
     }
+    manualSynthesisPulseRef.current = true;
+    triggerRhseLiquidMotion();
     synthesizeAetherion();
-  }, [canSynthesizeAetherion, synthesizeAetherion, triggerRhseLiquidMotion]);
+  }, [aetherion, aetherionTubes, canSynthesizeAetherion, language, routeTier, showActionTutorial, synthesizeAetherion, triggerRhseLiquidMotion, tubeCapacity]);
 
   React.useEffect(() => {
     const consumedTube = aetherionTubes < previousAetherionTubesRef.current;

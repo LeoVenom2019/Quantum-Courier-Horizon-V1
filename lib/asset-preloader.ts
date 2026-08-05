@@ -361,6 +361,7 @@ const route4BattleImages = [
   ...route4NewEarthOtherImages,
   `${route4BattleBase}/player/horizon/horizon.webp`,
   `${route4BattleBase}/player/horizon/horizon_12pos_spritesheet.webp`,
+  `${route4BattleBase}/player/horizon/war_drone.webp`,
   `${route4BattleBase}/enemys/air_ships/enemy_rt4.webp`,
   `${route4BattleBase}/enemys/air_ships/enemy_rt4_2.webp`,
   `${route4BattleBase}/enemys/air_ships/enemy_rt4_3.webp`,

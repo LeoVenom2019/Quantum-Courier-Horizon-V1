@@ -43,6 +43,7 @@ export interface RouteStats {
   autoExtractionPacksSold: number;
   qcFromBattles: number;
   battlesWon: number;
+  manualBattlesWon: number;
   perfectDeliveries: number;
   years?: number;
   population?: number;
