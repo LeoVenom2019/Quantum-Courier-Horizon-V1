@@ -22,6 +22,10 @@ import {
   getManualBattleResultAudio,
   pickManualBattleTheme,
 } from '@/lib/solar-interstellar-battle-media.mjs';
+import {
+  SOLAR_INTERSTELLAR_WAVE_COUNT,
+  buildSolarInterstellarWaveBlueprints,
+} from '@/lib/solar-interstellar-battle-waves.mjs';
 
 type SolarInterstellarRouteTier = 'Solar' | 'Interstellar';
 
@@ -129,6 +133,8 @@ function ResultScreen({
     { id: 'xp', icon: Trophy, label: 'XP', value: `+${activeBattle.xpReward || 0}`, show: (activeBattle.xpReward || 0) > 0 },
     { id: 'et', icon: Zap, label: language === 'pt' ? 'ETÉRION' : 'AETHERION', value: `+${activeBattle.aetherionReward || 0}`, show: (activeBattle.aetherionReward || 0) > 0 },
   ].filter((reward) => reward.show !== false);
+  const defeatedEnemies = activeBattle.enemiesDefeated || (isVictory ? activeBattle.totalEnemies : 0) || 0;
+  const totalEnemies = activeBattle.totalEnemies || SOLAR_INTERSTELLAR_WAVE_COUNT;
 
   return (
     <motion.div
@@ -246,6 +252,14 @@ function ResultScreen({
                   </div>
                 </div>
                 {isVictory ? <Orbit className={`h-7 w-7 ${palette.accent}`} /> : <Skull className={`h-7 w-7 ${palette.accent}`} />}
+              </div>
+              <div className={`mt-3 border-t ${palette.softBorder} pt-3 text-right`}>
+                <p className="font-mono text-[9px] uppercase tracking-[0.2em] text-slate-500">
+                  {language === 'pt' ? 'ALVOS NEUTRALIZADOS' : 'TARGETS NEUTRALIZED'}
+                </p>
+                <p className={`mt-1 font-orbitron text-sm font-black ${palette.accent}`}>
+                  {defeatedEnemies} / {totalEnemies}
+                </p>
               </div>
             </div>
           </div>
@@ -442,24 +456,40 @@ export default function SolarInterstellarBattleExperience({
     rarity: 'common' as const,
     upgrades: { damage: 0, shield: 0, crit: 0, loot: 0 },
   };
-  const enemies: VoidBattleEnemy[] = [{
-    id: `solar-enemy-${activeBattle.id}`,
-    type: activeBattle.isBoss ? 'Boss' : (activeBattle.enemyType === 'Elite' ? 'Elite' : 'Padrão'),
-    name: activeBattle.enemyName,
-    hp: activeBattle.enemyHp,
-    maxHp: activeBattle.enemyMaxHp,
+  const waveBlueprints = buildSolarInterstellarWaveBlueprints({
+    enemyMaxHp: activeBattle.enemyMaxHp,
+    enemyDps: activeBattle.enemyDps,
+    reward: activeBattle.reward,
+  });
+  const enemies: VoidBattleEnemy[] = waveBlueprints.map((wave: any) => ({
+    id: `chapter-${routeTier.toLowerCase()}-${activeBattle.id}-wave-${wave.wave}`,
+    type: wave.type,
+    name: wave.isBoss
+      ? `${activeBattle.enemyName} · ${language === 'pt' ? 'CHEFE' : 'BOSS'} ${wave.wave}/${SOLAR_INTERSTELLAR_WAVE_COUNT}`
+      : `${activeBattle.enemyName} · ${language === 'pt' ? 'ONDA' : 'WAVE'} ${wave.wave}/${SOLAR_INTERSTELLAR_WAVE_COUNT}`,
+    hp: wave.hp,
+    maxHp: wave.maxHp,
     shield: 0,
     maxShield: 0,
-    damage: activeBattle.enemyDps || 10,
-    qc: activeBattle.reward,
+    damage: wave.damage,
+    qc: wave.qc,
     x: 85,
     y: 50,
     image: activeBattle.enemyImage || '',
     spriteSheet: activeBattle.enemySpriteSheet,
-  }];
+    visualScale: wave.visualScale,
+    spawnDelayMs: wave.spawnDelayMs,
+  }));
+  const [openingEnemy, ...enemyQueue] = enemies;
 
   const forceBattleDefeat = () => {
-    const updated = { ...activeBattle, isDefeat: true, playerHp: 0 };
+    const updated = {
+      ...activeBattle,
+      isDefeat: true,
+      playerHp: 0,
+      enemiesDefeated: 0,
+      totalEnemies: SOLAR_INTERSTELLAR_WAVE_COUNT,
+    };
     setActiveBattle(updated);
     resolveBattleDefeat(updated);
   };
@@ -467,7 +497,8 @@ export default function SolarInterstellarBattleExperience({
   return (
     <div className="relative h-full w-full">
       <VoidBattleArena
-        initialEnemies={enemies}
+        initialEnemies={[openingEnemy]}
+        enemyQueue={enemyQueue}
         playerShipStats={stats}
         voidResources={voidResources}
         routeTier={routeTier}
@@ -481,6 +512,9 @@ export default function SolarInterstellarBattleExperience({
               ...activeBattle,
               isVictory: true,
               enemyHp: 0,
+              playerHp: result?.playerHp ?? activeBattle.playerHp,
+              enemiesDefeated: result?.enemiesDefeated ?? SOLAR_INTERSTELLAR_WAVE_COUNT,
+              totalEnemies: result?.totalEnemies ?? SOLAR_INTERSTELLAR_WAVE_COUNT,
               reward: result?.reward ?? activeBattle.reward,
               isMeteorEventReward: Boolean(result?.isMeteorEventReward),
               destroyedMeteors: result?.destroyedMeteors || 0,
@@ -495,7 +529,13 @@ export default function SolarInterstellarBattleExperience({
             return;
           }
 
-          const updated = { ...activeBattle, isDefeat: true, playerHp: 0 };
+          const updated = {
+            ...activeBattle,
+            isDefeat: true,
+            playerHp: 0,
+            enemiesDefeated: result?.enemiesDefeated || 0,
+            totalEnemies: result?.totalEnemies ?? SOLAR_INTERSTELLAR_WAVE_COUNT,
+          };
           setActiveBattle(updated);
           resolveBattleDefeat(updated);
         }}

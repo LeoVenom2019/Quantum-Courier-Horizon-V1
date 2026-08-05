@@ -3028,7 +3028,7 @@ const VoidBattleArena = memo(function VoidBattleArena({
               }
             } else {
               const enemySheet = enemy.spriteSheet;
-              const imgW = 110 * (enemySheet?.scale || 1);
+              const imgW = 110 * (enemySheet?.scale || 1) * (enemy.visualScale || 1);
               ctx.save();
               ctx.translate(x, y);
               if (enemySheet) {
@@ -3343,6 +3343,8 @@ const VoidBattleArena = memo(function VoidBattleArena({
               battleFinished = true;
               onBattleEnd('won', {
                 reward: s.totalRewardAccumulated || 0,
+                enemiesDefeated: battleEnemies.length + battleEnemyQueue.length,
+                totalEnemies: battleEnemies.length + battleEnemyQueue.length,
                 playerHp: s.playerHp,
                 playerShield: s.playerShield,
                 destroyedMeteors: s.destroyedMeteors,
@@ -3364,6 +3366,8 @@ const VoidBattleArena = memo(function VoidBattleArena({
             battleFinished = true;
             onBattleEnd('lost', {
               reward: 0,
+              enemiesDefeated: Math.max(0, battleEnemies.length + battleEnemyQueue.length - (s.enemyQueue?.length || 0) - s.enemies.filter(enemy => enemy.hp > 0).length),
+              totalEnemies: battleEnemies.length + battleEnemyQueue.length,
               playerHp: 0,
               playerShield: 0
             });
@@ -3411,7 +3415,7 @@ const VoidBattleArena = memo(function VoidBattleArena({
       canvas.removeEventListener('mousemove', handleMouseMove);
     };
   }, [assetsLoaded, triggerAttack, onBattleEnd, playSfx, stopSfx, dimensions, routeTier, triggerAbility, playerShipStats, locationId, videoReady, showBossIntro, activeShipImage,
-  activeShipSpriteSheet, addLog, initialEnemies, language, meteoriteQcValue, meteorQcValue]);
+  activeShipSpriteSheet, addLog, initialEnemies, language, meteoriteQcValue, meteorQcValue, battleEnemies.length, battleEnemyQueue.length]);
   const handlePauseReturn = useCallback(() => {
     isPausedRef.current = false;
     setIsPaused(false);

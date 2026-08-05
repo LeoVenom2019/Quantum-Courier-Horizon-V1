@@ -95,6 +95,8 @@ export interface Battle {
   meteorRewardTotal?: number;
   destroyedMeteorites?: number;
   destroyedMeteors?: number;
+  enemiesDefeated?: number;
+  totalEnemies?: number;
 }
 
 export interface BattleLogEntry {
