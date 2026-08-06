@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { X } from 'lucide-react';
 import { PremiumCanvasButton } from './ui/PremiumCanvasButton';
 import BattlePauseDialog from './BattlePauseDialog';
+import { resolveNewEarthHelicopterDropSfx } from '@/lib/new-earth-drop-sfx.mjs';
 
 type NewEarthHelicopterBattleStats = {
   speedBonus: number;
@@ -112,7 +113,6 @@ export function NewEarthHelicopterBattle({
       enemyEliteLoop: '/assets/rota4/SFX_new_land/helicopters_tanks/enemy_elite_sound.ogg',
       enemyBossLoop: '/assets/rota4/SFX_new_land/helicopters_tanks/enemy_boss_sound.ogg',
       aetherLoop: '/assets/rota4/SFX_new_land/helicopters_tanks/helicopter_aether_sound.ogg',
-      getDrone: '/assets/rota4/SFX_new_land/helicopters_tanks/get_drone_sound.ogg',
       droneExplosion: '/assets/rota4/SFX_new_land/helicopters_tanks/drone_explosion.ogg',
       enemyCommonFalling: '/assets/rota4/SFX_new_land/helicopters_tanks/enemy_comum_before_exploding.ogg',
       enemyEliteFalling: '/assets/rota4/SFX_new_land/helicopters_tanks/enemy_elite_before_exploding.ogg',
@@ -726,10 +726,14 @@ export function NewEarthHelicopterBattle({
           // just let it drift naturally
         }
 
-        const amp = enemy.kind === 'boss' ? 30 : 105;
-        let desiredX = enemy.baseX + Math.sin(enemy.phase * (enemy.kind === 'boss' ? 0.42 : 1.2)) * amp;
+        const bossDisabled = enemy.kind === 'boss' && bossRotorsDestroyed(enemy);
+        const amp = enemy.kind === 'boss' ? (bossDisabled ? 112 : 30) : 105;
+        let desiredX = enemy.baseX + Math.sin(enemy.phase * (enemy.kind === 'boss' ? (bossDisabled ? 0.56 : 0.42) : 1.2)) * amp;
+        if (bossDisabled) desiredX += Math.sin(now / 1450 + enemy.phase * 0.27) * 24;
         let desiredY = enemy.kind === 'boss'
-          ? HEIGHT / 2 - 12 + Math.sin(enemy.phase * 0.55) * 7
+          ? bossDisabled
+            ? HEIGHT / 2 + 34 + Math.sin(enemy.phase * 0.72) * 12
+            : HEIGHT / 2 - 12 + Math.sin(enemy.phase * 0.55) * 7
           : 72 + Math.sin(enemy.phase * 1.5) * 24;
 
         // dive bomb behaviour for ace/elite
@@ -752,10 +756,11 @@ export function NewEarthHelicopterBattle({
         }
 
         const oldX = enemy.x;
-        enemy.x = lerp(enemy.x, clamp(desiredX, 52, WIDTH-52), (enemy.kind === 'boss' ? 0.012 : 0.025) * dtScale);
-        const maxEnemyY = enemy.kind === 'boss' ? HEIGHT / 2 + 4 : ENEMY_HALF_MAX_Y;
+        enemy.x = lerp(enemy.x, clamp(desiredX, 52, WIDTH-52), (enemy.kind === 'boss' ? (bossDisabled ? 0.009 : 0.012) : 0.025) * dtScale);
+        const maxEnemyY = enemy.kind === 'boss' ? HEIGHT / 2 + (bossDisabled ? 52 : 4) : ENEMY_HALF_MAX_Y;
         enemy.y = lerp(enemy.y, clamp(desiredY, 36, maxEnemyY), enemy.diving ? 0.045 * dtScale : (enemy.kind === 'boss' ? 0.014 : 0.025) * dtScale);
-        enemy.bank = lerp(enemy.bank, clamp((enemy.x - oldX)*6,-14,14), 0.08);
+        const damagedBossWobble = bossDisabled ? Math.sin(now / 520 + enemy.phase * 0.35) * 8 : 0;
+        enemy.bank = lerp(enemy.bank, clamp((enemy.x - oldX) * 6 + damagedBossWobble, -18, 18), bossDisabled ? 0.055 : 0.08);
         enemy.angle = Math.PI/2 + enemy.bank * 0.012;
 
         enemy.cd -= dt; enemy.missileCd -= dt; enemy.patternCd -= dt;
@@ -845,6 +850,7 @@ export function NewEarthHelicopterBattle({
     }
 
     function applyPowerup(type) {
+      playSfx(resolveNewEarthHelicopterDropSfx(type), type === 'bossDrop' ? 0.76 : type === 'drone' ? 0.68 : 0.58);
       if (type === 'hp') {
         player.hp = Math.min(player.maxHp, player.hp + 120);
         addText(player.x, player.y - 50, '+120 HP', '#4ade80', 900);
@@ -868,7 +874,6 @@ export function NewEarthHelicopterBattle({
     }
 
     function reviveDrone() {
-      playSfx(SFX.getDrone, 0.68);
       if (drones.length >= maxDroneCount) {
         addText(player.x, player.y - 50, 'DRONES OK', '#a7f3d0', 900);
         return;
@@ -998,6 +1003,7 @@ export function NewEarthHelicopterBattle({
           closestRotor.part.hp = 0;
           closestRotor.part.stoppedAngle = rand(0, Math.PI * 2);
           addText(worldPoint.x - 22, worldPoint.y - 24, 'HÉLICE OFF', '#fb923c', 980);
+          playSfx(SFX.explosionElite, 0.72);
           bigExplosion(worldPoint.x, worldPoint.y, 0.72, '#fb923c');
           if (bossRotorsDestroyed(e)) {
             e.bossParts.coreUnlocked = true;
@@ -1778,38 +1784,59 @@ export function NewEarthHelicopterBattle({
       if (!part || part.hp > 0) return;
       const phase = now / 170 + rotorIndex * 1.73;
       const pulse = 0.78 + Math.sin(phase) * 0.18;
+      const flicker = 0.84 + Math.sin(now / 47 + rotorIndex * 2.1) * 0.1 + Math.sin(now / 23 + rotorIndex) * 0.06;
       ctx.save();
       ctx.globalCompositeOperation = 'source-over';
-      for (let i = 0; i < 5; i++) {
-        const drift = (now / (38 + i * 11) + rotorIndex * 17 + i * 9) % 28;
-        const sx = rx - 14 + Math.sin(phase + i) * 10 + i * 5;
+      for (let i = 0; i < 7; i++) {
+        const drift = (now / (34 + i * 9) + rotorIndex * 17 + i * 9) % 38;
+        const sx = rx - 17 + Math.sin(phase + i * 1.31) * 11 + i * 5;
         const sy = ry - 8 - drift;
-        const size = (14 + i * 4) * (0.75 + pulse * 0.25);
-        ctx.globalAlpha = Math.max(0, 0.34 - i * 0.035 - drift / 105);
-        ctx.fillStyle = i < 2 ? 'rgba(20,24,31,0.82)' : 'rgba(83,92,104,0.58)';
+        const size = (13 + i * 3.5) * (0.72 + pulse * 0.28);
+        ctx.globalAlpha = Math.max(0, 0.42 - i * 0.032 - drift / 115);
+        ctx.fillStyle = i < 3 ? 'rgba(15,18,24,0.88)' : 'rgba(66,74,84,0.62)';
         ctx.beginPath();
         ctx.ellipse(sx, sy, size * 1.15, size * 0.72, Math.sin(phase + i) * 0.45, 0, Math.PI * 2);
         ctx.fill();
       }
 
       ctx.globalCompositeOperation = 'lighter';
-      ctx.globalAlpha = 0.9;
-      const flameX = rx + 11 + Math.sin(phase * 1.4) * 4;
-      const flameY = ry + 15;
-      const flameH = 30 + pulse * 12;
-      const flameW = 15 + pulse * 7;
-      const flame = ctx.createRadialGradient(flameX, flameY, 0, flameX, flameY + 8, flameH);
-      flame.addColorStop(0, 'rgba(255,255,235,0.95)');
-      flame.addColorStop(0.28, 'rgba(251,191,36,0.86)');
-      flame.addColorStop(0.62, 'rgba(251,113,20,0.58)');
-      flame.addColorStop(1, 'rgba(127,29,29,0)');
-      ctx.fillStyle = flame;
-      ctx.beginPath();
-      ctx.moveTo(flameX - flameW * 0.55, flameY + 4);
-      ctx.quadraticCurveTo(flameX - flameW, flameY + flameH * 0.42, flameX - 2, flameY + flameH);
-      ctx.quadraticCurveTo(flameX + flameW * 0.9, flameY + flameH * 0.35, flameX + flameW * 0.52, flameY + 1);
-      ctx.quadraticCurveTo(flameX + 2, flameY + 11, flameX - flameW * 0.55, flameY + 4);
-      ctx.fill();
+      const flameX = rx + 8 + Math.sin(phase * 1.4) * 4;
+      const flameY = ry + 12;
+      const glow = ctx.createRadialGradient(flameX, flameY + 9, 1, flameX, flameY + 10, 43);
+      glow.addColorStop(0, 'rgba(255,245,190,0.72)');
+      glow.addColorStop(0.34, 'rgba(249,115,22,0.38)');
+      glow.addColorStop(1, 'rgba(127,29,29,0)');
+      ctx.globalAlpha = 0.72 * flicker;
+      ctx.fillStyle = glow;
+      ctx.beginPath(); ctx.arc(flameX, flameY + 10, 43, 0, Math.PI * 2); ctx.fill();
+
+      const flameLayers = [
+        { width: 21, height: 48, color: 'rgba(239,68,22,0.58)', sway: 1.0 },
+        { width: 14, height: 37, color: 'rgba(251,191,36,0.82)', sway: -0.7 },
+        { width: 7, height: 24, color: 'rgba(255,255,225,0.96)', sway: 0.45 },
+      ];
+      flameLayers.forEach((layer, index) => {
+        const flameH = layer.height * flicker * (0.92 + pulse * 0.08);
+        const flameW = layer.width * (0.9 + pulse * 0.1);
+        const tipX = flameX + Math.sin(phase * (1.8 + index * 0.35) + index) * 8 * layer.sway;
+        ctx.globalAlpha = 0.94 - index * 0.08;
+        ctx.fillStyle = layer.color;
+        ctx.beginPath();
+        ctx.moveTo(flameX - flameW / 2, flameY + 5);
+        ctx.bezierCurveTo(flameX - flameW, flameY + flameH * 0.35, tipX - flameW * 0.2, flameY + flameH * 0.72, tipX, flameY + flameH);
+        ctx.bezierCurveTo(tipX + flameW * 0.36, flameY + flameH * 0.68, flameX + flameW, flameY + flameH * 0.3, flameX + flameW / 2, flameY + 3);
+        ctx.quadraticCurveTo(flameX, flameY + 13, flameX - flameW / 2, flameY + 5);
+        ctx.fill();
+      });
+
+      for (let i = 0; i < 5; i++) {
+        const emberLife = (now / (54 + i * 8) + rotorIndex * 13 + i * 7) % 34;
+        const emberX = flameX + Math.sin(phase * 1.7 + i * 2.3) * (7 + emberLife * 0.28);
+        const emberY = flameY + 12 + emberLife;
+        ctx.globalAlpha = Math.max(0, 0.9 - emberLife / 38);
+        ctx.fillStyle = i % 2 ? '#facc15' : '#fb923c';
+        ctx.beginPath(); ctx.arc(emberX, emberY, 1.8 - i * 0.14, 0, Math.PI * 2); ctx.fill();
+      }
 
       ctx.globalCompositeOperation = 'source-over';
       ctx.globalAlpha = 0.62;

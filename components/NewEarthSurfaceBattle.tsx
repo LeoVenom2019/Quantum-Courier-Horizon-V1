@@ -5,6 +5,7 @@ import { Crosshair, X } from 'lucide-react';
 import { PremiumCanvasButton } from './ui/PremiumCanvasButton';
 import BattlePauseDialog from './BattlePauseDialog';
 import { NewEarthHelicopterBattle } from './NewEarthHelicopterBattle';
+import { NEW_EARTH_DROP_SFX } from '@/lib/new-earth-drop-sfx.mjs';
 
 export type NewEarthSurfaceBattleSiteId = 'zona-glacial' | 'ruinas-europeias' | 'continente-esquecido';
 export type NewEarthSurfaceBattleKind = 'tank' | 'helicopter';
@@ -277,6 +278,7 @@ const SURFACE_SFX = {
   commonExplosionA: '/assets/rota4/SFX_new_land/enemy_explosion_cap_4.ogg',
   commonExplosionB: '/assets/rota4/SFX_new_land/enemy_explosion_cap4_2.ogg',
   eliteExplosion: '/assets/rota4/SFX_new_land/explosion_elite_cap4.ogg',
+  bossDropPickup: NEW_EARTH_DROP_SFX.bossDocumentPickup,
 };
 
 const AAA_PALETTES = {
@@ -1409,6 +1411,18 @@ export default function NewEarthSurfaceBattle({
         }
       }
 
+      if (battleKind === 'tank') {
+        for (let i = tankBossDrops.length - 1; i >= 0; i--) {
+          const drop = tankBossDrops[i];
+          if (Math.hypot(player.x - drop.x, player.y - drop.y) >= 46) continue;
+          playSurfaceSfx(SURFACE_SFX.bossDropPickup, 0.78);
+          addGlow(drop.x, drop.y, 116, 'rgba(255,255,255,0.72)', 'rgba(168,85,247,0)', 0.72);
+          addShockwave(drop.x, drop.y, 126, 'rgba(240,171,252,0.86)', 4, 0.055, 7);
+          flashes.push({ color: '#f0abfc', life: 0.42, maxLife: 0.42, intensity: 0.18 });
+          tankBossDrops.splice(i, 1);
+        }
+      }
+
       ctx.save();
       if (screenShake > 0.1) {
         ctx.translate(rand(-screenShake, screenShake), rand(-screenShake, screenShake));
@@ -1448,6 +1462,37 @@ export default function NewEarthSurfaceBattle({
       });
       if (battleKind === 'tank') drawTankUnit(player, true);
       else drawHelicopter(ctx, { ...player, y: player.y + getHelicopterAltitudeBob(player, now, true) }, theme.palette.player, theme.palette.playerDark, true, -spin);
+
+      tankBossDrops.forEach(drop => {
+        drop.phase += 0.025 * dtScale;
+        const bob = Math.sin(drop.phase) * 5;
+        const pulse = 1 + Math.sin(drop.phase * 1.7) * 0.08;
+        ctx.save();
+        ctx.translate(drop.x, drop.y + bob);
+        ctx.scale(pulse, pulse);
+        ctx.globalCompositeOperation = 'lighter';
+        const aura = ctx.createRadialGradient(0, 0, 3, 0, 0, 40);
+        aura.addColorStop(0, 'rgba(255,255,255,0.76)');
+        aura.addColorStop(0.38, 'rgba(240,171,252,0.42)');
+        aura.addColorStop(1, 'rgba(168,85,247,0)');
+        ctx.fillStyle = aura;
+        ctx.beginPath(); ctx.arc(0, 0, 40, 0, Math.PI * 2); ctx.fill();
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.shadowColor = '#e879f9';
+        ctx.shadowBlur = 18;
+        ctx.fillStyle = '#f5e9ff';
+        ctx.strokeStyle = '#c084fc';
+        ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.roundRect(-17, -22, 34, 44, 4); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = '#7e22ce';
+        ctx.fillRect(-10, -12, 20, 3);
+        ctx.fillRect(-10, -5, 16, 2);
+        ctx.fillRect(-10, 1, 19, 2);
+        ctx.font = '900 8px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText('INTEL', 0, 15);
+        ctx.restore();
+      });
 
       shots.forEach(shot => {
         if (battleKind === 'tank') {
@@ -1685,7 +1730,7 @@ export default function NewEarthSurfaceBattle({
       }
       if (!endedRef.current && enemies.length === 0 && (
         (battleKind === 'helicopter' && helicopterWaveIndex >= HELICOPTER_TOTAL_WAVES)
-        || (battleKind === 'tank' && tankWaveIndex >= TANK_TOTAL_WAVES)
+        || (battleKind === 'tank' && tankWaveIndex >= TANK_TOTAL_WAVES && tankBossDrops.length === 0)
       )) {
         endedRef.current = true;
         pendingResult = 'victory';

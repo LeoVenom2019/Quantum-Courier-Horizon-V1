@@ -4,6 +4,7 @@ import { ARCADE_THEMES, ROUTE_THEMES } from './music-data';
 import { SOLAR_INTERSTELLAR_BATTLE_MEDIA } from './solar-interstellar-battle-media.mjs';
 import { NEW_LAND_BATTLE_MUSIC } from './new-land-battle-music.mjs';
 import { NEW_EARTH_SURFACE_WAR_TRACKS } from './new-earth-surface-war-music.mjs';
+import { NEW_EARTH_DROP_SFX } from './new-earth-drop-sfx.mjs';
 import { ROUTE4_ELITE_SHIP_IMAGES } from './route4-elite-ship-visuals.mjs';
 import { NEW_EARTH_BATTLE_BACKGROUNDS } from './route4-battle-backgrounds.mjs';
 import { NEW_EARTH_TREASURE_CATALOG } from './new-earth-treasures';
@@ -422,7 +423,7 @@ const route4BattleAudio = [
   '/assets/rota4/SFX_new_land/helicopters_tanks/enemy_elite_sound.ogg',
   '/assets/rota4/SFX_new_land/helicopters_tanks/enemy_boss_sound.ogg',
   '/assets/rota4/SFX_new_land/helicopters_tanks/helicopter_aether_sound.ogg',
-  '/assets/rota4/SFX_new_land/helicopters_tanks/get_drone_sound.ogg',
+  ...Object.values(NEW_EARTH_DROP_SFX),
   '/assets/rota4/SFX_new_land/helicopters_tanks/drone_explosion.ogg',
   '/assets/rota4/SFX_new_land/helicopters_tanks/enemy_comum_before_exploding.ogg',
   '/assets/rota4/SFX_new_land/helicopters_tanks/enemy_elite_before_exploding.ogg',
