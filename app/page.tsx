@@ -1831,6 +1831,8 @@ export default function GameHome() {
           language={language} 
           playerName={playerName}
           setPlayerName={setPlayerName}
+          musicOn={masterMusicOn}
+          musicVolume={masterMusicVolume}
           sfxOn={masterSfxOn}
         />
       ) : view === 'game' ? (

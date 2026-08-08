@@ -440,6 +440,7 @@ type NewEarthSurfaceVictorySummary = {
   supplies: Partial<Record<NewEarthSupplyId, number>>;
   intel: NewEarthWarIntel | null;
   intelNew: boolean;
+  intelCount: number;
   intelCollected: number;
   intelTotal: number;
   qcOnly: boolean;
@@ -9951,7 +9952,25 @@ const DashboardContent = memo(({
             const intelKind: NewEarthWarIntelKind = activeSurfaceBattle.battleKind === 'tank' ? 'tank' : 'helicopter';
             const normalizedWarIntel = normalizeNewEarthWarIntelCollection(newEarthWarIntelCollection);
             const siteIntelCatalog = getNewEarthWarIntelCatalogForSite(intelKind, activeSurfaceBattle.siteId);
-            const droppedIntel = getNextNewEarthWarIntelDrop(normalizedWarIntel, intelKind, activeSurfaceBattle.siteId);
+            const requestedWarDocumentCount = Math.max(1, Math.min(2, Math.floor(Number(payload?.warDocumentCount) || 1)));
+            const droppedIntelItems: NewEarthWarIntel[] = [];
+            let nextWarIntelCollection = normalizedWarIntel;
+            for (let index = 0; index < requestedWarDocumentCount; index++) {
+              const nextIntel = getNextNewEarthWarIntelDrop(nextWarIntelCollection, intelKind, activeSurfaceBattle.siteId);
+              if (!nextIntel) break;
+              droppedIntelItems.push(nextIntel);
+              nextWarIntelCollection = normalizeNewEarthWarIntelCollection({
+                ...nextWarIntelCollection,
+                [nextIntel.id]: {
+                  ...nextIntel,
+                  scrollSrc: NEW_EARTH_WAR_INTEL_SCROLLS[Math.floor(Math.random() * NEW_EARTH_WAR_INTEL_SCROLLS.length)] || nextIntel.scrollSrc,
+                  foundAt: nowTimestamp(),
+                  siteId: activeSurfaceBattle.siteId,
+                  colonyId: activeSurfaceBattle.colonyId,
+                },
+              });
+            }
+            const droppedIntel = droppedIntelItems[0] || null;
             const qcOnly = !droppedIntel;
             const reward = qcOnly
               ? rollNewEarthBattleReward(2_000_000, 3_000_000)
@@ -9962,18 +9981,6 @@ const DashboardContent = memo(({
             });
             const supplyTotal = qcOnly ? 0 : awardNewEarthSupplies(supplies);
             const intelNew = Boolean(droppedIntel);
-            const nextWarIntelCollection = droppedIntel
-              ? normalizeNewEarthWarIntelCollection({
-                ...normalizedWarIntel,
-                [droppedIntel.id]: {
-                  ...droppedIntel,
-                  scrollSrc: NEW_EARTH_WAR_INTEL_SCROLLS[Math.floor(Math.random() * NEW_EARTH_WAR_INTEL_SCROLLS.length)] || droppedIntel.scrollSrc,
-                  foundAt: nowTimestamp(),
-                  siteId: activeSurfaceBattle.siteId,
-                  colonyId: activeSurfaceBattle.colonyId,
-                },
-              })
-              : normalizedWarIntel;
             setNewEarthWarIntelCollection(nextWarIntelCollection);
             GameStorage.save(nextWarIntelCollection, NEW_EARTH_WAR_INTEL_STORAGE_KEY).catch(error => {
               console.warn('Unable to save New Earth war intel drop', error);
@@ -10006,6 +10013,7 @@ const DashboardContent = memo(({
               supplies,
               intel: droppedIntel,
               intelNew,
+              intelCount: droppedIntelItems.length,
               intelCollected,
               intelTotal,
               qcOnly,
@@ -10016,8 +10024,8 @@ const DashboardContent = memo(({
                   ? `Vitória em ${siteTitle}: +${formatValue(reward)} QC. Arquivo de guerra local completo; nenhum novo plano recuperado.`
                   : `Victory at ${siteTitle}: +${formatValue(reward)} QC. Local war archive complete; no new plan recovered.`
                 : language === 'pt'
-                  ? `Vitória em ${siteTitle}: +${formatValue(reward)} QC + ${formatValue(supplyTotal)} recursos + Informações de Guerra.`
-                  : `Victory at ${siteTitle}: +${formatValue(reward)} QC + ${formatValue(supplyTotal)} supplies + War Intel.`,
+                  ? `Vitória em ${siteTitle}: +${formatValue(reward)} QC + ${formatValue(supplyTotal)} recursos + ${droppedIntelItems.length} documento${droppedIntelItems.length === 1 ? '' : 's'} de guerra.`
+                  : `Victory at ${siteTitle}: +${formatValue(reward)} QC + ${formatValue(supplyTotal)} supplies + ${droppedIntelItems.length} war document${droppedIntelItems.length === 1 ? '' : 's'}.`,
               'success'
             );
             setActiveSurfaceBattle(null);
@@ -10149,7 +10157,9 @@ const DashboardContent = memo(({
                       </p>
                       <p className="mt-2 text-xs font-semibold text-slate-300/70">
                         {newEarthSurfaceVictorySummary.intelNew
-                          ? (language === 'pt' ? 'Novo pergaminho arquivado.' : 'New scroll archived.')
+                          ? (language === 'pt'
+                            ? `${newEarthSurfaceVictorySummary.intelCount} ${newEarthSurfaceVictorySummary.intelCount === 1 ? 'novo pergaminho arquivado' : 'novos pergaminhos arquivados'}.`
+                            : `${newEarthSurfaceVictorySummary.intelCount} new scroll${newEarthSurfaceVictorySummary.intelCount === 1 ? '' : 's'} archived.`)
                           : (language === 'pt' ? 'Limite de informações desta zona atingido.' : 'This zone intel limit has been reached.')}
                       </p>
                     </div>

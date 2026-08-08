@@ -6,6 +6,7 @@ import { PremiumCanvasButton } from './ui/PremiumCanvasButton';
 import BattlePauseDialog from './BattlePauseDialog';
 import { NewEarthHelicopterBattle } from './NewEarthHelicopterBattle';
 import { NEW_EARTH_DROP_SFX } from '@/lib/new-earth-drop-sfx.mjs';
+import { getNewEarthBossDocumentDropCount } from '@/lib/new-earth-boss-drop-flow.mjs';
 
 export type NewEarthSurfaceBattleSiteId = 'zona-glacial' | 'ruinas-europeias' | 'continente-esquecido';
 export type NewEarthSurfaceBattleKind = 'tank' | 'helicopter';
@@ -16,6 +17,7 @@ export type NewEarthSurfaceBattleVictoryPayload = {
   qcReward?: number;
   supplies?: NewEarthSupplyReward;
   specialDrop?: boolean;
+  warDocumentCount?: number;
 };
 
 interface NewEarthSurfaceBattleProps {
@@ -642,6 +644,7 @@ export default function NewEarthSurfaceBattle({
     const muzzleFlashes: MuzzleFlash[] = [];
     const destroyedTanks: DestroyedTank[] = [];
     const tankBossDrops: TankBossDrop[] = [];
+    let tankBossDocumentDropCount = 0;
     let screenShake = 0;
     const tankRunningAudio = typeof Audio !== 'undefined' ? new Audio(SURFACE_SFX.tankRunning) : null;
     if (tankRunningAudio) {
@@ -1405,7 +1408,12 @@ export default function NewEarthSurfaceBattle({
             if (tankWaveIndex < TANK_TOTAL_WAVES) {
               enemies.push(createTankEnemy(tankWaveIndex));
             } else if (!endedRef.current && defeatedKind === 'boss') {
-              spawnTankBossDrop(defeatedEnemy.x, defeatedEnemy.y);
+              const documentDropCount = getNewEarthBossDocumentDropCount();
+              tankBossDocumentDropCount = documentDropCount;
+              for (let index = 0; index < documentDropCount; index++) {
+                const spreadX = (index - (documentDropCount - 1) / 2) * 108;
+                spawnTankBossDrop(defeatedEnemy.x + spreadX, defeatedEnemy.y);
+              }
             }
           }
         }
@@ -1739,7 +1747,7 @@ export default function NewEarthSurfaceBattle({
 
       if (pendingResult && now >= pendingResultAt) {
         setResult(pendingResult);
-        if (pendingResult === 'victory') onVictoryRef.current(battleKind === 'tank' ? { specialDrop: true } : undefined);
+        if (pendingResult === 'victory') onVictoryRef.current(battleKind === 'tank' ? { specialDrop: true, warDocumentCount: tankBossDocumentDropCount || 1 } : undefined);
         else onDefeatRef.current();
         return;
       }

@@ -16,11 +16,18 @@ export interface RouteTheme {
   playlist: Track[];
 }
 
+export const START_JOURNEY_TRACK: Track = {
+  id: 'r1_intro_start_journey',
+  title: 'Start Journey',
+  url: '/assets/rota1/start_journey.ogg',
+};
+
 export const ROUTE_THEMES: Record<string, RouteTheme> = {
   'Solar': {
     id: 'route1',
     name: 'Chapter 1 - Solar Routes',
     playlist: [
+      START_JOURNEY_TRACK,
       { id: 'r1_t1', title: 'Hidden Places', url: '/audio/themes/route1/hidden_places.ogg' },
       { id: 'r1_t2', title: 'Miss The Earth', url: '/audio/themes/route1/miss_the_earth.ogg' },
       { id: 'r1_t3', title: 'Solar Echoes', url: '/audio/themes/route1/solar_schoes.ogg' },

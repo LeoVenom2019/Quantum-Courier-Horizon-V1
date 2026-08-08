@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Image from 'next/image';
 import { motion, AnimatePresence } from 'motion/react';
 import { Language, t } from '@/lib/i18n';
@@ -8,6 +8,7 @@ import { Rocket, ShieldCheck, ArrowRight, X, Sparkles } from 'lucide-react';
 import { SpaceAmbience } from './SpaceAmbience';
 import { BobbyBlueCharacter, BobbyBlueVariant } from './BobbyBlueCharacter';
 import { useSFX } from '@/hooks/useSFX';
+import { START_JOURNEY_TRACK } from '@/lib/music-data';
 import {
   getAssetGroupsSummary,
   getRecommendedAssetGroupsForRoute,
@@ -160,7 +161,9 @@ export const IntroNarrative = ({
   language,
   playerName,
   setPlayerName,
-  sfxOn
+  sfxOn,
+  musicOn = true,
+  musicVolume = 0.5,
 }: { 
   onComplete: () => void | Promise<void>; 
   onCancel: () => void;
@@ -168,6 +171,8 @@ export const IntroNarrative = ({
   playerName: string;
   setPlayerName: (name: string) => void;
   sfxOn?: boolean;
+  musicOn?: boolean;
+  musicVolume?: number;
 }) => {
   const { playSfx } = useSFX(sfxOn);
   const [index, setIndex] = useState(0);
@@ -182,12 +187,46 @@ export const IntroNarrative = ({
   const loadingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const loadingRunRef = useRef(0);
   const loadingUnsubscribeRef = useRef<(() => void) | null>(null);
+  const introMusicRef = useRef<HTMLAudioElement | null>(null);
+
+  const stopIntroMusic = useCallback(() => {
+    const audio = introMusicRef.current;
+    if (!audio) return;
+    audio.pause();
+    audio.currentTime = 0;
+  }, []);
 
   const currentText = STORY_TEXT[index] ? t(language, STORY_TEXT[index].en, STORY_TEXT[index].pt) : "";
   const typingKey = `${index}:${language}`;
   const charCount = typingState.key === typingKey ? typingState.charCount : 0;
   const isTyping = index < STORY_TEXT.length && charCount < currentText.length;
   const displayedText = currentText.slice(0, charCount);
+
+  useEffect(() => {
+    if (showPlayerId || !musicOn) {
+      stopIntroMusic();
+      return;
+    }
+
+    const targetVolume = Math.max(0, Math.min(1, musicVolume * 0.8));
+    if (!introMusicRef.current) {
+      const audio = new Audio(START_JOURNEY_TRACK.url);
+      audio.preload = 'auto';
+      audio.loop = false;
+      audio.volume = targetVolume;
+      introMusicRef.current = audio;
+      audio.play().catch((error) => console.warn('Intro music play blocked:', error));
+      return;
+    }
+
+    introMusicRef.current.volume = targetVolume;
+    introMusicRef.current.play().catch((error) => console.warn('Intro music play blocked:', error));
+  }, [musicOn, musicVolume, showPlayerId, stopIntroMusic]);
+
+  useEffect(() => () => {
+    stopIntroMusic();
+    introMusicRef.current = null;
+  }, [stopIntroMusic]);
 
   useEffect(() => {
     if (index >= STORY_TEXT.length) return;
@@ -225,6 +264,7 @@ export const IntroNarrative = ({
   }, []);
 
   const handleSkip = () => {
+    stopIntroMusic();
     setShowPlayerId(true);
   };
 

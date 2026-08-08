@@ -124,6 +124,7 @@ const createWindow = async () => {
   await waitForServer(PORT, HOST);
 
   const mainWindow = new BrowserWindow({
+    icon: path.join(app.getAppPath(), 'qch.ico'),
     width: 1440,
     height: 900,
     minWidth: 1180,

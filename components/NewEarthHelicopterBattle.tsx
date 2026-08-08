@@ -5,6 +5,7 @@ import { X } from 'lucide-react';
 import { PremiumCanvasButton } from './ui/PremiumCanvasButton';
 import BattlePauseDialog from './BattlePauseDialog';
 import { resolveNewEarthHelicopterDropSfx } from '@/lib/new-earth-drop-sfx.mjs';
+import { getNewEarthBossDocumentDropCount } from '@/lib/new-earth-boss-drop-flow.mjs';
 
 type NewEarthHelicopterBattleStats = {
   speedBonus: number;
@@ -22,7 +23,7 @@ interface NewEarthHelicopterBattleProps {
   background?: string;
   helicopterStats?: Partial<NewEarthHelicopterBattleStats>;
   onClose: () => void;
-  onVictory: () => void;
+  onVictory: (payload?: { warDocumentCount?: number }) => void;
   onDefeat: () => void;
 }
 
@@ -237,7 +238,7 @@ export function NewEarthHelicopterBattle({
     let particles, texts, clouds, drones, explosions, radio, powerups, mines;
     let crashers, playerCrash;
     let waveIndex, nextId, ended, pendingResult, pendingResultAt;
-    let maxDroneCount, bossDropPending;
+    let maxDroneCount, bossDropsPending, bossDocumentDropCount;
     let shake, flash, lock, camera, bgScroll;
     let score, combo, comboTimer, bestCombo, totalKills;
     let shockwaves; // AAA shockwave rings
@@ -299,9 +300,10 @@ export function NewEarthHelicopterBattle({
       }));
       normalizeDroneFormation();
       maxDroneCount = drones.length;
+      bossDocumentDropCount = 0;
       radio = []; powerups = []; mines = []; shockwaves = [];
       clouds = createClouds();
-      ended = false; pendingResult = ''; pendingResultAt = 0; bossDropPending = false;
+      ended = false; pendingResult = ''; pendingResultAt = 0; bossDropsPending = 0;
       shake = 0; flash = 0;
       lock = { targetId: null, amount: 0, locked: false, beep: 0 };
       camera = { x: 0, y: 0 };
@@ -562,22 +564,29 @@ export function NewEarthHelicopterBattle({
     function tryDropPowerup(x, y, kind) {
       const roll = Math.random();
       let type;
-      if (kind === 'boss') type = 'bossDrop';
-      else if (kind === 'elite' || kind === 'ace') {
+      let dropCount = 1;
+      if (kind === 'boss') {
+        type = 'bossDrop';
+        dropCount = getNewEarthBossDocumentDropCount();
+      } else if (kind === 'elite' || kind === 'ace') {
         type = roll < 0.35 ? 'hp' : roll < 0.6 ? 'missile' : roll < 0.8 ? 'shield' : 'drone';
       } else {
         if (roll > 0.72) type = roll > 0.9 ? 'missile' : 'hp';
-        else return;
+        else return 0;
       }
-      powerups.push({
-        x,
-        y: y + rand(-10,10),
-        vy: type === 'bossDrop' ? 0 : 1.2,
-        type,
-        life: type === 'bossDrop' ? Infinity : 7000,
-        id: nextId++,
-        bob: rand(0, Math.PI*2),
-      });
+      for (let index = 0; index < dropCount; index++) {
+        const spreadX = type === 'bossDrop' ? (index - (dropCount - 1) / 2) * 96 : 0;
+        powerups.push({
+          x: clamp(x + spreadX, 42, WIDTH - 42),
+          y: y + rand(-10,10),
+          vy: type === 'bossDrop' ? 0 : 1.2,
+          type,
+          life: type === 'bossDrop' ? Infinity : 7000,
+          id: nextId++,
+          bob: rand(0, Math.PI*2),
+        });
+      }
+      return dropCount;
     }
 
     // ─── lock ─────────────────────────────────────────────────────────────────
@@ -679,7 +688,7 @@ export function NewEarthHelicopterBattle({
       updateCrashes(dt, dtScale, now);
 
       // wave advance
-      if (enemies.length === 0 && crashers.length === 0 && !bossDropPending) {
+      if (!ended && enemies.length === 0 && crashers.length === 0 && bossDropsPending === 0) {
         waveIndex++;
         bullets.length = 0; enemyShots.length = 0;
         missiles = missiles.filter(m => m.from === 'player');
@@ -864,12 +873,13 @@ export function NewEarthHelicopterBattle({
       } else if (type === 'drone') {
         reviveDrone();
       } else if (type === 'bossDrop') {
-        bossDropPending = false;
+        bossDropsPending = Math.max(0, bossDropsPending - 1);
+        flash = Math.max(flash, 0.16);
+        addText(player.x, player.y - 54, 'ARTEFATO COLETADO', '#f0abfc', 1100);
+        if (bossDropsPending > 0) return;
         ended = true;
         pendingResult = 'victory';
         pendingResultAt = performance.now() + 350;
-        flash = Math.max(flash, 0.16);
-        addText(player.x, player.y - 54, 'ARTEFATO COLETADO', '#f0abfc', 1100);
       }
     }
 
@@ -1246,9 +1256,10 @@ export function NewEarthHelicopterBattle({
 
       aaaExplosion(c.x, c.y, c.kind);
       playSfx(c.kind === 'common' ? pick([SFX.explosionA, SFX.explosionB]) : SFX.explosionElite, c.kind === 'boss' ? 0.82 : 0.62);
-      tryDropPowerup(c.x, c.y, c.kind);
+      const spawnedDropCount = tryDropPowerup(c.x, c.y, c.kind);
       if (c.kind === 'boss') {
-        bossDropPending = true;
+        bossDropsPending = spawnedDropCount;
+        bossDocumentDropCount = spawnedDropCount;
         pushRadio('Comando', 'Boss abatido. Colete o núcleo antes de encerrar a operação.');
       }
     }
@@ -2198,7 +2209,7 @@ export function NewEarthHelicopterBattle({
       lastResult = result;
       stopAllLoops();
       if (result === 'victory') {
-        onVictoryRef.current();
+        onVictoryRef.current({ warDocumentCount: bossDocumentDropCount || 1 });
         return;
       }
       resultTitle.textContent = 'Derrota';

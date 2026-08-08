@@ -1,6 +1,6 @@
 import { CARD_BACKGROUND_BY_RARITY, CARD_MODAL_BACKGROUND_BY_RARITY } from './colony-cards';
 import { MINI_GAMES_CONFIG } from './mini-games-config';
-import { ARCADE_THEMES, ROUTE_THEMES } from './music-data';
+import { ARCADE_THEMES, ROUTE_THEMES, START_JOURNEY_TRACK } from './music-data';
 import { SOLAR_INTERSTELLAR_BATTLE_MEDIA } from './solar-interstellar-battle-media.mjs';
 import { NEW_LAND_BATTLE_MUSIC } from './new-land-battle-music.mjs';
 import { NEW_EARTH_SURFACE_WAR_TRACKS } from './new-earth-surface-war-music.mjs';
@@ -681,6 +681,7 @@ export const ASSET_GROUPS: Record<AssetGroupId, AssetPreloadEntry[]> = {
   'shared-ui': [
     ...asEntries([
       '/audio/bgm_landing.ogg',
+      START_JOURNEY_TRACK.url,
       '/audio/sfx/open_window.ogg',
       '/audio/sfx/close_window.ogg',
       '/assets/rota4/SFX_new_land/hangar_open_door.ogg',
