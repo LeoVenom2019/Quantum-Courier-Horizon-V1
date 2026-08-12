@@ -14,6 +14,7 @@
     "test:route4-elite-visuals": "node --test lib/route4-elite-ship-visuals.test.mjs",
     "test:route4-interaction-sfx": "node --test lib/route4-interaction-sfx.test.mjs",
     "test:new-earth-mission-rewards": "node --test lib/new-earth-mission-rewards.test.mjs",
+    "test:underwater-enemy-loot": "node --test lib/new-earth-underwater-enemy-loot.test.mjs",
     "test:horizon-achievement-stats": "node --test lib/horizon-achievement-stats.test.mjs",
     "test:arcade-intro": "node --test lib/arcade-intro-flow.test.mjs",
     "test:robot-runner-ghost-sfx": "node --test lib/robot-runner-ghost-sfx.test.mjs",

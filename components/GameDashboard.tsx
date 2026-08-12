@@ -4921,8 +4921,10 @@ const DashboardContent = memo(({
     }
   }, [playSfx, selectedSurfaceBattleBriefing]);
 
-  const handleUnderwaterTreasureLoot = useCallback((payload: any) => {
-    recordSubmarineMissionProgress({ type: 'submarine-treasure', amount: 1 });
+  const awardUnderwaterLoot = useCallback((payload: any, countsAsTreasure: boolean) => {
+    if (countsAsTreasure) {
+      recordSubmarineMissionProgress({ type: 'submarine-treasure', amount: 1 });
+    }
     if (!payload || typeof payload !== 'object') return;
 
     if (payload.type === 'relic' && payload.relic && typeof payload.relic === 'object') {
@@ -4981,6 +4983,12 @@ const DashboardContent = memo(({
         .catch(error => console.warn('Failed to persist underwater treasure reward', error));
     }
   }, [activeUnderwaterBattle?.colonyId, activeUnderwaterBattle?.siteId, creditQc, recordSubmarineMissionProgress]);
+  const handleUnderwaterTreasureLoot = useCallback((payload: any) => {
+    awardUnderwaterLoot(payload, true);
+  }, [awardUnderwaterLoot]);
+  const handleUnderwaterEnemyLoot = useCallback((payload: any) => {
+    awardUnderwaterLoot(payload, false);
+  }, [awardUnderwaterLoot]);
   const awardNewEarthSupplies = useCallback((supplies: Partial<Record<NewEarthSupplyId, number>>) => {
     const normalized = Object.entries(supplies).reduce<Partial<Record<NewEarthSupplyId, number>>>((acc, [key, value]) => {
       const amount = Math.max(0, Math.floor(Number(value) || 0));
@@ -9930,6 +9938,7 @@ const DashboardContent = memo(({
             );
           }}
           onTreasureLoot={handleUnderwaterTreasureLoot}
+          onEnemyLoot={handleUnderwaterEnemyLoot}
         />
       )}
 

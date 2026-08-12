@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { NEW_EARTH_SUBMARINE_DEPTH_STAGES } from '@/lib/new-earth-submarines';
 import { NEW_EARTH_TREASURES_BY_RARITY, type NewEarthTreasure } from '@/lib/new-earth-treasures';
+import { rollNewEarthUnderwaterEnemyLoot } from '@/lib/new-earth-underwater-enemy-loot.mjs';
 import { PremiumCanvasButton } from './ui/PremiumCanvasButton';
 import BattlePauseDialog from './BattlePauseDialog';
 
@@ -62,6 +63,7 @@ interface NewEarthUnderwaterBattleProps {
   onVictory?: (summary: { kills: number; depth: number }) => void;
   onDefeat?: (reason?: 'hull' | 'oxygen') => void;
   onTreasureLoot?: (payload: TreasureRewardPayload) => void;
+  onEnemyLoot?: (payload: TreasureRewardPayload) => void;
   defenseBattleLevel: number;
   onClose: () => void;
 }
@@ -2043,6 +2045,7 @@ export default function NewEarthUnderwaterBattle({
   onVictory,
   onDefeat,
   onTreasureLoot,
+  onEnemyLoot,
   onClose,
 }: NewEarthUnderwaterBattleProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -2954,7 +2957,36 @@ export default function NewEarthUnderwaterBattle({
         if (state.phase === 'combat') {
           const before = state.enemies.length;
           const destroyedEnemies = state.enemies.filter(enemy => enemy.hp <= 0);
-          destroyedEnemies.forEach(() => playRandomUnderwaterSound(SUBMARINE_EXPLOSION_SFX, 0.76));
+          destroyedEnemies.forEach(enemy => {
+            playRandomUnderwaterSound(SUBMARINE_EXPLOSION_SFX, 0.76);
+            const enemyLoot = rollNewEarthUnderwaterEnemyLoot({
+              rareRings: NEW_EARTH_TREASURES_BY_RARITY.legendary,
+              rareFish: NEW_EARTH_TREASURES_BY_RARITY.epic,
+              relics: NEW_EARTH_TREASURES_BY_RARITY.rare,
+            });
+            onEnemyLoot?.(enemyLoot);
+
+            const lootText = enemyLoot.type === 'qc'
+              ? `+${enemyLoot.amount.toLocaleString(language === 'pt' ? 'pt-BR' : 'en-US')} QC`
+              : enemyLoot.relic?.name || (language === 'pt' ? 'Sem drop' : 'No drop');
+            const lootColor = enemyLoot.type === 'qc'
+              ? '#fbbf24'
+              : enemyLoot.relic?.rarity === 'legendary'
+                ? '#f87171'
+                : enemyLoot.relic?.rarity === 'epic'
+                  ? '#c084fc'
+                  : enemyLoot.relic
+                    ? '#60a5fa'
+                    : '#94a3b8';
+            state.floatingTexts.push({
+              x: enemy.x,
+              y: enemy.y - enemy.radius - 30,
+              text: lootText,
+              color: lootColor,
+              life: 150,
+              maxLife: 150,
+            });
+          });
           state.enemies = state.enemies.filter(enemy => enemy.hp > 0);
           if (state.enemies.length !== before) {
             state.kills += before - state.enemies.length;
@@ -3325,7 +3357,7 @@ export default function NewEarthUnderwaterBattle({
     return () => {
       if (frameRef.current) cancelAnimationFrame(frameRef.current);
     };
-  }, [backgroundSrc, colonyId, currentDepthIndex, depthMeters, labels, labels.finalDepth, labels.oxygenDepleted, labels.portal, language, mounted, nextDepthMeters, onDefeat, onTreasureLoot, onVictory, oxygenReserveMs, playerMaxSpeed, playerShotDamage, playerShotSpeed, setCurrentDepthIndex, unlockedDepthIndex]);
+  }, [backgroundSrc, colonyId, currentDepthIndex, depthMeters, labels, labels.finalDepth, labels.oxygenDepleted, labels.portal, language, mounted, nextDepthMeters, onDefeat, onEnemyLoot, onTreasureLoot, onVictory, oxygenReserveMs, playerMaxSpeed, playerShotDamage, playerShotSpeed, setCurrentDepthIndex, unlockedDepthIndex]);
 
   useEffect(() => () => {
     activeLaunchAudiosRef.current.forEach(stopUnderwaterSound);
