@@ -6584,7 +6584,12 @@ const DashboardContent = memo(({
     updateAchievementProgress('qc_trillionaire', totalQC, true);
 
     // 3. Battle Warrior & Pirate Slayer
-    const pirateBattlesWon = getPirateBattleVictoryProgress(historyStats);
+    const pirateBattlesWon = getPirateBattleVictoryProgress({
+      historyStats,
+      chapter4LandDefenseVictories: newEarthAchievementMetrics.perfectLandSearchDefenses,
+      chapter4SeaDefenseVictories: newEarthAchievementMetrics.perfectSeaSearchDefenses,
+      chapter4DirectBattleVictories: newEarthAchievementMetrics.directBattleVictories,
+    });
     updateAchievementProgress('battle_warrior', pirateBattlesWon, true);
     const pirateSlayerProgress = getPirateSlayerProgress({
       chapter1ManualVictories: historyStats.Solar?.manualBattlesWon,

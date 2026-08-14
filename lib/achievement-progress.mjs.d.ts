@@ -1,8 +1,11 @@
 export function normalizeAchievementProgressAmount(value: unknown): number;
 
-export function getPirateBattleVictoryProgress(historyStats: Record<string, {
-  battlesWon?: number;
-}> | null | undefined): number;
+export function getPirateBattleVictoryProgress(input: {
+  historyStats: Record<string, { battlesWon?: number }> | null | undefined;
+  chapter4LandDefenseVictories?: number;
+  chapter4SeaDefenseVictories?: number;
+  chapter4DirectBattleVictories?: number;
+}): number;
 
 export function getDeliveryMissionCompletionProgress(input: {
   historyStats: Record<string, { missionsCompleted?: number }> | null | undefined;

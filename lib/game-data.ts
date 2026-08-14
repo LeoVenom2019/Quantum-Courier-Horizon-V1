@@ -574,7 +574,7 @@ export interface Achievement {
 export const ACHIEVEMENTS: Achievement[] = [
   { id: 'first_delivery', name: 'Primeira Entrega', description: 'Complete sua primeira entrega com sucesso.', type: 'milestone', target: 1, icon: 'CheckCircle2' },
   { id: 'qc_millionaire', name: 'Magnata Espacial', description: 'Acumule um total de 1.000.000 de QC.', type: 'milestone', target: 1000000, icon: 'Coins' },
-  { id: 'battle_warrior', name: 'Guerreiro das Estrelas', description: 'Vença 10 batalhas contra piratas.', type: 'accumulative', target: 10, icon: 'Sword' },
+  { id: 'battle_warrior', name: 'Guerreiro das Estrelas', description: 'Vença 10 batalhas nos Capítulos 1, 2 ou 4.', type: 'accumulative', target: 10, icon: 'Sword' },
   { id: 'robot_owner', name: 'Minerador Experiente', description: 'Compre 5 robôs mineradores.', type: 'accumulative', target: 5, icon: 'Bot' },
   { id: 'route_2_unlocked', name: 'Explorador Interestelar', description: 'Desbloqueie o Capítulo 2 - Rotas Interestelares.', type: 'milestone', target: 1, icon: 'Globe' },
   { id: 'tech_master', name: 'Mestre da Tecnologia', description: 'Desbloqueie 5 tecnologias diferentes.', type: 'accumulative', target: 5, icon: 'Cpu' },
