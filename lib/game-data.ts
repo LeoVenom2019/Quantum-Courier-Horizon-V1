@@ -467,7 +467,7 @@ export const EXTRACTION_POINTS: ExtractionPoint[] = [
     productionPerCycle: 10,
     cycleTime: 5000,
     cost: 500000000, // 500 Mi
-    researchTime: 60000, // 1 minute
+    researchTime: 30000, // 30 seconds
     valuePerPack: 10000000, // 10 Mi
     tier: 'Interstellar',
   },
@@ -478,7 +478,7 @@ export const EXTRACTION_POINTS: ExtractionPoint[] = [
     productionPerCycle: 10,
     cycleTime: 5000,
     cost: 2500000000, // 2.5 Bi
-    researchTime: 60000, // 1 minute
+    researchTime: 30000, // 30 seconds
     valuePerPack: 40000000, // 40 Mi
     tier: 'Interstellar',
   },
@@ -489,7 +489,7 @@ export const EXTRACTION_POINTS: ExtractionPoint[] = [
     productionPerCycle: 10,
     cycleTime: 5000,
     cost: 10000000000, // 10 Bi
-    researchTime: 60000, // 1 minute
+    researchTime: 30000, // 30 seconds
     valuePerPack: 180000000, // 180 Mi
     tier: 'Interstellar',
   },
@@ -500,7 +500,7 @@ export const EXTRACTION_POINTS: ExtractionPoint[] = [
     productionPerCycle: 10,
     cycleTime: 5000,
     cost: 50000000000, // 50 Bi
-    researchTime: 60000, // 1 minute
+    researchTime: 30000, // 30 seconds
     valuePerPack: 900000000, // 900 Mi
     tier: 'Interstellar',
   },
@@ -511,7 +511,7 @@ export const EXTRACTION_POINTS: ExtractionPoint[] = [
     productionPerCycle: 10,
     cycleTime: 5000,
     cost: 200000000000, // 200 Bi
-    researchTime: 60000, // 1 minute
+    researchTime: 30000, // 30 seconds
     valuePerPack: 3500000000, // 3.5 Bi
     tier: 'Interstellar',
   },
@@ -522,7 +522,7 @@ export const EXTRACTION_POINTS: ExtractionPoint[] = [
     productionPerCycle: 10,
     cycleTime: 5000,
     cost: 1000000000000, // 1 Tri
-    researchTime: 60000, // 1 minute
+    researchTime: 30000, // 30 seconds
     valuePerPack: 18000000000, // 18 Bi
     tier: 'Interstellar',
   },
@@ -533,7 +533,7 @@ export const EXTRACTION_POINTS: ExtractionPoint[] = [
     productionPerCycle: 10,
     cycleTime: 5000,
     cost: 5000000000000, // 5 Tri
-    researchTime: 60000, // 1 minute
+    researchTime: 30000, // 30 seconds
     valuePerPack: 90000000000, // 90 Bi
     tier: 'Interstellar',
   },
@@ -544,7 +544,7 @@ export const EXTRACTION_POINTS: ExtractionPoint[] = [
     productionPerCycle: 10,
     cycleTime: 5000,
     cost: 25000000000000, // 25 Tri
-    researchTime: 60000, // 1 minute
+    researchTime: 30000, // 30 seconds
     valuePerPack: 450000000000, // 450 Bi
     tier: 'Interstellar',
   },
@@ -555,7 +555,7 @@ export const EXTRACTION_POINTS: ExtractionPoint[] = [
     productionPerCycle: 10,
     cycleTime: 5000,
     cost: 100000000000000, // 100 Tri
-    researchTime: 60000, // 1 minute
+    researchTime: 30000, // 30 seconds
     valuePerPack: 1800000000000, // 1.8 Tri
     tier: 'Interstellar',
   },

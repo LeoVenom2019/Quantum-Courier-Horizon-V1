@@ -65,6 +65,7 @@ interface SolarInterstellarBattleExperienceProps {
   voidResources: any;
   battleLevel: number;
   meteoriteRewardValue?: number;
+  disableMeteorEvent?: boolean;
   musicOn: boolean;
   jukebox: JukeboxController;
 }
@@ -382,6 +383,7 @@ export default function SolarInterstellarBattleExperience({
   voidResources,
   battleLevel,
   meteoriteRewardValue = 0,
+  disableMeteorEvent = false,
   musicOn,
   jukebox,
 }: SolarInterstellarBattleExperienceProps) {
@@ -575,7 +577,7 @@ export default function SolarInterstellarBattleExperience({
         isGroupBattle={false}
         onExitBattle={forceBattleDefeat}
         meteoriteRewardValue={meteoriteRewardValue}
-        disableMeteorEvent={false}
+        disableMeteorEvent={disableMeteorEvent}
       />
     </div>
   );

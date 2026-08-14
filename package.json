@@ -7,6 +7,7 @@
   "scripts": {
     "test:battle-media": "node --test lib/solar-interstellar-battle-media.test.mjs",
     "test:battle-waves": "node --test lib/solar-interstellar-battle-waves.test.mjs",
+    "test:battle-auto": "node --test lib/cap12-auto-battle.test.mjs",
     "test:delivery-progress": "node --test lib/delivery-progress.test.mjs",
     "test:new-land-battle-music": "node --test lib/new-land-battle-music.test.mjs",
     "test:surface-war-music": "node --test lib/new-earth-surface-war-music.test.mjs",
@@ -27,6 +28,7 @@
     "test:robot-runner-ghost-sfx": "node --test lib/robot-runner-ghost-sfx.test.mjs",
     "test:robot-runner-maze": "node --test lib/robot-runner-maze.test.mjs",
     "test:research-timing": "node --test lib/research-timing.test.mjs",
+    "test:route3-unlock": "node --test lib/route3-extraction-unlock.test.mjs",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
