@@ -572,7 +572,25 @@ const route12BattleImages = [
   '/images/battle/enemy_comum/enemy_comum.webp',
   '/images/battle/enemy_elite/enemy_elite.webp',
   '/images/battle/enemy_boss/enemy_boss.webp',
+  '/images/battle/standard_ship.webp',
+  '/images/battle/solar/meteorite1.webp',
+  '/images/battle/solar/meteorite2.webp',
+  '/images/battle/solar/meteor1.webp',
+  '/images/battle/solar/meteor2.webp',
 ];
+
+const route1BattleBackgroundImages = [
+  '/assets/rota1/battle/layer_background1.webp',
+  '/assets/rota1/battle/bg_layer.webp',
+];
+
+const route2BattleBackgroundImages = [
+  '/assets/rota2/battle/layer_background1.webp',
+  '/assets/rota2/battle/bg_layer.webp',
+];
+
+const route1BattleVideos = ['/assets/rota1/battle/background_battle.mp4'];
+const route2BattleVideos = ['/assets/rota2/battle/background_battle.mp4'];
 
 const route3VoidLocationKeys = ['zero', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 const route3VoidBossSpriteImages = route3VoidLocationKeys.flatMap(locationKey => (
@@ -732,8 +750,8 @@ export const ASSET_GROUPS: Record<AssetGroupId, AssetPreloadEntry[]> = {
     ...asEntries([...fliperSfx, ...route4BobbyLockedArcadeCardAudio], 'audio'),
   ],
   route1: [
-    ...asEntries([routeHeaderImages.route1, ACTIVE_DELIVERY_BACKGROUNDS.route1, MISSION_HEADER_BACKGROUNDS.route1, AETHERION_CHAMBER_BACKGROUND, ...ROUTE1_UI_BACKGROUNDS, ...route1UpgradeBackgrounds, ...route1HistoricBackgrounds, ...route12BattleImages], 'image'),
-    ...asEntries(route1MineralVideos, 'video'),
+    ...asEntries([routeHeaderImages.route1, ACTIVE_DELIVERY_BACKGROUNDS.route1, MISSION_HEADER_BACKGROUNDS.route1, AETHERION_CHAMBER_BACKGROUND, ...ROUTE1_UI_BACKGROUNDS, ...route1UpgradeBackgrounds, ...route1HistoricBackgrounds, ...route12BattleImages, ...route1BattleBackgroundImages], 'image'),
+    ...asEntries([...route1MineralVideos, ...route1BattleVideos], 'video'),
     ...asEntries([
       ...routeThemeAudio('Solar'),
       SOLAR_INTERSTELLAR_BATTLE_MEDIA.Solar.victoryTheme,
@@ -741,8 +759,8 @@ export const ASSET_GROUPS: Record<AssetGroupId, AssetPreloadEntry[]> = {
     ], 'audio'),
   ],
   route2: [
-    ...asEntries([routeHeaderImages.route2, ACTIVE_DELIVERY_BACKGROUNDS.route2, MISSION_HEADER_BACKGROUNDS.route2, AETHERION_CHAMBER_BACKGROUND, ...ROUTE2_UI_BACKGROUNDS, ...route2UpgradeBackgrounds, ...route2HistoricBackgrounds, ...route12BattleImages], 'image'),
-    ...asEntries(route2MineralVideos, 'video'),
+    ...asEntries([routeHeaderImages.route2, ACTIVE_DELIVERY_BACKGROUNDS.route2, MISSION_HEADER_BACKGROUNDS.route2, AETHERION_CHAMBER_BACKGROUND, ...ROUTE2_UI_BACKGROUNDS, ...route2UpgradeBackgrounds, ...route2HistoricBackgrounds, ...route12BattleImages, ...route2BattleBackgroundImages], 'image'),
+    ...asEntries([...route2MineralVideos, ...route2BattleVideos], 'video'),
     ...asEntries([
       ...routeThemeAudio('Interstellar'),
       '/audio/themes/intro_cap_02.ogg',

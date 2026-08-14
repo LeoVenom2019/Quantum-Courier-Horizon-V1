@@ -36,6 +36,17 @@ interface JukeboxController {
     playlist: Track[],
     options?: { loop?: boolean; rememberPreference?: boolean; restart?: boolean },
   ) => void;
+  getPlaybackSnapshot: () => JukeboxPlaybackSnapshot | null;
+  restorePlaybackSnapshot: (snapshot: JukeboxPlaybackSnapshot) => void;
+}
+
+interface JukeboxPlaybackSnapshot {
+  playlist: Track[];
+  currentTrackIndex: number;
+  currentTime: number;
+  isPlaying: boolean;
+  desiredIsPlaying: boolean;
+  isLoop: boolean;
 }
 
 interface SolarInterstellarBattleExperienceProps {
@@ -378,10 +389,13 @@ export default function SolarInterstellarBattleExperience({
   const resultAudioRef = useRef<HTMLAudioElement | null>(null);
   const playedOutcomeRef = useRef<string>('');
   const musicOnRef = useRef(musicOn);
+  const routeMusicSnapshotRef = useRef<JukeboxPlaybackSnapshot | null>(null);
   const [battleTheme] = useState(() => pickManualBattleTheme(routeTier));
   const stopJukebox = jukebox.stop;
   const playJukeboxPlaylist = jukebox.playPlaylist;
   const outcome = activeBattle.isVictory ? 'victory' : activeBattle.isDefeat ? 'defeat' : '';
+  const getJukeboxPlaybackSnapshot = jukebox.getPlaybackSnapshot;
+  const restoreJukeboxPlaybackSnapshot = jukebox.restorePlaybackSnapshot;
   const targetVolume = Math.min(0.8, Math.max(0.18, Number(jukebox.volume ?? 0.5) * 0.95));
   const targetVolumeRef = useRef(targetVolume);
 
@@ -395,6 +409,7 @@ export default function SolarInterstellarBattleExperience({
   }, [musicOn, targetVolume]);
 
   useEffect(() => {
+    routeMusicSnapshotRef.current = getJukeboxPlaybackSnapshot();
     stopJukebox({ rememberPreference: false });
     if (typeof window !== 'undefined' && battleTheme) {
       const audio = new Audio(battleTheme);
@@ -410,12 +425,17 @@ export default function SolarInterstellarBattleExperience({
       stopAudio(resultAudioRef.current);
       battleAudioRef.current = null;
       resultAudioRef.current = null;
-      const routePlaylist = ROUTE_THEMES[routeTier]?.playlist;
-      if (musicOnRef.current && routePlaylist?.length) {
-        playJukeboxPlaylist(routePlaylist, { loop: false, rememberPreference: false });
+      const routeMusicSnapshot = routeMusicSnapshotRef.current;
+      if (musicOnRef.current && routeMusicSnapshot) {
+        restoreJukeboxPlaybackSnapshot(routeMusicSnapshot);
+      } else {
+        const routePlaylist = ROUTE_THEMES[routeTier]?.playlist;
+        if (musicOnRef.current && routePlaylist?.length) {
+          playJukeboxPlaylist(routePlaylist, { loop: false, rememberPreference: false });
+        }
       }
     };
-  }, [battleTheme, playJukeboxPlaylist, routeTier, stopJukebox]);
+  }, [battleTheme, getJukeboxPlaybackSnapshot, playJukeboxPlaylist, restoreJukeboxPlaybackSnapshot, routeTier, stopJukebox]);
 
   useEffect(() => {
     if (!outcome || playedOutcomeRef.current === outcome) return;
@@ -456,15 +476,14 @@ export default function SolarInterstellarBattleExperience({
     rarity: 'common' as const,
     upgrades: { damage: 0, shield: 0, crit: 0, loot: 0 },
   };
-  const waveBlueprints = buildSolarInterstellarWaveBlueprints({
+  const enemies: VoidBattleEnemy[] = buildSolarInterstellarWaveBlueprints({
     enemyMaxHp: activeBattle.enemyMaxHp,
     enemyDps: activeBattle.enemyDps,
     reward: activeBattle.reward,
     playerDamage: stats.damage,
     critChance: stats.critChance,
     criticalDamage: stats.damage * 2,
-  });
-  const enemies: VoidBattleEnemy[] = waveBlueprints.map((wave: any) => ({
+  }).map((wave: any) => ({
     id: `chapter-${routeTier.toLowerCase()}-${activeBattle.id}-wave-${wave.wave}`,
     type: wave.type,
     name: wave.isBoss
@@ -476,14 +495,18 @@ export default function SolarInterstellarBattleExperience({
     maxShield: 0,
     damage: wave.damage,
     qc: wave.qc,
-    x: 85,
-    y: 50,
+    x: wave.x,
+    y: wave.y,
     image: activeBattle.enemyImage || '',
     spriteSheet: activeBattle.enemySpriteSheet,
     visualScale: wave.visualScale,
     spawnDelayMs: wave.spawnDelayMs,
+    spawnWithNext: wave.spawnWithNext,
+    trackingOffsetY: wave.trackingOffsetY,
   }));
-  const [openingEnemy, ...enemyQueue] = enemies;
+  const openingEnemyCount = enemies[0]?.spawnWithNext ? 2 : 1;
+  const openingEnemies = enemies.slice(0, openingEnemyCount);
+  const enemyQueue = enemies.slice(openingEnemyCount);
 
   const forceBattleDefeat = () => {
     const updated = {
@@ -500,7 +523,7 @@ export default function SolarInterstellarBattleExperience({
   return (
     <div className="relative h-full w-full">
       <VoidBattleArena
-        initialEnemies={[openingEnemy]}
+        initialEnemies={openingEnemies}
         enemyQueue={enemyQueue}
         playerShipStats={stats}
         voidResources={voidResources}

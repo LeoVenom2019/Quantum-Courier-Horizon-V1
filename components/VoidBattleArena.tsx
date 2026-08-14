@@ -53,7 +53,11 @@ export interface VoidBattleEnemy {
   shootSpriteUntil?: number;
   assetLocationId?: number;
   visualScale?: number;
+  spawnX?: number;
+  movementPhase?: number;
+  trackingOffsetY?: number;
   spawnDelayMs?: number;
+  spawnWithNext?: boolean;
 }
 
 export interface VoidBattleParticle {
@@ -474,7 +478,7 @@ const VoidBattleArena = memo(function VoidBattleArena({
 
   // Game state in a ref for zero-latency updates
   const gameRef = useRef<VoidBattleState>({
-    enemies: battleEnemies.map(e => ({ ...e, isExploding: false })),
+    enemies: battleEnemies.map(e => ({ ...e, spawnX: e.x, movementPhase: Math.random() * Math.PI * 2, isExploding: false })),
     playerX: 10,
     playerY: 50,
     projectiles: [],
@@ -2465,11 +2469,11 @@ const VoidBattleArena = memo(function VoidBattleArena({
           const oldX = enemy.x;
           const oldY = enemy.y;
 
-          const dy = s.playerY - enemy.y;
+          const dy = Math.max(8, Math.min(92, s.playerY + (enemy.trackingOffsetY || 0))) - enemy.y;
           const trackingSpeed = (enemy.type === 'Boss' ? 0.05 : 0.03) * deltaTime;
           enemy.y += dy * trackingSpeed;
 
-          enemy.x = 80 + Math.sin(now / 1200) * 8;
+          enemy.x = (enemy.spawnX ?? 80) + Math.sin(now / 1200 + (enemy.movementPhase || 0)) * 8;
 
           // Calculate movement vectors for sprite selection
           enemy.vx = enemy.x - oldX;
@@ -2522,7 +2526,8 @@ const VoidBattleArena = memo(function VoidBattleArena({
         // Enemy Attack — Com IA de mira real e lastShot
         s.enemies.forEach(enemy => {
           if (enemy.hp <= 0) return;
-          if (now - (enemy.lastShot || 0) > 2500) {
+          const enemyShotInterval = routeTier === 'Solar' || routeTier === 'Interstellar' ? 1250 : 2500;
+          if (now - (enemy.lastShot || 0) > enemyShotInterval) {
             enemy.lastShot = now;
             const dx = s.playerX - enemy.x;
             const dy = s.playerY - enemy.y;
@@ -3318,7 +3323,10 @@ const VoidBattleArena = memo(function VoidBattleArena({
             if (now >= s.enemyQueueNextSpawnAt) {
               const nextEnemy = s.enemyQueue.shift();
               if (nextEnemy) {
-                s.enemies = [{ ...nextEnemy, isExploding: false }];
+                const pairedEnemy = nextEnemy.spawnWithNext ? s.enemyQueue.shift() : undefined;
+                s.enemies = [nextEnemy, pairedEnemy]
+                  .filter((enemy): enemy is VoidBattleEnemy => Boolean(enemy))
+                  .map(enemy => ({ ...enemy, spawnX: enemy.x, movementPhase: Math.random() * Math.PI * 2, isExploding: false }));
                 s.lastEnemyAttack = now;
                 s.flashAlpha = Math.max(s.flashAlpha, nextEnemy.visualScale && nextEnemy.visualScale < 1 ? 0.2 : 0.5);
                 s.flashColor = nextEnemy.visualScale && nextEnemy.visualScale < 1 ? '190, 90, 255' : '255, 170, 80';
@@ -3431,7 +3439,10 @@ const VoidBattleArena = memo(function VoidBattleArena({
     });
   }, [onBattleEnd, onExitBattle]);
 
-  if (!assetsLoaded) {
+  // Void battles still use the explicit loading gate because their directional
+  // sprite sets vary by location. Chapter 1/2 assets are preloaded globally, so
+  // keeping their arena mounted avoids a one-frame loading-screen flash in Electron.
+  if (!assetsLoaded && routeTier === 'Void') {
     return (
       <div className="fixed inset-0 z-[20000] flex flex-col items-center justify-center bg-[#050510]">
         <div className="w-16 h-16 border-4 border-cyan-500/20 border-t-cyan-500 rounded-full animate-spin" />
@@ -3447,6 +3458,17 @@ const VoidBattleArena = memo(function VoidBattleArena({
 
   return (
     <div ref={containerRef} className="fixed inset-0 z-[20000] flex flex-col relative overflow-hidden bg-black">
+      {!assetsLoaded && routeTier !== 'Void' && (
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 z-0 bg-cover bg-center bg-no-repeat"
+          style={{
+            backgroundImage: `url('${routeTier === 'Solar'
+              ? '/assets/rota1/battle/layer_background1.webp'
+              : '/assets/rota2/battle/layer_background1.webp'}')`,
+          }}
+        />
+      )}
       <VoidBattleHUD
         hud={hud}
         playerMaxHp={gameRef.current.playerMaxHp}

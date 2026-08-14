@@ -69,7 +69,8 @@ import {
   Loader2,
   Play,
   Pause,
-  FileText
+  FileText,
+  Shuffle,
 } from 'lucide-react';
 
 const ROUTE2_MISSIONS_REQUIREMENT = 100;
@@ -10433,6 +10434,7 @@ const DashboardContent = memo(({
               <div className="flex items-center gap-3">
                 <PremiumCanvasButton
                   onClick={() => {
+                    if (jukebox.isPlaying) jukebox.setIsShuffle(false);
                     jukebox.togglePlay();
                     playSfx(jukebox.isPlaying ? 'close_window' : 'open_window');
                   }}
@@ -10448,6 +10450,21 @@ const DashboardContent = memo(({
                   {jukebox.isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
                   <span>{jukebox.isPlaying ? 'MUSIC ON' : 'MUSIC OFF'}</span>
                 </PremiumCanvasButton>
+                <PremiumCanvasButton
+                  onClick={() => {
+                    if (!jukebox.isPlaying) return;
+                    jukebox.setIsShuffle(!jukebox.isShuffle);
+                    playSfx(jukebox.isShuffle ? 'close_window' : 'open_window');
+                  }}
+                  disabled={!jukebox.isPlaying}
+                  tone={jukebox.isPlaying && jukebox.isShuffle ? 'cyan' : 'steel'}
+                  contentClassName={`gap-2 text-base font-orbitron font-bold uppercase tracking-widest ${dashboardPremiumText(jukebox.isPlaying && jukebox.isShuffle)}`}
+                  title={language === 'pt' ? 'Tocar músicas aleatoriamente' : 'Shuffle music'}
+                >
+                  <Shuffle className="w-4 h-4" />
+                  <span>{language === 'pt' ? 'ALEATÓRIO' : 'SHUFFLE'} {jukebox.isPlaying && jukebox.isShuffle ? 'ON' : 'OFF'}</span>
+                </PremiumCanvasButton>
+
 
                 <PremiumCanvasButton
                   onClick={() => {
