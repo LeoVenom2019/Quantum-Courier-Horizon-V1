@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { NEW_EARTH_SUBMARINE_DEPTH_STAGES } from '@/lib/new-earth-submarines';
 import { NEW_EARTH_TREASURES_BY_RARITY, type NewEarthTreasure } from '@/lib/new-earth-treasures';
-import { rollNewEarthUnderwaterEnemyLoot } from '@/lib/new-earth-underwater-enemy-loot.mjs';
+import { excludeCollectedUnderwaterTreasures, rollNewEarthUnderwaterBossLoot, rollNewEarthUnderwaterEnemyLoot } from '@/lib/new-earth-underwater-enemy-loot.mjs';
 import { PremiumCanvasButton } from './ui/PremiumCanvasButton';
 import BattlePauseDialog from './BattlePauseDialog';
 
@@ -64,6 +64,7 @@ interface NewEarthUnderwaterBattleProps {
   onDefeat?: (reason?: 'hull' | 'oxygen') => void;
   onTreasureLoot?: (payload: TreasureRewardPayload) => void;
   onEnemyLoot?: (payload: TreasureRewardPayload) => void;
+  collectedTreasureIds?: string[];
   defenseBattleLevel: number;
   onClose: () => void;
 }
@@ -78,6 +79,7 @@ type VecEntity = {
   hp: number;
   maxHp: number;
   cooldown: number;
+  isBoss: boolean;
   visual: EnemyVisualState;
 };
 
@@ -247,6 +249,10 @@ const NEXT_ENEMY_SPAWN_MIN_MS = 1500;
 const NEXT_ENEMY_SPAWN_MAX_MS = 2500;
 const MAX_ACTIVE_ENEMIES = 1;
 const TARGET_KILLS = 3;
+const BOSS_HEALTH_MULTIPLIER = 3;
+const BOSS_SIZE_MULTIPLIER = 2;
+const BOSS_FIRE_RATE_MULTIPLIER = 2;
+const BOSS_MAX_ACTIVE_TORPEDOES = 2;
 const DARKNESS_MULTIPLIER = 0.72;
 const FOREGROUND_DEBRIS_COUNT = 18;
 const PLAYER_SPRITE_TURN_FRAME_MS = 70;
@@ -265,6 +271,7 @@ const ENEMY_SUBMARINE_ENTER_SFX = `${UNDERWATER_SFX_BASE}/enemy_submarine_enter.
 const PLAYER_TORPEDO_LAUNCH_SFX = `${UNDERWATER_SFX_BASE}/player_torped_launcher.ogg`;
 const PLAYER_TORPEDO_IMPACT_SFX = `${UNDERWATER_SFX_BASE}/player_torped_impact.ogg`;
 const SUBMARINE_ENTER_SFX = `${UNDERWATER_SFX_BASE}/submarine_enter.ogg`;
+const SUBMARINE_PORTAL_ENTER_SFX = '/assets/games/flipers_sfx/space_jump_jump.ogg';
 const RADAR_SUBMARINE_SFX = `${UNDERWATER_SFX_BASE}/radar_submarine_1.ogg`;
 const SUBMARINE_AIM_GREEN_SFX = `${UNDERWATER_SFX_BASE}/submarine_aim_green.ogg`;
 const SUBMARINE_PLAYER_CONSTANT_SFX = `${UNDERWATER_SFX_BASE}/submarine_player_constant.ogg`;
@@ -331,9 +338,10 @@ const ENEMY_SUBMARINE_SPRITES: Record<EnemySubmarineSpriteSetId, Record<PlayerSu
   enemy_submarine3: createSubmarineSpriteSet('/assets/rota4/colonys/enemy_submarine3', 'enemy_submarine3'),
 };
 const imageCache = new Map<string, HTMLImageElement>();
-const pickTreasureRelic = (rarity: TreasureRarity) => {
+const pickTreasureRelic = (rarity: TreasureRarity, unavailableIds: Set<string>) => {
   if (rarity === 'normal') return undefined;
-  const relics = NEW_EARTH_TREASURES_BY_RARITY[rarity];
+  const relics = excludeCollectedUnderwaterTreasures(NEW_EARTH_TREASURES_BY_RARITY[rarity], unavailableIds);
+  if (relics.length === 0) return undefined;
   return relics[Math.floor(Math.random() * relics.length)];
 };
 
@@ -538,18 +546,23 @@ const drawEnemySpriteSubmarine = (
   const sprites = ENEMY_SUBMARINE_SPRITES[enemy.visual.spriteSetId];
   const spriteKey = getPlayerSubmarineSpriteKey(enemy.visual, getPlayerSpriteKeyFromAngle(angle), time);
   const sprite = getImage(sprites[spriteKey]);
+  const sizeMultiplier = enemy.isBoss ? BOSS_SIZE_MULTIPLIER : 1;
 
   if (!sprite?.complete || sprite.naturalWidth <= 0) {
-    drawSubmarine(ctx, enemy.x, enemy.y, angle, 'rgba(88,28,28,0.92)', false);
+    ctx.save();
+    ctx.translate(enemy.x, enemy.y);
+    ctx.scale(sizeMultiplier, sizeMultiplier);
+    drawSubmarine(ctx, 0, 0, angle, 'rgba(88,28,28,0.92)', false);
+    ctx.restore();
     return;
   }
 
-  const drawW = 104;
-  const drawH = 72;
+  const drawW = 104 * sizeMultiplier;
+  const drawH = 72 * sizeMultiplier;
   ctx.save();
   ctx.translate(enemy.x, enemy.y);
-  ctx.shadowColor = 'rgba(248,113,113,0.48)';
-  ctx.shadowBlur = 10;
+  ctx.shadowColor = enemy.isBoss ? 'rgba(239,68,68,0.82)' : 'rgba(248,113,113,0.48)';
+  ctx.shadowBlur = enemy.isBoss ? 24 : 10;
   ctx.drawImage(sprite, -drawW / 2, -drawH / 2, drawW, drawH);
   ctx.restore();
 };
@@ -1346,7 +1359,7 @@ const drawCombatParticles = (
   });
 };
 
-const drawDeepPortal = (
+export const drawDeepPortal = (
   ctx: CanvasRenderingContext2D,
   width: number,
   height: number,
@@ -2046,10 +2059,17 @@ export default function NewEarthUnderwaterBattle({
   onDefeat,
   onTreasureLoot,
   onEnemyLoot,
+  collectedTreasureIds = [],
   onClose,
 }: NewEarthUnderwaterBattleProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const keysRef = useRef<Set<string>>(new Set());
+  const ownedTreasureIdsRef = useRef<Set<string>>(new Set());
+  const claimedTreasureIdsRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    ownedTreasureIdsRef.current = new Set(collectedTreasureIds);
+    collectedTreasureIds.forEach(id => claimedTreasureIdsRef.current.add(id));
+  }, [collectedTreasureIds]);
   const aimRef = useRef<AimState>({
     x: WIDTH / 2,
     y: HEIGHT / 2,
@@ -2064,6 +2084,7 @@ export default function NewEarthUnderwaterBattle({
   const playerConstantMotorAudioRef = useRef<HTMLAudioElement | null>(null);
   const underwaterThemeAudioRef = useRef<HTMLAudioElement | null>(null);
   const radarAudioRef = useRef<HTMLAudioElement | null>(null);
+  const lastPortalTransitionDepthRef = useRef<number | null>(null);
 
   useEffect(() => {
     playUnderwaterSound(SUBMARINE_ENTER_SFX, 0.8);
@@ -2101,6 +2122,8 @@ export default function NewEarthUnderwaterBattle({
     nextEnemySpawnAt: 0,
     nextId: 1,
     kills: 0,
+    bossSpawned: false,
+    bossDefeated: false,
     phase: 'combat' as 'combat' | 'exploration' | 'player_exploding' | 'defeat',
     playerExplosionEndsAt: 0,
     victoryHandled: false,
@@ -2115,8 +2138,10 @@ export default function NewEarthUnderwaterBattle({
   const [portalFeedback, setPortalFeedback] = useState<string | null>(null);
   const [isPaused, setIsPaused] = useState(false);
   const [isExitConfirmationOpen, setIsExitConfirmationOpen] = useState(false);
+  const [isFinalPortalConfirmationOpen, setIsFinalPortalConfirmationOpen] = useState(false);
   const isPausedRef = useRef(false);
   const portalFeedbackRef = useRef<string | null>(null);
+  const finalPortalPromptDismissedRef = useRef(false);
   const oxygenRemainingMsRef = useRef(0);
   const oxygenInitializedRef = useRef(false);
   const lastHudUpdateAtRef = useRef(0);
@@ -2168,7 +2193,6 @@ export default function NewEarthUnderwaterBattle({
     oxygenCritical: language === 'pt' ? 'Oxigênio crítico. Retorne à superfície.' : 'Oxygen critical. Return to surface.',
     oxygenDepleted: language === 'pt' ? 'Oxigênio esgotado' : 'Oxygen depleted',
     portal: language === 'pt' ? 'Portal Profundo' : 'Deep Portal',
-    finalDepth: language === 'pt' ? 'Limite explorado deste setor.' : 'Sector depth limit explored.',
   }), [language]);
 
   useEffect(() => {
@@ -2220,6 +2244,7 @@ export default function NewEarthUnderwaterBattle({
 
   useEffect(() => {
     const state = stateRef.current;
+    claimedTreasureIdsRef.current = new Set(ownedTreasureIdsRef.current);
     Object.assign(state, {
       player: { x: 145, y: HEIGHT / 2, vx: 0, vy: 0, hp: playerMaxHp, maxHp: playerMaxHp, cooldown: 0, angle: 0, thrust: 0, lastThrustAt: 0 },
       enemies: [],
@@ -2229,6 +2254,8 @@ export default function NewEarthUnderwaterBattle({
       nextEnemySpawnAt: 0,
       nextId: 1,
       kills: 0,
+      bossSpawned: false,
+      bossDefeated: false,
       phase: 'combat' as const,
       playerExplosionEndsAt: 0,
       victoryHandled: false,
@@ -2289,7 +2316,13 @@ export default function NewEarthUnderwaterBattle({
         
         rewardAmount = rollNormalTreasureReward(rewardType);
       }
-      const relic = pickTreasureRelic(rarity);
+      const relic = pickTreasureRelic(rarity, claimedTreasureIdsRef.current);
+      if (relic) {
+        claimedTreasureIdsRef.current.add(relic.id);
+      } else if (rarity !== 'normal') {
+        rewardType = 'qc';
+        rewardAmount = rollNormalTreasureReward('qc');
+      }
 
       return {
         id: stateRef.current.nextId++,
@@ -2368,6 +2401,12 @@ export default function NewEarthUnderwaterBattle({
       }
       if (event.key === 'Escape' && status !== 'defeat') {
         event.preventDefault();
+        if (isFinalPortalConfirmationOpen) {
+          setIsFinalPortalConfirmationOpen(false);
+          isPausedRef.current = false;
+          setIsPaused(false);
+          return;
+        }
         if (isExitConfirmationOpen) {
           setIsExitConfirmationOpen(false);
           isPausedRef.current = false;
@@ -2395,7 +2434,7 @@ export default function NewEarthUnderwaterBattle({
       window.removeEventListener('keydown', down);
       window.removeEventListener('keyup', up);
     };
-  }, [isExitConfirmationOpen, status]);
+  }, [isExitConfirmationOpen, isFinalPortalConfirmationOpen, status]);
 
   useEffect(() => {
     if (!mounted) return;
@@ -2409,7 +2448,7 @@ export default function NewEarthUnderwaterBattle({
       NEXT_ENEMY_SPAWN_MIN_MS + Math.random() * (NEXT_ENEMY_SPAWN_MAX_MS - NEXT_ENEMY_SPAWN_MIN_MS)
     );
 
-    const spawnEnemy = () => {
+    const spawnEnemy = (isBoss = false) => {
       const state = stateRef.current;
       if (state.enemies.length >= MAX_ACTIVE_ENEMIES) return;
       const side = Math.floor(Math.random() * 4);
@@ -2425,17 +2464,22 @@ export default function NewEarthUnderwaterBattle({
       const dy = targetY - spawn.y;
       const len = Math.hypot(dx, dy) || 1;
       const enemyId = state.nextId++;
-      const spriteSetId = `enemy_submarine${((enemyId - 1) % 3) + 1}` as EnemySubmarineSpriteSetId;
+      const spriteVariant = isBoss
+        ? Math.floor(Math.random() * 3) + 1
+        : ((enemyId - 1) % 3) + 1;
+      const spriteSetId = `enemy_submarine${spriteVariant}` as EnemySubmarineSpriteSetId;
+      const normalHp = 32;
       state.enemies.push({
         id: enemyId,
         x: spawn.x,
         y: spawn.y,
         vx: (dx / len) * (0.45 + Math.random() * 0.38),
         vy: (dy / len) * (0.45 + Math.random() * 0.38),
-        radius: 25,
-        hp: 32,
-        maxHp: 32,
-        cooldown: 900 + Math.random() * 1100,
+        radius: 25 * (isBoss ? BOSS_SIZE_MULTIPLIER : 1),
+        hp: normalHp * (isBoss ? BOSS_HEALTH_MULTIPLIER : 1),
+        maxHp: normalHp * (isBoss ? BOSS_HEALTH_MULTIPLIER : 1),
+        cooldown: (900 + Math.random() * 1100) / (isBoss ? BOSS_FIRE_RATE_MULTIPLIER : 1),
+        isBoss,
         visual: {
           key: getPlayerSpriteKeyFromAngle(Math.atan2(dy, dx)),
           turnFrom: null,
@@ -2445,7 +2489,7 @@ export default function NewEarthUnderwaterBattle({
           spriteSetId,
         },
       });
-      playUnderwaterSound(ENEMY_SUBMARINE_ENTER_SFX, 0.5);
+      playUnderwaterSound(ENEMY_SUBMARINE_ENTER_SFX, isBoss ? 0.8 : 0.5);
     };
     spawnEnemy();
 
@@ -2801,28 +2845,42 @@ export default function NewEarthUnderwaterBattle({
               }
             }
             enemy.cooldown -= delta;
-            if (enemy.cooldown <= 0 && !state.shots.some(shot => shot.ownerId === `enemy:${enemy.id}`)) {
-              enemy.cooldown = 1350 + Math.random() * 900;
-              state.shots.push({
-                id: state.nextId++,
-                from: 'enemy',
-                ownerId: `enemy:${enemy.id}`,
-                targetId: null,
-                angle: Math.atan2(dy, dx),
-                speed: ENEMY_SHOT_SPEED,
-                wakeSeed: Math.random() * 1000,
-                x: enemy.x - 20,
-                y: enemy.y,
-                vx: (dx / len) * ENEMY_SHOT_SPEED,
-                vy: (dy / len) * ENEMY_SHOT_SPEED,
-                damage: 9,
-                radius: 4,
-                life: 190,
-                trail: [],
-                guideStrength: 0,
-                wobble: 0,
-                wobbleVel: 0,
-              });
+            const ownerId = `enemy:${enemy.id}`;
+            const activeEnemyTorpedoes = state.shots.filter(shot => shot.ownerId === ownerId).length;
+            const maxActiveTorpedoes = enemy.isBoss ? BOSS_MAX_ACTIVE_TORPEDOES : 1;
+            if (enemy.cooldown <= 0 && activeEnemyTorpedoes < maxActiveTorpedoes) {
+              enemy.cooldown = (1350 + Math.random() * 900) / (enemy.isBoss ? BOSS_FIRE_RATE_MULTIPLIER : 1);
+              const torpedoCount = enemy.isBoss ? maxActiveTorpedoes - activeEnemyTorpedoes : 1;
+              const baseAngle = Math.atan2(dy, dx);
+              for (let torpedoIndex = 0; torpedoIndex < torpedoCount; torpedoIndex++) {
+                const lateralOffset = enemy.isBoss ? (torpedoIndex - (torpedoCount - 1) / 2) * 22 : 0;
+                const shotX = enemy.isBoss
+                  ? enemy.x + Math.cos(baseAngle) * 42 - Math.sin(baseAngle) * lateralOffset
+                  : enemy.x - 20;
+                const shotY = enemy.isBoss
+                  ? enemy.y + Math.sin(baseAngle) * 42 + Math.cos(baseAngle) * lateralOffset
+                  : enemy.y;
+                state.shots.push({
+                  id: state.nextId++,
+                  from: 'enemy',
+                  ownerId,
+                  targetId: null,
+                  angle: baseAngle,
+                  speed: ENEMY_SHOT_SPEED,
+                  wakeSeed: Math.random() * 1000,
+                  x: shotX,
+                  y: shotY,
+                  vx: (dx / len) * ENEMY_SHOT_SPEED,
+                  vy: (dy / len) * ENEMY_SHOT_SPEED,
+                  damage: 9,
+                  radius: 4,
+                  life: 190,
+                  trail: [],
+                  guideStrength: 0,
+                  wobble: 0,
+                  wobbleVel: 0,
+                });
+              }
             }
           });
         } else if (state.phase === 'exploration') {
@@ -2907,7 +2965,7 @@ export default function NewEarthUnderwaterBattle({
               target.hp -= shot.damage;
               spawnImpact(shot.x, shot.y, '#7dd3fc', false, 1.12);
               if (target.hp <= 0) {
-                spawnImpact(target.x, target.y, '#f87171', true, 1.45);
+                spawnImpact(target.x, target.y, '#f87171', true, target.isBoss ? 2.6 : 1.45);
               }
               stopUnderwaterSound(shot.launchAudio);
               if (shot.launchAudio) activeLaunchAudiosRef.current.delete(shot.launchAudio);
@@ -2959,37 +3017,64 @@ export default function NewEarthUnderwaterBattle({
           const destroyedEnemies = state.enemies.filter(enemy => enemy.hp <= 0);
           destroyedEnemies.forEach(enemy => {
             playRandomUnderwaterSound(SUBMARINE_EXPLOSION_SFX, 0.76);
-            const enemyLoot = rollNewEarthUnderwaterEnemyLoot({
-              rareRings: NEW_EARTH_TREASURES_BY_RARITY.legendary,
-              rareFish: NEW_EARTH_TREASURES_BY_RARITY.epic,
-              relics: NEW_EARTH_TREASURES_BY_RARITY.rare,
-            });
-            onEnemyLoot?.(enemyLoot);
+            const enemyLoots: TreasureRewardPayload[] = enemy.isBoss
+              ? (() => {
+                const bossLoot = rollNewEarthUnderwaterBossLoot({
+                  rareRings: excludeCollectedUnderwaterTreasures(
+                    NEW_EARTH_TREASURES_BY_RARITY.legendary,
+                    claimedTreasureIdsRef.current,
+                  ),
+                  relics: excludeCollectedUnderwaterTreasures(
+                    NEW_EARTH_TREASURES_BY_RARITY.rare,
+                    claimedTreasureIdsRef.current,
+                  ),
+                });
+                return [bossLoot.qc, bossLoot.treasure];
+              })()
+              : [rollNewEarthUnderwaterEnemyLoot({
+                rareRings: excludeCollectedUnderwaterTreasures(
+                  NEW_EARTH_TREASURES_BY_RARITY.legendary,
+                  claimedTreasureIdsRef.current,
+                ),
+                rareFish: excludeCollectedUnderwaterTreasures(
+                  NEW_EARTH_TREASURES_BY_RARITY.epic,
+                  claimedTreasureIdsRef.current,
+                ),
+                relics: excludeCollectedUnderwaterTreasures(
+                  NEW_EARTH_TREASURES_BY_RARITY.rare,
+                  claimedTreasureIdsRef.current,
+                ),
+              })];
 
-            const lootText = enemyLoot.type === 'qc'
-              ? `+${enemyLoot.amount.toLocaleString(language === 'pt' ? 'pt-BR' : 'en-US')} QC`
-              : enemyLoot.relic?.name || (language === 'pt' ? 'Sem drop' : 'No drop');
-            const lootColor = enemyLoot.type === 'qc'
-              ? '#fbbf24'
-              : enemyLoot.relic?.rarity === 'legendary'
-                ? '#f87171'
-                : enemyLoot.relic?.rarity === 'epic'
-                  ? '#c084fc'
-                  : enemyLoot.relic
-                    ? '#60a5fa'
-                    : '#94a3b8';
-            state.floatingTexts.push({
-              x: enemy.x,
-              y: enemy.y - enemy.radius - 30,
-              text: lootText,
-              color: lootColor,
-              life: 150,
-              maxLife: 150,
+            enemyLoots.forEach((enemyLoot, lootIndex) => {
+              if (enemyLoot.relic) claimedTreasureIdsRef.current.add(enemyLoot.relic.id);
+              onEnemyLoot?.(enemyLoot);
+              const lootText = enemyLoot.type === 'qc'
+                ? `+${enemyLoot.amount.toLocaleString(language === 'pt' ? 'pt-BR' : 'en-US')} QC`
+                : enemyLoot.relic?.name || (language === 'pt' ? 'Sem drop' : 'No drop');
+              const lootColor = enemyLoot.type === 'qc'
+                ? '#fbbf24'
+                : enemyLoot.relic?.rarity === 'legendary'
+                  ? '#f87171'
+                  : enemyLoot.relic?.rarity === 'epic'
+                    ? '#c084fc'
+                    : enemyLoot.relic
+                      ? '#60a5fa'
+                      : '#94a3b8';
+              state.floatingTexts.push({
+                x: enemy.x,
+                y: enemy.y - enemy.radius - 30 - lootIndex * 24,
+                text: lootText,
+                color: lootColor,
+                life: 150,
+                maxLife: 150,
+              });
             });
           });
           state.enemies = state.enemies.filter(enemy => enemy.hp > 0);
           if (state.enemies.length !== before) {
-            state.kills += before - state.enemies.length;
+            state.kills += destroyedEnemies.filter(enemy => !enemy.isBoss).length;
+            if (destroyedEnemies.some(enemy => enemy.isBoss)) state.bossDefeated = true;
             setKills(state.kills);
             state.nextEnemySpawnAt = state.kills < TARGET_KILLS ? time + getNextEnemySpawnDelay() : 0;
             Object.assign(aimRef.current, {
@@ -3001,15 +3086,23 @@ export default function NewEarthUnderwaterBattle({
           }
 
           if (state.kills >= TARGET_KILLS) {
-            state.phase = 'exploration';
-            state.enemies = [];
-            state.shots = [];
-            setStatus('exploration');
-            if (!state.victoryHandled) {
-              state.victoryHandled = true;
-              onVictory?.({ kills: state.kills, depth: depthMeters });
+            const bossRequired = !nextDepthMeters;
+            if (bossRequired && !state.bossSpawned) {
+              state.bossSpawned = true;
+              spawnEnemy(true);
             }
-          } else if (state.player.hp <= 0) {
+            if (!bossRequired || state.bossDefeated) {
+              state.phase = 'exploration';
+              state.enemies = [];
+              state.shots = [];
+              setStatus('exploration');
+              if (!state.victoryHandled) {
+                state.victoryHandled = true;
+                onVictory?.({ kills: state.kills, depth: depthMeters });
+              }
+            }
+          }
+          if (state.phase === 'combat' && state.player.hp <= 0) {
             if (!playerExplosionPlayedRef.current) {
               playerExplosionPlayedRef.current = true;
               spawnImpact(state.player.x, state.player.y, '#f87171', true, 1.45);
@@ -3095,15 +3188,30 @@ export default function NewEarthUnderwaterBattle({
           let nextPortalFeedback: string | null = null;
           if (isAtDeepPortal) {
             if (nextDepthMeters && currentDepthIndex < unlockedDepthIndex) {
+              if (lastPortalTransitionDepthRef.current !== currentDepthIndex) {
+                lastPortalTransitionDepthRef.current = currentDepthIndex;
+                playUnderwaterSound(SUBMARINE_PORTAL_ENTER_SFX, 0.75);
+              }
               setCurrentDepthIndex(current => Math.min(current + 1, unlockedDepthIndex));
               nextPortalFeedback = null;
             } else if (nextDepthMeters) {
               nextPortalFeedback = language === 'pt'
                 ? `Melhore o submarino para alcançar ${nextDepthMeters.toLocaleString('pt-BR')} m.`
                 : `Upgrade the submarine to reach ${nextDepthMeters.toLocaleString('en-US')} m.`;
-            } else {
-              nextPortalFeedback = labels.finalDepth;
+            } else if (!finalPortalPromptDismissedRef.current) {
+              finalPortalPromptDismissedRef.current = true;
+              if (lastPortalTransitionDepthRef.current !== currentDepthIndex) {
+                lastPortalTransitionDepthRef.current = currentDepthIndex;
+                playUnderwaterSound(SUBMARINE_PORTAL_ENTER_SFX, 0.75);
+              }
+              keysRef.current.clear();
+              isPausedRef.current = true;
+              setIsPaused(true);
+              setIsFinalPortalConfirmationOpen(true);
             }
+          } else {
+            finalPortalPromptDismissedRef.current = false;
+            lastPortalTransitionDepthRef.current = null;
           }
           if (portalFeedbackRef.current !== nextPortalFeedback) {
             portalFeedbackRef.current = nextPortalFeedback;
@@ -3329,10 +3437,22 @@ export default function NewEarthUnderwaterBattle({
 
       state.enemies.forEach(enemy => {
         drawEnemySpriteSubmarine(ctx, enemy, Math.atan2(enemy.vy, enemy.vx), time);
+        const healthBarWidth = enemy.isBoss ? 96 : 48;
+        const healthBarY = enemy.y - enemy.radius - 12;
         ctx.fillStyle = 'rgba(0,0,0,0.55)';
-        ctx.fillRect(enemy.x - 24, enemy.y - 30, 48, 4);
-        ctx.fillStyle = 'rgba(248,113,113,0.9)';
-        ctx.fillRect(enemy.x - 24, enemy.y - 30, 48 * Math.max(0, enemy.hp / enemy.maxHp), 4);
+        ctx.fillRect(enemy.x - healthBarWidth / 2, healthBarY, healthBarWidth, enemy.isBoss ? 7 : 4);
+        ctx.fillStyle = enemy.isBoss ? 'rgba(239,68,68,0.98)' : 'rgba(248,113,113,0.9)';
+        ctx.fillRect(enemy.x - healthBarWidth / 2, healthBarY, healthBarWidth * Math.max(0, enemy.hp / enemy.maxHp), enemy.isBoss ? 7 : 4);
+        if (enemy.isBoss) {
+          ctx.save();
+          ctx.font = '900 13px Orbitron, sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillStyle = '#fecaca';
+          ctx.shadowColor = 'rgba(239,68,68,0.9)';
+          ctx.shadowBlur = 8;
+          ctx.fillText('BOSS', enemy.x, healthBarY - 8);
+          ctx.restore();
+        }
       });
 
       if (state.phase !== 'player_exploding' && state.phase !== 'defeat') {
@@ -3357,7 +3477,7 @@ export default function NewEarthUnderwaterBattle({
     return () => {
       if (frameRef.current) cancelAnimationFrame(frameRef.current);
     };
-  }, [backgroundSrc, colonyId, currentDepthIndex, depthMeters, labels, labels.finalDepth, labels.oxygenDepleted, labels.portal, language, mounted, nextDepthMeters, onDefeat, onEnemyLoot, onTreasureLoot, onVictory, oxygenReserveMs, playerMaxSpeed, playerShotDamage, playerShotSpeed, setCurrentDepthIndex, unlockedDepthIndex]);
+  }, [backgroundSrc, colonyId, currentDepthIndex, depthMeters, labels, labels.oxygenDepleted, labels.portal, language, mounted, nextDepthMeters, onDefeat, onEnemyLoot, onTreasureLoot, onVictory, oxygenReserveMs, playerMaxSpeed, playerShotDamage, playerShotSpeed, setCurrentDepthIndex, unlockedDepthIndex]);
 
   useEffect(() => () => {
     activeLaunchAudiosRef.current.forEach(stopUnderwaterSound);
@@ -3396,6 +3516,18 @@ export default function NewEarthUnderwaterBattle({
   };
   const confirmExitToSurface = () => {
     setIsExitConfirmationOpen(false);
+    isPausedRef.current = false;
+    setIsPaused(false);
+    keysRef.current.clear();
+    onClose();
+  };
+  const cancelFinalPortalExit = () => {
+    setIsFinalPortalConfirmationOpen(false);
+    isPausedRef.current = false;
+    setIsPaused(false);
+  };
+  const confirmFinalPortalExit = () => {
+    setIsFinalPortalConfirmationOpen(false);
     isPausedRef.current = false;
     setIsPaused(false);
     keysRef.current.clear();
@@ -3450,6 +3582,51 @@ export default function NewEarthUnderwaterBattle({
           </div>
         </div>
       )}
+      {isFinalPortalConfirmationOpen && (
+        <div
+          className="fixed inset-0 z-[30000] flex items-center justify-center bg-black/82 p-4 backdrop-blur-xl"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="underwater-final-portal-confirmation-title"
+        >
+          <div className="w-full max-w-md rounded-2xl border border-cyan-300/30 bg-slate-950/95 p-6 text-center shadow-[0_0_55px_rgba(34,211,238,0.22)]">
+            <p className="font-mono text-[10px] font-black uppercase tracking-[0.34em] text-cyan-200/70">
+              {language === 'pt' ? 'Último portal' : 'Final portal'}
+            </p>
+            <h2
+              id="underwater-final-portal-confirmation-title"
+              className="mt-2 font-orbitron text-2xl font-black uppercase tracking-wider text-white"
+            >
+              {language === 'pt' ? 'Área explorada' : 'Area explored'}
+            </h2>
+            <p className="mt-4 text-sm leading-relaxed text-slate-300">
+              {language === 'pt'
+                ? 'Você já explorou a área, deseja voltar para a superfície?'
+                : 'You have already explored this area. Do you want to return to the surface?'}
+            </p>
+            <div className="mt-7 grid grid-cols-2 gap-3">
+              <PremiumCanvasButton
+                type="button"
+                tone="steel"
+                onClick={cancelFinalPortalExit}
+                className="h-12 rounded-xl"
+                contentClassName="text-[11px] font-black uppercase tracking-[0.18em] text-slate-100"
+              >
+                {language === 'pt' ? 'Não' : 'No'}
+              </PremiumCanvasButton>
+              <PremiumCanvasButton
+                type="button"
+                tone="cyan"
+                onClick={confirmFinalPortalExit}
+                className="h-12 rounded-xl"
+                contentClassName="text-[11px] font-black uppercase tracking-[0.18em] text-white"
+              >
+                {language === 'pt' ? 'Sim' : 'Yes'}
+              </PremiumCanvasButton>
+            </div>
+          </div>
+        </div>
+      )}
       <div className={`relative grid w-full max-w-[104rem] grid-cols-1 overflow-hidden rounded-3xl border border-cyan-300/30 bg-gradient-to-br ${site.tone} shadow-[0_0_90px_rgba(34,211,238,0.22)] xl:grid-cols-[minmax(0,1280px)_340px]`}>
         <PremiumCanvasButton
           type="button"
@@ -3463,7 +3640,7 @@ export default function NewEarthUnderwaterBattle({
         </PremiumCanvasButton>
 
         <div className="relative aspect-video min-h-0 bg-black">
-          {isPaused && !isExitConfirmationOpen && (
+          {isPaused && !isExitConfirmationOpen && !isFinalPortalConfirmationOpen && (
             <BattlePauseDialog
               language={language}
               onContinue={() => {
@@ -3482,63 +3659,6 @@ export default function NewEarthUnderwaterBattle({
             onPointerLeave={handleCanvasPointerLeave}
             onPointerDown={handleCanvasPointerDown}
           />
-          <div className="pointer-events-none absolute left-5 top-5 w-[250px] border border-cyan-200/35 bg-slate-950/55 px-4 py-3 shadow-[0_0_26px_rgba(34,211,238,0.18)] backdrop-blur-sm">
-            <div className="flex items-center justify-between gap-3">
-              <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-cyan-100/75">{labels.oxygen}</p>
-              <span className={`font-orbitron text-lg font-black ${oxygenCritical ? 'text-red-200' : 'text-cyan-50'}`}>{oxygenPercent}%</span>
-            </div>
-            <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.24em] text-cyan-100/60">{language === 'pt' ? 'Reserva restante' : 'Remaining reserve'}</p>
-            <div className="mt-2 h-2.5 overflow-hidden rounded-sm border border-cyan-100/20 bg-black/58">
-              <div
-                className={`h-full transition-[width] duration-200 ${oxygenCritical ? 'bg-red-400' : 'bg-cyan-300'}`}
-                style={{ width: `${oxygenPercent}%` }}
-              />
-            </div>
-          </div>
-
-          <div className="pointer-events-none absolute left-5 top-[150px] flex gap-3 border border-cyan-200/25 bg-slate-950/45 px-3 py-3 shadow-[0_0_24px_rgba(34,211,238,0.14)] backdrop-blur-sm">
-            <div className="flex h-[172px] w-3 items-end overflow-hidden rounded-sm border border-cyan-100/25 bg-black/65">
-              <div
-                className={`mt-auto w-full ${oxygenCritical ? 'bg-gradient-to-t from-red-400 to-cyan-300' : 'bg-cyan-300'}`}
-                style={{ height: `${Math.max(6, oxygenPercent)}%` }}
-              />
-            </div>
-            <div className="w-[170px] space-y-3">
-              <div>
-                <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-cyan-100/62">{labels.hp}</p>
-                <p className="font-orbitron text-2xl font-black leading-none text-cyan-50">{hpPercent}%</p>
-                <div className="mt-1.5 h-1.5 overflow-hidden bg-black/55">
-                  <div className="h-full bg-cyan-300" style={{ width: `${hpPercent}%` }} />
-                </div>
-              </div>
-              <div>
-                <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-cyan-100/62">{labels.currentDepth}</p>
-                <p className="font-orbitron text-2xl font-black leading-none text-cyan-50">{formattedCurrentDepth}m</p>
-              </div>
-              <div>
-                <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-cyan-100/62">{labels.power}</p>
-                <p className="font-orbitron text-2xl font-black leading-none text-cyan-50">{powerPercent}%</p>
-                <div className="mt-1.5 h-1.5 overflow-hidden bg-black/55">
-                  <div className="h-full bg-cyan-300" style={{ width: `${powerPercent}%` }} />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="pointer-events-none absolute right-5 top-[88px] w-[330px] border border-cyan-200/35 bg-slate-950/50 px-4 py-3 shadow-[0_0_26px_rgba(34,211,238,0.16)] backdrop-blur-sm">
-            <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-cyan-100/70">{labels.missionStatus}</p>
-            <div className="mt-2 flex items-start gap-2">
-              <span className="mt-1 h-3 w-3 rounded-full border border-cyan-200 bg-cyan-400/35 shadow-[0_0_10px_rgba(34,211,238,0.8)]" />
-              <div>
-                <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-cyan-200/70">{labels.objective}</p>
-                <p className="font-orbitron text-sm font-black uppercase leading-tight text-white">{labels.locateAnomaly}</p>
-                <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.18em] text-cyan-100/55">
-                  {formattedStageDepth}m · {treasuresFound}/{treasureTotal}
-                </p>
-              </div>
-            </div>
-          </div>
-
           {oxygenCritical && (
             <div className="pointer-events-none absolute bottom-5 left-1/2 -translate-x-1/2 rounded-xl border border-red-300/35 bg-red-950/72 px-5 py-3 font-orbitron text-xs font-black uppercase tracking-[0.16em] text-red-100 shadow-[0_0_26px_rgba(248,113,113,0.22)]">
               {labels.oxygenCritical}
@@ -3566,39 +3686,80 @@ export default function NewEarthUnderwaterBattle({
           )}
         </div>
 
-        <aside className="flex min-h-[720px] flex-col justify-between border-t border-cyan-300/15 bg-black/38 p-6 xl:border-l xl:border-t-0">
-          <div>
+        <aside className="flex min-h-[720px] flex-col border-t border-cyan-300/15 bg-black/38 p-5 xl:border-l xl:border-t-0">
+          <div className="pr-9">
             <p className="font-mono text-[10px] uppercase tracking-[0.38em] text-cyan-200/70">{site.subtitle[language]}</p>
-            <h2 className="mt-2 font-orbitron text-3xl font-black uppercase leading-tight text-white">{site.title[language]}</h2>
-            <p className="mt-3 text-sm leading-relaxed text-cyan-50/72">
+            <h2 className="mt-2 font-orbitron text-2xl font-black uppercase leading-tight text-white">{site.title[language]}</h2>
+            <p className="mt-2 text-xs leading-relaxed text-cyan-50/72">
               {language === 'pt'
                 ? `${colonyName} enviou um submarino de ataque para operar em profundidade extrema.`
                 : `${colonyName} deployed an attack submarine for extreme-depth operations.`}
             </p>
-            <div className="mt-4 rounded-2xl border border-cyan-300/15 bg-black/24 p-4">
-              <p className="font-mono text-[10px] uppercase tracking-[0.28em] text-cyan-200/70">{labels.depth}</p>
-              <p className="mt-2 font-orbitron text-2xl font-black text-white">{depthMeters.toLocaleString(language === 'pt' ? 'pt-BR' : 'en-US')} m</p>
-              <p className="mt-1 font-mono text-[9px] uppercase tracking-[0.18em] text-cyan-100/55">
-                {labels.maxDepth}: {maxDepth.toLocaleString(language === 'pt' ? 'pt-BR' : 'en-US')} m
-              </p>
-            </div>
           </div>
 
-          <div className="grid gap-3">
-            <div className="rounded-2xl border border-cyan-300/20 bg-cyan-300/8 p-4">
-              <p className="font-mono text-[10px] uppercase tracking-[0.28em] text-cyan-200/70">{labels.hp}</p>
-              <p className="mt-2 font-orbitron text-3xl font-black text-white">{hpPercent}%</p>
-              <div className="mt-3 h-2 overflow-hidden rounded-full bg-black/55">
-                <div className="h-full bg-cyan-300" style={{ width: `${hpPercent}%` }} />
+          <div className="mt-4 grid flex-1 content-start gap-2">
+            <div className="rounded-xl border border-cyan-300/20 bg-cyan-300/8 p-3">
+              <p className="font-mono text-[9px] uppercase tracking-[0.26em] text-cyan-200/70">{labels.missionStatus}</p>
+              <div className="mt-2 flex items-start gap-2">
+                <span className="mt-0.5 h-2.5 w-2.5 shrink-0 rounded-full border border-cyan-200 bg-cyan-400/35 shadow-[0_0_10px_rgba(34,211,238,0.8)]" />
+                <div className="min-w-0">
+                  <p className="font-mono text-[9px] uppercase tracking-[0.18em] text-cyan-200/65">{labels.objective}</p>
+                  <p className="font-orbitron text-xs font-black uppercase leading-tight text-white">{labels.locateAnomaly}</p>
+                  <p className="mt-1 font-mono text-[9px] uppercase tracking-[0.16em] text-cyan-100/55">
+                    {formattedStageDepth}m · {treasuresFound}/{treasureTotal}
+                  </p>
+                </div>
               </div>
             </div>
-            <div className="rounded-2xl border border-red-300/20 bg-red-300/8 p-4">
-              <p className="font-mono text-[10px] uppercase tracking-[0.28em] text-red-200/70">{labels.kills}</p>
-              <p className="mt-2 font-orbitron text-3xl font-black text-white">{kills} / {TARGET_KILLS}</p>
+
+            <div className="grid grid-cols-2 gap-2">
+              <div className="rounded-xl border border-cyan-300/15 bg-black/24 p-3">
+                <p className="font-mono text-[9px] uppercase tracking-[0.2em] text-cyan-200/70">{labels.currentDepth}</p>
+                <p className="mt-1 font-orbitron text-xl font-black text-white">{formattedCurrentDepth} m</p>
+              </div>
+              <div className="rounded-xl border border-cyan-300/15 bg-black/24 p-3">
+                <p className="font-mono text-[9px] uppercase tracking-[0.2em] text-cyan-200/70">{labels.depth}</p>
+                <p className="mt-1 font-orbitron text-xl font-black text-white">{formattedStageDepth} m</p>
+              </div>
             </div>
-            <div className="rounded-2xl border border-amber-300/20 bg-amber-300/8 p-4">
-              <p className="font-mono text-[10px] uppercase tracking-[0.28em] text-amber-200/70">{labels.treasures}</p>
-              <p className="mt-2 font-orbitron text-3xl font-black text-white">{treasuresFound} / {treasureTotal}</p>
+            <p className="-mt-1 px-1 font-mono text-[8px] uppercase tracking-[0.16em] text-cyan-100/50">
+              {labels.maxDepth}: {maxDepth.toLocaleString(language === 'pt' ? 'pt-BR' : 'en-US')} m
+            </p>
+
+            <div className="grid grid-cols-2 gap-2">
+              <div className={`rounded-xl border p-3 ${oxygenCritical ? 'border-red-300/30 bg-red-300/10' : 'border-cyan-300/20 bg-cyan-300/8'}`}>
+                <p className={`font-mono text-[9px] uppercase tracking-[0.2em] ${oxygenCritical ? 'text-red-200/80' : 'text-cyan-200/70'}`}>{labels.oxygen}</p>
+                <p className={`mt-1 font-orbitron text-xl font-black ${oxygenCritical ? 'text-red-100' : 'text-white'}`}>{oxygenPercent}%</p>
+                <p className="mt-1 font-mono text-[8px] uppercase tracking-[0.13em] text-cyan-100/50">{language === 'pt' ? 'Reserva restante' : 'Remaining reserve'}</p>
+                <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-black/55">
+                  <div className={`h-full transition-[width] duration-200 ${oxygenCritical ? 'bg-red-400' : 'bg-cyan-300'}`} style={{ width: `${oxygenPercent}%` }} />
+                </div>
+              </div>
+              <div className="rounded-xl border border-cyan-300/20 bg-cyan-300/8 p-3">
+                <p className="font-mono text-[9px] uppercase tracking-[0.2em] text-cyan-200/70">{labels.power}</p>
+                <p className="mt-1 font-orbitron text-xl font-black text-white">{powerPercent}%</p>
+                <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-black/55">
+                  <div className="h-full bg-cyan-300" style={{ width: `${powerPercent}%` }} />
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-2">
+              <div className="rounded-xl border border-cyan-300/20 bg-cyan-300/8 p-3">
+                <p className="font-mono text-[8px] uppercase tracking-[0.16em] text-cyan-200/70">{labels.hp}</p>
+                <p className="mt-1 font-orbitron text-xl font-black text-white">{hpPercent}%</p>
+                <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-black/55">
+                  <div className="h-full bg-cyan-300" style={{ width: `${hpPercent}%` }} />
+                </div>
+              </div>
+              <div className="rounded-xl border border-red-300/20 bg-red-300/8 p-3">
+                <p className="font-mono text-[8px] uppercase tracking-[0.16em] text-red-200/70">{labels.kills}</p>
+                <p className="mt-1 whitespace-nowrap font-orbitron text-xl font-black text-white">{kills}/{TARGET_KILLS}</p>
+              </div>
+              <div className="rounded-xl border border-amber-300/20 bg-amber-300/8 p-3">
+                <p className="font-mono text-[8px] uppercase tracking-[0.16em] text-amber-200/70">{labels.treasures}</p>
+                <p className="mt-1 whitespace-nowrap font-orbitron text-xl font-black text-white">{treasuresFound}/{treasureTotal}</p>
+              </div>
             </div>
           </div>
 
@@ -3606,7 +3767,7 @@ export default function NewEarthUnderwaterBattle({
             type="button"
             onClick={requestExitConfirmation}
             tone="cyan"
-            className="h-12 rounded-2xl"
+            className="mt-4 h-12 shrink-0 rounded-2xl"
             contentClassName="px-4 text-[12px] font-black uppercase tracking-[0.22em] text-white"
           >
             {labels.surface}

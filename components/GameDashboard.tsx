@@ -105,18 +105,9 @@ const VOID_BOSS_ACHIEVEMENT_IDS: Record<number, string> = {
   9: 'void_boss_9_defeated',
 };
 
-const normalizeAchievementMeta = (value: any) => ({
-  unlockedAchievements: Array.isArray(value?.unlockedAchievements)
-    ? value.unlockedAchievements.filter((id: unknown): id is string => typeof id === 'string')
-    : [],
-  achievementProgress: value?.achievementProgress && typeof value.achievementProgress === 'object'
-    ? Object.fromEntries(
-      Object.entries(value.achievementProgress)
-        .filter(([key, progress]) => typeof key === 'string' && Number.isFinite(Number(progress)))
-        .map(([key, progress]) => [key, Number(progress)])
-    )
-    : {},
-});
+const normalizeAchievementMeta = (value: any) => (
+  normalizeAchievementMetaForCatalog(value, ACHIEVEMENT_IDS)
+);
 
 const hasSecretAlienAchievement = (meta: { unlockedAchievements: string[]; achievementProgress: Record<string, number> }) => (
   meta.unlockedAchievements.includes(SECRET_ALIEN_ACHIEVEMENT_ID)
@@ -146,6 +137,9 @@ import {
   VoidPOI,
   ThemeColor
 } from '@/lib/game-data';
+import { normalizeAchievementMetaForCatalog } from '@/lib/achievement-meta.mjs';
+
+const ACHIEVEMENT_IDS = ACHIEVEMENTS.map(achievement => achievement.id);
 import { useSFX } from '@/hooks/useSFX';
 import { GameStorage } from '@/lib/game-storage';
 import { SaveManager, sanitizeSave } from '@/lib/save-manager';
@@ -156,6 +150,12 @@ import { calculateNewEarthAnnualPopulationGrowth } from '@/lib/new-earth-populat
 import { hasBossZeroDefeatEvidence } from '@/lib/void-boss-achievements.mjs';
 import { getNewEarthDefenseAchievementProgress } from '@/lib/new-earth-defense-achievements.mjs';
 import { getPirateSlayerProgress } from '@/lib/pirate-slayer-progress.mjs';
+import {
+  getDeliveryMissionCompletionProgress,
+  getPirateBattleVictoryProgress,
+  getReachedSubmarineDepthProgress,
+  normalizeAchievementProgressAmount,
+} from '@/lib/achievement-progress.mjs';
 import {
   BOSS_ENCOUNTER_COOLDOWN_MS,
   getDeliveryFuelCost,
@@ -1465,6 +1465,10 @@ const DashboardContent = memo(({
   const [newEarthMuseumCategory, setNewEarthMuseumCategory] = useState<NewEarthTreasureCategory>('rare_fish');
   const [newEarthMuseumPage, setNewEarthMuseumPage] = useState(0);
   const [newEarthMuseumTreasures, setNewEarthMuseumTreasures] = useState<NewEarthMuseumTreasures>({});
+  const newEarthMuseumTreasureIds = useMemo(
+    () => Object.keys(newEarthMuseumTreasures),
+    [newEarthMuseumTreasures],
+  );
   const [newEarthWarIntelOpen, setNewEarthWarIntelOpen] = useState(false);
   const [newEarthWarIntelKind, setNewEarthWarIntelKind] = useState<NewEarthWarIntelKind>('helicopter');
   const [newEarthWarIntelPage, setNewEarthWarIntelPage] = useState(0);
@@ -3054,12 +3058,13 @@ const DashboardContent = memo(({
     const achievement = ACHIEVEMENTS.find(a => a.id === id);
     if (!achievement) return;
 
-    const currentProgress = achievementProgressRef.current[id] || 0;
-    const nextProgress = isSet ? amount : currentProgress + amount;
+    const currentProgress = normalizeAchievementProgressAmount(achievementProgressRef.current[id]);
+    const safeAmount = normalizeAchievementProgressAmount(amount);
+    const nextProgress = isSet ? safeAmount : currentProgress + safeAmount;
 
     // PERFORMANCE FIX: Only dispatch if progress actually changed
     if (nextProgress !== currentProgress) {
-      dispatch({ type: 'UPDATE_ACHIEVEMENT_PROGRESS', payload: { achievementId: id, progress: amount, isAbsolute: isSet } });
+      dispatch({ type: 'UPDATE_ACHIEVEMENT_PROGRESS', payload: { achievementId: id, progress: safeAmount, isAbsolute: isSet } });
       achievementProgressRef.current[id] = nextProgress;
     }
 
@@ -6579,8 +6584,8 @@ const DashboardContent = memo(({
     updateAchievementProgress('qc_trillionaire', totalQC, true);
 
     // 3. Battle Warrior & Pirate Slayer
-    const totalBattlesWon = Object.values(historyStats).reduce((acc, curr) => acc + (curr.battlesWon || 0), 0);
-    updateAchievementProgress('battle_warrior', totalBattlesWon, true);
+    const pirateBattlesWon = getPirateBattleVictoryProgress(historyStats);
+    updateAchievementProgress('battle_warrior', pirateBattlesWon, true);
     const pirateSlayerProgress = getPirateSlayerProgress({
       chapter1ManualVictories: historyStats.Solar?.manualBattlesWon,
       chapter2ManualVictories: historyStats.Interstellar?.manualBattlesWon,
@@ -6652,7 +6657,7 @@ const DashboardContent = memo(({
     updateAchievementProgress('all_ships_r1_r2', shipsR1R2, true);
 
     // 12. Total Missions
-    const totalMissions = Object.values(historyStats).reduce((acc, curr) => acc + (curr.missionsCompleted || 0), 0);
+    const totalMissions = getDeliveryMissionCompletionProgress({ historyStats, missions });
     updateAchievementProgress('total_missions_1k', totalMissions, true);
 
     // 13. Battle Level
@@ -6660,7 +6665,11 @@ const DashboardContent = memo(({
 
     // 14. Mining Tycoon
     const totalPacksSold = Object.values(historyStats).reduce((acc, curr) =>
-      acc + (curr.manualMiningPacksSold || 0) + (curr.autoMiningPacksSold || 0), 0);
+      acc
+      + (curr.manualMiningPacksSold || 0)
+      + (curr.autoMiningPacksSold || 0)
+      + (curr.manualExtractionPacksSold || 0)
+      + (curr.autoExtractionPacksSold || 0), 0);
     updateAchievementProgress('mining_tycoon', totalPacksSold, true);
 
     // 15. Perfect Pilot
@@ -6700,7 +6709,10 @@ const DashboardContent = memo(({
     updateAchievementProgress('ne_horizon_level_50', savedHorizonProgress.level, true);
     updateAchievementProgress('ne_horizon_level_100', savedHorizonProgress.level, true);
 
-    const equippedBattleCards = BATTLE_CARD_SLOTS.filter(slot => Boolean(newEarthBattleLoadout[slot])).length;
+    const equippedBattleCards = BATTLE_CARD_SLOTS
+      .map(slot => getCardById(newEarthBattleLoadout[slot]))
+      .filter((card): card is ColonyCard => Boolean(card && isBattleCard(card)))
+      .length;
     updateAchievementProgress('ne_horizon_battle_cards_6', equippedBattleCards, true);
     updateAchievementProgress('ne_special_laser_10', newEarthAchievementMetrics.specialUses['apocalypse-laser'], true);
     updateAchievementProgress('ne_special_barrage_10', newEarthAchievementMetrics.specialUses['hellfire-barrage'], true);
@@ -6743,12 +6755,14 @@ const DashboardContent = memo(({
     const rareFishFound = NEW_EARTH_RARE_FISH_TREASURES.filter(treasure => museumHas(treasure.id)).length;
     const relicsFound = NEW_EARTH_RELIC_TREASURES.filter(treasure => museumHas(treasure.id)).length;
     const rareRingsFound = NEW_EARTH_RARE_RING_TREASURES.filter(treasure => museumHas(treasure.id)).length;
+    const museumTotalFound = rareFishFound + relicsFound + rareRingsFound;
     updateAchievementProgress('ne_rare_fish_1', rareFishFound, true);
-    updateAchievementProgress('ne_rare_fish_all', NEW_EARTH_RARE_FISH_TREASURES.length > 0 && rareFishFound >= NEW_EARTH_RARE_FISH_TREASURES.length ? 1 : 0, true);
+    updateAchievementProgress('ne_rare_fish_all', rareFishFound, true);
     updateAchievementProgress('ne_relic_1', relicsFound, true);
-    updateAchievementProgress('ne_relics_all', NEW_EARTH_RELIC_TREASURES.length > 0 && relicsFound >= NEW_EARTH_RELIC_TREASURES.length ? 1 : 0, true);
+    updateAchievementProgress('ne_relics_all', relicsFound, true);
     updateAchievementProgress('ne_rare_ring_1', rareRingsFound, true);
-    updateAchievementProgress('ne_rare_rings_all', NEW_EARTH_RARE_RING_TREASURES.length > 0 && rareRingsFound >= NEW_EARTH_RARE_RING_TREASURES.length ? 1 : 0, true);
+    updateAchievementProgress('ne_rare_rings_all', rareRingsFound, true);
+    updateAchievementProgress('ne_museum_all', museumTotalFound, true);
 
     const aetherUpgradeTotal = NEW_EARTH_HELICOPTER_UPGRADES.reduce((total, upgrade) => total + (newEarthHelicopters['colony-3']?.[upgrade.id] || 0), 0);
     const wardenUpgradeTotal = NEW_EARTH_TANK_UPGRADES.reduce((total, upgrade) => total + (newEarthTanks['colony-1']?.[upgrade.id] || 0), 0);
@@ -6768,23 +6782,18 @@ const DashboardContent = memo(({
     const submarineUpgradeTotal = (colonyId: NewEarthSubmarineColonyId) => NEW_EARTH_SUBMARINE_UPGRADES.reduce((total, upgrade) => (
       total + (newEarthSubmarines[colonyId]?.[upgrade.id] || 0)
     ), 0);
-    const deepestAvailableSubmarine = route4Unlocked
-      ? Math.max(
-          getNewEarthSubmarineStats(newEarthSubmarines['colony-4']).maxDepth,
-          getNewEarthSubmarineStats(newEarthSubmarines['colony-2']).maxDepth,
-          newEarthAchievementMetrics.maxSubmarineDepth
-        )
-      : 0;
+    const deepestReachedSubmarineDepth = getReachedSubmarineDepthProgress(newEarthAchievementMetrics);
     updateAchievementProgress('ne_neptune_maxed', submarineUpgradeTotal('colony-4'), true);
     updateAchievementProgress('ne_poseidon_maxed', submarineUpgradeTotal('colony-2'), true);
     updateAchievementProgress('ne_enemy_submarines_10', newEarthAchievementMetrics.enemySubmarinesDestroyed, true);
-    updateAchievementProgress('ne_submarine_depth_10000', deepestAvailableSubmarine, true);
+    updateAchievementProgress('ne_submarine_depth_10000', deepestReachedSubmarineDepth, true);
   }, [
     updateAchievementProgress,
     totalDeliveries,
     routeTier,
     route4Unlocked,
     historyStats,
+    missions,
     miningRobots,
     isRoute2Unlocked,
     isRoute3Unlocked,
@@ -9903,6 +9912,7 @@ const DashboardContent = memo(({
           colonyName={activeUnderwaterBattleColony.name}
           musicOn={musicOn}
           submarineStats={getNewEarthSubmarineStats(newEarthSubmarines[activeUnderwaterBattle.colonyId])}
+          collectedTreasureIds={newEarthMuseumTreasureIds}
           defenseBattleLevel={Math.max(1, battleLevel || 1)}
           onClose={() => setActiveUnderwaterBattle(null)}
           onVictory={(summary) => {

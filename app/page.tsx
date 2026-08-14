@@ -10,6 +10,7 @@ import { AchievementsModal } from '@/components/AchievementsModal';
 import { Jukebox } from '@/components/Jukebox';
 import { SplashScreen } from '@/components/SplashScreen';
 import { TitleScreen } from '@/components/TitleScreen';
+import { MainMenuExitPortal } from '@/components/MainMenuExitPortal';
 import { useJukebox } from '@/hooks/useJukebox';
 import { useSFX } from '@/hooks/useSFX';
 import { useSoundMaster } from '@/hooks/useSoundMaster';
@@ -18,8 +19,9 @@ import { GameStorage } from '@/lib/game-storage';
 import { useDispatch } from '@/lib/game-state';
 import { COLONY_SAVE_STORAGE_KEYS, SaveManager, sanitizeSave } from '@/lib/save-manager';
 import { Language, t } from '@/lib/i18n';
-import { ThemeColor } from '@/lib/game-data';
+import { ACHIEVEMENTS, ThemeColor } from '@/lib/game-data';
 import { hasBossZeroDefeatEvidence } from '@/lib/void-boss-achievements.mjs';
+import { normalizeAchievementMetaForCatalog } from '@/lib/achievement-meta.mjs';
 import {
   areAssetGroupsReady,
   getAssetGroupsSummary,
@@ -94,18 +96,10 @@ const getLandingChapterLabel = (routeTier: string, language: Language) => {
   return labels[routeTier]?.[language] || routeTier;
 };
 
-const normalizeAchievementMeta = (value: any): AchievementMeta => ({
-  unlockedAchievements: Array.isArray(value?.unlockedAchievements)
-    ? value.unlockedAchievements.filter((id: unknown): id is string => typeof id === 'string')
-    : [],
-  achievementProgress: value?.achievementProgress && typeof value.achievementProgress === 'object'
-    ? Object.fromEntries(
-      Object.entries(value.achievementProgress)
-        .filter(([key, progress]) => typeof key === 'string' && Number.isFinite(Number(progress)))
-        .map(([key, progress]) => [key, Number(progress)])
-    )
-    : {},
-});
+const ACHIEVEMENT_IDS = ACHIEVEMENTS.map(achievement => achievement.id);
+const normalizeAchievementMeta = (value: any): AchievementMeta => (
+  normalizeAchievementMetaForCatalog(value, ACHIEVEMENT_IDS)
+);
 
 const hasSecretAlienAchievement = (meta: AchievementMeta) => (
   meta.unlockedAchievements.includes(SECRET_ALIEN_ACHIEVEMENT_ID)
@@ -2053,6 +2047,10 @@ export default function GameHome() {
               )}
             </div>
           </div>
+
+          {!showSplash && !showTitleScreen && (
+            <MainMenuExitPortal language={language} />
+          )}
         </>
       )}
 
@@ -2453,4 +2451,3 @@ export default function GameHome() {
     </motion.main>
   );
 }
-

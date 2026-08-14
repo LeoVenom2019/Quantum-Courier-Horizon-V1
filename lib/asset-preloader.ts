@@ -466,6 +466,7 @@ const route4BattleAudio = [
   '/assets/rota4/SFX_new_land/player_torped_launcher.ogg',
   '/assets/rota4/SFX_new_land/player_torped_impact.ogg',
   '/assets/rota4/SFX_new_land/submarine_enter.ogg',
+  '/assets/games/flipers_sfx/space_jump_jump.ogg',
   '/assets/rota4/SFX_new_land/radar_submarine_1.ogg',
   '/assets/rota4/SFX_new_land/submarine_aim_green.ogg',
   '/assets/rota4/SFX_new_land/submarine_ocean_sounds_1.ogg',
