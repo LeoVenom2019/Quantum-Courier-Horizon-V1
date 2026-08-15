@@ -257,6 +257,12 @@ const BOSS_INTROS: Record<number, {
 
 const randomInt = ([min, max]: [number, number]) => Math.floor(min + Math.random() * (max - min + 1));
 const BOSS_SPRITE_FADE_MS = 110;
+const BATTLE_SPRITE_BASE_WIDTH = 110;
+const VOID_ENEMY_RENDER_WIDTH: Record<VoidBattleEnemy['type'], number> = {
+  'Padrão': BATTLE_SPRITE_BASE_WIDTH,
+  Elite: 136,
+  Boss: 262,
+};
 const BOSS_SHOOT_SPRITE_MS = 320;
 const HELLFIRE_IMPACT_DAMAGE_MULTIPLIER = 6;
 const HELLFIRE_BURN_TICK_DAMAGE_MULTIPLIER = 0.35;
@@ -971,6 +977,8 @@ const VoidBattleArena = memo(function VoidBattleArena({
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
 
     let isMouseFiring = false;
     const mouseAim = { x: canvas.width, y: canvas.height / 2 };
@@ -2893,7 +2901,7 @@ const VoidBattleArena = memo(function VoidBattleArena({
           ctx.save();
           const isMythic = playerShipStats.rarity === 'mythic';
           const isSkyring = activeShipImage?.includes('skyring');
-          const baseWidth = 110;
+          const baseWidth = BATTLE_SPRITE_BASE_WIDTH;
           let imgW = isMythic ? baseWidth * 1.15 : baseWidth;
 
           // Increase size by 20% for Skyring in Routes 1 & 2
@@ -2987,10 +2995,7 @@ const VoidBattleArena = memo(function VoidBattleArena({
 
           if (eImg && eImg.width > 0) {
             if (routeTier === 'Void') {
-              let baseSize = 128;
-              if (enemy.type === 'Boss') baseSize *= 3.0 * (enemy.visualScale || 1);
-              else if (enemy.type === 'Elite') baseSize *= 1.25;
-              const imgW = baseSize;
+              const imgW = VOID_ENEMY_RENDER_WIDTH[enemy.type] * (enemy.visualScale || 1);
               const imgH = eImg.height * (imgW / eImg.width);
               if (enemy.type !== 'Boss') {
                 y += Math.sin(now / 400 + enemy.y) * 10;
