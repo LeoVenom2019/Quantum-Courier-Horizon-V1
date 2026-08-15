@@ -29,6 +29,7 @@
     "test:robot-runner-maze": "node --test lib/robot-runner-maze.test.mjs",
     "test:research-timing": "node --test lib/research-timing.test.mjs",
     "test:route3-unlock": "node --test lib/route3-extraction-unlock.test.mjs",
+    "test:save-backup": "node --test lib/save-backup-core.test.mjs",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",

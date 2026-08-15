@@ -17,7 +17,8 @@ import { useSoundMaster } from '@/hooks/useSoundMaster';
 import { HorizonRadioModal } from '@/components/HorizonRadioModal';
 import { GameStorage } from '@/lib/game-storage';
 import { useDispatch } from '@/lib/game-state';
-import { COLONY_SAVE_STORAGE_KEYS, SaveManager, sanitizeSave } from '@/lib/save-manager';
+import { COLONY_SAVE_STORAGE_KEYS, SaveManager } from '@/lib/save-manager';
+import { COMPLETE_SAVE_ACCEPT, downloadCompleteSave, restoreCompleteSave } from '@/lib/save-backup';
 import { Language, t } from '@/lib/i18n';
 import { ACHIEVEMENTS, ThemeColor } from '@/lib/game-data';
 import { hasBossZeroDefeatEvidence } from '@/lib/void-boss-achievements.mjs';
@@ -1581,27 +1582,12 @@ export default function GameHome() {
   };
 
   const handleExportSave = async () => {
-    const supplementalEntries = await Promise.all(
-      COLONY_SAVE_STORAGE_KEYS.map(async key => [key, await GameStorage.load(key)] as const)
-    );
-    const data = {
-      time_travel_save: await GameStorage.load('time_travel_save'),
-      ...Object.fromEntries(supplementalEntries),
-      qch_secret_alien_name_unlocked: localStorage.getItem(SECRET_ALIEN_NAME_STORAGE_KEY) === 'true',
-      export_date: new Date().toISOString(),
-      version: '1.3'
-    };
-
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `qch_save_${new Date().toISOString().split('T')[0]}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    playSfx('click');
+    try {
+      await downloadCompleteSave();
+      playSfx('click');
+    } catch (err) {
+      console.error('Failed to export save', err);
+    }
   };
 
   const handleImportSave = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -1611,34 +1597,13 @@ export default function GameHome() {
     const reader = new FileReader();
     reader.onload = async (e) => {
       try {
-        const data = JSON.parse(e.target?.result as string);
-        const importedMainSave = data.time_travel_save ? sanitizeSave(data.time_travel_save) : null;
-        if (!importedMainSave) return;
-
-        for (const key of resetStorageKeys) {
-          localStorage.removeItem(key);
-        }
-        sessionStorage.clear();
-
-        await GameStorage.save(importedMainSave, 'time_travel_save');
-
-        const embeddedStorage = importedMainSave.colony_system?.storage || {};
-        for (const key of COLONY_SAVE_STORAGE_KEYS) {
-          if (Object.prototype.hasOwnProperty.call(data, key)) {
-            await GameStorage.save(data[key], key);
-          } else if (Object.prototype.hasOwnProperty.call(embeddedStorage, key)) {
-            await GameStorage.save(embeddedStorage[key], key);
-          }
-        }
-
-        if (data.qch_secret_alien_name_unlocked === true || importedMainSave.global?.secretAlienNameUnlocked === true) {
-          localStorage.setItem(SECRET_ALIEN_NAME_STORAGE_KEY, 'true');
-        }
-        
+        await restoreCompleteSave(e.target?.result as string);
         playSfx('click');
         setTimeout(() => window.location.reload(), 500);
       } catch (err) {
         console.error("Failed to import save", err);
+      } finally {
+        event.target.value = '';
       }
     };
     reader.readAsText(file);
@@ -2261,7 +2226,7 @@ export default function GameHome() {
                     </button>
                     <label className="py-2 rounded font-orbitron text-[12px] border border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/10 transition-all uppercase flex items-center justify-center gap-2 cursor-pointer text-center">
                       <Navigation className="w-3 h-3 -rotate-90" /> {tl('IMPORT', 'IMPORTAR')}
-                      <input type="file" accept=".json" onChange={handleImportSave} className="hidden" />
+                      <input type="file" accept={COMPLETE_SAVE_ACCEPT} onChange={handleImportSave} className="hidden" />
                     </label>
                   </div>
                 </div>

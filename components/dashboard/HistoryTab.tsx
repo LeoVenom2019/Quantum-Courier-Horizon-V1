@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Download, Upload, Target, Activity, TrendingUp, LogOut, ChevronLeft, ChevronRight, Play, Pause, PackageCheck, Bot, User, Database } from 'lucide-react';
 import { useDashboard } from './DashboardProvider';
 import { GameStorage } from '@/lib/game-storage';
+import { COMPLETE_SAVE_ACCEPT } from '@/lib/save-backup';
 import { MINI_GAMES_CONFIG } from '@/lib/mini-games-config';
 import { getOwnedArcadeIdsFromCards, normalizeOwnedColonyCardIds } from '@/lib/colony-cards';
 import { ROUTES } from '@/lib/game-data';
@@ -212,7 +213,7 @@ const HistoryTab = memo(function HistoryTab({ newEarthWarIntelCollection }: Hist
               <label className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-base font-mono uppercase tracking-widest transition-all cursor-pointer bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border border-white/5">
                 <Upload size={12} />
                 {t('import')}
-                <input type="file" className="hidden" accept=".dat" onChange={importGameData} />
+                <input type="file" className="hidden" accept={COMPLETE_SAVE_ACCEPT} onChange={importGameData} />
               </label>
             </div>
           </div>
@@ -369,7 +370,7 @@ const HistoryTab = memo(function HistoryTab({ newEarthWarIntelCollection }: Hist
               <label className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-mono uppercase tracking-widest transition-all cursor-pointer ${isInterstellar ? 'bg-orange-500/10 text-orange-400 hover:bg-orange-500/20 border-orange-500/30' : 'bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20 border-cyan-500/30'} border-2`}>
                 <Upload size={14} />
                 {t('import')}
-                <input type="file" className="hidden" accept=".dat" onChange={importGameData} />
+                <input type="file" className="hidden" accept={COMPLETE_SAVE_ACCEPT} onChange={importGameData} />
               </label>
             </div>
           </div>

@@ -1,8 +1,9 @@
 'use client';
 
 import React, { createContext, useContext, useMemo, ReactNode, useCallback, useState, useEffect } from 'react';
-import { COLONY_SAVE_STORAGE_KEYS, SaveManager, sanitizeSave } from '../../lib/save-manager';
+import { sanitizeSave } from '../../lib/save-manager';
 import { GameStorage } from '../../lib/game-storage';
+import { downloadCompleteSave, restoreCompleteSave } from '../../lib/save-backup';
 import { RouteStats } from '@/lib/game-state/types';
 import { normalizeGameNumber } from '@/lib/game-state/numbers';
 import { getDeliveryFuelCost, getLocationCostMultiplier, getMiningProductionBase, getMissionRewardUpgradeCost } from '@/lib/economy-balance';
@@ -27,71 +28,8 @@ import { ActionBlockedTutorialModal, ActionTutorialConfig } from './ActionBlocke
 import { ROUTES_MAP, EXTRACTION_PRODUCTION_COSTS, ORES_MAP, EXTRACTION_POINTS_MAP, UPGRADES_MAP, ROBOT_UPGRADES_MAP, INTERSTELLAR_EXTRACTION_VALUE_MULTIPLIER, MINING_VALUE_MULTIPLIER, BATTLE_REWARD_VALUE_MULTIPLIER } from '@/lib/game-constants';
 
 const MAIN_SAVE_STORAGE_KEY = 'time_travel_save';
-const LEGACY_SAVE_SECRET_KEY = 73;
 const RHSE_TUBE_COST = 2500;
-const SAVE_EXPORT_FORMAT = 'qch-save-export';
 const SECRET_ALIEN_NAME_STORAGE_KEY = 'qch_secret_alien_name_unlocked';
-
-const isRecord = (value: unknown): value is Record<string, any> => (
-  Boolean(value) && typeof value === 'object' && !Array.isArray(value)
-);
-
-const decodeLegacyDatSave = (encryptedData: string) => {
-  const decoded = decodeURIComponent(escape(atob(encryptedData)));
-  const decrypted = decoded
-    .split('')
-    .map((char, index) => String.fromCharCode(char.charCodeAt(0) ^ (LEGACY_SAVE_SECRET_KEY + (index % 17))))
-    .join('');
-
-  return JSON.parse(decrypted);
-};
-
-const parseImportedSave = (fileContents: string) => {
-  try {
-    return JSON.parse(fileContents);
-  } catch {
-    return decodeLegacyDatSave(fileContents);
-  }
-};
-
-const buildSupplementalSaveEntries = (data: Record<string, any>, mainSave: any) => {
-  const embeddedStorage = isRecord(mainSave?.colony_system?.storage)
-    ? mainSave.colony_system.storage
-    : {};
-
-  return Object.fromEntries(
-    COLONY_SAVE_STORAGE_KEYS.map(key => [
-      key,
-      Object.prototype.hasOwnProperty.call(data, key) ? data[key] : embeddedStorage[key]
-    ])
-  );
-};
-
-const normalizeImportedSavePackage = (rawData: any) => {
-  const packageData = isRecord(rawData) ? rawData : {};
-  const mainSaveCandidate = packageData[MAIN_SAVE_STORAGE_KEY] ?? rawData;
-  const supplementalEntries = buildSupplementalSaveEntries(packageData, mainSaveCandidate);
-  const mainSave = sanitizeSave({
-    ...mainSaveCandidate,
-    colony_system: {
-      ...(isRecord(mainSaveCandidate?.colony_system) ? mainSaveCandidate.colony_system : {}),
-      storage: {
-        ...(isRecord(mainSaveCandidate?.colony_system?.storage) ? mainSaveCandidate.colony_system.storage : {}),
-        ...supplementalEntries,
-      },
-    },
-  });
-
-  return {
-    mainSave,
-    supplementalEntries: buildSupplementalSaveEntries(packageData, mainSave),
-    secretAlienNameUnlocked: Boolean(
-      packageData[SECRET_ALIEN_NAME_STORAGE_KEY]
-      ?? packageData.timeTravelSecretAlienNameUnlocked
-      ?? mainSave.global.secretAlienNameUnlocked
-    ),
-  };
-};
 
 const VOID_POI_RESOURCE_KEY_BY_NEED: Record<string, string> = {
   'Energia': 'energy',
@@ -2332,13 +2270,6 @@ export const DashboardProvider = ({
 
   const exportGameData = React.useCallback(async () => {
     const persistedMainSave = sanitizeSave(await GameStorage.load(MAIN_SAVE_STORAGE_KEY));
-    const supplementalEntries = await Promise.all(
-      COLONY_SAVE_STORAGE_KEYS.map(async key => [
-        key,
-        (await GameStorage.load(key)) ?? persistedMainSave.colony_system.storage[key]
-      ] as const)
-    );
-    const supplementalStorage = Object.fromEntries(supplementalEntries);
     const mainSave = sanitizeSave({
       ...persistedMainSave,
       global: {
@@ -2472,28 +2403,10 @@ export const DashboardProvider = ({
       },
       colony_system: {
         ...persistedMainSave.colony_system,
-        storage: supplementalStorage,
       },
       arcadeScores: game.state.system.arcadeScores,
     });
-    const data = {
-      export_format: SAVE_EXPORT_FORMAT,
-      export_date: new Date().toISOString(),
-      version: mainSave.version,
-      [MAIN_SAVE_STORAGE_KEY]: mainSave,
-      ...supplementalStorage,
-      [SECRET_ALIEN_NAME_STORAGE_KEY]: mainSave.global.secretAlienNameUnlocked,
-    };
-
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `qch_save_${new Date().toISOString().split('T')[0]}.json`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    await downloadCompleteSave(mainSave);
   }, [autoTravelActive, autoTravelDesired, colonies, combat, earth, economy, game.state.system, mining, missions, progression]);
   const importGameData = React.useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -2502,20 +2415,8 @@ export const DashboardProvider = ({
     reader.onload = async (e) => {
       try {
         const fileContents = e.target?.result as string;
-        const rawData = parseImportedSave(fileContents);
-        const { mainSave, supplementalEntries, secretAlienNameUnlocked } = normalizeImportedSavePackage(rawData);
-        const structuredState = SaveManager.loadSave(mainSave);
-        if (structuredState) {
-          if (typeof localStorage !== 'undefined') {
-            localStorage.setItem(SECRET_ALIEN_NAME_STORAGE_KEY, String(secretAlienNameUnlocked));
-          }
-          await GameStorage.save(mainSave, MAIN_SAVE_STORAGE_KEY);
-          await Promise.all(
-            COLONY_SAVE_STORAGE_KEYS.map(key => GameStorage.save(supplementalEntries[key], key))
-          );
-          dispatch({ type: 'LOAD_SAVE', payload: structuredState });
-          window.location.reload();
-        }
+        await restoreCompleteSave(fileContents);
+        window.location.reload();
       } catch (err) {
         console.error("Failed to import save:", err);
       } finally {
@@ -2523,7 +2424,7 @@ export const DashboardProvider = ({
       }
     };
     reader.readAsText(file);
-  }, [dispatch]);
+  }, []);
   const value = useMemo(() => ({
     progression,
     economy,
