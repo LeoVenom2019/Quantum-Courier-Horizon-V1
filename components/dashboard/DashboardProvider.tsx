@@ -7,6 +7,12 @@ import { downloadCompleteSave, restoreCompleteSave } from '../../lib/save-backup
 import { RouteStats } from '@/lib/game-state/types';
 import { normalizeGameNumber } from '@/lib/game-state/numbers';
 import { getDeliveryFuelCost, getLocationCostMultiplier, getMiningProductionBase, getMissionRewardUpgradeCost } from '@/lib/economy-balance';
+import {
+  applyVoidShipUpgradeBalance,
+  getVoidShipCritChance,
+  getVoidShipDamage,
+  getVoidShipLootEfficiency,
+} from '@/lib/void-ship-upgrades';
 
 import { 
   useEconomy, 
@@ -1519,26 +1525,27 @@ export const DashboardProvider = ({
   }, [progression, economy.qc, dispatch, playSfx, addLog, t]);
 
   const getEffectiveVoidStats = useCallback((stats: any) => {
+    const balancedStats = applyVoidShipUpgradeBalance(stats);
     const rarityBonus = {
       common: 0,
       rare: 0.05,
       elite: 0.10,
       legendary: 0.15,
       mythic: 0.20
-    }[stats.rarity as 'common' | 'rare' | 'elite' | 'legendary' | 'mythic'] || 0;
+    }[balancedStats.rarity as 'common' | 'rare' | 'elite' | 'legendary' | 'mythic'] || 0;
 
     const battleShipUpgradeLevel = progression.battleShipUpgradeLevel || 0;
     const shipUpgradeDmgMult = 1 + (battleShipUpgradeLevel * 0.2);
     const critDamageBonus = battleShipUpgradeLevel * 200;
-    const damage = stats.damage * (1 + rarityBonus) * shipUpgradeDmgMult;
+    const damage = balancedStats.damage * (1 + rarityBonus) * shipUpgradeDmgMult;
     const criticalDamage = (damage * 2) + critDamageBonus;
 
     return {
-      ...stats,
+      ...balancedStats,
       damage,
-      maxHp: stats.maxHp * (1 + rarityBonus),
-      maxShield: stats.maxShield * (1 + rarityBonus),
-      critChance: Math.min(1, stats.critChance * (1 + rarityBonus)),
+      maxHp: balancedStats.maxHp * (1 + rarityBonus),
+      maxShield: balancedStats.maxShield * (1 + rarityBonus),
+      critChance: Math.min(1, balancedStats.critChance * (1 + rarityBonus)),
       critDamageBonus,
       critDamageMultiplier: criticalDamage / Math.max(1, damage),
       criticalDamage
@@ -1698,10 +1705,10 @@ export const DashboardProvider = ({
       const nextUpgrades = { ...prev.upgrades, [type]: currentLevel + 1 };
       let nextStats = { ...prev, upgrades: nextUpgrades };
       
-      if (type === 'damage') nextStats.damage += 25;
+      if (type === 'damage') nextStats.damage = getVoidShipDamage(nextUpgrades.damage);
       if (type === 'shield') { nextStats.maxShield += 250; nextStats.shield += 250; }
-      if (type === 'crit') nextStats.critChance += 0.02;
-      if (type === 'loot') nextStats.lootEfficiency += 0.05;
+      if (type === 'crit') nextStats.critChance = getVoidShipCritChance(nextUpgrades.crit);
+      if (type === 'loot') nextStats.lootEfficiency = getVoidShipLootEfficiency(nextUpgrades.loot);
       
       return nextStats;
     });

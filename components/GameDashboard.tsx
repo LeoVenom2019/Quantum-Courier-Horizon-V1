@@ -67,11 +67,9 @@ import {
   Plane,
   MousePointer2,
   Loader2,
-  Play,
-  Pause,
   FileText,
-  Shuffle,
 } from 'lucide-react';
+import { DashboardMediaPlayer } from './DashboardMediaPlayer';
 
 const ROUTE2_MISSIONS_REQUIREMENT = 100;
 const ROUTE3_MISSIONS_REQUIREMENT = 500;
@@ -139,6 +137,12 @@ import {
   ThemeColor
 } from '@/lib/game-data';
 import { normalizeAchievementMetaForCatalog } from '@/lib/achievement-meta.mjs';
+import {
+  applyVoidShipUpgradeBalance,
+  getVoidShipCritChance,
+  getVoidShipDamage,
+  getVoidShipLootEfficiency,
+} from '@/lib/void-ship-upgrades';
 
 const ACHIEVEMENT_IDS = ACHIEVEMENTS.map(achievement => achievement.id);
 import { useSFX } from '@/hooks/useSFX';
@@ -3291,6 +3295,37 @@ const DashboardContent = memo(({
     }
 
   }, [activeArcadeMusicEnabled, activeMiniGameId, routeTier, isLoaded, musicOn, isSurfaceWarBattle, isVoidLocalBattle, route4ColonyBattleMusicActive, jukebox, jukebox.desiredIsPlaying, jukebox.playPlaylist, jukebox.stop, jukebox.currentTrack?.url]);
+
+  const playDashboardChapterTrack = useCallback((offset: 0 | 1) => {
+    const chapterPlaylist = ROUTE_THEMES[routeTier]?.playlist || [];
+    if (chapterPlaylist.length === 0) return;
+
+    const activeChapterIndex = chapterPlaylist.findIndex(track => track.url === jukebox.currentTrack?.url);
+    const nextIndex = offset === 0
+      ? Math.max(0, activeChapterIndex)
+      : (activeChapterIndex + 1 + chapterPlaylist.length) % chapterPlaylist.length;
+
+    jukebox.setIsShuffle(false);
+    jukebox.setIsLoop(false);
+    jukebox.setPlaylist(chapterPlaylist);
+    jukebox.setCurrentTrackIndex(nextIndex);
+    jukebox.setIsPlaying(true);
+  }, [jukebox, routeTier]);
+
+  const toggleDashboardMusic = useCallback(() => {
+    if (jukebox.isPlaying) {
+      jukebox.togglePlay();
+    } else {
+      playDashboardChapterTrack(0);
+    }
+    playSfx(jukebox.isPlaying ? 'close_window' : 'open_window');
+  }, [jukebox, playDashboardChapterTrack, playSfx]);
+
+  const playNextDashboardTrack = useCallback(() => {
+    playDashboardChapterTrack(1);
+    playSfx('open_window');
+  }, [playDashboardChapterTrack, playSfx]);
+
   const setOresCollected = useCallback((val: Record<string, number> | ((prev: Record<string, number>) => Record<string, number>)) => {
     const nextVal = typeof val === 'function' ? val(oresCollectedRef.current) : val;
     oresCollectedRef.current = nextVal;
@@ -6913,7 +6948,7 @@ const DashboardContent = memo(({
       maxShield: 1000,
       damage: 100,
       critChance: 0.10,
-      lootEfficiency: 0.25,
+      lootEfficiency: 1,
       rarity: 'common',
       upgrades: { damage: 0, shield: 0, crit: 0, loot: 0 }
     });
@@ -8271,25 +8306,26 @@ const DashboardContent = memo(({
 
 
   const getEffectiveVoidStats = (stats: any) => {
+    const balancedStats = applyVoidShipUpgradeBalance(stats);
     const rarityBonus = {
       common: 0,
       rare: 0.05,
       elite: 0.10,
       legendary: 0.15,
       mythic: 0.20
-    }[stats.rarity as 'common' | 'rare' | 'elite' | 'legendary' | 'mythic'] || 0;
+    }[balancedStats.rarity as 'common' | 'rare' | 'elite' | 'legendary' | 'mythic'] || 0;
 
     const shipUpgradeDmgMult = 1 + (battleShipUpgradeLevelRef.current * 0.2); // +20% per level
     const shipUpgradeCritBonus = battleShipUpgradeLevelRef.current * 200; // +200 crit damage per level
-    const damage = stats.damage * (1 + rarityBonus) * shipUpgradeDmgMult;
+    const damage = balancedStats.damage * (1 + rarityBonus) * shipUpgradeDmgMult;
     const criticalDamage = (damage * 2) + shipUpgradeCritBonus;
 
     return {
-      ...stats,
+      ...balancedStats,
       damage,
-      maxHp: stats.maxHp * (1 + rarityBonus),
-      maxShield: stats.maxShield * (1 + rarityBonus),
-      critChance: Math.min(1, stats.critChance * (1 + rarityBonus)),
+      maxHp: balancedStats.maxHp * (1 + rarityBonus),
+      maxShield: balancedStats.maxShield * (1 + rarityBonus),
+      critChance: Math.min(1, balancedStats.critChance * (1 + rarityBonus)),
       critDamageBonus: shipUpgradeCritBonus,
       critDamageMultiplier: criticalDamage / Math.max(1, damage),
       criticalDamage
@@ -8382,16 +8418,18 @@ const DashboardContent = memo(({
       }));
 
       setVoidBattleShipStats(prev => {
-        const next = { ...prev };
-        next.upgrades[type] = currentLevel + 1;
+        const next = {
+          ...prev,
+          upgrades: { ...prev.upgrades, [type]: currentLevel + 1 }
+        };
 
-        if (type === 'damage') next.damage = 100 * (1 + next.upgrades.damage * 0.10);
+        if (type === 'damage') next.damage = getVoidShipDamage(next.upgrades.damage);
         if (type === 'shield') {
           next.maxShield = 1000 * (1 + next.upgrades.shield * 0.15);
           next.shield = next.maxShield;
         }
-        if (type === 'crit') next.critChance = 0.10 + (next.upgrades.crit * 0.10);
-        if (type === 'loot') next.lootEfficiency = 0.8 + (next.upgrades.loot * 0.25);
+        if (type === 'crit') next.critChance = getVoidShipCritChance(next.upgrades.crit);
+        if (type === 'loot') next.lootEfficiency = getVoidShipLootEfficiency(next.upgrades.loot);
 
         return next;
       });
@@ -10428,38 +10466,15 @@ const DashboardContent = memo(({
           <div className="relative z-10 flex items-center gap-6">
             <div className="flex flex-col items-end">
               <div className="flex items-center gap-3">
-                <PremiumCanvasButton
-                  onClick={() => {
-                    if (jukebox.isPlaying) jukebox.setIsShuffle(false);
-                    jukebox.togglePlay();
-                    playSfx(jukebox.isPlaying ? 'close_window' : 'open_window');
-                  }}
-                  tone={dashboardPremiumTone(jukebox.isPlaying)}
-                  className="h-9 rounded-full px-4"
-                  contentClassName={`gap-2 text-base font-orbitron font-bold uppercase tracking-widest ${dashboardPremiumText(jukebox.isPlaying)}`}
-                  title={jukebox.isPlaying ? t('pauseMusic') : t('playMusic')}
-                >
-                  <div className={`w-1.5 h-1.5 rounded-full ${jukebox.isPlaying
-                      ? (isInterstellar ? 'bg-orange-400 animate-pulse shadow-[0_0_8px_rgba(249,115,22,0.8)]' : isEarth ? 'bg-emerald-400 animate-pulse shadow-[0_0_8px_rgba(52,211,153,0.8)]' : 'bg-cyan-400 animate-pulse shadow-[0_0_8px_rgba(6,182,212,0.8)]')
-                      : 'bg-slate-600'
-                    }`} />
-                  {jukebox.isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
-                  <span>{jukebox.isPlaying ? 'MUSIC ON' : 'MUSIC OFF'}</span>
-                </PremiumCanvasButton>
-                <PremiumCanvasButton
-                  onClick={() => {
-                    if (!jukebox.isPlaying) return;
-                    jukebox.setIsShuffle(!jukebox.isShuffle);
-                    playSfx(jukebox.isShuffle ? 'close_window' : 'open_window');
-                  }}
-                  disabled={!jukebox.isPlaying}
-                  tone={jukebox.isPlaying && jukebox.isShuffle ? 'cyan' : 'steel'}
-                  contentClassName={`gap-2 text-base font-orbitron font-bold uppercase tracking-widest ${dashboardPremiumText(jukebox.isPlaying && jukebox.isShuffle)}`}
-                  title={language === 'pt' ? 'Tocar músicas aleatoriamente' : 'Shuffle music'}
-                >
-                  <Shuffle className="w-4 h-4" />
-                  <span>{language === 'pt' ? 'ALEATÓRIO' : 'SHUFFLE'} {jukebox.isPlaying && jukebox.isShuffle ? 'ON' : 'OFF'}</span>
-                </PremiumCanvasButton>
+                <DashboardMediaPlayer
+                  isPlaying={jukebox.isPlaying}
+                  trackTitle={jukebox.currentTrack?.title}
+                  language={language}
+                  tone={dashboardPremiumTone(true)}
+                  accentTextClass={dashboardPremiumText(true)}
+                  onTogglePlay={toggleDashboardMusic}
+                  onNext={playNextDashboardTrack}
+                />
 
 
                 <PremiumCanvasButton

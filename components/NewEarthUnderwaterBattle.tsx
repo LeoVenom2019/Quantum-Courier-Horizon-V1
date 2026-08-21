@@ -140,6 +140,12 @@ type Bubble = {
   shine: number;
 };
 
+type AmbientFaunaSprite = {
+  src: string;
+  blend: GlobalCompositeOperation;
+  sourceCrop?: [number, number, number, number];
+};
+
 type TreasureRarity = 'normal' | 'rare' | 'legendary' | 'epic';
 
 type TreasureRewardPayload = {
@@ -337,7 +343,35 @@ const ENEMY_SUBMARINE_SPRITES: Record<EnemySubmarineSpriteSetId, Record<PlayerSu
   enemy_submarine2: createSubmarineSpriteSet('/assets/rota4/colonys/enemy_submarine2', 'enemy_submarine2'),
   enemy_submarine3: createSubmarineSpriteSet('/assets/rota4/colonys/enemy_submarine3', 'enemy_submarine3'),
 };
+const ENEMY_SUBMARINE_FBX_RENDER = '/assets/rota4/enemy-submarines/enemy-submarine-fbx-render.png';
+const ENEMY_SUBMARINE_FBX_SOURCE_CROP = [390, 260, 510, 205] as const;
+const ENEMY_SUBMARINE_VISUAL_SCALE = 1.2;
 const imageCache = new Map<string, HTMLImageElement>();
+const AMBIENT_FAUNA_SPRITES = {
+  whale: {
+    src: '/assets/rota4/fauna/whale-humpback-source.png',
+    blend: 'screen',
+    sourceCrop: [48, 360, 1824, 650],
+  },
+  tuna: {
+    src: '/assets/rota4/fauna/tuna-render.png',
+    blend: 'multiply',
+    sourceCrop: [34, 14, 850, 480],
+  },
+  bluegill: {
+    src: '/assets/rota4/fauna/bluegill-source.png',
+    blend: 'multiply',
+  },
+  goldfish: {
+    src: '/assets/rota4/fauna/goldfish-source.jpeg',
+    blend: 'screen',
+  },
+} satisfies Record<'whale' | 'tuna' | 'bluegill' | 'goldfish', AmbientFaunaSprite>;
+const BLOOP_SWIM_SPRITESHEET = '/assets/rota4/fauna/bloop/bloop-swim-spritesheet.png';
+const BLOOP_FRAME_WIDTH = 512;
+const BLOOP_FRAME_HEIGHT = 224;
+const BLOOP_FRAME_COUNT = 4;
+const BLOOP_ANIMATION_DURATION_MS = 4125;
 const pickTreasureRelic = (rarity: TreasureRarity, unavailableIds: Set<string>) => {
   if (rarity === 'normal') return undefined;
   const relics = excludeCollectedUnderwaterTreasures(NEW_EARTH_TREASURES_BY_RARITY[rarity], unavailableIds);
@@ -545,10 +579,63 @@ const drawEnemySpriteSubmarine = (
 ) => {
   const sprites = ENEMY_SUBMARINE_SPRITES[enemy.visual.spriteSetId];
   const spriteKey = getPlayerSubmarineSpriteKey(enemy.visual, getPlayerSpriteKeyFromAngle(angle), time);
-  const sprite = getImage(sprites[spriteKey]);
-  const sizeMultiplier = enemy.isBoss ? BOSS_SIZE_MULTIPLIER : 1;
+  const fallbackSprite = getImage(sprites[spriteKey]);
+  const trialSprite = getImage(ENEMY_SUBMARINE_FBX_RENDER);
+  const sizeMultiplier = (enemy.isBoss ? BOSS_SIZE_MULTIPLIER : 1) * ENEMY_SUBMARINE_VISUAL_SCALE;
 
-  if (!sprite?.complete || sprite.naturalWidth <= 0) {
+  if (trialSprite?.complete && trialSprite.naturalWidth > 0) {
+    const variantStyle: Record<EnemySubmarineSpriteSetId, { glow: string; filter: string }> = {
+      enemy_submarine1: { glow: 'rgba(248,113,113,0.52)', filter: 'hue-rotate(180deg) saturate(2.4)' },
+      enemy_submarine2: { glow: 'rgba(216,180,254,0.52)', filter: 'hue-rotate(120deg) saturate(2.15)' },
+      enemy_submarine3: { glow: 'rgba(251,191,36,0.5)', filter: 'hue-rotate(220deg) saturate(2.3)' },
+    };
+    const style = enemy.isBoss
+      ? { glow: 'rgba(239,68,68,0.82)', filter: 'hue-rotate(180deg) saturate(3)' }
+      : variantStyle[enemy.visual.spriteSetId];
+    const drawW = 124 * sizeMultiplier;
+    const drawH = 50 * sizeMultiplier;
+    const [sourceX, sourceY, sourceWidth, sourceHeight] = ENEMY_SUBMARINE_FBX_SOURCE_CROP;
+    const facesRight = Math.cos(angle) >= 0;
+    const uprightPitch = clamp(
+      Math.atan2(Math.sin(angle), Math.abs(Math.cos(angle))),
+      -0.42,
+      0.42,
+    );
+
+    ctx.save();
+    ctx.translate(enemy.x, enemy.y);
+    ctx.rotate(uprightPitch);
+
+    ctx.globalCompositeOperation = 'screen';
+    const aura = ctx.createRadialGradient(0, 0, 4, 0, 0, 72 * sizeMultiplier);
+    aura.addColorStop(0, style.glow);
+    aura.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = aura;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 72 * sizeMultiplier, 34 * sizeMultiplier, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.scale(facesRight ? -1 : 1, 1);
+    ctx.globalCompositeOperation = 'multiply';
+    ctx.filter = style.filter;
+    ctx.shadowColor = style.glow;
+    ctx.shadowBlur = enemy.isBoss ? 24 : 12;
+    ctx.drawImage(
+      trialSprite,
+      sourceX,
+      sourceY,
+      sourceWidth,
+      sourceHeight,
+      -drawW / 2,
+      -drawH / 2,
+      drawW,
+      drawH,
+    );
+    ctx.restore();
+    return;
+  }
+
+  if (!fallbackSprite?.complete || fallbackSprite.naturalWidth <= 0) {
     ctx.save();
     ctx.translate(enemy.x, enemy.y);
     ctx.scale(sizeMultiplier, sizeMultiplier);
@@ -563,7 +650,7 @@ const drawEnemySpriteSubmarine = (
   ctx.translate(enemy.x, enemy.y);
   ctx.shadowColor = enemy.isBoss ? 'rgba(239,68,68,0.82)' : 'rgba(248,113,113,0.48)';
   ctx.shadowBlur = enemy.isBoss ? 24 : 10;
-  ctx.drawImage(sprite, -drawW / 2, -drawH / 2, drawW, drawH);
+  ctx.drawImage(fallbackSprite, -drawW / 2, -drawH / 2, drawW, drawH);
   ctx.restore();
 };
 
@@ -1573,6 +1660,166 @@ const drawWaterOverlay = (ctx: CanvasRenderingContext2D, tick: number, bubbles: 
   foregroundShade.addColorStop(1, 'rgba(0,0,0,0.48)');
   ctx.fillStyle = foregroundShade;
   ctx.fillRect(0, 0, WIDTH, HEIGHT);
+};
+
+const drawAmbientFaunaSprite = (
+  ctx: CanvasRenderingContext2D,
+  sprite: AmbientFaunaSprite,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  alpha: number,
+  flipX = false,
+  blur = 0,
+) => {
+  const image = getImage(sprite.src);
+  if (!image?.complete || image.naturalWidth <= 0) return;
+
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(flipX ? -1 : 1, 1);
+  ctx.globalAlpha = alpha;
+  ctx.globalCompositeOperation = sprite.blend;
+  ctx.filter = blur > 0 ? `blur(${blur}px)` : 'none';
+
+  if (sprite.sourceCrop) {
+    const [sourceX, sourceY, sourceWidth, sourceHeight] = sprite.sourceCrop;
+    ctx.drawImage(image, sourceX, sourceY, sourceWidth, sourceHeight, -width / 2, -height / 2, width, height);
+  } else {
+    ctx.drawImage(image, -width / 2, -height / 2, width, height);
+  }
+  ctx.restore();
+};
+
+const drawDistantWhale = (
+  ctx: CanvasRenderingContext2D,
+  time: number,
+  depthIndex: number,
+  siteId: UnderwaterBattleSiteId,
+) => {
+  if (depthIndex > 0) return;
+
+  const sitePhase = siteId === 'cemiterio-navios' ? 1.7 : 0;
+  const whalePhase = time * 0.00004 + sitePhase;
+  const x = WIDTH * 0.56 + Math.sin(whalePhase) * WIDTH * 0.22;
+  const y = 150 + Math.sin(time * 0.00055 + sitePhase) * 14;
+  const breath = 1 + Math.sin(time * 0.0011) * 0.012;
+  const movingRight = Math.cos(whalePhase) > 0;
+
+  drawAmbientFaunaSprite(
+    ctx,
+    AMBIENT_FAUNA_SPRITES.whale,
+    x,
+    y,
+    510 * breath,
+    182 * breath,
+    siteId === 'cemiterio-navios' ? 0.11 : 0.16,
+    movingRight,
+    1.4,
+  );
+};
+
+const drawDistantBloop = (
+  ctx: CanvasRenderingContext2D,
+  time: number,
+  depthIndex: number,
+  siteId: UnderwaterBattleSiteId,
+) => {
+  if (depthIndex < 3) return;
+  const spriteSheet = getImage(BLOOP_SWIM_SPRITESHEET);
+  if (!spriteSheet?.complete || spriteSheet.naturalWidth <= 0) return;
+
+  const sitePhase = siteId === 'cemiterio-navios' ? 2.4 : 0.7;
+  const travelPhase = time * 0.000026 + sitePhase;
+  const movingRight = Math.cos(travelPhase) >= 0;
+  const x = WIDTH * 0.52 + Math.sin(travelPhase) * WIDTH * 0.3;
+  const y = 165 + depthIndex * 18 + Math.sin(time * 0.00034 + sitePhase) * 11;
+  const frameProgress = ((time % BLOOP_ANIMATION_DURATION_MS) / BLOOP_ANIMATION_DURATION_MS) * BLOOP_FRAME_COUNT;
+  const currentFrame = Math.floor(frameProgress) % BLOOP_FRAME_COUNT;
+  const nextFrame = (currentFrame + 1) % BLOOP_FRAME_COUNT;
+  const frameBlend = frameProgress - Math.floor(frameProgress);
+  const width = depthIndex >= 4 ? 680 : 610;
+  const height = width * (BLOOP_FRAME_HEIGHT / BLOOP_FRAME_WIDTH);
+  const opacity = depthIndex >= 4 ? 0.13 : 0.095;
+
+  const drawFrame = (frame: number, alpha: number) => {
+    ctx.globalAlpha = opacity * alpha;
+    ctx.drawImage(
+      spriteSheet,
+      frame * BLOOP_FRAME_WIDTH,
+      0,
+      BLOOP_FRAME_WIDTH,
+      BLOOP_FRAME_HEIGHT,
+      -width / 2,
+      -height / 2,
+      width,
+      height,
+    );
+  };
+
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(movingRight ? 1 : -1, 1);
+  ctx.rotate(Math.sin(time * 0.00042 + sitePhase) * 0.018);
+  ctx.globalCompositeOperation = 'screen';
+  ctx.filter = 'blur(1.35px) saturate(0.72)';
+  ctx.shadowColor = 'rgba(56,189,248,0.28)';
+  ctx.shadowBlur = 18;
+  drawFrame(currentFrame, 1 - frameBlend);
+  drawFrame(nextFrame, frameBlend);
+  ctx.restore();
+};
+
+const drawAmbientFish = (
+  ctx: CanvasRenderingContext2D,
+  time: number,
+  depthIndex: number,
+  siteId: UnderwaterBattleSiteId,
+) => {
+  const densityByDepth = [8, 6, 4, 2, 1];
+  const fishCount = densityByDepth[depthIndex] ?? 1;
+  const sitePhase = siteId === 'cemiterio-navios' ? 1.7 : 0;
+
+  for (let index = 0; index < fishCount; index += 1) {
+    const farLayer = index % 3 === 0 || depthIndex >= 3;
+    const direction = index % 2 === 0 ? 1 : -1;
+    const speed = (farLayer ? 0.012 : 0.02) + (index % 4) * 0.003;
+    const padding = 180;
+    const routeLength = WIDTH + padding * 2;
+    const progress = ((time * speed + index * 257 + sitePhase * 173) % routeLength + routeLength) % routeLength;
+    const x = direction > 0 ? progress - padding : WIDTH + padding - progress;
+    const lane = (index * 137 + depthIndex * 83) % 430;
+    const baseY = 145 + lane;
+    const bob = Math.sin(time * (0.0012 + index * 0.00007) + index * 1.43) * (farLayer ? 4 : 8);
+    const pitch = Math.sin(time * 0.001 + index) * 0.025;
+    const depthFade = Math.max(0.34, 1 - depthIndex * 0.14);
+    const baseWidth = farLayer ? 58 : 88;
+    const width = baseWidth * (0.86 + (index % 3) * 0.13);
+    const sprite = depthIndex <= 1 && index % 5 === 1
+      ? AMBIENT_FAUNA_SPRITES.goldfish
+      : depthIndex <= 1 && index % 4 === 2
+        ? AMBIENT_FAUNA_SPRITES.bluegill
+        : AMBIENT_FAUNA_SPRITES.tuna;
+    const aspect = sprite === AMBIENT_FAUNA_SPRITES.tuna ? 0.48 : 0.56;
+    const naturalFacesRight = sprite !== AMBIENT_FAUNA_SPRITES.bluegill;
+
+    ctx.save();
+    ctx.translate(x, baseY + bob);
+    ctx.rotate(pitch * direction);
+    drawAmbientFaunaSprite(
+      ctx,
+      sprite,
+      0,
+      0,
+      width,
+      width * aspect,
+      (farLayer ? 0.13 : 0.21) * depthFade * (siteId === 'cemiterio-navios' ? 0.78 : 1),
+      naturalFacesRight ? direction < 0 : direction > 0,
+      farLayer ? 0.75 : 0.25,
+    );
+    ctx.restore();
+  }
 };
 
 const drawOceanBubbles = (
@@ -3289,7 +3536,10 @@ export default function NewEarthUnderwaterBattle({
         playerVisualKey,
         state.phase !== 'player_exploding' && state.phase !== 'defeat',
       );
+      drawDistantWhale(ctx, time, currentDepthIndex, siteId);
+      drawDistantBloop(ctx, time, currentDepthIndex, siteId);
       drawWaterOverlay(ctx, time, state.bubbles);
+      drawAmbientFish(ctx, time, currentDepthIndex, siteId);
       drawOceanBubbles(ctx, state.bubbles, time);
       drawForegroundDebris(ctx, time);
 
@@ -3477,7 +3727,7 @@ export default function NewEarthUnderwaterBattle({
     return () => {
       if (frameRef.current) cancelAnimationFrame(frameRef.current);
     };
-  }, [backgroundSrc, colonyId, currentDepthIndex, depthMeters, labels, labels.oxygenDepleted, labels.portal, language, mounted, nextDepthMeters, onDefeat, onEnemyLoot, onTreasureLoot, onVictory, oxygenReserveMs, playerMaxSpeed, playerShotDamage, playerShotSpeed, setCurrentDepthIndex, unlockedDepthIndex]);
+  }, [backgroundSrc, colonyId, currentDepthIndex, depthMeters, labels, labels.oxygenDepleted, labels.portal, language, mounted, nextDepthMeters, onDefeat, onEnemyLoot, onTreasureLoot, onVictory, oxygenReserveMs, playerMaxSpeed, playerShotDamage, playerShotSpeed, setCurrentDepthIndex, siteId, unlockedDepthIndex]);
 
   useEffect(() => () => {
     activeLaunchAudiosRef.current.forEach(stopUnderwaterSound);

@@ -479,12 +479,9 @@ export default function SolarInterstellarBattleExperience({
     upgrades: { damage: 0, shield: 0, crit: 0, loot: 0 },
   };
   const enemies: VoidBattleEnemy[] = buildSolarInterstellarWaveBlueprints({
-    enemyMaxHp: activeBattle.enemyMaxHp,
     enemyDps: activeBattle.enemyDps,
     reward: activeBattle.reward,
-    playerDamage: stats.damage,
-    critChance: stats.critChance,
-    criticalDamage: stats.damage * 2,
+    routeTier,
   }).map((wave: any) => ({
     id: `chapter-${routeTier.toLowerCase()}-${activeBattle.id}-wave-${wave.wave}`,
     type: wave.type,

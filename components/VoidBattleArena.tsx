@@ -5,6 +5,22 @@ import { motion } from 'motion/react';
 import { Shield, Target, MousePointer2, X } from 'lucide-react';
 import BattlePauseDialog from './BattlePauseDialog';
 import type { BattleSpriteSheet } from '@/lib/battle-sprites';
+import { PASSIVE_SHOT_DAMAGE_TIERS, rollPassiveShotDamageForRoute } from '@/lib/passive-shot-damage.mjs';
+import {
+  buildSolarInterstellarEnemyVolley,
+  getSolarInterstellarEnemyFireConfig,
+  SOLAR_INTERSTELLAR_FIRE_PERFORMANCE,
+} from '@/lib/solar-interstellar-enemy-fire.mjs';
+
+export type PassiveShotDamageTier = 'common' | 'brutal' | 'insane' | 'divine';
+
+type SolarInterstellarEnemyShot = {
+  angleOffset: number;
+  speed: number;
+  color: string;
+  size: number;
+  special: boolean;
+};
 
 export interface VoidBattleProjectile {
   id: string;
@@ -13,12 +29,16 @@ export interface VoidBattleProjectile {
   owner: 'player' | 'enemy';
   damage: number;
   isCrit?: boolean;
+  passiveDamageTier?: PassiveShotDamageTier;
+  passiveDamageMultiplier?: number;
   vx: number;
   vy: number;
   type?: 'normal' | 'burst' | 'beam';
   speed?: number;
   size?: number;
   isSkyring?: boolean;
+  projectileColor?: string;
+  isSpecialEnemyShot?: boolean;
   trail?: { x: number; y: number }[];
   bossAttack?: 'acid' | 'fireball' | 'toxicMud' | 'darkRay' | 'moltenIron' | 'sonicWave' | 'darkBarrage' | 'abyssLaser' | 'godArc';
   dotDamagePerSecond?: number;
@@ -47,6 +67,7 @@ export interface VoidBattleEnemy {
   isExploding?: boolean;
   originalId?: string; // For asset lookup when id is unique per instance
   lastShot?: number;
+  lastSpecialShot?: number;
   spriteSuffix?: string;
   previousSpriteSuffix?: string;
   spriteTransitionStartedAt?: number;
@@ -90,6 +111,9 @@ export interface VoidBattleDamageNumber {
   isCrit: boolean;
   color: string;
   owner: 'player' | 'enemy';
+  passiveDamageTier?: PassiveShotDamageTier;
+  sizeMultiplier?: number;
+  durationMultiplier?: number;
 }
 
 export interface VoidBattleMeteor {
@@ -746,10 +770,17 @@ const VoidBattleArena = memo(function VoidBattleArena({
   useEffect(() => {
     setVideoReady(false);
     const locKey = locationId === 0 ? 'zero' : locationId;
-    const video = document.createElement('video');
-    video.src = routeTier === 'Void'
+    const videoSource = routeTier === 'Void'
       ? `/assets/rota3/void/${locKey}/background_battle_${locKey}.mp4`
-      : (routeTier === 'Solar' ? '/assets/rota1/battle/background_battle.mp4' : '/assets/rota2/battle/background_battle.mp4');
+      : routeTier === 'Solar'
+        ? '/assets/rota1/battle/background_battle.mp4'
+        : undefined;
+    if (!videoSource) {
+      videoRef.current = null;
+      return;
+    }
+    const video = document.createElement('video');
+    video.src = videoSource;
     video.loop = true;
     video.muted = true;
     video.autoplay = true;
@@ -936,15 +967,21 @@ const VoidBattleArena = memo(function VoidBattleArena({
 
     const isMythic = playerShipStats.rarity === 'mythic';
     const isSkyring = activeShipImage?.includes('skyring');
+    const passiveDamage = rollPassiveShotDamageForRoute(
+      isCrit ? criticalDamage : playerShipStats.damage,
+      routeTier
+    );
     s.projectiles.push({
       id: `pp-${now}`,
       x: s.playerX + 5,
       y: s.playerY,
       owner: 'player',
-      damage: isCrit ? criticalDamage : playerShipStats.damage,
+      damage: passiveDamage.damage,
       vx,
       vy,
       isCrit,
+      passiveDamageTier: passiveDamage.tier as PassiveShotDamageTier,
+      passiveDamageMultiplier: passiveDamage.multiplier,
       size: isSkyring ? 2.0 : (isMythic ? 1.6 : 1),
       isSkyring,
       trail: []
@@ -968,7 +1005,7 @@ const VoidBattleArena = memo(function VoidBattleArena({
         type: 'spark'
       });
     }
-  }, [playSfx, playerShipStats, activeShipImage]);
+  }, [playSfx, playerShipStats, activeShipImage, routeTier]);
 
   useEffect(() => {
     if (!assetsLoaded) return;
@@ -1357,16 +1394,32 @@ const VoidBattleArena = memo(function VoidBattleArena({
         playSfx('enemy_explosion');
       }
     };
-    const createDamageNumber = (x: number, y: number, value: number, isCrit: boolean, owner: 'player' | 'enemy') => {
+    const createDamageNumber = (
+      x: number,
+      y: number,
+      value: number,
+      isCrit: boolean,
+      owner: 'player' | 'enemy',
+      passiveDamageTier: PassiveShotDamageTier = 'common'
+    ) => {
       const s = gameRef.current;
+      const playerDamageColor = passiveDamageTier === 'brutal'
+        ? '#ff1744'
+        : passiveDamageTier === 'insane'
+          ? '#00b7ff'
+          : '#ffffff';
+      const numberPresentation = PASSIVE_SHOT_DAMAGE_TIERS[passiveDamageTier];
       s.damageNumbers.push({
         id: `dn-${Date.now()}-${Math.random()}`,
         x, y,
         value: Math.floor(value),
         life: 1.0,
         isCrit,
-        color: owner === 'player' ? (isCrit ? '#fcd34d' : '#22d3ee') : '#ef4444',
-        owner
+        color: owner === 'player' ? playerDamageColor : '#ef4444',
+        owner,
+        passiveDamageTier: owner === 'player' ? passiveDamageTier : undefined,
+        sizeMultiplier: owner === 'player' ? numberPresentation.numberSizeMultiplier : 1,
+        durationMultiplier: owner === 'player' ? numberPresentation.numberDurationMultiplier : 1,
       });
     };
 
@@ -1377,7 +1430,9 @@ const VoidBattleArena = memo(function VoidBattleArena({
       return 'rgba(200,30,0,1)';
     };
 
-    const applyPlayerDamageToEnemy = (enemy: VoidBattleEnemy, damage: number) => {
+    const applyPlayerDamageToEnemy = (enemy: VoidBattleEnemy, baseDamage: number, isCrit = false) => {
+      const passiveDamage = rollPassiveShotDamageForRoute(baseDamage, routeTier);
+      const damage = passiveDamage.damage;
       let remainingDamage = damage;
       if (enemy.shield > 0) {
         const shieldDamage = Math.min(enemy.shield, remainingDamage);
@@ -1387,7 +1442,7 @@ const VoidBattleArena = memo(function VoidBattleArena({
       if (remainingDamage > 0) {
         enemy.hp = Math.max(0, enemy.hp - remainingDamage);
       }
-      createDamageNumber(enemy.x, enemy.y - 10, damage, false, 'player');
+      createDamageNumber(enemy.x, enemy.y - 10, damage, isCrit, 'player', passiveDamage.tier as PassiveShotDamageTier);
     };
 
     const findNearestLivingEnemy = (state: VoidBattleState, x: number, y: number, width: number, height: number) => {
@@ -1799,7 +1854,12 @@ const VoidBattleArena = memo(function VoidBattleArena({
             drawImageCoverScaled(solarLayer, 0.76, layerOffsetX, layerOffsetY, 0.82);
           }
         } else {
-          drawParallaxLayer('bg_layer_1', 0.04, 0.8, 0);
+          const interstellarLayer = assetsRef.current.bg_layer_1;
+          if (interstellarLayer) {
+            const layerOffsetX = Math.sin(now / 10500) * cWidth * 0.025;
+            const layerOffsetY = Math.cos(now / 12500) * cHeight * 0.012;
+            drawImageCoverScaled(interstellarLayer, 0.86, layerOffsetX, layerOffsetY, 0.86);
+          }
         }
       }
 
@@ -1852,14 +1912,7 @@ const VoidBattleArena = memo(function VoidBattleArena({
           s.enemies.forEach(e => {
               const dist = Math.hypot((e.x / 100) * cWidth - s.laserImpactPos.x, (e.y / 100) * cHeight - s.laserImpactPos.y);
               if (dist < 400) {
-                  const totalDmg = playerShipStats.damage * 15;
-                  if (e.shield > 0) {
-                      const sDmg = Math.min(e.shield, totalDmg);
-                      e.shield -= sDmg;
-                      const rem = totalDmg - sDmg;
-                      if (rem > 0) e.hp = Math.max(0, e.hp - rem);
-                  } else { e.hp = Math.max(0, e.hp - totalDmg); }
-                  createDamageNumber(e.x, e.y - 20, totalDmg, true, 'player');
+                  applyPlayerDamageToEnemy(e, playerShipStats.damage * 15, true);
               }
           });
           // GIANT IMPACT SHOCKWAVE
@@ -2008,16 +2061,7 @@ const VoidBattleArena = memo(function VoidBattleArena({
             s.enemies.forEach(e => {
                 const ex = (e.x / 100) * cWidth;
                 if (e.hp > 0 && Math.abs((e.y / 100) * cHeight - start.y) < 90 && ex > (start.x - 50) && ex < end.x + 50) {
-                    let remainingDamage = LASER_DAMAGE_PER_TICK;
-                    if (e.shield > 0) {
-                        const shieldDamage = Math.min(e.shield, remainingDamage);
-                        e.shield -= shieldDamage;
-                        remainingDamage -= shieldDamage;
-                    }
-                    if (remainingDamage > 0) {
-                        e.hp = Math.max(0, e.hp - remainingDamage);
-                    }
-                    createDamageNumber(e.x, e.y - 15, LASER_DAMAGE_PER_TICK, true, 'player');
+                    applyPlayerDamageToEnemy(e, LASER_DAMAGE_PER_TICK, true);
                 }
             });
           }
@@ -2110,17 +2154,8 @@ const VoidBattleArena = memo(function VoidBattleArena({
                   const ey = (e.y / 100) * cHeight;
                   const dist = Math.hypot(ex - ball.x, ey - ball.y);
                   if (dist < 150) {
-                      const totalDmg = ball.damage;
-                      if (e.shield > 0) {
-                          const sDmg = Math.min(e.shield, totalDmg);
-                          e.shield -= sDmg;
-                          const rem = totalDmg - sDmg;
-                          if (rem > 0) e.hp = Math.max(0, e.hp - totalDmg);
-                      } else {
-                          e.hp = Math.max(0, e.hp - totalDmg);
-                      }
+                      applyPlayerDamageToEnemy(e, ball.damage, true);
                       createImpactEffect(ex, ey, '#fb923c', 0, 2, 'ship');
-                      createDamageNumber(e.x, e.y - 20, totalDmg, true, 'player');
                   }
               });
           }
@@ -2138,12 +2173,13 @@ const VoidBattleArena = memo(function VoidBattleArena({
       if (s.keysPressed.has('a') || s.keysPressed.has('arrowleft')) s.playerX = Math.max(5, s.playerX - moveSpeed);
       if (s.keysPressed.has('d') || s.keysPressed.has('arrowright')) s.playerX = Math.min(45, s.playerX + moveSpeed);
 
-      if (now % 3 === 0) {
+      if (s.frameCount % 3 === 0) {
         if (!s.playerIsExploding) {
           const pDmgFactor = 1.0 + (1.0 - s.playerHp / s.playerMaxHp) * 1.5;
           const isSkyring = activeShipImage?.includes('skyring');
           // Skyring base smoke is more frequent and detailed
-          const smokeCount = (Math.random() < pDmgFactor ? Math.ceil(pDmgFactor) : Math.floor(pDmgFactor)) * (isSkyring ? 2 : 1);
+          const skyringSmokeMultiplier = isSkyring && routeTier !== 'Interstellar' ? 2 : 1;
+          const smokeCount = (Math.random() < pDmgFactor ? Math.ceil(pDmgFactor) : Math.floor(pDmgFactor)) * skyringSmokeMultiplier;
           for (let i = 0; i < smokeCount; i++) {
             s.particles.push({
               id: `pe-${now}-p-${i}-${Math.random()}`,
@@ -2177,6 +2213,9 @@ const VoidBattleArena = memo(function VoidBattleArena({
         }
 
         const isSkyring = activeShipImage?.includes('skyring');
+        const isInterstellarSkyring = isSkyring && routeTier === 'Interstellar';
+        const shouldEmitSkyringExhaust = !isInterstellarSkyring
+          || s.frameCount % SOLAR_INTERSTELLAR_FIRE_PERFORMANCE.interstellarSkyringExhaustIntervalFrames === 0;
 
 
 
@@ -2189,9 +2228,15 @@ const VoidBattleArena = memo(function VoidBattleArena({
             ctx.save(); ctx.fillStyle = `rgba(0, 0, 0, ${s.cinematicDarkness * 0.35})`; ctx.fillRect(0, 0, cWidth, cHeight); ctx.restore();
             s.cinematicDarkness *= 0.92;
         }
-        if (isSkyring && !s.playerIsExploding) {
+        if (isSkyring && !s.playerIsExploding && shouldEmitSkyringExhaust) {
+          const coreParticleCount = isInterstellarSkyring
+            ? SOLAR_INTERSTELLAR_FIRE_PERFORMANCE.interstellarSkyringCoreParticles
+            : 3;
+          const plasmaParticleCount = isInterstellarSkyring
+            ? SOLAR_INTERSTELLAR_FIRE_PERFORMANCE.interstellarSkyringPlasmaParticles
+            : 5;
           // Layer 1: Core Heat - Very fast white/yellow sparks at the nozzle
-          for (let i = 0; i < 3; i++) {
+          for (let i = 0; i < coreParticleCount; i++) {
             s.particles.push({
               id: `sky-core-${now}-${i}`,
               x: s.playerX - 3,
@@ -2206,7 +2251,7 @@ const VoidBattleArena = memo(function VoidBattleArena({
           }
 
           // Layer 2: Plasma Exhaust - Multi-colored vibrant flow
-          for (let i = 0; i < 5; i++) {
+          for (let i = 0; i < plasmaParticleCount; i++) {
             const colorType = Math.random();
             s.particles.push({
               id: `sky-plasma-${now}-${i}`,
@@ -2222,8 +2267,12 @@ const VoidBattleArena = memo(function VoidBattleArena({
           }
 
           // Layer 3: Dissipating Smoke - Large, slow, transparent purple/grey
-          if (now % 2 === 0) {
-            for (let i = 0; i < 2; i++) {
+          const shouldEmitDissipation = isInterstellarSkyring
+            ? s.frameCount % SOLAR_INTERSTELLAR_FIRE_PERFORMANCE.interstellarSkyringDissipationIntervalFrames === 0
+            : now % 2 === 0;
+          if (shouldEmitDissipation) {
+            const dissipationParticleCount = isInterstellarSkyring ? 1 : 2;
+            for (let i = 0; i < dissipationParticleCount; i++) {
               s.particles.push({
                 id: `sky-dissipation-${now}-${i}`,
                 x: s.playerX - 10 - Math.random() * 5,
@@ -2239,7 +2288,12 @@ const VoidBattleArena = memo(function VoidBattleArena({
           }
         }
 
-        s.enemies.forEach(e => {
+        const isSolarInterstellarBattle = routeTier === 'Solar' || routeTier === 'Interstellar';
+        const enemyProjectilePressure = isSolarInterstellarBattle
+          ? s.projectiles.reduce((count, projectile) => count + (projectile.owner === 'enemy' ? 1 : 0), 0)
+          : 0;
+        const damageSmokeFrameInterval = enemyProjectilePressure > SOLAR_INTERSTELLAR_FIRE_PERFORMANCE.highProjectilePressure ? 4 : 2;
+        if (!isSolarInterstellarBattle || s.frameCount % damageSmokeFrameInterval === 0) s.enemies.forEach(e => {
           if (e.hp > 0) {
             const isMonster = routeTier === 'Void';
             const eDmgFactor = 1.0 + (1.0 - e.hp / e.maxHp) * 1.5;
@@ -2268,10 +2322,16 @@ const VoidBattleArena = memo(function VoidBattleArena({
 
           if (!p.trail) p.trail = [];
           p.trail.push({ x: p.x, y: p.y });
-          if (p.trail.length > 7) p.trail.shift();
+          const trailPointLimit = p.owner === 'enemy' && routeTier !== 'Void'
+            ? SOLAR_INTERSTELLAR_FIRE_PERFORMANCE.enemyTrailPoints
+            : 7;
+          if (p.trail.length > trailPointLimit) p.trail.shift();
 
           // Skyring Neon Smoke Trail
-          if (p.isSkyring && s.frameCount % 2 === 0) {
+          const skyringProjectileTrailInterval = routeTier === 'Interstellar'
+            ? SOLAR_INTERSTELLAR_FIRE_PERFORMANCE.interstellarSkyringProjectileTrailIntervalFrames
+            : 2;
+          if (p.isSkyring && s.frameCount % skyringProjectileTrailInterval === 0) {
             s.particles.push({
               id: `sky-trail-${now}-${Math.random()}`,
               x: p.x - (p.vx || 0) * 0.5,
@@ -2301,7 +2361,14 @@ const VoidBattleArena = memo(function VoidBattleArena({
                 enemy.hp = Math.max(0, enemy.hp - d);
                 const impactAngle = Math.atan2(p.vy || 0, p.vx || 0);
                 createImpactEffect(p.x, p.y, p.isCrit ? '#fcd34d' : '#22d3ee', impactAngle, 1.0, 'ship', 1.5);
-                createDamageNumber(enemy.x, enemy.y - 10, p.damage, p.isCrit || false, 'player');
+                createDamageNumber(
+                  enemy.x,
+                  enemy.y - 10,
+                  p.damage,
+                  p.isCrit || false,
+                  'player',
+                  p.passiveDamageTier || 'common'
+                );
                 triggerEnemyDestruction(enemy);
                 hit = true;
                 break;
@@ -2426,12 +2493,12 @@ const VoidBattleArena = memo(function VoidBattleArena({
             const p = s.projectiles[i];
             if (p.owner === 'player' && Math.abs(p.x - m.x) < m.size/2 + 2 && Math.abs(p.y - m.y) < m.size/2 + 2) {
               const isCrit = p.isCrit ?? false;
-              const dmg = isCrit ? 2 : 1;
+              const dmg = (isCrit ? 2 : 1) * (p.passiveDamageMultiplier || 1);
               m.hp -= dmg;
               p.x = 200; // Marcar para remoção no próximo loop do projétil
               playSfx('click');
               createImpactEffect(m.x, m.y, '#fff', 0, 1, m.type === 'meteor' ? 'meteor' : 'meteorite');
-              createDamageNumber(m.x, m.y - 10, dmg, isCrit, 'player');
+              createDamageNumber(m.x, m.y - 10, dmg, isCrit, 'player', p.passiveDamageTier || 'common');
 
                 if (m.hp <= 0) {
                   if (m.type === 'meteor') s.destroyedMeteors++;
@@ -2470,6 +2537,9 @@ const VoidBattleArena = memo(function VoidBattleArena({
           return true;
         });
 
+        const movementEnemyProjectilePressure = routeTier === 'Solar' || routeTier === 'Interstellar'
+          ? s.projectiles.reduce((count, projectile) => count + (projectile.owner === 'enemy' ? 1 : 0), 0)
+          : 0;
         for (let j = 0; j < s.enemies.length; j++) {
           const enemy = s.enemies[j];
           if (enemy.hp <= 0) continue;
@@ -2488,7 +2558,10 @@ const VoidBattleArena = memo(function VoidBattleArena({
           enemy.vy = enemy.y - oldY;
 
           // Enemy engine smoke trail (non-bosses only)
-          if (enemy.type !== 'Boss' && Math.random() > 0.45) {
+          const enemyEngineSmokeThreshold = movementEnemyProjectilePressure > SOLAR_INTERSTELLAR_FIRE_PERFORMANCE.highProjectilePressure
+            ? 0.82
+            : 0.45;
+          if (enemy.type !== 'Boss' && Math.random() > enemyEngineSmokeThreshold) {
             s.particles.push({
               id: `enemy-smoke-${now}-${Math.random()}`,
               x: enemy.x + 3,
@@ -2531,10 +2604,69 @@ const VoidBattleArena = memo(function VoidBattleArena({
           }
         }
 
-        // Enemy Attack — Com IA de mira real e lastShot
+        // Enemy Attack — Com IA de mira real e padrões próprios por capítulo
         s.enemies.forEach(enemy => {
           if (enemy.hp <= 0) return;
-          const enemyShotInterval = routeTier === 'Solar' || routeTier === 'Interstellar' ? 1250 : 2500;
+
+          if (routeTier === 'Solar' || routeTier === 'Interstellar') {
+            const fireConfig = getSolarInterstellarEnemyFireConfig(enemy.type);
+            const fireVolley = (special: boolean) => {
+              const volley: SolarInterstellarEnemyShot[] = buildSolarInterstellarEnemyVolley({
+                enemyType: enemy.type,
+                routeTier,
+                special,
+              });
+              const aimAngle = Math.atan2(s.playerY - enemy.y, s.playerX - enemy.x);
+
+              volley.forEach((shot, shotIndex) => {
+                const angle = aimAngle + shot.angleOffset;
+                s.projectiles.push({
+                  id: `ep-${now}-${enemy.id}-${special ? 'special' : 'regular'}-${shotIndex}-${Math.random()}`,
+                  x: enemy.x - 5,
+                  y: enemy.y,
+                  owner: 'enemy',
+                  damage: enemy.damage,
+                  vx: Math.cos(angle) * shot.speed,
+                  vy: Math.sin(angle) * shot.speed,
+                  size: shot.size,
+                  projectileColor: shot.color,
+                  isSpecialEnemyShot: shot.special,
+                  trail: [],
+                });
+              });
+              if (now - (s.lastEnemyShot || 0) >= SOLAR_INTERSTELLAR_FIRE_PERFORMANCE.sfxCooldownMs) {
+                s.lastEnemyShot = now;
+                playSfx('shoot_enemy');
+              }
+            };
+
+            const specialIntervalMs = 'specialIntervalMs' in fireConfig
+              ? fireConfig.specialIntervalMs
+              : undefined;
+            if (enemy.lastShot === undefined) {
+              enemy.lastShot = now + Math.random() * SOLAR_INTERSTELLAR_FIRE_PERFORMANCE.staggerWindowMs;
+            }
+
+            let firedSpecialVolley = false;
+            if (enemy.type !== 'Padrão' && specialIntervalMs) {
+              if (enemy.lastSpecialShot === undefined) {
+                enemy.lastSpecialShot = now + Math.random() * SOLAR_INTERSTELLAR_FIRE_PERFORMANCE.staggerWindowMs;
+              } else if (now - enemy.lastSpecialShot >= specialIntervalMs) {
+                enemy.lastSpecialShot = now;
+                fireVolley(true);
+                firedSpecialVolley = true;
+                enemy.lastShot = now;
+              }
+            }
+
+            if (!firedSpecialVolley && now - enemy.lastShot >= fireConfig.regularIntervalMs) {
+              enemy.lastShot = now;
+              fireVolley(false);
+            }
+            return;
+          }
+
+          const enemyShotInterval = 2500;
           if (now - (enemy.lastShot || 0) > enemyShotInterval) {
             enemy.lastShot = now;
             const dx = s.playerX - enemy.x;
@@ -2561,16 +2693,25 @@ const VoidBattleArena = memo(function VoidBattleArena({
               trail: []
             });
 
-            if (routeTier === 'Void') {
-              const locKey = locationId === 0 ? 'zero' : locationId;
-              if (enemy.type === 'Boss') playSfx(`shoot_boss_${locKey}`);
-              else if (enemy.type === 'Elite') playSfx('shoot_elite_zero');
-              else playSfx('shoot_monster_zero');
-            } else {
-              playSfx('shoot_enemy');
-            }
+            const locKey = locationId === 0 ? 'zero' : locationId;
+            if (enemy.type === 'Boss') playSfx(`shoot_boss_${locKey}`);
+            else if (enemy.type === 'Elite') playSfx('shoot_elite_zero');
+            else playSfx('shoot_monster_zero');
           }
         });
+        if (routeTier === 'Solar' || routeTier === 'Interstellar') {
+          let enemyProjectileOverflow = s.projectiles.reduce(
+            (count, projectile) => count + (projectile.owner === 'enemy' ? 1 : 0),
+            0
+          ) - SOLAR_INTERSTELLAR_FIRE_PERFORMANCE.maxActiveEnemyProjectiles;
+          if (enemyProjectileOverflow > 0) {
+            s.projectiles = s.projectiles.filter(projectile => {
+              if (projectile.owner !== 'enemy' || enemyProjectileOverflow <= 0) return true;
+              enemyProjectileOverflow -= 1;
+              return false;
+            });
+          }
+        }
         s.lastEnemyAttack = now;
 
         s.playerDotEffects = s.playerDotEffects.filter(dot => {
@@ -2631,7 +2772,14 @@ const VoidBattleArena = memo(function VoidBattleArena({
         });
 
         // Limite de Partículas (Performance AAA)
-        const MAX_PARTICLES = 250;
+        const activeEnemyProjectiles = routeTier === 'Solar' || routeTier === 'Interstellar'
+          ? s.projectiles.reduce((count, projectile) => count + (projectile.owner === 'enemy' ? 1 : 0), 0)
+          : 0;
+        const MAX_PARTICLES = routeTier === 'Solar' || routeTier === 'Interstellar'
+          ? (activeEnemyProjectiles > SOLAR_INTERSTELLAR_FIRE_PERFORMANCE.highProjectilePressure
+              ? SOLAR_INTERSTELLAR_FIRE_PERFORMANCE.highPressureParticleBudget
+              : SOLAR_INTERSTELLAR_FIRE_PERFORMANCE.particleBudget)
+          : 250;
         if (s.particles.length > MAX_PARTICLES) {
           s.particles.splice(0, s.particles.length - MAX_PARTICLES);
         }
@@ -2641,7 +2789,7 @@ const VoidBattleArena = memo(function VoidBattleArena({
         for (let i = 0; i < s.damageNumbers.length; i++) {
           const dn = s.damageNumbers[i];
           dn.y -= 0.3 * deltaTime;
-          dn.life -= 0.02 * deltaTime;
+          dn.life -= (0.02 / (dn.durationMultiplier || 1)) * deltaTime;
           if (dn.life > 0) remainingDN.push(dn);
         }
         s.damageNumbers = remainingDN;
@@ -3079,25 +3227,42 @@ const VoidBattleArena = memo(function VoidBattleArena({
           ctx.fillRect(x - 20, y + 25, 40 * (enemy.hp / enemy.maxHp), 4);
         }
       });
+      const enemyShotBodyBatches = new Map<string, Path2D>();
+      const enemyShotHaloBatches = new Map<string, Path2D>();
+      const enemyShotCoreBatch = new Path2D();
+      let hasEnemyShotCores = false;
       s.projectiles.forEach(p => {
         const isMonsterShot = p.owner === 'enemy' && routeTier === 'Void';
         const isCrit = p.isCrit ?? false;
         const isPlayer = p.owner === 'player';
-        const color = isCrit ? '#FFD700' : (isPlayer ? '#22d3ee' : '#ef4444');
+        const color = isCrit ? '#FFD700' : (isPlayer ? '#22d3ee' : (p.projectileColor || '#ef4444'));
         const px = (p.x / 100) * cWidth;
         const py = (p.y / 100) * cHeight;
 
         // Trilha de luz escalada (Otimizada)
         const baseRadius = cWidth * 0.004;
-        if (p.trail) {
-          p.trail.forEach((pos, ti) => {
-            const progress = ti / p.trail!.length;
-            ctx.globalAlpha = progress * (isPlayer ? 0.3 : 0.2);
-            ctx.fillStyle = color;
+        if (p.trail?.length) {
+          if (isPlayer || isMonsterShot) {
+            p.trail.forEach((pos, ti) => {
+              const progress = ti / p.trail!.length;
+              ctx.globalAlpha = progress * (isPlayer ? 0.3 : 0.2);
+              ctx.fillStyle = color;
+              ctx.beginPath();
+              ctx.arc((pos.x / 100) * cWidth, (pos.y / 100) * cHeight, baseRadius * progress * (isPlayer ? 1.1 : (p.size || 1)), 0, Math.PI * 2);
+              ctx.fill();
+            });
+          } else if (p.trail.length > 1) {
+            const trailStart = p.trail[0];
+            const trailEnd = p.trail[p.trail.length - 1];
+            ctx.globalAlpha = 0.22;
+            ctx.strokeStyle = color;
+            ctx.lineWidth = Math.max(1.5, baseRadius * (p.size || 1));
+            ctx.lineCap = 'round';
             ctx.beginPath();
-            ctx.arc((pos.x / 100) * cWidth, (pos.y / 100) * cHeight, baseRadius * progress * (isPlayer ? 1.1 : 1), 0, Math.PI * 2);
-            ctx.fill();
-          });
+            ctx.moveTo((trailStart.x / 100) * cWidth, (trailStart.y / 100) * cHeight);
+            ctx.lineTo((trailEnd.x / 100) * cWidth, (trailEnd.y / 100) * cHeight);
+            ctx.stroke();
+          }
         }
         ctx.globalAlpha = 1;
 
@@ -3188,11 +3353,39 @@ const VoidBattleArena = memo(function VoidBattleArena({
           ctx.fill();
           ctx.restore();
         } else {
-          ctx.fillStyle = color;
-          ctx.beginPath(); ctx.arc(px, py, 3.5, 0, Math.PI * 2); ctx.fill();
-          if (isCrit) { ctx.fillStyle = 'white'; ctx.beginPath(); ctx.arc(px, py, 1.5, 0, Math.PI * 2); ctx.fill(); }
+          const enemyShotRadius = 3.5 * (p.size || 1);
+          let bodyBatch = enemyShotBodyBatches.get(color);
+          if (!bodyBatch) {
+            bodyBatch = new Path2D();
+            enemyShotBodyBatches.set(color, bodyBatch);
+          }
+          bodyBatch.arc(px, py, enemyShotRadius, 0, Math.PI * 2);
+          if (p.isSpecialEnemyShot) {
+            let haloBatch = enemyShotHaloBatches.get(color);
+            if (!haloBatch) {
+              haloBatch = new Path2D();
+              enemyShotHaloBatches.set(color, haloBatch);
+            }
+            haloBatch.arc(px, py, enemyShotRadius * 1.75, 0, Math.PI * 2);
+            enemyShotCoreBatch.arc(px, py, enemyShotRadius * 0.38, 0, Math.PI * 2);
+            hasEnemyShotCores = true;
+          }
         }
       });
+      ctx.globalAlpha = 0.22;
+      enemyShotHaloBatches.forEach((path, batchColor) => {
+        ctx.fillStyle = batchColor;
+        ctx.fill(path);
+      });
+      ctx.globalAlpha = 1;
+      enemyShotBodyBatches.forEach((path, batchColor) => {
+        ctx.fillStyle = batchColor;
+        ctx.fill(path);
+      });
+      if (hasEnemyShotCores) {
+        ctx.fillStyle = '#ffffff';
+        ctx.fill(enemyShotCoreBatch);
+      }
 
       // Draw Shockwaves
       s.shockwaves.forEach(sw => {
@@ -3279,13 +3472,26 @@ const VoidBattleArena = memo(function VoidBattleArena({
       s.damageNumbers.forEach(dn => {
         const x = (dn.x / 100) * cWidth;
         const y = (dn.y / 100) * cHeight;
+        const sizeMultiplier = dn.sizeMultiplier || 1;
         ctx.save();
         ctx.globalAlpha = dn.life;
-        ctx.fillStyle = dn.color;
-        ctx.font = `bold ${dn.isCrit ? '24px' : '16px'} Orbitron`;
+        if (dn.owner === 'player' && dn.passiveDamageTier === 'divine') {
+          const hue = (now / 5 + dn.x * 3) % 360;
+          const rgbGradient = ctx.createLinearGradient(x - 28 * sizeMultiplier, y, x + 28 * sizeMultiplier, y);
+          rgbGradient.addColorStop(0, `hsl(${hue} 100% 62%)`);
+          rgbGradient.addColorStop(0.5, `hsl(${(hue + 120) % 360} 100% 68%)`);
+          rgbGradient.addColorStop(1, `hsl(${(hue + 240) % 360} 100% 62%)`);
+          ctx.fillStyle = rgbGradient;
+          ctx.shadowColor = `hsl(${(hue + 120) % 360} 100% 65%)`;
+          ctx.shadowBlur = 18;
+        } else {
+          ctx.fillStyle = dn.color;
+          ctx.shadowColor = dn.color;
+          ctx.shadowBlur = 10;
+        }
+        const baseFontSize = dn.isCrit ? 24 : 16;
+        ctx.font = `bold ${baseFontSize * sizeMultiplier}px Orbitron`;
         ctx.textAlign = 'center';
-        ctx.shadowBlur = 10;
-        ctx.shadowColor = dn.color;
         ctx.fillText(dn.value.toString(), x, y);
         if (dn.isCrit) {
           ctx.strokeStyle = 'white';
