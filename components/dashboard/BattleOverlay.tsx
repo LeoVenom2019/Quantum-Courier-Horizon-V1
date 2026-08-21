@@ -9,19 +9,11 @@ import {
   Zap, 
   ShieldAlert, 
   Shield, 
-  ZapOff, 
-  MousePointer2, 
-  Target, 
-  Swords, 
-  TrendingUp, 
-  Skull, 
-  ArrowRight, 
-  Clock 
+  ZapOff,
 } from 'lucide-react';
-import VoidBattleArena, { VoidBattleEnemy } from '../VoidBattleArena';
 import { PremiumCanvasButton } from '../ui/PremiumCanvasButton';
 import SolarInterstellarBattleExperience from './SolarInterstellarBattleExperience';
-import { isSolarInterstellarManualBattle } from '@/lib/solar-interstellar-battle-media.mjs';
+import { isSolarInterstellarBattle } from '@/lib/solar-interstellar-battle-media.mjs';
 
 interface BattleOverlayProps {
   activeBattle: any;
@@ -39,11 +31,7 @@ interface BattleOverlayProps {
   voidResources: any;
   shipLevel: number;
   battleLevel: number;
-  privatePoliceLevel: number;
-  getPoliceBonus: (level: number) => number;
   ROUTES_MAP: Map<string, any>;
-  aetherion: number;
-  autoSkipBattle: (battle: any, cost: number) => boolean;
   meteoriteRewardValue?: number;
   musicOn: boolean;
   jukebox: any;
@@ -65,11 +53,7 @@ const BattleOverlay = memo(({
   voidResources,
   shipLevel,
   battleLevel,
-  privatePoliceLevel,
-  getPoliceBonus,
   ROUTES_MAP,
-  aetherion,
-  autoSkipBattle,
   meteoriteRewardValue = 0,
   musicOn,
   jukebox
@@ -80,9 +64,7 @@ const BattleOverlay = memo(({
   const battleRoute = ROUTES_MAP.get(activeBattle.routeId);
   if (battleRoute?.tier !== routeTier) return null;
 
-  const canSkipActiveBattle = String(activeBattle.deliveryId || '').startsWith('auto-');
-
-  if (isSolarInterstellarManualBattle(routeTier, activeBattle.deliveryId)) {
+  if (isSolarInterstellarBattle(routeTier)) {
     return (
       <SolarInterstellarBattleExperience
         activeBattle={activeBattle}
@@ -100,6 +82,7 @@ const BattleOverlay = memo(({
         voidResources={voidResources}
         battleLevel={battleLevel}
         meteoriteRewardValue={meteoriteRewardValue}
+        disableMeteorEvent={String(activeBattle.deliveryId || '').startsWith('auto-')}
         musicOn={musicOn}
         jukebox={jukebox}
       />
@@ -247,117 +230,6 @@ const BattleOverlay = memo(({
           </motion.div>
         </motion.div>
       </AnimatePresence>
-    );
-  }
-
-  // For Solar and Interstellar, use VoidBattleArena instead of static UI
-  if ((routeTier === 'Solar' || routeTier === 'Interstellar') && !activeBattle.isVictory && !activeBattle.isDefeat) {
-    const stats = {
-      hp: activeBattle.playerHp,
-      maxHp: activeBattle.playerMaxHp,
-      shield: 0,
-      maxShield: 0,
-      damage: (activeBattle.playerDps || 10) * 1.5, // Buffer for interactive feel
-      critChance: 0,
-      lootEfficiency: 1,
-      rarity: 'common' as const,
-      upgrades: { damage: 0, shield: 0, crit: 0, loot: 0 }
-    };
-
-    const enemies: VoidBattleEnemy[] = [{
-      id: `solar-enemy-${activeBattle.id}`,
-      type: activeBattle.isBoss ? 'Boss' : (activeBattle.enemyType === 'Elite' ? 'Elite' : 'Padrão'),
-      name: activeBattle.enemyName,
-      hp: activeBattle.enemyHp,
-      maxHp: activeBattle.enemyMaxHp,
-      shield: 0,
-      maxShield: 0,
-      damage: activeBattle.enemyDps || 10,
-      qc: activeBattle.reward,
-      x: 85,
-      y: 50,
-      image: activeBattle.enemyImage || '',
-      spriteSheet: activeBattle.enemySpriteSheet
-    }];
-
-    return (
-      <div className="relative w-full h-full">
-        <VoidBattleArena 
-          initialEnemies={enemies}
-        playerShipStats={stats}
-        voidResources={voidResources} // Not used for Solar/Interstellar
-        routeTier={routeTier}
-        locationId={0}
-        activeShipImage={activeBattle.playerImage}
-        activeShipSpriteSheet={activeBattle.playerSpriteSheet}
-        battleLevel={battleLevel}
-        onBattleEnd={(status, result) => {
-          if (status === 'won') {
-            const updated = { 
-              ...activeBattle, 
-              isVictory: true, 
-              enemyHp: 0,
-              reward: result?.reward ?? activeBattle.reward,
-              isMeteorEventReward: Boolean(result?.isMeteorEventReward),
-              destroyedMeteors: result?.destroyedMeteors || 0,
-              destroyedMeteorites: result?.destroyedMeteorites || 0,
-              meteoriteRewardValue: result?.meteoriteRewardValue,
-              meteorRewardValue: result?.meteorRewardValue,
-              meteoriteRewardTotal: result?.meteoriteRewardTotal,
-              meteorRewardTotal: result?.meteorRewardTotal
-            };
-            setActiveBattle(updated);
-            resolveBattleVictory(updated);
-          } else {
-            const updated = { ...activeBattle, isDefeat: true, playerHp: 0 };
-            setActiveBattle(updated);
-            resolveBattleDefeat(updated);
-          }
-        }}
-        onUpdateResources={() => {}}
-        playSfx={playSfx}
-        stopSfx={stopSfx}
-        t={t}
-        language={language}
-        addLog={addLog}
-        formatValue={formatValue}
-        isGroupBattle={false}
-        onExitBattle={forceBattleDefeat}
-        meteoriteRewardValue={meteoriteRewardValue}
-        disableMeteorEvent={String(activeBattle.deliveryId || '').startsWith('auto-')}
-      />
-
-        {/* Skip Button only for automatic delivery battles */}
-        {canSkipActiveBattle && (
-          <div className="absolute top-6 right-6 z-[600]">
-          <button
-            onClick={() => {
-              const skipCost = routeTier === 'Interstellar' ? 40 : 10;
-              if (aetherion >= skipCost) {
-                const victory = autoSkipBattle(activeBattle, skipCost);
-                if (victory) {
-                  setActiveBattle({ ...activeBattle, isVictory: true, enemyHp: 0 });
-                } else {
-                  setActiveBattle({ ...activeBattle, isDefeat: true, playerHp: 0 });
-                }
-              }
-            }}
-            disabled={aetherion < (routeTier === 'Interstellar' ? 40 : 10)}
-            className={`px-6 py-3 rounded-xl border font-black transition-all uppercase text-[14px] flex flex-col items-center gap-1 shadow-2xl backdrop-blur-md ${
-              aetherion >= (routeTier === 'Interstellar' ? 40 : 10)
-              ? 'bg-orange-600/40 text-orange-400 border-orange-500/60 hover:bg-orange-600/60'
-              : 'bg-black/60 border-white/10 text-slate-600 cursor-not-allowed opacity-50'
-            }`}
-          >
-            <div className="flex items-center gap-2">
-              <Clock className="w-4 h-4" />
-              <span>{t('skipBattle')}</span>
-            </div>
-            <span className="text-[10px] opacity-70">-{routeTier === 'Interstellar' ? 40 : 10} AE</span>
-          </button>
-          </div>
-        )}
-      </div>
     );
   }
 

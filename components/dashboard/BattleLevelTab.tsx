@@ -21,6 +21,7 @@ import {
 import { useDashboard } from './DashboardProvider';
 import { PremiumCanvasButton } from '../ui/PremiumCanvasButton';
 import { getDoomPBonus, getPoliceBonus } from '@/lib/game-constants';
+import { getCap12DisplayedWinChance } from '@/lib/cap12-auto-battle.mjs';
 
 interface BattleLevelTabProps {
   setSelectedReward: (reward: any) => void;
@@ -98,7 +99,11 @@ const BattleLevelTab = memo(({
   const estimatedPlayerTimeToKill = estimatedEnemyHp / Math.max(1, estimatedPlayerDps);
   const estimatedEnemyTimeToKill = estimatedPlayerHp / Math.max(1, estimatedEnemyDps);
   const estimatedBaseWinChance = Math.floor((estimatedEnemyTimeToKill / (estimatedPlayerTimeToKill + estimatedEnemyTimeToKill)) * 100);
-  const autoSkipWinChance = Math.min(100, Math.max(0, estimatedBaseWinChance + getDoomPBonus(doomPLevel) + getPoliceBonus(privatePoliceLevel)));
+  const autoSkipWinChance = getCap12DisplayedWinChance(
+    estimatedBaseWinChance,
+    getDoomPBonus(doomPLevel),
+    getPoliceBonus(privatePoliceLevel),
+  );
 
   const baseCooldown = 60000;
   let currentCooldown = battleLevel >= 5 ? baseCooldown / 2 : baseCooldown;

@@ -5,6 +5,15 @@ import { useSoundMaster } from './useSoundMaster';
 
 export type { Track };
 
+export interface JukeboxPlaybackSnapshot {
+  playlist: Track[];
+  currentTrackIndex: number;
+  currentTime: number;
+  isPlaying: boolean;
+  desiredIsPlaying: boolean;
+  isLoop: boolean;
+}
+
 export const LANDING_BGM: Track = { 
   id: 'landing', 
   title: 'Galactic Horizon (Landing BGM)', 
@@ -69,6 +78,17 @@ export function useJukebox(onPlayStateChange?: (isPlaying: boolean) => void) {
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const pendingGesturePlaybackRef = useRef(false);
+  const playbackStateRef = useRef({
+    playlist,
+    currentTrackIndex,
+    isPlaying,
+    desiredIsPlaying,
+    isLoop,
+  });
+  useEffect(() => {
+    playbackStateRef.current = { playlist, currentTrackIndex, isPlaying, desiredIsPlaying, isLoop };
+  }, [playlist, currentTrackIndex, isPlaying, desiredIsPlaying, isLoop]);
+
 
   const requestPlayback = useCallback((label: string) => {
     const audio = audioRef.current;
@@ -157,8 +177,9 @@ export function useJukebox(onPlayStateChange?: (isPlaying: boolean) => void) {
     if (playlist.length === 0) return;
     
     let nextIndex = currentTrackIndex + 1;
-    if (isShuffle) {
-      nextIndex = Math.floor(Math.random() * playlist.length);
+    if (isShuffle && playlist.length > 1) {
+      const randomOffset = 1 + Math.floor(Math.random() * (playlist.length - 1));
+      nextIndex = (currentTrackIndex + randomOffset) % playlist.length;
     } else if (nextIndex >= playlist.length) {
       nextIndex = 0;
     }
@@ -229,6 +250,31 @@ export function useJukebox(onPlayStateChange?: (isPlaying: boolean) => void) {
       setDesiredIsPlaying(true);
     }
   }, [fullPlaylist]);
+
+  const getPlaybackSnapshot = useCallback((): JukeboxPlaybackSnapshot | null => {
+    const state = playbackStateRef.current;
+    if (!audioRef.current || state.playlist.length === 0) return null;
+    return {
+      playlist: [...state.playlist], currentTrackIndex: state.currentTrackIndex,
+      currentTime: Number.isFinite(audioRef.current.currentTime) ? audioRef.current.currentTime : 0,
+      isPlaying: state.isPlaying, desiredIsPlaying: state.desiredIsPlaying, isLoop: state.isLoop,
+    };
+  }, []);
+
+  const restorePlaybackSnapshot = useCallback((snapshot: JukeboxPlaybackSnapshot) => {
+    if (!snapshot.playlist.length) return;
+    setPlaylist(snapshot.playlist);
+    setCurrentTrackIndex(Math.min(snapshot.currentTrackIndex, snapshot.playlist.length - 1));
+    setIsLoop(snapshot.isLoop);
+    setDesiredIsPlaying(snapshot.desiredIsPlaying);
+    setIsPlaying(snapshot.isPlaying);
+    window.setTimeout(() => {
+      const audio = audioRef.current;
+      if (!audio) return;
+      audio.currentTime = Math.max(0, snapshot.currentTime);
+      if (snapshot.isPlaying) requestPlayback('Restored playback failed');
+    }, 0);
+  }, [requestPlayback]);
 
   const stop = useCallback((options: { rememberPreference?: boolean } = {}) => {
     setIsPlaying(false);
@@ -309,6 +355,8 @@ export function useJukebox(onPlayStateChange?: (isPlaying: boolean) => void) {
     playNext,
     playPrev,
     isEmpty: playlist.length === 0,
+    getPlaybackSnapshot,
+    restorePlaybackSnapshot,
     currentTrack: playlist[currentTrackIndex]
   }), [
     playlist, 
@@ -325,6 +373,8 @@ export function useJukebox(onPlayStateChange?: (isPlaying: boolean) => void) {
     playNext, 
     playPrev, 
     setTrack,
-    setLibraryTrack
+    setLibraryTrack,
+    getPlaybackSnapshot,
+    restorePlaybackSnapshot
   ]);
 }

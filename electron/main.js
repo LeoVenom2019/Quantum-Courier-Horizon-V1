@@ -65,6 +65,10 @@ ipcMain.handle('qch-display:apply', async (event, settings = {}) => {
   return getDisplayState(mainWindow);
 });
 
+ipcMain.on('qch-app:quit', () => {
+  app.quit();
+});
+
 const getAppRoot = () => (isDev ? path.join(__dirname, '..') : process.resourcesPath);
 
 const getServerPath = () => {

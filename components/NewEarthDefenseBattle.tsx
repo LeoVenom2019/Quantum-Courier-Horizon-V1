@@ -5,6 +5,7 @@ import { X } from 'lucide-react';
 import { BattleShipComputedStats, getHorizonXpForNextLevel, MAX_HORIZON_LEVEL } from '@/lib/colony-cards';
 import type { NewEarthBattleBackground } from '@/lib/route4-battle-backgrounds.types';
 import { pickRoute4EliteShipImage } from '@/lib/route4-elite-ship-visuals.mjs';
+import { drawNewEarthAmbientBirds, preloadNewEarthAmbientBirds } from '@/lib/new-earth-ambient-birds';
 import { PremiumCanvasButton } from './ui/PremiumCanvasButton';
 import BattlePauseDialog from './BattlePauseDialog';
 
@@ -1000,6 +1001,7 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
   }, [result]);
 
   useEffect(() => {
+    preloadNewEarthAmbientBirds();
     const state = stateRef.current;
     state.player.hp = shipStats.health;
     state.player.shield = shipStats.shield;
@@ -4178,6 +4180,12 @@ export const NewEarthDefenseBattle: React.FC<NewEarthDefenseBattleProps> = ({
             : 'rgba(2, 6, 23, 0.42)';
       ctx.fillRect(0, 0, WIDTH, HEIGHT);
       const now = performance.now();
+      drawNewEarthAmbientBirds(ctx, now, WIDTH, HEIGHT, {
+        flockCount: 2,
+        opacity: 0.46,
+        speed: 0.055,
+        verticalBand: [0.08, 0.3],
+      });
       if (laserActive) {
         ctx.save();
         ctx.globalCompositeOperation = 'lighter';

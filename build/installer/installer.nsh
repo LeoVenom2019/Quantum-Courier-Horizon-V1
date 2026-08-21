@@ -1,9 +1,14 @@
-!macro customWelcomePage
-  !define MUI_WELCOMEPAGE_TITLE "Bem-vindo ao Quantum Courier Horizon"
-  !define MUI_WELCOMEPAGE_TEXT "Prepare-se para explorar novos horizontes.$\r$\n$\r$\nEste assistente instalará o Quantum Courier Horizon e configurará os atalhos necessários. Recomendamos fechar outros aplicativos antes de continuar."
-  !insertmacro MUI_PAGE_WELCOME
-!macroend
+!include LogicLib.nsh
+!include nsDialogs.nsh
+!include MUI2.nsh
 
-!define MUI_FINISHPAGE_TITLE "Instalação concluída"
-!define MUI_FINISHPAGE_TEXT "Quantum Courier Horizon está pronto para jogar.$\r$\n$\r$\nClique em Concluir para encerrar o instalador."
-!define MUI_ABORTWARNING
+!ifndef MUI_INSTFILESYPAGE_INTERFACE
+  !define MUI_INSTFILESYPAGE_INTERFACE
+  Var mui.InstFilesPage
+  Var mui.InstFilesPage.Text
+  Var mui.InstFilesPage.ProgressBar
+  Var mui.InstFilesPage.ShowLogButton
+  Var mui.InstFilesPage.Log
+!endif
+
+!include "${__FILEDIR__}\installer-body.nsh"
