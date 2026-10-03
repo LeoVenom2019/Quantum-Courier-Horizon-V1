@@ -7,6 +7,7 @@ import BattlePauseDialog from './BattlePauseDialog';
 import { NewEarthHelicopterBattle } from './NewEarthHelicopterBattle';
 import { NEW_EARTH_DROP_SFX } from '@/lib/new-earth-drop-sfx.mjs';
 import { getNewEarthBossDocumentDropCount } from '@/lib/new-earth-boss-drop-flow.mjs';
+import { drawNewEarthAmbientBirds, preloadNewEarthAmbientBirds } from '@/lib/new-earth-ambient-birds';
 
 export type NewEarthSurfaceBattleSiteId = 'zona-glacial' | 'ruinas-europeias' | 'continente-esquecido';
 export type NewEarthSurfaceBattleKind = 'tank' | 'helicopter';
@@ -543,6 +544,7 @@ export default function NewEarthSurfaceBattle({
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
+    preloadNewEarthAmbientBirds();
 
     let raf = 0;
     let last = performance.now();
@@ -1438,6 +1440,12 @@ export default function NewEarthSurfaceBattle({
       }
 
       drawArena(now);
+      drawNewEarthAmbientBirds(ctx, now, WIDTH, HEIGHT, {
+        flockCount: 2,
+        opacity: 0.44,
+        speed: 0.048,
+        verticalBand: [0.1, 0.34],
+      });
       if (battleKind === 'tank') drawDestroyedTanks();
       const spin = now / 58;
       enemies.forEach(enemy => {

@@ -411,7 +411,7 @@ const VoidBattleTab = memo(function VoidBattleTab({
              const rarityQCBonus = { common: 1, rare: 1.3, elite: 1.4, legendary: 1.5, mythic: 1.6 }[voidBattleShipStats.rarity as 'common' | 'rare' | 'elite' | 'legendary' | 'mythic'] || 1;
              const finalReward = result?.isMeteorEventReward
                ? Math.floor(rawReward)
-               : Math.floor(rawReward * voidBattleShipStats.lootEfficiency * rarityQCBonus);
+               : Math.floor(rawReward * effectiveStats.lootEfficiency * rarityQCBonus);
 
              setVoidBattleResult({
                reward: finalReward,
@@ -912,7 +912,7 @@ const VoidBattleTab = memo(function VoidBattleTab({
             { id: 'damage', name: language === 'pt' ? 'Sistema de Armas' : t('weaponSystem'), value: (effectiveStats.damage || 100).toFixed(0), icon: Sword, color: 'text-orange-400', tone: 'orange' as const },
             { id: 'crit_dmg', name: language === 'pt' ? 'Dano Crítico' : t('criticalDamage'), value: (effectiveStats.criticalDamage || ((effectiveStats.damage || 100) * (effectiveStats.critDamageMultiplier || 2))).toFixed(0), icon: Zap, color: 'text-yellow-400', tone: 'amber' as const },
             { id: 'crit', name: language === 'pt' ? 'Scanner de Fraqueza' : t('weaknessScanner'), value: `${((effectiveStats.critChance || 0.1) * 100).toFixed(0)}%`, icon: Target, color: 'text-red-400', tone: 'red' as const },
-            { id: 'loot', name: language === 'pt' ? 'Avarícia' : t('avarice'), value: `${((stats.lootEfficiency || 0.8) * 100).toFixed(0)}%`, icon: TrendingUp, color: 'text-emerald-400', tone: 'green' as const }
+            { id: 'loot', name: language === 'pt' ? 'Avarícia' : t('avarice'), value: `${((effectiveStats.lootEfficiency || 1) * 100).toFixed(0)}%`, icon: TrendingUp, color: 'text-emerald-400', tone: 'green' as const }
           ].map(s => (
             <PremiumStaticCard
               key={s.name}
@@ -933,10 +933,10 @@ const VoidBattleTab = memo(function VoidBattleTab({
         <div className="grid flex-1 grid-cols-1 gap-4 overflow-hidden xl:grid-cols-[minmax(0,0.56fr)_minmax(420px,0.44fr)]">
           <div className="grid h-full min-h-0 grid-cols-2 grid-rows-3 gap-2.5">
               {[
-                { id: 'damage', name: t('weaponSystem'), desc: `+10% ${t('dmgBonus')}`, icon: Sword, max: 5 },
+                { id: 'damage', name: t('weaponSystem'), desc: `+15% ${t('dmgBonus')}`, icon: Sword, max: 5 },
                 { id: 'shield', name: t('reinforcedShields'), desc: `+15% ${t('shield')}`, icon: Shield, max: 5 },
                 { id: 'crit', name: language === 'pt' ? 'Scanner de Fraqueza' : t('weaknessScanner'), desc: language === 'pt' ? '+10% Chance Crítica' : `+10% ${t('criticalChance')}`, icon: Target, max: 5 },
-                { id: 'loot', name: language === 'pt' ? 'Avarícia' : t('avarice'), desc: language === 'pt' ? '+25% Saque QC' : `+25% Loot QC`, icon: TrendingUp, max: 5 }
+                { id: 'loot', name: language === 'pt' ? 'Avarícia' : t('avarice'), desc: language === 'pt' ? '+10% Saque QC' : `+10% Loot QC`, icon: TrendingUp, max: 5 }
               ].map(upg => {
                 const maxLevel = upg.max;
                 const level = stats.upgrades[upg.id as keyof typeof stats.upgrades];

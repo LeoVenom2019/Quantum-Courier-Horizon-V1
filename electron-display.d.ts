@@ -13,6 +13,9 @@ declare global {
 
   interface Window {
     qchDesktop?: {
+      app: {
+        quit: () => void;
+      };
       display: {
         getState: () => Promise<QchDisplayState | null>;
         apply: (settings: { mode: QchDisplayMode; resolution?: string }) => Promise<QchDisplayState | null>;

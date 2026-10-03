@@ -1,6 +1,9 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('qchDesktop', {
+  app: {
+    quit: () => ipcRenderer.send('qch-app:quit'),
+  },
   display: {
     getState: () => ipcRenderer.invoke('qch-display:get-state'),
     apply: settings => ipcRenderer.invoke('qch-display:apply', settings),

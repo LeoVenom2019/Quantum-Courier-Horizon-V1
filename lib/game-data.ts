@@ -467,7 +467,7 @@ export const EXTRACTION_POINTS: ExtractionPoint[] = [
     productionPerCycle: 10,
     cycleTime: 5000,
     cost: 500000000, // 500 Mi
-    researchTime: 60000, // 1 minute
+    researchTime: 30000, // 30 seconds
     valuePerPack: 10000000, // 10 Mi
     tier: 'Interstellar',
   },
@@ -478,7 +478,7 @@ export const EXTRACTION_POINTS: ExtractionPoint[] = [
     productionPerCycle: 10,
     cycleTime: 5000,
     cost: 2500000000, // 2.5 Bi
-    researchTime: 60000, // 1 minute
+    researchTime: 30000, // 30 seconds
     valuePerPack: 40000000, // 40 Mi
     tier: 'Interstellar',
   },
@@ -489,7 +489,7 @@ export const EXTRACTION_POINTS: ExtractionPoint[] = [
     productionPerCycle: 10,
     cycleTime: 5000,
     cost: 10000000000, // 10 Bi
-    researchTime: 60000, // 1 minute
+    researchTime: 30000, // 30 seconds
     valuePerPack: 180000000, // 180 Mi
     tier: 'Interstellar',
   },
@@ -500,7 +500,7 @@ export const EXTRACTION_POINTS: ExtractionPoint[] = [
     productionPerCycle: 10,
     cycleTime: 5000,
     cost: 50000000000, // 50 Bi
-    researchTime: 60000, // 1 minute
+    researchTime: 30000, // 30 seconds
     valuePerPack: 900000000, // 900 Mi
     tier: 'Interstellar',
   },
@@ -511,7 +511,7 @@ export const EXTRACTION_POINTS: ExtractionPoint[] = [
     productionPerCycle: 10,
     cycleTime: 5000,
     cost: 200000000000, // 200 Bi
-    researchTime: 60000, // 1 minute
+    researchTime: 30000, // 30 seconds
     valuePerPack: 3500000000, // 3.5 Bi
     tier: 'Interstellar',
   },
@@ -522,7 +522,7 @@ export const EXTRACTION_POINTS: ExtractionPoint[] = [
     productionPerCycle: 10,
     cycleTime: 5000,
     cost: 1000000000000, // 1 Tri
-    researchTime: 60000, // 1 minute
+    researchTime: 30000, // 30 seconds
     valuePerPack: 18000000000, // 18 Bi
     tier: 'Interstellar',
   },
@@ -533,7 +533,7 @@ export const EXTRACTION_POINTS: ExtractionPoint[] = [
     productionPerCycle: 10,
     cycleTime: 5000,
     cost: 5000000000000, // 5 Tri
-    researchTime: 60000, // 1 minute
+    researchTime: 30000, // 30 seconds
     valuePerPack: 90000000000, // 90 Bi
     tier: 'Interstellar',
   },
@@ -544,7 +544,7 @@ export const EXTRACTION_POINTS: ExtractionPoint[] = [
     productionPerCycle: 10,
     cycleTime: 5000,
     cost: 25000000000000, // 25 Tri
-    researchTime: 60000, // 1 minute
+    researchTime: 30000, // 30 seconds
     valuePerPack: 450000000000, // 450 Bi
     tier: 'Interstellar',
   },
@@ -555,7 +555,7 @@ export const EXTRACTION_POINTS: ExtractionPoint[] = [
     productionPerCycle: 10,
     cycleTime: 5000,
     cost: 100000000000000, // 100 Tri
-    researchTime: 60000, // 1 minute
+    researchTime: 30000, // 30 seconds
     valuePerPack: 1800000000000, // 1.8 Tri
     tier: 'Interstellar',
   },
@@ -574,7 +574,7 @@ export interface Achievement {
 export const ACHIEVEMENTS: Achievement[] = [
   { id: 'first_delivery', name: 'Primeira Entrega', description: 'Complete sua primeira entrega com sucesso.', type: 'milestone', target: 1, icon: 'CheckCircle2' },
   { id: 'qc_millionaire', name: 'Magnata Espacial', description: 'Acumule um total de 1.000.000 de QC.', type: 'milestone', target: 1000000, icon: 'Coins' },
-  { id: 'battle_warrior', name: 'Guerreiro das Estrelas', description: 'Vença 10 batalhas contra piratas.', type: 'accumulative', target: 10, icon: 'Sword' },
+  { id: 'battle_warrior', name: 'Guerreiro das Estrelas', description: 'Vença 10 batalhas nos Capítulos 1, 2 ou 4.', type: 'accumulative', target: 10, icon: 'Sword' },
   { id: 'robot_owner', name: 'Minerador Experiente', description: 'Compre 5 robôs mineradores.', type: 'accumulative', target: 5, icon: 'Bot' },
   { id: 'route_2_unlocked', name: 'Explorador Interestelar', description: 'Desbloqueie o Capítulo 2 - Rotas Interestelares.', type: 'milestone', target: 1, icon: 'Globe' },
   { id: 'tech_master', name: 'Mestre da Tecnologia', description: 'Desbloqueie 5 tecnologias diferentes.', type: 'accumulative', target: 5, icon: 'Cpu' },
@@ -599,7 +599,7 @@ export const ACHIEVEMENTS: Achievement[] = [
   { id: 'all_ships_r1_r2', name: 'Colecionador de Frotas', description: 'Compre todas as naves dos Capítulos 1 e 2 (18 naves).', type: 'milestone', target: 18, icon: 'Rocket' },
   { id: 'total_missions_1k', name: 'Herói das Galáxias', description: 'Faça 1000 Missões ao longo dos capítulos de entrega.', type: 'accumulative', target: 1000, icon: 'Trophy' },
   { id: 'battle_level_55', name: 'Lenda de Combate', description: 'Alcance o Nível de Batalha 55.', type: 'milestone', target: 55, icon: 'Sword' },
-  { id: 'mining_tycoon', name: 'Magnata da Mineração', description: 'Venda 10.000 pacotes de minério.', type: 'accumulative', target: 10000, icon: 'Pickaxe' },
+  { id: 'mining_tycoon', name: 'Magnata da Mineração', description: 'Venda 10.000 pacotes de minério dos Capítulos 1 e 2 ou dos pontos de extração, manual ou automaticamente.', type: 'accumulative', target: 10000, icon: 'Pickaxe' },
   { id: 'perfect_pilot', name: 'Piloto Perfeito', description: 'Alcance o bônus "PERFEITO" em 100 entregas.', type: 'accumulative', target: 100, icon: 'Zap' },
   { id: 'ne_eden_builder_60', name: 'Eden Erguida', description: 'Construa todas as 60 construções de Eden.', type: 'milestone', target: 60, icon: 'Globe' },
   { id: 'ne_genesis_builder_60', name: 'Genesis Erguida', description: 'Construa todas as 60 construções de Genesis.', type: 'milestone', target: 60, icon: 'Globe' },
@@ -633,11 +633,12 @@ export const ACHIEVEMENTS: Achievement[] = [
   { id: 'ne_all_cards_maxed', name: 'Baralho Supremo', description: 'Melhore todas as cartas do jogo ao máximo.', type: 'milestone', target: 1, icon: 'Zap' },
   { id: 'secret_alien_name', name: 'Contato Imediato', description: 'Descubra o evento secreto do nome Alien.', type: 'action', target: 1, icon: 'Skull', secret: true },
   { id: 'ne_rare_fish_1', name: 'Primeiro Peixe Raro', description: 'Encontre 1 peixe raro para o museu.', type: 'milestone', target: 1, icon: 'Globe' },
-  { id: 'ne_rare_fish_all', name: 'Aquário Abissal', description: 'Encontre todos os peixes raros.', type: 'milestone', target: 1, icon: 'Globe' },
+  { id: 'ne_rare_fish_all', name: 'Aquário Abissal', description: 'Encontre todos os 17 peixes raros.', type: 'milestone', target: 17, icon: 'Globe' },
   { id: 'ne_relic_1', name: 'Primeira Relíquia', description: 'Encontre 1 relíquia para o museu.', type: 'milestone', target: 1, icon: 'HistoryIcon' },
-  { id: 'ne_relics_all', name: 'Arquivo das Relíquias', description: 'Encontre todas as relíquias.', type: 'milestone', target: 1, icon: 'HistoryIcon' },
+  { id: 'ne_relics_all', name: 'Arquivo das Relíquias', description: 'Encontre todas as 20 relíquias.', type: 'milestone', target: 20, icon: 'HistoryIcon' },
   { id: 'ne_rare_ring_1', name: 'Primeiro Anel Raro', description: 'Encontre 1 anel raro para o museu.', type: 'milestone', target: 1, icon: 'Coins' },
-  { id: 'ne_rare_rings_all', name: 'Coroa dos Anéis', description: 'Encontre todos os anéis raros.', type: 'milestone', target: 1, icon: 'Coins' },
+  { id: 'ne_rare_rings_all', name: 'Coroa dos Anéis', description: 'Encontre todos os 10 anéis raros.', type: 'milestone', target: 10, icon: 'Coins' },
+  { id: 'ne_museum_all', name: 'Museu Completo', description: 'Complete 100% do Museu reunindo os 47 colecionáveis submarinos.', type: 'milestone', target: 47, icon: 'Globe' },
   { id: 'ne_aether_maxed', name: 'Aether no Limite', description: 'Melhore totalmente o helicóptero Aether.', type: 'milestone', target: 30, icon: 'Rocket' },
   { id: 'ne_helicopter_win_1', name: 'Primeiro Céu Limpo', description: 'Vença uma batalha de helicóptero.', type: 'milestone', target: 1, icon: 'Rocket' },
   { id: 'ne_helicopter_wins_10', name: 'Asas de Elysium', description: 'Vença 10 batalhas de helicóptero.', type: 'accumulative', target: 10, icon: 'Rocket' },

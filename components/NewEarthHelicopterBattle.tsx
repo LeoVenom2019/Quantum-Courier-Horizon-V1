@@ -6,6 +6,7 @@ import { PremiumCanvasButton } from './ui/PremiumCanvasButton';
 import BattlePauseDialog from './BattlePauseDialog';
 import { resolveNewEarthHelicopterDropSfx } from '@/lib/new-earth-drop-sfx.mjs';
 import { getNewEarthBossDocumentDropCount } from '@/lib/new-earth-boss-drop-flow.mjs';
+import { drawNewEarthAmbientBirds, preloadNewEarthAmbientBirds } from '@/lib/new-earth-ambient-birds';
 
 type NewEarthHelicopterBattleStats = {
   speedBonus: number;
@@ -58,6 +59,7 @@ export function NewEarthHelicopterBattle({
   useEffect(() => {
     const root = rootRef.current;
     if (!root) return;
+    preloadNewEarthAmbientBirds();
 
     const WIDTH = 1280, HEIGHT = 720;
     const ENEMY_HALF_MAX_Y = HEIGHT / 2 - 22;
@@ -1292,6 +1294,12 @@ export function NewEarthHelicopterBattle({
       ctx.translate(sx + camera.x, sy + camera.y);
 
       drawBackground(now);
+      drawNewEarthAmbientBirds(ctx, now, WIDTH, HEIGHT, {
+        flockCount: 2,
+        opacity: 0.52,
+        speed: 0.082,
+        verticalBand: [0.08, 0.36],
+      });
       drawMines(now);
       enemies.forEach(e => drawHelicopter(e, false, now));
       drawCrashes(now);

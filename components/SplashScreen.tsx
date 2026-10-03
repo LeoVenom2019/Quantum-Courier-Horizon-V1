@@ -6,9 +6,10 @@ import { Cog, SkipForward } from 'lucide-react';
 
 const INTRO_BLACK_MS = 350;
 const OUTRO_BLACK_MS = 700;
-const VIDEO_FALLBACK_MS = 6500;
+const PRODUCER_VIDEO_FALLBACK_MS = 10500;
+const QCH_VIDEO_FALLBACK_MS = 9000;
 
-type SplashPhase = 'intro-black' | 'video' | 'outro-black';
+type SplashPhase = 'intro-black' | 'producer-video' | 'qch-video' | 'outro-black';
 
 export const SplashScreen = ({ onComplete }: { onComplete: () => void }) => {
   const [phase, setPhase] = useState<SplashPhase>('intro-black');
@@ -25,30 +26,33 @@ export const SplashScreen = ({ onComplete }: { onComplete: () => void }) => {
   const finishVideo = useCallback(() => {
     if (videoFinishedRef.current) return;
     videoFinishedRef.current = true;
-    setPhase('outro-black');
+    setPhase((currentPhase) =>
+      currentPhase === 'producer-video' ? 'qch-video' : 'outro-black',
+    );
   }, []);
 
   useEffect(() => {
     if (phase !== 'intro-black') return;
 
     const timer = window.setTimeout(() => {
-      setPhase('video');
+      setPhase('producer-video');
     }, INTRO_BLACK_MS);
 
     return () => window.clearTimeout(timer);
   }, [phase]);
 
   useEffect(() => {
-    if (phase !== 'video') return;
+    if (phase !== 'producer-video' && phase !== 'qch-video') return;
 
     videoFinishedRef.current = false;
     const video = videoRef.current;
+    const fallbackMs =
+      phase === 'producer-video' ? PRODUCER_VIDEO_FALLBACK_MS : QCH_VIDEO_FALLBACK_MS;
     const fallback = window.setTimeout(() => {
       if (!videoFinishedRef.current) {
-        videoFinishedRef.current = true;
-        setPhase('outro-black');
+        finishVideo();
       }
-    }, VIDEO_FALLBACK_MS);
+    }, fallbackMs);
 
     if (video) {
       video.currentTime = 0;
@@ -62,10 +66,10 @@ export const SplashScreen = ({ onComplete }: { onComplete: () => void }) => {
     }
 
     return () => window.clearTimeout(fallback);
-  }, [phase]);
+  }, [finishVideo, phase]);
 
   useEffect(() => {
-    if (phase !== 'video') return;
+    if (phase !== 'producer-video' && phase !== 'qch-video') return;
 
     const handleSkip = (event: KeyboardEvent) => {
       if (event.repeat) return;
@@ -91,19 +95,26 @@ export const SplashScreen = ({ onComplete }: { onComplete: () => void }) => {
       className="fixed inset-0 z-[200] flex items-center justify-center overflow-hidden bg-black"
     >
       <motion.video
+        key={phase === 'qch-video' ? 'qch-video' : 'producer-video'}
         ref={videoRef}
-        src="/splash/lx999games_splash_1.mp4"
+        src={
+          phase === 'qch-video'
+            ? '/splash/QCH_splash_final.mp4'
+            : '/splash/lx999games_splash_1.mp4'
+        }
         playsInline
         preload="auto"
         onEnded={finishVideo}
         onError={finishVideo}
         initial={false}
-        animate={{ opacity: phase === 'video' ? 1 : 0 }}
+        animate={{
+          opacity: phase === 'producer-video' || phase === 'qch-video' ? 1 : 0,
+        }}
         transition={{ duration: phase === 'outro-black' ? 1.05 : 0.65, ease: 'easeInOut' }}
         className="absolute inset-0 h-full w-full object-cover object-center"
       />
 
-      {phase === 'video' && (
+      {(phase === 'producer-video' || phase === 'qch-video') && (
         <>
           <button
             type="button"

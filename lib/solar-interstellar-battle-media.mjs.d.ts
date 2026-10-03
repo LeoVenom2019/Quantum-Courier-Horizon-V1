@@ -13,10 +13,7 @@ export const SOLAR_INTERSTELLAR_BATTLE_MEDIA: Readonly<{
   defeatTheme: string;
 }>;
 
-export function isSolarInterstellarManualBattle(
-  routeTier: string,
-  deliveryId?: string | null,
-): boolean;
+export function isSolarInterstellarBattle(routeTier: string): boolean;
 
 export function pickManualBattleTheme(
   routeTier: string,

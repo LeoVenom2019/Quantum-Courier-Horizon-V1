@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef, useSyncExternalStore } from 'react';
 import Image from 'next/image';
 import { motion, AnimatePresence } from 'motion/react';
-import { 
+import {
   Home, 
   Trees, 
   Factory, 
@@ -97,6 +97,7 @@ import {
   refreshNewEarthMissionBoard,
   recordNewEarthMissionEvent,
 } from '@/lib/new-earth-missions';
+import { getUncountedNewEarthMissionCompletionKeys } from '@/lib/new-earth-mission-achievements.mjs';
 
 // --- Types ---
 
@@ -1449,6 +1450,7 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
   const paidNewEarthMissionCycleBonusRef = useRef<number | null>(null);
   const readyNewEarthMissionIdsRef = useRef<Set<string>>(new Set());
   const countedNewEarthMissionCompletionIdsRef = useRef<Set<string>>(new Set());
+  const newEarthMissionCompletionTrackingInitializedRef = useRef(false);
   const readyNewEarthMissionAudioInitializedRef = useRef(false);
   const newLandBattleAudioRef = useRef<HTMLAudioElement | null>(null);
   const newLandBattleMusicVolumeRef = useRef(Number(jukebox.volume ?? 0.5));
@@ -2056,6 +2058,29 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
     GameStorage.save(newEarthMissions, NEW_EARTH_MISSIONS_STORAGE_KEY);
   }, [newEarthMissions, isLoaded, isNewEarthMissionsLoaded]);
 
+  useEffect(() => {
+    if (!isLoaded || !isNewEarthMissionsLoaded) return;
+    const completionKeys: string[] = getUncountedNewEarthMissionCompletionKeys(
+      newEarthMissions,
+      countedNewEarthMissionCompletionIdsRef.current,
+    );
+
+    if (!newEarthMissionCompletionTrackingInitializedRef.current) {
+      newEarthMissions.missions
+        .filter(mission => mission.completed)
+        .forEach(mission => countedNewEarthMissionCompletionIdsRef.current.add(`${newEarthMissions.cycle}:${mission.id}`));
+      newEarthMissionCompletionTrackingInitializedRef.current = true;
+      return;
+    }
+    if (completionKeys.length === 0) return;
+
+    completionKeys.forEach(key => countedNewEarthMissionCompletionIdsRef.current.add(key));
+    dispatchNewEarthAchievementMetric({
+      type: 'new-earth-mission-completed',
+      amount: completionKeys.length,
+    });
+  }, [isLoaded, isNewEarthMissionsLoaded, newEarthMissions]);
+
   useEffect(() => () => {
     if (newEarthMissionCycleBonusTimeoutRef.current) {
       window.clearTimeout(newEarthMissionCycleBonusTimeoutRef.current);
@@ -2371,16 +2396,6 @@ export const ColonySystem: React.FC<ColonySystemProps> = ({
             card.id === event.cardId ? { ...card, level: upgradedLevel } : card
           )),
         };
-      }
-      const newlyCompletedMissionIds = eventResult.completedMissionIds.filter(id => (
-        !countedNewEarthMissionCompletionIdsRef.current.has(id)
-      ));
-      if (newlyCompletedMissionIds.length > 0) {
-        newlyCompletedMissionIds.forEach(id => countedNewEarthMissionCompletionIdsRef.current.add(id));
-        dispatchNewEarthAchievementMetric({
-          type: 'new-earth-mission-completed',
-          amount: newlyCompletedMissionIds.length,
-        });
       }
       const normalized = normalizeNewEarthMissionState(
         eventResult.changed ? eventResult.state : prev,
